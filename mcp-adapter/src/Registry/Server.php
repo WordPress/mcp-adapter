@@ -12,6 +12,7 @@ namespace WP\MCP\Registry;
 use WP\MCP\Resources\RegisterResource;
 use WP\MCP\Prompts\RegisterPrompt;
 use WP\MCP\Tools\RegisterTool;
+use WP\MCP\Transport\RegisterTransport;
 use WP\MCP\Utils\ErrorHandler;
 use WP\MCP\Transport\Stdio;
 use Exception;
@@ -80,7 +81,7 @@ class Server {
 	 * @param array $resources Optional resources to register during construction.
 	 * @param array $prompts Optional prompts to register during construction.
 	 */
-	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array() ) {
+	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_key = 'default' ) {
 		$this->server_id          = $server_id;
 		$this->server_url         = $server_url;
 		$this->server_name        = $server_name;
@@ -98,7 +99,7 @@ class Server {
 		}
 
 		// Initialize the transport.
-		new Stdio( $this );
+		new ( RegisterTransport::get( $transport_key ) )( $this );
 	}
 
 	/**
