@@ -303,11 +303,11 @@ class Server {
 				$processed_transports = RegisterTransport::create_transports( $transport, $server_context );
 
 				// Add the processed tools to this server.
-				foreach ( $processed_transports as $transport_key => $transport_data ) {
-					$this->transports[ $transport_key ] = $transport_data;
+				foreach ( $processed_transports as $transport_key => $transport ) {
+					$this->transports[ $transport_key ] = $transport;
 
 					// Update existing_transports in context for duplicate checking.
-					$server_context['existing_transports'][ $transport_key ] = $transport_data;
+					$server_context['existing_transports'][ $transport_key ] = $transport;
 				}
 			} catch ( Exception $e ) {
 				ErrorHandler::log(

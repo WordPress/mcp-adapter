@@ -23,29 +23,23 @@ class RegisterTransport {
 	 * @param array $server_context Server context, must include at least 'server_id' and optionally 'existing_transports'.
 	 * @return array<string, object> Array of transport instances keyed by class or alias.
 	 */
-	public static function create_transports( $transport_args_or_class, array $server_context ): array {
+	public static function create_transports( $transport_args_or_class, $server_context ): array {
+		if ( is_string( $transport_args_or_class ) ) {
+			$transport_args_or_class = [ $transport_args_or_class ];
+		}
+	
 		$instances = [];
-
-		// Normalize input to array.
-		$items = is_array( $transport_args_or_class ) ? $transport_args_or_class : [ $transport_args_or_class ];
-
-		foreach ( $items as $item ) {
-			// Support both direct class names or [ key => class/config ].
-			if ( is_string( $item ) ) {
-				$class = $item;
-				$instance = new $class( self::get_server_from_context( $server_context ) );
-				$instances[ $class ] = $instance;
-
-			} elseif ( is_array( $item ) ) {
-				foreach ( $item as $key => $class ) {
-					$instance = new $class( self::get_server_from_context( $server_context ) );
-					$instances[ $key ] = $instance;
-				}
+	
+		foreach ( $transport_args_or_class as $transport_class ) {
+			if ( class_exists( $transport_class ) ) {
+				$instance = new $transport_class( $server_context['server'] ?? null );
+				$instances[] = $instance;
 			}
 		}
-
+	
 		return $instances;
 	}
+	
 
 	protected static function get_server_from_context( array $context ): Server {
 		if ( isset( $context['server'] ) && $context['server'] instanceof Server ) {
