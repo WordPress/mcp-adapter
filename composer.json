@@ -4,7 +4,7 @@
 	"type": "library",
 	"autoload": {
 		"psr-4": {
-			"Automattic\\McpAdapter\\": "src/"
+			"WP\\MCP\\": "src/"
 		}
 	},
 	"require": {
