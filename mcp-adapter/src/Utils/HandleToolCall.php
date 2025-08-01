@@ -196,7 +196,7 @@ class HandleToolsCall {
 					 * @param string      $param_name    The route parameter name.
 					 * @param array       $args          The original args passed to the tool.
 					 */
-					$replacement_value = apply_filters( 'mcp_route_param_fallback', null, $param_name, $args );
+					$replacement_value = apply_filters( 'wp_mcp_route_param_fallback', null, $param_name, $args );
 				}				
 
 				if ( null !== $replacement_value ) {
