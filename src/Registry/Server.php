@@ -269,19 +269,57 @@ class Server {
 		return $this;
 	}
 
-	public function register_transport( $transport_args_or_class ): self {
-		// Prepare server context for validation.
+	public function register_transports( array $transports ): self {
+		if ( empty( $tools ) ) {
+			return $this;
+		}
+
+		// Validate input array structure.
+		foreach ( $transports as $index => $transport ) {
+			if ( ! is_string( $transport ) && ! is_array( $transport ) ) {
+				ErrorHandler::log(
+					'Invalid transport at index ' . $index . '. Transports must be class names or arrays.',
+					array(
+						'transport_index' => $index,
+						'transport_type'  => gettype( $transport ),
+						'server_id'  => $this->server_id,
+						'method'     => __METHOD__,
+					)
+				);
+				continue;
+			}
+		}
+
+		// Prepare server context once for the entire batch.
 		$server_context = array(
-			'server_id'      => $this->server_id,
+			'server_id'           => $this->server_id,
 			'existing_transports' => $this->transports,
 		);
 
-		// Use RegisterTransport to handle all validation and processing.
-		$processed_transports = RegisterTransport::create_transports( $transport_args_or_class, $server_context );
+		// Process tools efficiently.
+		foreach ( $transports as $transport ) {
+			try {
+				// Use RegisterTool to handle all validation and processing.
+				$processed_transports = RegisterTransport::create_transports( $transport, $server_context );
 
-		// Add the processed transports to this server.
-		foreach ( $processed_transports as $transport_key => $transport_data ) {
-			$this->transports[ $transport_key ] = $transport_data;
+				// Add the processed tools to this server.
+				foreach ( $processed_transports as $transport_key => $transport_data ) {
+					$this->transports[ $transport_key ] = $transport_data;
+
+					// Update existing_transports in context for duplicate checking.
+					$server_context['existing_transports'][ $transport_key ] = $transport_data;
+				}
+			} catch ( Exception $e ) {
+				ErrorHandler::log(
+					'Failed to register transport during bulk registration: ' . $e->getMessage(),
+					array(
+						'transport'      => $transport,
+						'server_id' => $this->server_id,
+						'error'     => $e->getMessage(),
+						'method'    => __METHOD__,
+					)
+				);
+			}
 		}
 
 		return $this;
