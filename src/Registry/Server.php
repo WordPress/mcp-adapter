@@ -71,6 +71,13 @@ class Server {
 	private array $prompts = array();
 
 	/**
+	 * Transports registered to this server.
+	 *
+	 * @var array
+	 */
+	private array $transports = array();
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string $server_id Unique identifier for the server.
@@ -80,8 +87,9 @@ class Server {
 	 * @param array $tools Optional tools to register during construction.
 	 * @param array $resources Optional resources to register during construction.
 	 * @param array $prompts Optional prompts to register during construction.
+	 * @param array $transports Optional transports to register during construction.
 	 */
-	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_key = 'default' ) {
+	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), array $transports = array() ) {
 		$this->server_id          = $server_id;
 		$this->server_url         = $server_url;
 		$this->server_name        = $server_name;
@@ -97,9 +105,11 @@ class Server {
 		if ( ! empty( $prompts ) ) {
 			$this->register_prompts( $prompts );
 		}
+		if ( ! empty( $transports ) ) {
+			$this->register_transports( $transports );
+		}
 
-		// Initialize the transport.
-		new ( RegisterTransport::get( $transport_key ) )( $this );
+		return $this;
 	}
 
 	/**
@@ -254,6 +264,24 @@ class Server {
 				),
 				'debug'
 			);
+		}
+
+		return $this;
+	}
+
+	public function register_transport( $transport_args_or_class ): self {
+		// Prepare server context for validation.
+		$server_context = array(
+			'server_id'      => $this->server_id,
+			'existing_transports' => $this->transports,
+		);
+
+		// Use RegisterTransport to handle all validation and processing.
+		$processed_transports = RegisterTransport::create_transports( $transport_args_or_class, $server_context );
+
+		// Add the processed transports to this server.
+		foreach ( $processed_transports as $transport_key => $transport_data ) {
+			$this->transports[ $transport_key ] = $transport_data;
 		}
 
 		return $this;

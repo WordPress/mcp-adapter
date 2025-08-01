@@ -8,12 +8,11 @@ use WP\MCP\Resources\SiteResources;
 use WP\MCP\Prompts\SamplePrompts;
 use WP\MCP\Adapter\AbilityToTool;
 use WP\MCP\Registry;
+use WP\MCP\Transport\Stdio;
 
 class Server {
 	public static function register(): self {
 		$instance = new self();
-
-		$prompt_classes = SamplePrompts::class;
 
 		Registry::instance()->create_server(
 			'default',
@@ -28,7 +27,10 @@ class Server {
 				SiteResources::class,
 			],
 			[
-				$prompt_classes,
+				SamplePrompts::class,
+			],
+			[
+				Stdio::class,
 			]
 		);
 
