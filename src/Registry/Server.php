@@ -12,6 +12,7 @@ namespace WP\MCP\Registry;
 use WP\MCP\Resources\RegisterResource;
 use WP\MCP\Prompts\RegisterPrompt;
 use WP\MCP\Tools\RegisterTool;
+use WP\MCP\Transport\RegisterTransport;
 use WP\MCP\Utils\ErrorHandler;
 use WP\MCP\Transport\Stdio;
 use Exception;
