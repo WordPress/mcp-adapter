@@ -27,8 +27,7 @@ class Server {
 			],
 			[
 				SamplePrompts::class,
-			],
-			'default'
+			]
 		);
 
 		return $instance;

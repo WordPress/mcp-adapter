@@ -79,8 +79,9 @@ class Server {
 	 * @param array $tools Optional tools to register during construction.
 	 * @param array $resources Optional resources to register during construction.
 	 * @param array $prompts Optional prompts to register during construction.
+	 * @param string $transport_key Optional transport key to register during construction.
 	 */
-	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array() ) {
+	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_key = 'default' ) {
 		$this->server_id          = $server_id;
 		$this->server_url         = $server_url;
 		$this->server_name        = $server_name;
@@ -96,6 +97,13 @@ class Server {
 		if ( ! empty( $prompts ) ) {
 			$this->register_prompts( $prompts );
 		}
+
+		$transport_class = RegisterTransport::get( $transport_key );
+
+		error_log( print_r( compact('transport_class'), true ) );
+
+		// Initialize the transport.
+		new ( $transport_class )( $this );
 
 		return $this;
 	}
