@@ -1,0 +1,14 @@
+{
+	"name": "automattic/mcp-adapter",
+	"description": "MCP Adapter for WordPress Abilities",
+	"type": "library",
+	"autoload": {
+		"psr-4": {
+			"Automattic\\McpAdapter\\": "src/"
+		}
+	},
+	"require": {
+		"php": ">=7.4"
+	},
+	"license": "GPL-2.0-or-later"
+}
