@@ -16,8 +16,8 @@ class Server {
 		$prompt_classes = SamplePrompts::class;
 
 		Registry::instance()->create_server(
-			'core/default',
-			'v1',
+			'default',
+			'mcp/v1',
 			'WordPress MCP Server',
 			'MCP Adapter Server for Core WordPress',
 			[
