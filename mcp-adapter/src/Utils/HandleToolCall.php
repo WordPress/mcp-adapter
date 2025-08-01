@@ -186,12 +186,18 @@ class HandleToolsCall {
 			foreach ( $param_names as $param_name ) {
 				$replacement_value = null;
 
-				// Special case for wpcom_site - use current blog ID.
-				if ( 'wpcom_site' === $param_name ) {
-					$replacement_value = (string) get_current_blog_id();
-				} elseif ( isset( $args[ $param_name ] ) ) {
+				if ( isset( $args[ $param_name ] ) ) {
 					$replacement_value = (string) $args[ $param_name ];
-				}
+				} else {
+					/**
+					 * Allow plugins to dynamically provide a fallback value for a route param.
+					 *
+					 * @param string|null $value         The fallback value. Default null.
+					 * @param string      $param_name    The route parameter name.
+					 * @param array       $args          The original args passed to the tool.
+					 */
+					$replacement_value = apply_filters( 'mcp_route_param_fallback', null, $param_name, $args );
+				}				
 
 				if ( null !== $replacement_value ) {
 					$pattern = '/\(\?P<' . preg_quote( $param_name, '/' ) . '>[^)]+\)/';

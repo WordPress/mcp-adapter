@@ -2,7 +2,7 @@
 /**
  * System method handlers for MCP requests.
  *
- * @package WordPressMcp
+ * @package WP\MCP
  */
 
 declare(strict_types=1);

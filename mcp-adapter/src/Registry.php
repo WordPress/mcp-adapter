@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  *
- * @package WpcomMcp
+ * @package WP\MCP
  */
 
 declare(strict_types=1);
@@ -60,7 +60,7 @@ class Registry {
 			// Register the MCP assets late in the rest_api_init hook (required for rest_alias tools).
 			// This is to ensure that the rest_api_init hook is not called too early.
 			// We use a priority of 20000 to ensure that the rest_api_init hook is called after the rest_api_init hook of the FeaturesAPI plugin.
-			add_action( 'rest_api_init', array( $this, 'mcp_init' ), 20000 );
+			add_action( 'rest_api_init', array( $this, 'init' ), 20000 );
 
 			self::$initialized = true;
 		}
@@ -80,10 +80,10 @@ class Registry {
 	/**
 	 * Initialize the plugin.
 	 */
-	public function mcp_init(): void {
+	public function init(): void {
 		// Only trigger the mcp_init action if MCP is enabled and hasn't been triggered before.
 		if ( ! $this->has_triggered_init ) {
-			do_action( 'mcp_init', $this );
+			do_action( 'wp_mcp_init', $this );
 			$this->has_triggered_init = true;
 		}
 	}
@@ -142,9 +142,9 @@ class Registry {
 	 */
 	public function create_server( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array() ): self {
 
-		if ( ! doing_action( 'mcp_init' ) ) {
+		if ( ! doing_action( 'wp_mcp_init' ) ) {
 			ErrorHandler::log(
-				'Server creation must be done during mcp_init action.',
+				'Server creation must be done during wp_mcp_init action.',
 				array(
 					'method' => __METHOD__,
 				)
@@ -252,10 +252,10 @@ class Registry {
 	 */
 	public function get_debug_info(): array {
 		$debug_info = array(
-			'wpcom_mcp_initialized'    => self::$initialized,
-			'init_action_triggered'    => $this->has_triggered_init,
-			'servers'                  => array(),
-			'statistics'               => $this->get_statistics(),
+			'wp_mcp_initialized'     => self::$initialized,
+			'init_action_triggered'  => $this->has_triggered_init,
+			'servers'                => array(),
+			'statistics'             => $this->get_statistics(),
 		);
 
 		// Add basic registration system info without potentially problematic data.

@@ -2,7 +2,7 @@
 /**
  * Register a resource.
  *
- * @package mcp-adapter
+ * @package WP\MCP
  */
 declare(strict_types=1);
 
@@ -13,11 +13,6 @@ use WP\MCP\Resources\Interfaces\ResourcesInterface;
 use WP\MCP\Utils\ErrorHandler;
 use InvalidArgumentException;
 
-/**
- * Register Resource.
- *
- * @package mcp-adapter
- */
 class RegisterResource {
 
 	/**
@@ -67,7 +62,7 @@ class RegisterResource {
 	/**
 	 * Static factory method to handle both class and array inputs.
 	 *
-	 * @param array|string $resource_args_or_class Resource arguments array or class name implementing WpcomMcpResourcesInterface.
+	 * @param array|string $resource_args_or_class Resource arguments array or class name implementing ResourcesInterface.
 	 * @param callable|null $callback Resource callback function (required when using array input).
 	 * @param array $server_context Server context for validation (server_id, existing_resources).
 	 *
@@ -81,7 +76,7 @@ class RegisterResource {
 		if ( is_string( $resource_args_or_class ) && class_exists( $resource_args_or_class ) ) {
 			if ( ! is_a( $resource_args_or_class, ResourcesInterface::class, true ) ) {
 				ErrorHandler::log(
-					"Class '{$resource_args_or_class}' must implement WpcomMcpResourcesInterface.",
+					"Class '{$resource_args_or_class}' must implement ResourcesInterface.",
 					array(
 						'class'     => $resource_args_or_class,
 						'server_id' => $server_id,
@@ -125,7 +120,7 @@ class RegisterResource {
 		// Handle array input.
 		if ( ! is_array( $resource_args_or_class ) ) {
 			ErrorHandler::log(
-				'Resource must be an array or a class name implementing WpcomMcpResourcesInterface.',
+				'Resource must be an array or a class name implementing ResourcesInterface.',
 				array(
 					'provided_type' => gettype( $resource_args_or_class ),
 					'server_id'     => $server_id,

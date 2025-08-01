@@ -2,7 +2,7 @@
 /**
  * Register an MCP tool.
  *
- * @package WpcomMcp
+ * @package WP\MCP
  */
 
 declare( strict_types=1 );
@@ -69,7 +69,7 @@ class RegisterTool {
 	/**
 	 * Static factory method to handle both class and array inputs.
 	 *
-	 * @param array|string $tool_args_or_class Tool arguments array or class name implementing WpcomMcpToolsInterface.
+	 * @param array|string $tool_args_or_class Tool arguments array or class name implementing ToolsInterface.
 	 * @param array        $server_context Server context for validation (server_id, existing_tools).
 	 *
 	 * @return array Array of processed tools.
@@ -82,7 +82,7 @@ class RegisterTool {
 		if ( is_string( $tool_args_or_class ) && class_exists( $tool_args_or_class ) ) {
 			if ( ! is_a( $tool_args_or_class, ToolsInterface::class, true ) ) {
 				ErrorHandler::log(
-					"Class '{$tool_args_or_class}' must implement WpcomMcpToolsInterface.",
+					"Class '{$tool_args_or_class}' must implement ToolsInterface.",
 					array(
 						'class'     => $tool_args_or_class,
 						'server_id' => $server_id,
@@ -126,7 +126,7 @@ class RegisterTool {
 		// Handle array input.
 		if ( ! is_array( $tool_args_or_class ) ) {
 			ErrorHandler::log(
-				'Tool must be an array or a class name implementing WpcomMcpToolsInterface.',
+				'Tool must be an array or a class name implementing ToolsInterface.',
 				array(
 					'provided_type' => gettype( $tool_args_or_class ),
 					'server_id'     => $server_id,

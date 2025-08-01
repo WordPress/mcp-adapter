@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Server class for managing server-specific tools, resources, and prompts.
  *
- * @package WpcomMcp
+ * @package WP\MCP
  */
 
 declare( strict_types=1 );
@@ -99,8 +99,6 @@ class Server {
 
 		// Initialize the transport.
 		new Stdio( $this );
-		//new WpcomMcpStreamableTransport( $this );
-		//new WpcomMcpInternalTransport( $this );
 	}
 
 	/**
@@ -142,7 +140,7 @@ class Server {
 	/**
 	 * Register a tool to this server.
 	 *
-	 * @param array|string $tool_args_or_class Tool arguments array or class name implementing WpcomMcpToolsInterface.
+	 * @param array|string $tool_args_or_class Tool arguments array or class name implementing ToolsInterface.
 	 *
 	 * @return self
 	 */
@@ -181,7 +179,7 @@ class Server {
 	/**
 	 * Register a resource to this server.
 	 *
-	 * @param array|string $resource_args_or_class Resource arguments array or class name implementing WpcomMcpResourcesInterface.
+	 * @param array|string $resource_args_or_class Resource arguments array or class name implementing ResourcesInterface.
 	 * @param callable|null $callback Resource callback function (required when using array input).
 	 *
 	 * @return self
@@ -221,7 +219,7 @@ class Server {
 	/**
 	 * Register a prompt to this server.
 	 *
-	 * @param array|string $prompt_args_or_class Prompt arguments array or class name implementing WpcomMcpPromptsInterface.
+	 * @param array|string $prompt_args_or_class Prompt arguments array or class name implementing PromptsInterface.
 	 * @param array|null   $messages Prompt messages (required when using array input).
 	 *
 	 * @return self

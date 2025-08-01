@@ -2,7 +2,7 @@
 /**
  * MCP Error Handler for standardized JSON-RPC error handling.
  *
- * @package WordPressMcp
+ * @package WP\MCP
  */
 
 declare(strict_types=1);

@@ -2,7 +2,7 @@
 /**
  * Register an MCP prompt.
  *
- * @package WpcomMcp
+ * @package WP\MCP
  */
 
 declare( strict_types=1 );
@@ -60,7 +60,7 @@ class RegisterPrompt {
 	/**
 	 * Static factory method to handle both class and array inputs.
 	 *
-	 * @param array|string $prompt_args_or_class Prompt arguments array or class name implementing WpcomMcpPromptsInterface.
+	 * @param array|string $prompt_args_or_class Prompt arguments array or class name implementing PromptsInterface.
 	 * @param array|null   $messages Prompt messages (required when using array input).
 	 * @param array        $server_context Server context for validation (server_id, existing_prompts).
 	 *
@@ -74,7 +74,7 @@ class RegisterPrompt {
 		if ( is_string( $prompt_args_or_class ) && class_exists( $prompt_args_or_class ) ) {
 			if ( ! is_a( $prompt_args_or_class, PromptsInterface::class, true ) ) {
 				ErrorHandler::log(
-					"Class '{$prompt_args_or_class}' must implement WpcomMcpPromptsInterface.",
+					"Class '{$prompt_args_or_class}' must implement PromptsInterface.",
 					array(
 						'class'     => $prompt_args_or_class,
 						'server_id' => $server_id,
@@ -118,7 +118,7 @@ class RegisterPrompt {
 		// Handle array input.
 		if ( ! is_array( $prompt_args_or_class ) ) {
 			ErrorHandler::log(
-				'Prompt must be an array or a class name implementing WpcomMcpPromptsInterface.',
+				'Prompt must be an array or a class name implementing PromptsInterface.',
 				array(
 					'provided_type' => gettype( $prompt_args_or_class ),
 					'server_id'     => $server_id,

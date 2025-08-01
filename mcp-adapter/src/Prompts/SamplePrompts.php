@@ -2,7 +2,7 @@
 /**
  * Sample MCP Prompts for WordPress.
  *
- * @package WpcomMcp
+ * @package WP\MCP
  */
 
 declare( strict_types=1 );
