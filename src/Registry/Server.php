@@ -12,7 +12,6 @@ namespace WP\MCP\Registry;
 use WP\MCP\Resources\RegisterResource;
 use WP\MCP\Prompts\RegisterPrompt;
 use WP\MCP\Tools\RegisterTool;
-use WP\MCP\Transport\RegisterTransport;
 use WP\MCP\Utils\ErrorHandler;
 use WP\MCP\Transport\Stdio;
 use Exception;
@@ -71,13 +70,6 @@ class Server {
 	private array $prompts = array();
 
 	/**
-	 * Transports registered to this server.
-	 *
-	 * @var array
-	 */
-	private array $transports = array();
-
-	/**
 	 * Constructor.
 	 *
 	 * @param string $server_id Unique identifier for the server.
@@ -87,9 +79,8 @@ class Server {
 	 * @param array $tools Optional tools to register during construction.
 	 * @param array $resources Optional resources to register during construction.
 	 * @param array $prompts Optional prompts to register during construction.
-	 * @param array $transports Optional transports to register during construction.
 	 */
-	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), array $transports = array() ) {
+	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array() ) {
 		$this->server_id          = $server_id;
 		$this->server_url         = $server_url;
 		$this->server_name        = $server_name;
@@ -104,9 +95,6 @@ class Server {
 		}
 		if ( ! empty( $prompts ) ) {
 			$this->register_prompts( $prompts );
-		}
-		if ( ! empty( $transports ) ) {
-			$this->register_transports( $transports );
 		}
 
 		return $this;
@@ -264,62 +252,6 @@ class Server {
 				),
 				'debug'
 			);
-		}
-
-		return $this;
-	}
-
-	public function register_transports( array $transports ): self {
-		if ( empty( $tools ) ) {
-			return $this;
-		}
-
-		// Validate input array structure.
-		foreach ( $transports as $index => $transport ) {
-			if ( ! is_string( $transport ) && ! is_array( $transport ) ) {
-				ErrorHandler::log(
-					'Invalid transport at index ' . $index . '. Transports must be class names or arrays.',
-					array(
-						'transport_index' => $index,
-						'transport_type'  => gettype( $transport ),
-						'server_id'  => $this->server_id,
-						'method'     => __METHOD__,
-					)
-				);
-				continue;
-			}
-		}
-
-		// Prepare server context once for the entire batch.
-		$server_context = array(
-			'server_id'           => $this->server_id,
-			'existing_transports' => $this->transports,
-		);
-
-		// Process tools efficiently.
-		foreach ( $transports as $transport ) {
-			try {
-				// Use RegisterTool to handle all validation and processing.
-				$processed_transports = RegisterTransport::create_transports( $transport, $server_context );
-
-				// Add the processed tools to this server.
-				foreach ( $processed_transports as $transport_key => $transport ) {
-					$this->transports[ $transport_key ] = $transport;
-
-					// Update existing_transports in context for duplicate checking.
-					$server_context['existing_transports'][ $transport_key ] = $transport;
-				}
-			} catch ( Exception $e ) {
-				ErrorHandler::log(
-					'Failed to register transport during bulk registration: ' . $e->getMessage(),
-					array(
-						'transport'      => $transport,
-						'server_id' => $this->server_id,
-						'error'     => $e->getMessage(),
-						'method'    => __METHOD__,
-					)
-				);
-			}
 		}
 
 		return $this;

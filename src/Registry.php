@@ -138,10 +138,10 @@ class Registry {
 	 * @param array  $tools Tools to register.
 	 * @param array  $resources Resources to register.
 	 * @param array  $prompts Prompts to register.
-	 * @param array  $transports Transports to register.
+	 * @param string $transport_key Transport key to register.
 	 * @return self|null
 	 */
-	public function create_server( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), array $transports = array() ): self {
+	public function create_server( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_key = 'default' ): self {
 
 		if ( ! doing_action( 'wp_mcp_init' ) ) {
 			ErrorHandler::log(
@@ -162,7 +162,7 @@ class Registry {
 		}
 
 		// Create server with tools, resources, prompts, and transports - let server handle all registration logic.
-		$server                      = new Server( $server_id, $server_url, $server_name, $server_description, $tools, $resources, $prompts, $transports );
+		$server                      = new Server( $server_id, $server_url, $server_name, $server_description, $tools, $resources, $prompts, $transport_key );
 		$this->servers[ $server_id ] = $server;
 
 		return $this;
