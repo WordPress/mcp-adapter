@@ -12,7 +12,6 @@ namespace WP\MCP\Registry;
 use WP\MCP\Resources\RegisterResource;
 use WP\MCP\Prompts\RegisterPrompt;
 use WP\MCP\Tools\RegisterTool;
-use WP\MCP\Transport\RegisterTransport;
 use WP\MCP\Utils\ErrorHandler;
 use WP\MCP\Transport\Stdio;
 use Exception;
@@ -80,9 +79,8 @@ class Server {
 	 * @param array $tools Optional tools to register during construction.
 	 * @param array $resources Optional resources to register during construction.
 	 * @param array $prompts Optional prompts to register during construction.
-	 * @param string $transport_key Optional transport key to register during construction.
 	 */
-	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_key = 'default' ) {
+	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array() ) {
 		$this->server_id          = $server_id;
 		$this->server_url         = $server_url;
 		$this->server_name        = $server_name;
@@ -98,13 +96,6 @@ class Server {
 		if ( ! empty( $prompts ) ) {
 			$this->register_prompts( $prompts );
 		}
-
-		$transport_class = RegisterTransport::get( $transport_key );
-
-		error_log( print_r( compact('transport_class'), true ) );
-
-		// Initialize the transport.
-		new ( $transport_class )( $this );
 
 		return $this;
 	}
@@ -470,6 +461,20 @@ class Server {
 	 */
 	public function get_resource( string $resource_uri ): ?array {
 		return $this->resources[ $resource_uri ] ?? null;
+	}
+
+	/**
+	 * Get server info.
+	 *
+	 * @return array
+	 */
+	public function get_server_info(): array {
+		return array(
+			'server_id' => $this->server_id,
+			'server_url' => $this->server_url,
+			'server_name' => $this->server_name,
+			'server_description' => $this->server_description,
+		);
 	}
 
 	/**

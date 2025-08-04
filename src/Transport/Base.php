@@ -69,7 +69,7 @@ abstract class Base {
 		$this->mcp = $mcp;
 
 		// Initialize handlers.
-		$this->initialize_handler = new InitializeHandler();
+		$this->initialize_handler = new InitializeHandler( $this->mcp );
 		$this->tools_handler      = new ToolsHandler( $this->mcp );
 		$this->resources_handler  = new ResourcesHandler( $this->mcp );
 		$this->prompts_handler    = new PromptsHandler( $this->mcp );

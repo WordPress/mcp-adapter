@@ -22,11 +22,13 @@ class InitializeHandler {
 	 * @var Server
 	 */
 	private Server $mcp;
+	use WP\MCP\Registry\Server;
 
 	/**
 	 * Constructor.
 	 */
-	public function __construct() {
+	public function __construct( Server $server ) {
+		$this->mcp = $server;
 	}
 
 	/**
