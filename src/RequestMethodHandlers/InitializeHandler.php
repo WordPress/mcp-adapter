@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace WP\MCP\RequestMethodHandlers;
 
-use WP\MCP\Server;
+use WP\MCP\Registry\Server;
 use stdClass;
 
 /**
@@ -22,7 +22,6 @@ class InitializeHandler {
 	 * @var Server
 	 */
 	private Server $mcp;
-	use WP\MCP\Registry\Server;
 
 	/**
 	 * Constructor.

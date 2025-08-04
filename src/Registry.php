@@ -11,6 +11,7 @@ namespace WP\MCP;
 
 use WP\MCP\Registry\Server;
 use WP\MCP\Tools\RegisterTool;
+use WP\MCP\Transport\Stdio;
 use WP\MCP\Utils\ErrorHandler;
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
@@ -55,14 +56,21 @@ class Registry {
 	 * Constructor
 	 */
 	private function __construct() {
-		// Only initialize if not already initialized.
-		if ( ! self::$initialized ) {
-			// Register the MCP assets late in the rest_api_init hook (required for rest_alias tools).
-			// This is to ensure that the rest_api_init hook is not called too early.
-			// We use a priority of 20000 to ensure that the rest_api_init hook is called after the rest_api_init hook of the FeaturesAPI plugin.
-			add_action( 'rest_api_init', array( $this, 'init' ), 20000 );
+		$early_servers = apply_filters( 'wp_mcp_pre_registered_servers', [] );
 
-			self::$initialized = true;
+		foreach ( $early_servers as $config ) {
+			if ( ! isset( $this->servers[ $config['server_id'] ] ) ) {
+				$this->create_server(
+					$config['server_id'],
+					$config['server_url'],
+					$config['server_name'],
+					$config['server_description'],
+					$config['tools'] ?? [],
+					$config['resources'] ?? [],
+					$config['prompts'] ?? [],
+					$config['transport_class'] ?? Stdio::class,
+				);
+			}
 		}
 	}
 
@@ -138,19 +146,11 @@ class Registry {
 	 * @param array  $tools Tools to register.
 	 * @param array  $resources Resources to register.
 	 * @param array  $prompts Prompts to register.
-	 * @param string $transport_key Transport key to register.
+	 * @param string $transport_class Transport class to register.
 	 * @return self|null
 	 */
-	public function create_server( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_key = 'default' ): self {
+	public function create_server( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_class = Stdio::class ): self {
 
-		if ( ! doing_action( 'wp_mcp_init' ) ) {
-			ErrorHandler::log(
-				'Server creation must be done during wp_mcp_init action.',
-				array(
-					'method' => __METHOD__,
-				)
-			);
-		}
 		if ( isset( $this->servers[ $server_id ] ) ) {
 			ErrorHandler::log(
 				"Server with ID '{$server_id}' already exists.",
@@ -162,7 +162,7 @@ class Registry {
 		}
 
 		// Create server with tools, resources, prompts, and transports - let server handle all registration logic.
-		$server                      = new Server( $server_id, $server_url, $server_name, $server_description, $tools, $resources, $prompts, $transport_key );
+		$server                      = new Server( $server_id, $server_url, $server_name, $server_description, $tools, $resources, $prompts, $transport_class );
 		$this->servers[ $server_id ] = $server;
 
 		return $this;

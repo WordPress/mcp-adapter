@@ -79,8 +79,9 @@ class Server {
 	 * @param array $tools Optional tools to register during construction.
 	 * @param array $resources Optional resources to register during construction.
 	 * @param array $prompts Optional prompts to register during construction.
+	 * @param string $transport_class Optional transport class to register during construction.
 	 */
-	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array() ) {
+	public function __construct( string $server_id, string $server_url, string $server_name, string $server_description, array $tools = array(), array $resources = array(), array $prompts = array(), string $transport_class = Stdio::class ) {
 		$this->server_id          = $server_id;
 		$this->server_url         = $server_url;
 		$this->server_name        = $server_name;
@@ -96,6 +97,8 @@ class Server {
 		if ( ! empty( $prompts ) ) {
 			$this->register_prompts( $prompts );
 		}
+		// Instantiate the transport class to make sure routes are registered on the rest_api_init
+		new $transport_class( $this );
 
 		return $this;
 	}

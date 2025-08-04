@@ -13,24 +13,31 @@ class Server {
 	public static function register(): self {
 		$instance = new self();
 
-		Registry::instance()->create_server(
-			'default',
-			'mcp/v1',
-			'WordPress MCP Server',
-			'MCP Adapter Server for Core WordPress',
+		$server_id = 'default';
+		$tools = array_filter(
 			[
 				SitesTools::class,
 				AbilityToTool::make( 'core/posts-search' ),
-			],
-			[
-				SiteResources::class,
-			],
-			[
-				SamplePrompts::class,
 			]
 		);
+
+		// Check if server exists
+		if ( ! Registry::instance()->get_server( $server_id ) ) {
+			Registry::instance()->create_server(
+				$server_id,
+				'mcp/v1',
+				'WordPress MCP Server',
+				'MCP Adapter Server for Core WordPress',
+				$tools,
+				[
+					SiteResources::class,
+				],
+				[
+					SamplePrompts::class,
+				]
+			);
+		}
 
 		return $instance;
 	}
 }
-
