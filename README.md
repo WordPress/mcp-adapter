@@ -214,12 +214,24 @@ This adapter requires the WordPress Abilities API, which provides:
 
 ## Installation
 
-The MCP Adapter can be installed either manually or via Composer. While Composer is not required, it provides additional
-benefits for dependency management and version resolution.
+### Via Composer (Recommended)
 
-### Manual Installation (Recommended)
+The preferred way to install the MCP Adapter is through Composer for enhanced dependency management:
 
-The adapter works perfectly without Composer by using the included Jetpack autoloader:
+```bash
+composer require wordpress/mcp-adapter
+```
+
+**Composer Benefits:**
+
+- Automatic dependency resolution and updates
+- Version constraint management across your project
+- Integration with existing Composer-based workflows
+- Simplified dependency tracking in `composer.json`
+
+### Manual Installation (Alternative)
+
+The adapter also works without Composer by using the included Jetpack autoloader:
 
 1. Download the library to your WordPress installation (e.g., `wp-content/lib/mcp-adapter/`)
 2. Load the Jetpack autoloader in your plugin or theme:
@@ -234,20 +246,9 @@ The adapter works perfectly without Composer by using the included Jetpack autol
    ```
 3. Ensure the WordPress Abilities API is loaded before initializing the adapter
 
-### Via Composer (Optional)
+### Example Implementation
 
-If your project uses Composer, you can install the adapter for enhanced dependency management:
-
-```bash
-composer require wordpress/mcp-adapter
-```
-
-**Composer Benefits:**
-
-- Automatic dependency resolution and updates
-- Version constraint management across your project
-- Integration with existing Composer-based workflows
-- Simplified dependency tracking in `composer.json`
+For a complete working example of MCP Adapter integration, see the [MCP Adapter Implementation Example](https://github.com/galatanovidiu/mcp-adapter-implementation-example) - a WordPress plugin demonstrating best practices for implementing MCP servers with the adapter.
 
 ## Basic Usage
 
