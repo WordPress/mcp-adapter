@@ -1,6 +1,6 @@
 # MCP Adapter
 
-*Part of the **AI Building Blocks for WordPress** initiative*
+[*Part of the **AI Building Blocks for WordPress** initiative*](https://make.wordpress.org/ai/2025/07/17/ai-building-blocks)
 
 A PHP library that provides an adapter for the WordPress Abilities API, enabling WordPress abilities to be exposed as
 MCP (Model Context Protocol) tools, resources, and prompts. This adapter serves as the foundation for integrating
