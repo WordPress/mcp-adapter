@@ -1,0 +1,75 @@
+# Dependencies
+/vendor/
+/node_modules/
+
+# Composer
+composer.phar
+composer.lock
+
+# PHPUnit
+/.phpunit.cache/
+/.phpunit.result.cache
+/.coverage/
+/coverage/
+/clover.xml
+/phpunit.xml
+
+# PHP CodeSniffer
+/.phpcbf.cache
+/.phpcs.cache
+
+# IDE and Editor files
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/logs/
+error_log
+debug.log
+
+# Environment and Config
+.env
+.env.local
+.env.*.local
+wp-config-local.php
+wp-config.php
+
+# WordPress specific
+/wp-content/uploads/
+/wp-content/cache/
+/wp-content/backup-db/
+/wp-content/backups/
+/wp-content/blogs.dir/
+/wp-content/upgrade/
+/wp-content/w3tc-config/
+.htaccess
+
+# Build artifacts
+/build/
+/dist/
+*.min.js
+*.min.css
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+/temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Personal notes/docs
+/_notes/

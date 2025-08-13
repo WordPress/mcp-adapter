@@ -1,0 +1,64 @@
+<?xml version="1.0"?>
+<ruleset name="MCP Adapter Coding Standards">
+  <description>PHPCS rules for the MCP Adapter library.</description>
+
+  <file>src</file>
+  <exclude-pattern>vendor/*</exclude-pattern>
+  <exclude-pattern>build/*</exclude-pattern>
+  <exclude-pattern>docs/*</exclude-pattern>
+  <exclude-pattern>node_modules/*</exclude-pattern>
+  <exclude-pattern>tests/*</exclude-pattern>
+
+  <config name="installed_paths" value="vendor/wp-coding-standards/wpcs,vendor/phpcompatibility/php-compatibility,vendor/phpcompatibility/phpcompatibility-wp,vendor/phpcompatibility/phpcompatibility-paragonie,vendor/phpcsstandards/phpcsextra,vendor/phpcsstandards/phpcsutils" />
+
+  <!-- Include WordPress standards with specific exclusions -->
+  <rule ref="WordPress-Core">
+    <!-- Allow PSR-4 class/file naming instead of WordPress class/file naming scheme -->
+    <exclude name="WordPress.Files.FileName" />
+    <!-- Allow modern PHP syntax -->
+    <exclude name="Universal.Operators.DisallowShortTernary" />
+  </rule>
+  
+  <rule ref="WordPress-Extra">
+    <!-- Allow internal hook names without prefixes -->
+    <exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound" />
+    <!-- Allow unused parameters in interface implementations -->
+    <exclude name="Generic.CodeAnalysis.UnusedFunctionParameter" />
+  </rule>
+  
+  <rule ref="WordPress-Docs">
+    <!-- Relax inline comment formatting -->
+    <exclude name="Squiz.Commenting.InlineComment.InvalidEndChar" />
+  </rule>
+  
+  <rule ref="PHPCompatibilityWP" />
+  
+  <!-- We use PSR-4 namespaces; ignore WPCS namespace prefix requirement -->
+  <exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound" />
+
+  <config name="testVersion" value="8.1-" />
+
+  <rule ref="WordPress.WP.I18n">
+    <properties>
+      <property name="text_domain" type="array">
+        <element value="mcp-adapter" />
+      </property>
+    </properties>
+  </rule>
+
+  <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+    <properties>
+      <property name="prefixes" type="array">
+        <element value="mcp-adapter" />
+        <element value="WPMCP" />
+      </property>
+    </properties>
+    <exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound" />
+    <exclude name="WordPress.NamingConventions.PrefixAllGlobals.InvalidPrefixPassed" />
+    <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase" />
+    <exclude name="WordPress.Files.FileName.NotHyphenatedLowercase" />
+    <exclude name="WordPress.Files.FileName.InvalidClassFileName" />
+  </rule>
+
+  <arg value="ps" />
+</ruleset>

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<phpunit
+    bootstrap="tests/bootstrap.php"
+    backupGlobals="false"
+    colors="true"
+    convertErrorsToExceptions="true"
+    convertWarningsToExceptions="true"
+    convertNoticesToExceptions="true"
+    convertDeprecationsToExceptions="true"
+>
+    <testsuites>
+        <testsuite name="mcp-adapter">
+            <directory suffix="Test.php">./tests/Unit/</directory>
+            <directory suffix="Test.php">./tests/Integration/</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
