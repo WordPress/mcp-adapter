@@ -1,6 +1,7 @@
 {
   "name": "wordpress/mcp-adapter",
   "description": "Adapter for abilities api, letting the abilities to be used as MCP tools, resources or prompts",
+  "version": "0.1.0",
   "license": "GPL-2.0-or-later",
   "type": "library",
   "keywords": [
