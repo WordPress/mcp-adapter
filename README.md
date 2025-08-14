@@ -237,7 +237,7 @@ The adapter also works without Composer by using the included Jetpack autoloader
 2. Load the Jetpack autoloader in your plugin or theme:
    ```php
    // Check if the class isn't already loaded by another plugin
-   if ( ! class_exists( 'WP\MCP\McpAdapter' ) ) {
+   if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
        // Load the Jetpack autoloader
        if ( is_file( ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php' ) ) {
            require_once ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
@@ -255,7 +255,7 @@ For a complete working example of MCP Adapter integration, see the [MCP Adapter 
 ### Initializing the Adapter
 
 ```php
-use WP\MCP\McpAdapter;
+use WP\MCP\Core\McpAdapter;
 
 // Get the adapter instance
 $adapter = McpAdapter::instance();
