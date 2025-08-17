@@ -1,0 +1,35 @@
+{
+	"name": "mcp-adapter",
+	"type": "module",
+	"license": "GPL-2.0-or-later",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/WordPress/mcp-adapter.git"
+	},
+	"engines": {
+		"node": ">=20.10.0",
+		"npm": ">=10.2.3"
+	},
+	"devDependencies": {
+		"@wordpress/env": "^10.28.0",
+		"@wordpress/scripts": "^30.21.0",
+		"@wordpress/prettier-config": "^4.28.0"
+	},
+	"files": [
+		"src",
+		"LICENSE",
+		"CHANGELOG.md",
+		"README.md",
+		"readme.txt",
+		"mcp-adapter.php"
+	],
+	"scripts": {
+		"plugin-zip": "wp-scripts plugin-zip",
+		"format": "wp-scripts format",
+		"lint:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php",
+		"lint:php:fix": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:fix",
+		"lint:php:stan": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:stan",
+		"test:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
+		"wp-env": "wp-env"
+	}
+}

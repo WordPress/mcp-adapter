@@ -1,0 +1,253 @@
+name: Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - trunk
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - ready_for_review
+
+# Cancels all previous workflow runs for pull requests that have not completed.
+concurrency:
+  # The concurrency group contains the workflow name and the branch name for pull requests
+  # or the commit hash for any other events.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  # Runs the PHP coding standards checks.
+  #
+  # Violations are reported inline with annotations.
+  #
+  # Performs the following steps:
+  # - Checks out the repository.
+  # - Sets up PHP.
+  # - Configures caching for PHPCS scans.
+  # - Installs Composer dependencies.
+  # - Make Composer packages available globally.
+  # - Runs PHPCS on the full codebase.
+  # - Generate a report for displaying issues as pull request annotations.
+  phpcs:
+    name: Run PHPCS coding standards checks
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: cs2pr
+
+      # This date is used to ensure that the PHPCS cache is cleared at least once every week.
+      # http://man7.org/linux/man-pages/man1/date.1.html
+      - name: "Get last Monday's date"
+        id: get-date
+        run: echo "date=$(/bin/date -u --date='last Mon' "+%F")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache PHPCS scan cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: tests/_output/phpcs-cache.json
+          key: ${{ runner.os }}-date-${{ steps.get-date.outputs.date }}-phpcs-cache-${{ hashFiles('**/composer.json', 'phpcs.xml.dist') }}
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+
+      - name: Run PHPCS
+        id: phpcs
+        run: composer lint:php -- --report-full --report-checkstyle=./tests/_output/phpcs-report.xml
+
+      - name: Show PHPCS results in PR
+        if: ${{ always() && steps.phpcs.outcome == 'failure' }}
+        run: cs2pr ./tests/_output/phpcs-report.xml
+
+  # Runs PHP static analysis tests.
+  #
+  # Violations are reported inline with annotations.
+  #
+  # Performs the following steps:
+  # - Checks out the repository.
+  # - Sets up PHP.
+  # - Installs Composer dependencies.
+  # - Configures caching for PHP static analysis scans.
+  # - Make Composer packages available globally.
+  # - Runs PHPStan static analysis (with Pull Request annotations).
+  # - Saves the PHPStan result cache.
+  # - Ensures version-controlled files are not modified or deleted.
+  phpstan:
+    name: Run PHP static analysis
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        with:
+          php-version: 8.3
+          coverage: none
+          tools: cs2pr
+
+      # This date is used to ensure that the Composer cache is cleared at least once every week.
+      # http://man7.org/linux/man-pages/man1/date.1.html
+      - name: "Get last Monday's date"
+        id: get-date
+        run: echo "date=$(/bin/date -u --date='last Mon' "+%F")" >> "$GITHUB_OUTPUT"
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+
+      - name: Cache PHP Static Analysis scan cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: tests/_output # This is defined in the base.neon file.
+          key: 'phpstan-result-cache-${{ github.run_id }}'
+          restore-keys: |
+            phpstan-result-cache-
+
+      - name: Run PHP static analysis tests
+        id: phpstan
+        run: composer lint:php:stan -- -vvv --error-format=checkstyle | cs2pr
+
+      - name: 'Save result cache'
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        if: ${{ !cancelled() }}
+        with:
+          path: tests/_output
+          key: 'phpstan-result-cache-${{ github.run_id }}'
+
+  # Runs the PHPUnit tests for WordPress.
+  #
+  # Performs the following steps:
+  # - Sets environment variables.
+  # - Checks out the repository.
+  # - Sets up Node.js.
+  # - Sets up PHP.
+  # - Installs Composer dependencies.
+  # - Installs npm dependencies
+  # - Logs general debug information about the runner.
+  # - Logs Docker debug information (about the Docker installation within the runner).
+  # - Starts the WordPress Docker container.
+  # - Logs the running Docker containers.
+  # - Logs debug information about what's installed within the WordPress Docker containers.
+  # - Install WordPress within the Docker container.
+  # - Run the PHPUnit tests.
+  # - Upload the code coverage report to Codecov.io.
+  # - Upload the HTML code coverage report as an artifact.
+  # - Ensures version-controlled files are not modified or deleted.
+  # - Checks out the WordPress Test reporter repository.
+  # - Submit the test results to the WordPress.org host test results.
+  phpunit:
+    name: Test PHP ${{ matrix.php }} WP ${{ matrix.wp }}${{ matrix.coverage && ' with coverage' || '' }}
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        php: ['8.4', '8.3', '8.2', '8.1', '8.0', '7.4']
+        wp: [latest, trunk]
+        coverage: [false]
+        include:
+          - php: '8.4'
+            wp: latest
+            coverage: true
+    env:
+      WP_ENV_PHP_VERSION: ${{ matrix.php }}
+      WP_ENV_CORE: ${{ matrix.wp == 'trunk' && 'WordPress/WordPress' || format( 'https://wordpress.org/wordpress-{0}.zip', matrix.wp ) }}
+
+    steps:
+      - name: Configure environment variables
+        run: |
+          echo "PHP_FPM_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "PHP_FPM_GID=$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
+          persist-credentials: false
+
+      ##
+      # This allows Composer dependencies to be installed using a single step.
+      #
+      # Since the tests are currently run within the Docker containers where the PHP version varies,
+      # the same PHP version needs to be configured for the action runner machine so that the correct
+      # dependency versions are installed and cached.
+      ##
+      - name: Set up PHP
+        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        with:
+          php-version: '${{ matrix.php }}'
+          coverage: none
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          cache: 'npm'
+          node-version-file: '.nvmrc'
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Start the Docker testing environment
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: |
+            if [ "${{ matrix.coverage }}" == "true" ]; then
+            npm run wp-env start -- --xdebug=coverage
+            else
+            npm run wp-env start
+            fi
+
+      - name: Log versions
+        run: |
+          npm run wp-env -- run cli php -- -v
+          npm run wp-env -- run cli wp core version
+
+      - name: Run PHPUnit tests${{ matrix.coverage && ' with coverage report' || '' }}
+        continue-on-error: true
+        id: phpunit
+        run: |
+          npm run test:php
+
+      - name: Upload code coverage report
+        continue-on-error: true
+        if: ${{ matrix.coverage }}
+        uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: tests/_output/php-coverage.xml
+          flags: unit
+          fail_ci_if_error: true
+
+      - name: Upload HTML coverage report as artifact
+        if: ${{ matrix.coverage }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp-code-coverage-${{ matrix.php }}-${{ matrix.wp }}
+          path: tests/_output/html
+          overwrite: true

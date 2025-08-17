@@ -1,0 +1,5 @@
+vendor
+node_modules
+tests/_output
+package-lock.json
+composer.lock

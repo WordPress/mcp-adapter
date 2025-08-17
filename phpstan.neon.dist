@@ -1,0 +1,39 @@
+parameters:
+		# Rules
+		treatPhpDocTypesAsCertain: false
+		inferPrivatePropertyTypeFromConstructor: true
+		checkExplicitMixedMissingReturn: true
+		checkFunctionNameCase: true
+		checkInternalClassCaseSensitivity: true
+		checkTooWideReturnTypesInProtectedAndPublicMethods: true
+		polluteScopeWithAlwaysIterableForeach: false
+		polluteScopeWithLoopInitialAssignments: false
+		reportAlwaysTrueInLastCondition: true
+		reportStaticMethodSignatures: true
+		reportWrongPhpDocTypeInVarTag: true
+
+		# Configuration
+		level: 8
+		phpVersion:
+			min: 70400
+			max: 80400
+		bootstrapFiles:
+				- mcp-adapter.php
+		paths:
+				- mcp-adapter.php
+				- src/
+		scanDirectories:
+			- ../abilities-api
+		excludePaths:
+			analyse:
+				- tests/
+				- vendor/
+			analyseAndScan:
+				- node_modules (?)
+
+		# Ignore specific errors
+		ignoreErrors:
+			- # @todo restore these when the less noisy bugs are fixed.
+				identifier: missingType.iterableValue
+			-
+				identifier: missingType.generics
