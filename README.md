@@ -216,11 +216,23 @@ This adapter requires the WordPress Abilities API, which provides:
 
 ### Via Composer (Recommended)
 
-The preferred way to install the MCP Adapter is through Composer for enhanced dependency management:
+The preferred way to install the MCP Adapter is through Composer for enhanced dependency management.
 
-```bash
-composer require wordpress/mcp-adapter
+To do so, add the following to your `composer.json` file:
+
+```json
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/WordPress/mcp-adapter"
+    }
+  ],
+  "require": {
+    "wordpress/mcp-adapter": "dev-trunk"
+  },
 ```
+
+Then run `composer install` from your terminal. When asked to trust "automattic/jetpack-autoloader", you can reply with `y`
 
 **Composer Benefits:**
 
