@@ -17,6 +17,7 @@
 	"scripts": {
 		"format": "wp-scripts format",
 		"lint:php": "composer run-script lint:php",
-		"lint:php:fix": "composer run-script lint:php:fix"
+		"lint:php:fix": "composer run-script lint:php:fix",
+		"lint:php:stan": "composer run-script lint:php:stan"
 	}
 }
