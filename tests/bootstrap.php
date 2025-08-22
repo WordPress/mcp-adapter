@@ -1,6 +1,8 @@
 <?php
 /**
  * PHPUnit bootstrap file for mcp-adapter (WordPress-style with unit fallback).
+ *
+ * phpcs:disable WordPress.NamingConventions.PrefixAllGlobals
  */
 
 // Load Composer autoloader for the library code under test.

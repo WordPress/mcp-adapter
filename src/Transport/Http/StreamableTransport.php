@@ -71,7 +71,7 @@ class StreamableTransport implements McpTransportInterface {
 	 *
 	 * @return bool|\WP_Error
 	 */
-	public function check_permission( ?WP_REST_Request $request = null ): \WP_Error|bool {
+	public function check_permission( ?WP_REST_Request $request = null ) {
 		// Use custom permission callback if provided
 		if ( null !== $this->context->transport_permission_callback ) {
 			try {
@@ -105,7 +105,7 @@ class StreamableTransport implements McpTransportInterface {
 	 *
 	 * @return \WP_REST_Response
 	 */
-	public function handle_request( mixed $request ): WP_REST_Response {
+	public function handle_request( $request ): WP_REST_Response {
 		// Handle preflight requests.
 		if ( 'OPTIONS' === $request->get_method() ) {
 			return new WP_REST_Response( null );

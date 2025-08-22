@@ -276,7 +276,7 @@ class McpResource {
 	 *
 	 * @return void
 	 */
-	public function add_annotation( string $key, mixed $value ): void {
+	public function add_annotation( string $key, $value ): void {
 		$this->annotations[ $key ] = $value;
 	}
 

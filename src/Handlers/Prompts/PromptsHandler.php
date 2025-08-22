@@ -41,7 +41,7 @@ class PromptsHandler {
 	 *
 	 * @return array|null Returns error if permission denied, null if allowed.
 	 */
-	private function check_permission(): null|array {
+	private function check_permission(): ?array {
 		$enforce_handler_auth = (bool) apply_filters( 'mcp_enforce_handler_auth', false );
 
 		if ( $enforce_handler_auth && ! is_user_logged_in() ) {

@@ -133,7 +133,7 @@ class McpPromptValidator {
 	 *
 	 * @return array Array of validation errors, empty if valid.
 	 */
-	private static function get_arguments_validation_errors( mixed $arguments ): array {
+	private static function get_arguments_validation_errors( $arguments ): array {
 		$errors = array();
 
 		// Arguments must be an array

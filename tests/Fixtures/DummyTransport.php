@@ -21,11 +21,11 @@ class DummyTransport implements McpTransportInterface {
 		// No route registration needed for tests
 	}
 
-	public function check_permission(): \WP_Error|bool {
+	public function check_permission() {
 		return true;
 	}
 
-	public function handle_request( mixed $request ): mixed {
+	public function handle_request( $request ) {
 		// Simple test implementation
 		return array( 'success' => true );
 	}

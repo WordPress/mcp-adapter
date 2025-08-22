@@ -63,7 +63,7 @@ class RestTransport implements McpTransportInterface {
 	 *
 	 * @return bool|\WP_Error
 	 */
-	public function check_permission(): \WP_Error|bool {
+	public function check_permission() {
 		// Use custom permission callback if provided
 		if ( null !== $this->context->transport_permission_callback ) {
 			try {
@@ -97,7 +97,7 @@ class RestTransport implements McpTransportInterface {
 	 *
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function handle_request( mixed $request ): \WP_Error|WP_REST_Response {
+	public function handle_request( $request ) {
 		$message = $request->get_json_params();
 
 		$validation = $this->validate_rest_message( is_array( $message ) ? $message : array() );
@@ -125,7 +125,7 @@ class RestTransport implements McpTransportInterface {
 	 * @param array $message Incoming message.
 	 * @return \WP_Error|true
 	 */
-	private function validate_rest_message( array $message ): \WP_Error|bool {
+	private function validate_rest_message( array $message ) {
 		if ( empty( $message ) ) {
 			return new \WP_Error( 'invalid_request', 'Invalid request: Empty body', array( 'status' => 400 ) );
 		}
