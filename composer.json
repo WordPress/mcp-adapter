@@ -76,6 +76,7 @@
 	},
 	"require-dev": {
 		"automattic/vipwpcs": "^3.0",
+		"phpcompatibility/php-compatibility": "10.x-dev as 9.99.99",
 		"phpcompatibility/phpcompatibility-wp": "^2.1",
 		"phpunit/phpunit": "^9.6",
 		"slevomat/coding-standard": "^8.0",
