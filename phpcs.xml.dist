@@ -35,6 +35,7 @@
 	<arg name="severity" value="1" />
 
 	<!-- Ruleset Config: set these to match your project constraints. -->
+
 	<!--
 		Tests for PHP version compatibility.
 	https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards#Recomended-additional-rulesets
@@ -184,6 +185,20 @@
 	</rule>
 	<rule ref="SlevomatCodingStandard.Variables.UselessVariable" />
 
+	<!--
+		Ignore Rules for Tests
+	-->
+	<rule ref="PluginCheck.CodeAnalysis.Offloading.OffloadedContent">
+		<exclude-pattern>/tests/*</exclude-pattern>
+	</rule>
+
+	<!-- Do not apply filename rules for unit tests -->
+	<rule ref="WordPress.Files.FileName.NotHyphenatedLowercase">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
+	<rule ref="WordPress.Files.FileName.InvalidClassFileName">
+		<exclude-pattern>tests/*</exclude-pattern>
+	</rule>
 
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
 		<properties>
