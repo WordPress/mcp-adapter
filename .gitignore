@@ -1,75 +1,40 @@
 # Dependencies
-/vendor/
-/node_modules/
-
-# Composer
-composer.phar
-composer.lock
-
-# PHPUnit
-/.phpunit.cache/
-/.phpunit.result.cache
-/.coverage/
-/coverage/
-/clover.xml
-/phpunit.xml
-
-# PHP CodeSniffer
-/.phpcbf.cache
-/.phpcs.cache
-
-# IDE and Editor files
-/.idea/
-/.vscode/
-*.swp
-*.swo
-*~
+# macOS/IDE
 .DS_Store
-Thumbs.db
-
-# Logs
-*.log
-/logs/
-error_log
-debug.log
-
-# Environment and Config
-.env
-.env.local
-.env.*.local
-wp-config-local.php
-wp-config.php
-
-# WordPress specific
-/wp-content/uploads/
-/wp-content/cache/
-/wp-content/backup-db/
-/wp-content/backups/
-/wp-content/blogs.dir/
-/wp-content/upgrade/
-/wp-content/w3tc-config/
-.htaccess
-
-# Build artifacts
-/build/
-/dist/
-*.min.js
-*.min.css
-
-# Temporary files
-*.tmp
-*.temp
-/tmp/
-/temp/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
+.idea
 .Spotlight-V100
 .Trashes
+.vscode
+*.sublime-project
+*.sublime-workspace
+/.vscode/
 ehthumbs.db
 Thumbs.db
 
-# Personal notes/docs
-/_notes/
+# Log files
+*.log
+/tests/logs
+
+# Packages
+/vendor/
+/node_modules/
+
+# Environment
+.env
+
+# Cache
+.phpunit.result.cache
+
+# Test output
+/tests/_output/*
+!/tests/_output/.gitkeep
+/coverage/
+
+# Configs
+/phpcs.xml
+/phpunit.xml
+/phpstan.neon
+
+# WP ENV
+/.wp-env.override.json
+
