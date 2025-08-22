@@ -18,6 +18,20 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
  */
 class ToolsHandler {
 	/**
+	 * Error categories keyed by throwable class name.
+	 *
+	 * @used-by ::categorize_error() method.
+	*/
+	private static array $error_categories = array(
+		\ArgumentCountError::class       => 'arguments',
+		\Error::class                    => 'system',
+		\InvalidArgumentException::class => 'validation',
+		\LogicException::class           => 'logic',
+		\RuntimeException::class         => 'execution',
+		\TypeError::class                => 'type',
+	);
+
+	/**
 	 * The WordPress MCP instance.
 	 *
 	 * @var \WP\MCP\Core\McpServer
@@ -316,14 +330,6 @@ class ToolsHandler {
 	 * @return string
 	 */
 	private function categorize_error( \Throwable $exception ): string {
-		return match ( get_class( $exception ) ) {
-			'InvalidArgumentException' => 'validation',
-			'RuntimeException' => 'execution',
-			'LogicException' => 'logic',
-			'Error' => 'system',
-			'TypeError' => 'type',
-			'ArgumentCountError' => 'arguments',
-			default => 'unknown'
-		};
+		return self::$error_categories[ get_class( $exception ) ] ?? 'unknown';
 	}
 }
