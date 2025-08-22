@@ -16,6 +16,19 @@ namespace WP\MCP\Infrastructure\Observability;
  * tag management, metric formatting, and sanitization functionality.
  */
 trait McpObservabilityHelperTrait {
+	/**
+	 * Error categories keyed by throwable class name.
+	 *
+	 * @used-by ::categorize_error() method.
+	*/
+	private static array $error_categories = array(
+		\ArgumentCountError::class       => 'arguments',
+		\Error::class                    => 'system',
+		\InvalidArgumentException::class => 'validation',
+		\LogicException::class           => 'logic',
+		\RuntimeException::class         => 'execution',
+		\TypeError::class                => 'type',
+	);
 
 	/**
 	 * Get default tags that should be included with all metrics.
@@ -120,14 +133,6 @@ trait McpObservabilityHelperTrait {
 	 * @return string
 	 */
 	public static function categorize_error( \Throwable $exception ): string {
-		return match ( get_class( $exception ) ) {
-			'InvalidArgumentException' => 'validation',
-			'RuntimeException' => 'execution',
-			'LogicException' => 'logic',
-			'Error' => 'system',
-			'TypeError' => 'type',
-			'ArgumentCountError' => 'arguments',
-			default => 'unknown'
-		};
+		return self::$error_categories[ get_class( $exception ) ] ?? 'unknown';
 	}
 }
