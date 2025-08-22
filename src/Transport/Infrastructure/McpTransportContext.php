@@ -37,15 +37,83 @@ class McpTransportContext {
 	 * @param \WP\MCP\Transport\Infrastructure\McpRequestRouter|null $request_router The request router service.
 	 * @param callable|null         $transport_permission_callback Optional custom permission callback for transport-level authentication.
 	 */
-	public function __construct(
-		public McpServer $mcp_server,
-		public InitializeHandler $initialize_handler,
-		public ToolsHandler $tools_handler,
-		public ResourcesHandler $resources_handler,
-		public PromptsHandler $prompts_handler,
-		public SystemHandler $system_handler,
-		public string $observability_handler,
-		public ?McpRequestRouter $request_router,
-		public $transport_permission_callback = null
-	) {}
+	/**
+	 * The MCP server instance.
+	 *
+	 * @var \WP\MCP\Core\McpServer
+	 */
+	public McpServer $mcp_server;
+
+	/**
+	 * The initialize handler.
+	 *
+	 * @var \WP\MCP\Handlers\Initialize\InitializeHandler
+	 */
+	public InitializeHandler $initialize_handler;
+
+	/**
+	 * The tools handler.
+	 *
+	 * @var \WP\MCP\Handlers\Tools\ToolsHandler
+	 */
+	public ToolsHandler $tools_handler;
+
+	/**
+	 * The resources handler.
+	 *
+	 * @var \WP\MCP\Handlers\Resources\ResourcesHandler
+	 */
+	public ResourcesHandler $resources_handler;
+
+	/**
+	 * The prompts handler.
+	 *
+	 * @var \WP\MCP\Handlers\Prompts\PromptsHandler
+	 */
+	public PromptsHandler $prompts_handler;
+
+	/**
+	 * The system handler.
+	 *
+	 * @var \WP\MCP\Handlers\System\SystemHandler
+	 */
+	public SystemHandler $system_handler;
+
+	/**
+	 * The observability handler class name.
+	 */
+	public string $observability_handler;
+
+	/**
+	 * The request router service.
+	 */
+	public ?\WP\MCP\Transport\Infrastructure\McpRequestRouter $request_router;
+
+	/**
+	 * Optional custom permission callback for transport-level authentication.
+	 *
+	 * @var callable|callable-string|null
+	 */
+	public $transport_permission_callback;
+
+	/**
+	 * Initialize the transport context.
+	 *
+	 * @param array{
+	 *   mcp_server: \WP\MCP\Core\McpServer,
+	 *   initialize_handler: \WP\MCP\Handlers\Initialize\InitializeHandler,
+	 *   tools_handler: \WP\MCP\Handlers\Tools\ToolsHandler,
+	 *   resources_handler: \WP\MCP\Handlers\Resources\ResourcesHandler,
+	 *   prompts_handler: \WP\MCP\Handlers\Prompts\PromptsHandler,
+	 *   system_handler: \WP\MCP\Handlers\System\SystemHandler,
+	 *   observability_handler: string,
+	 *   request_router?: \WP\MCP\Transport\Infrastructure\McpRequestRouter|null,
+	 *   transport_permission_callback?: callable|null
+	 * } $properties Properties to set on the context.
+	 */
+	public function __construct( array $properties ) {
+		foreach ( $properties as $name => $value ) {
+				$this->$name = $value;
+		}
+	}
 }
