@@ -123,7 +123,7 @@ class McpToolValidator {
 	 *
 	 * @return array Array of validation errors, empty if valid.
 	 */
-	private static function get_schema_validation_errors( mixed $schema, string $field_name ): array {
+	private static function get_schema_validation_errors( $schema, string $field_name ): array {
 		// Normalize stdClass to array for validation, and reject scalars/null.
 		if ( $schema instanceof stdClass ) {
 			$schema = (array) $schema;

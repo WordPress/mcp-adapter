@@ -32,7 +32,7 @@ interface McpTransportInterface {
 	 *
 	 * @return bool|\WP_Error True if allowed, WP_Error or false if not.
 	 */
-	public function check_permission(): \WP_Error|bool;
+	public function check_permission();
 
 	/**
 	 * Handle incoming requests.
@@ -42,7 +42,7 @@ interface McpTransportInterface {
 	 * @param mixed $request The request object (type varies by transport).
 	 * @return mixed Transport-specific response format.
 	 */
-	public function handle_request( mixed $request ): mixed;
+	public function handle_request( $request );
 
 	/**
 	 * Register transport-specific routes.
