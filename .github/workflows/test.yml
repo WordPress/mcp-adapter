@@ -94,11 +94,7 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
-    defaults:
-      # Needed to install abilities api alongside mcp-adapter.cancel-timeout-minutes: 
-      # Can be removed when we move to wp-env.
-      run:
-        working-directory: mcp-adapter
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -139,16 +135,21 @@ jobs:
 
       - name: Install Composer dependencies
         uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+        with:
+          working-directory: mcp-adapter
 
       - name: Make Composer packages available globally
         run: echo "${PWD}/vendor/bin" >> "$GITHUB_PATH"
+        working-directory: mcp-adapter
+
       - name: Run PHP static analysis tests
         id: phpstan
         run: phpstan analyse -vvv --error-format=checkstyle | cs2pr
+        working-directory: mcp-adapter
 
       - name: 'Save result cache'
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         if: ${{ !cancelled() }}
         with:
-          path: tests/_output
+          path: mcp-adapter/tests/_output
           key: 'phpstan-result-cache-${{ runner.os }}-date-${{ steps.get-date.outputs.date }}'
