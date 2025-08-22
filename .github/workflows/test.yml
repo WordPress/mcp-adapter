@@ -105,7 +105,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: wordpress/abilities-api
-          path: ../abilities-api
+          path: abilities-api
           ref: trunk
           fetch-depth: 1
           persist-credentials: false
