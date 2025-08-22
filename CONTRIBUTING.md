@@ -13,7 +13,7 @@ Join the `#core-ai` channel [on WordPress Slack](http://wordpress.slack.com) ([s
 In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/). All code in the Performance Lab plugin must follow these requirements:
 
 - **WordPress**: As of MCP Adapter v0.1.0, released {@todo}, the plugin's minimum WordPress version requirement is 6.8.
-- **PHP**: The minimum required version right now is 8.1. This is subject to change and will be brought in sync with the WordPress core minimum PHP version requirement closer to release.
+- **PHP**: The minimum required version right now is 7.4. This is subject to change and will be brought in sync with the WordPress core minimum PHP version requirement closer to release.
 
 We include [several tools](#useful-commands) to help ensure your code meets contribution
 

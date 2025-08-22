@@ -28,7 +28,7 @@
 	"prefer-stable": true,
 	"config": {
 		"platform": {
-			"php": "8.1"
+			"php": "7.4"
 		},
 		"sort-packages": true,
 		"optimize-autoloader": true,
@@ -71,7 +71,7 @@
 		}
 	},
 	"require": {
-		"php": ">=8.1",
+		"php": ">=7.4",
 		"automattic/jetpack-autoloader": "^5.0"
 	},
 	"require-dev": {
