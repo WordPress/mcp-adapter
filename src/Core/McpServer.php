@@ -595,15 +595,17 @@ class McpServer {
 
 		// Create context for the router first (without router to avoid circular dependency)
 		$router_context = new McpTransportContext(
-			mcp_server: $this,
-			initialize_handler: $initialize_handler,
-			tools_handler: $tools_handler,
-			resources_handler: $resources_handler,
-			prompts_handler: $prompts_handler,
-			system_handler: $system_handler,
-			observability_handler: $this->observability_handler,
-			request_router: null,
-			transport_permission_callback: $this->transport_permission_callback
+			array(
+				'mcp_server'                    => $this,
+				'initialize_handler'            => $initialize_handler,
+				'tools_handler'                 => $tools_handler,
+				'resources_handler'             => $resources_handler,
+				'prompts_handler'               => $prompts_handler,
+				'system_handler'                => $system_handler,
+				'observability_handler'         => $this->observability_handler,
+				'request_router'                => null,
+				'transport_permission_callback' => $this->transport_permission_callback,
+			)
 		);
 
 		// Create the router
@@ -611,15 +613,17 @@ class McpServer {
 
 		// Create the final context with the router
 		return new McpTransportContext(
-			mcp_server: $this,
-			initialize_handler: $initialize_handler,
-			tools_handler: $tools_handler,
-			resources_handler: $resources_handler,
-			prompts_handler: $prompts_handler,
-			system_handler: $system_handler,
-			observability_handler: $this->observability_handler,
-			request_router: $request_router,
-			transport_permission_callback: $this->transport_permission_callback
+			array(
+				'mcp_server'                    => $this,
+				'initialize_handler'            => $initialize_handler,
+				'tools_handler'                 => $tools_handler,
+				'resources_handler'             => $resources_handler,
+				'prompts_handler'               => $prompts_handler,
+				'system_handler'                => $system_handler,
+				'observability_handler'         => $this->observability_handler,
+				'request_router'                => $request_router,
+				'transport_permission_callback' => $this->transport_permission_callback,
+			)
 		);
 	}
 

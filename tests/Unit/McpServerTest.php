@@ -14,15 +14,15 @@ final class McpServerTest extends TestCase {
 
 	public function test_it_initializes_and_exposes_basic_getters(): void {
 		$server = new McpServer(
-			server_id: 'test-server',
-			server_route_namespace: 'mcp/v1',
-			server_route: '/mcp',
-			server_name: 'Test MCP',
-			server_description: 'Testing server',
-			server_version: '0.1.0',
-			mcp_transports: array( DummyTransport::class ),
-			error_handler: NullMcpErrorHandler::class,
-			observability_handler: NullMcpObservabilityHandler::class,
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Test MCP',
+			'Testing server',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
 		);
 
 		$this->assertSame( 'test-server', $server->get_server_id() );
