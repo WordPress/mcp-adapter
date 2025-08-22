@@ -94,10 +94,16 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
+    defaults:
+      # Needed to install abilities api alongside mcp-adapter.cancel-timeout-minutes: 
+      # Can be removed when we move to wp-env.
+      run:
+        working-directory: mcp-adapter
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          path: mcp-adapter
           persist-credentials: false
 
       # Clone the public wordpress/abilities-api repo as a sibling directory for PHPStan analysis
