@@ -151,7 +151,7 @@ If your project uses Composer, you can install the adapter for enhanced dependen
     "name": "my-company/my-wordpress-plugin",
     "description": "WordPress plugin with MCP integration",
     "require": {
-        "php": ">=8.1",
+        "php": "^7.4 || ^8.0",
         "wordpress/mcp-adapter": "^1.0"
     },
     "autoload": {

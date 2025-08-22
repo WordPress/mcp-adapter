@@ -198,7 +198,7 @@ Individual server management with comprehensive configuration:
 
 ### Required Dependencies
 
-- **PHP**: >= 8.1
+- **PHP**: >= 7.4
 - **WordPress Abilities API**: For ability registration and management
 - **Automattic Jetpack Autoloader**: For PSR-4 autoloading
 

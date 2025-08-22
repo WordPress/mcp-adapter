@@ -13,7 +13,7 @@ expose your WordPress capabilities to AI systems.
 
 Before you begin, ensure you have:
 
-- **PHP 8.1 or higher**
+- **PHP 7.4 or higher**
 - **WordPress with Abilities API** loaded
 - **Basic understanding of WordPress plugins/themes**
 - **Optional**: Composer (for enhanced dependency management)

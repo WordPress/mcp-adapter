@@ -7,7 +7,7 @@ This guide explains how to run and write tests for the MCP Adapter. The suite su
 
 ## Prerequisites
 
-- PHP 8.1+
+- PHP 7.4+
 - Composer
 - Optional (for full WP tests): a local MySQL/MariaDB server or a WordPress test DB
 
