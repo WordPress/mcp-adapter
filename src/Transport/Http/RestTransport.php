@@ -10,15 +10,11 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Http;
 
-use Throwable;
-use WP\MCP\Core\McpServer;
 use WP\MCP\Transport\Contracts\McpTransportInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
-use WP_REST_Server;
-use WP_REST_Request;
 use WP_REST_Response;
-use WP_Error;
+use WP_REST_Server;
 
 /**
  * Class McpRestTransport
@@ -32,14 +28,14 @@ class RestTransport implements McpTransportInterface {
 	/**
 	 * The transport context.
 	 *
-	 * @var McpTransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
 	private McpTransportContext $context;
 
 	/**
 	 * Initialize the class and register routes
 	 *
-	 * @param McpTransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct( McpTransportContext $context ) {
 		$this->context = $context;
@@ -65,14 +61,14 @@ class RestTransport implements McpTransportInterface {
 	/**
 	 * Check if the user has permission to access the MCP API
 	 *
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
-	public function check_permission(): WP_Error|bool {
+	public function check_permission(): \WP_Error|bool {
 		// Use custom permission callback if provided
 		if ( null !== $this->context->transport_permission_callback ) {
 			try {
 				return call_user_func( $this->context->transport_permission_callback );
-			} catch ( Throwable $e ) {
+			} catch ( \Throwable $e ) {
 				// Log error and fall back to default
 				if ( $this->context->mcp_server->error_handler ) {
 					$this->context->mcp_server->error_handler->log(
@@ -99,9 +95,9 @@ class RestTransport implements McpTransportInterface {
 	 *
 	 * @param mixed $request The request.
 	 *
-	 * @return WP_REST_Response|WP_Error
+	 * @return \WP_REST_Response|\WP_Error
 	 */
-	public function handle_request( mixed $request ): WP_Error|WP_REST_Response {
+	public function handle_request( mixed $request ): \WP_Error|WP_REST_Response {
 		$message = $request->get_json_params();
 
 		$validation = $this->validate_rest_message( is_array( $message ) ? $message : array() );
@@ -127,15 +123,15 @@ class RestTransport implements McpTransportInterface {
 	 * Validate REST message shape and return either true or WP_Error.
 	 *
 	 * @param array $message Incoming message.
-	 * @return WP_Error|true
+	 * @return \WP_Error|true
 	 */
-	private function validate_rest_message( array $message ): WP_Error|bool {
+	private function validate_rest_message( array $message ): \WP_Error|bool {
 		if ( empty( $message ) ) {
-			return new WP_Error( 'invalid_request', 'Invalid request: Empty body', array( 'status' => 400 ) );
+			return new \WP_Error( 'invalid_request', 'Invalid request: Empty body', array( 'status' => 400 ) );
 		}
 
 		if ( ! isset( $message['method'] ) || ! is_string( $message['method'] ) || '' === trim( $message['method'] ) ) {
-			return new WP_Error( 'invalid_request', 'Invalid request: Missing or invalid method', array( 'status' => 400 ) );
+			return new \WP_Error( 'invalid_request', 'Invalid request: Missing or invalid method', array( 'status' => 400 ) );
 		}
 
 		return true;
@@ -147,7 +143,7 @@ class RestTransport implements McpTransportInterface {
 	 * @param array $result The result data.
 	 * @param int   $request_id The request ID (unused in WordPress format).
 	 *
-	 * @return WP_REST_Response
+	 * @return \WP_REST_Response
 	 */
 	protected function format_success_response( array $result, int $request_id = 0 ): WP_REST_Response {
 		return rest_ensure_response( $result );
@@ -159,15 +155,15 @@ class RestTransport implements McpTransportInterface {
 	 * @param array $error The error data.
 	 * @param int   $request_id The request ID (unused in WordPress format).
 	 *
-	 * @return WP_Error
+	 * @return \WP_Error
 	 */
-	protected function format_error_response( array $error, int $request_id = 0 ): WP_Error {
+	protected function format_error_response( array $error, int $request_id = 0 ): \WP_Error {
 		// Convert legacy array error format to WP_Error
 		$error_data = $error['error'] ?? $error;
 		$code       = $error_data['code'] ?? 'unknown_error';
 		$message    = $error_data['message'] ?? 'Unknown error';
 		$data       = $error_data['data'] ?? array( 'status' => 500 );
 
-		return new WP_Error( $code, $message, $data );
+		return new \WP_Error( $code, $message, $data );
 	}
 }

@@ -9,26 +9,23 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
-use Exception;
-use InvalidArgumentException;
-use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
-use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
+use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Prompts\McpPrompt;
+use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
+use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
-use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
-use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
-use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
-use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\MCP\Transport\Infrastructure\McpRequestRouter;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
-use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
+use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
+use WP\MCP\Handlers\Tools\ToolsHandler;
+use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
+use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
+use WP\MCP\Transport\Contracts\McpTransportInterface;
+use WP\MCP\Transport\Infrastructure\McpRequestRouter;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -100,7 +97,7 @@ class McpServer {
 	/**
 	 * Error handler instance.
 	 *
-	 * @var McpErrorHandlerInterface|null
+	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null
 	 */
 	public ?McpErrorHandlerInterface $error_handler;
 
@@ -136,14 +133,14 @@ class McpServer {
 	 * @param string                                              $server_description Server description.
 	 * @param string                                              $server_version Server version.
 	 * @param array                                               $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
-	 * @param class-string<McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
-	 * @param class-string<McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
+	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
+	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
 	 * @param array                                               $tools Optional ability names to register as tools during construction.
 	 * @param array                                               $resources Optional resources to register during construction.
 	 * @param array                                               $prompts Optional prompts to register during construction.
 	 * @param callable|null                                       $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @throws Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
+	 * @throws \WP\MCP\Core\Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
 	 */
 	public function __construct(
 		string $server_id,
@@ -172,7 +169,7 @@ class McpServer {
 
 		// Validate and set transport permission callback
 		if ( $transport_permission_callback !== null && ! is_callable( $transport_permission_callback ) ) {
-			throw new InvalidArgumentException(
+			throw new \InvalidArgumentException(
 				esc_html__( 'Transport permission callback must be callable.', 'mcp-adapter' )
 			);
 		}
@@ -273,37 +270,39 @@ class McpServer {
 	 */
 	public function register_tools( array $abilities ): void {
 		foreach ( $abilities as $ability_name ) {
-			if ( is_string( $ability_name ) ) {
-				try {
-					$tool = RegisterAbilityAsMcpTool::make( $ability_name, $this );
-					// Add the processed tools to this server.
-					$this->tools[ $tool->get_name() ] = $tool;
+			if ( ! is_string( $ability_name ) ) {
+				continue;
+			}
 
-					// Track successful tool registration.
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'tool',
-							'component_name' => $ability_name,
-							'server_id'      => $this->server_id,
-						)
-					);
-				} catch ( InvalidArgumentException $e ) {
-					if ( $this->error_handler ) {
-						$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$ability_name}" ) );
-					}
+			try {
+				$tool = RegisterAbilityAsMcpTool::make( $ability_name, $this );
+				// Add the processed tools to this server.
+				$this->tools[ $tool->get_name() ] = $tool;
 
-					// Track tool registration failure.
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'tool',
-							'component_name' => $ability_name,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->server_id,
-						)
-					);
+				// Track successful tool registration.
+				$this->observability_handler::record_event(
+					'mcp.component.registered',
+					array(
+						'component_type' => 'tool',
+						'component_name' => $ability_name,
+						'server_id'      => $this->server_id,
+					)
+				);
+			} catch ( \InvalidArgumentException $e ) {
+				if ( $this->error_handler ) {
+					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$ability_name}" ) );
 				}
+
+				// Track tool registration failure.
+				$this->observability_handler::record_event(
+					'mcp.component.registration_failed',
+					array(
+						'component_type' => 'tool',
+						'component_name' => $ability_name,
+						'error_type'     => get_class( $e ),
+						'server_id'      => $this->server_id,
+					)
+				);
 			}
 		}
 	}
@@ -317,37 +316,39 @@ class McpServer {
 	 */
 	public function register_resources( array $abilities ): void {
 		foreach ( $abilities as $ability_name ) {
-			if ( is_string( $ability_name ) ) {
-				try {
-					$resource = RegisterAbilityAsMcpResource::make( $ability_name, $this );
-					// Add the processed resources to this server.
-					$this->resources[ $resource->get_uri() ] = $resource;
+			if ( ! is_string( $ability_name ) ) {
+				continue;
+			}
 
-					// Track successful resource registration.
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'resource',
-							'component_name' => $ability_name,
-							'server_id'      => $this->server_id,
-						)
-					);
-				} catch ( InvalidArgumentException $e ) {
-					if ( $this->error_handler ) {
-						$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
-					}
+			try {
+				$resource = RegisterAbilityAsMcpResource::make( $ability_name, $this );
+				// Add the processed resources to this server.
+				$this->resources[ $resource->get_uri() ] = $resource;
 
-					// Track resource registration failure.
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'resource',
-							'component_name' => $ability_name,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->server_id,
-						)
-					);
+				// Track successful resource registration.
+				$this->observability_handler::record_event(
+					'mcp.component.registered',
+					array(
+						'component_type' => 'resource',
+						'component_name' => $ability_name,
+						'server_id'      => $this->server_id,
+					)
+				);
+			} catch ( \InvalidArgumentException $e ) {
+				if ( $this->error_handler ) {
+					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
 				}
+
+				// Track resource registration failure.
+				$this->observability_handler::record_event(
+					'mcp.component.registration_failed',
+					array(
+						'component_type' => 'resource',
+						'component_name' => $ability_name,
+						'error_type'     => get_class( $e ),
+						'server_id'      => $this->server_id,
+					)
+				);
 			}
 		}
 	}
@@ -361,84 +362,86 @@ class McpServer {
 	 */
 	public function register_prompts( array $prompts ): void {
 		foreach ( $prompts as $prompt_item ) {
-			if ( is_string( $prompt_item ) ) {
-				// Check if it's a class that implements McpPromptBuilderInterface
-				if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
-					try {
-						// Create instance of the prompt builder class
-						$builder = new $prompt_item();
-						$prompt  = $builder->build();
+			if ( ! is_string( $prompt_item ) ) {
+				continue;
+			}
 
-						// Set the MCP server after building
-						$prompt->set_mcp_server( $this );
+			// Check if it's a class that implements McpPromptBuilderInterface
+			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
+				try {
+					// Create instance of the prompt builder class
+					$builder = new $prompt_item();
+					$prompt  = $builder->build();
 
-						// Validate if validation is enabled
-						if ( $this->is_mcp_validation_enabled() ) {
-							$prompt->validate( "McpPromptBuilder::{$prompt_item}" );
-						}
+					// Set the MCP server after building
+					$prompt->set_mcp_server( $this );
 
-						// Add the prompt to this server
-						$this->prompts[ $prompt->get_name() ] = $prompt;
-
-						// Track successful prompt registration
-						$this->observability_handler::record_event(
-							'mcp.component.registered',
-							array(
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'server_id'      => $this->server_id,
-							)
-						);
-					} catch ( InvalidArgumentException $e ) {
-						if ( $this->error_handler ) {
-							$this->error_handler->log( $e->getMessage(), array( "McpPromptBuilder::{$prompt_item}" ) );
-						}
-
-						// Track prompt registration failure
-						$this->observability_handler::record_event(
-							'mcp.component.registration_failed',
-							array(
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'error_type'     => get_class( $e ),
-								'server_id'      => $this->server_id,
-							)
-						);
+					// Validate if validation is enabled
+					if ( $this->is_mcp_validation_enabled() ) {
+						$prompt->validate( "McpPromptBuilder::{$prompt_item}" );
 					}
-				} else {
-					// Treat as ability name (legacy behavior)
-					try {
-						// Use RegisterMcpPrompt to handle all validation and processing.
-						$prompt = RegisterAbilityAsMcpPrompt::make( $prompt_item, $this );
 
-						// Add the processed prompts to this server.
-						$this->prompts[ $prompt->get_name() ] = $prompt;
+					// Add the prompt to this server
+					$this->prompts[ $prompt->get_name() ] = $prompt;
 
-						// Track successful prompt registration.
-						$this->observability_handler::record_event(
-							'mcp.component.registered',
-							array(
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'server_id'      => $this->server_id,
-							)
-						);
-					} catch ( InvalidArgumentException $e ) {
-						if ( $this->error_handler ) {
-							$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
-						}
-
-						// Track prompt registration failure.
-						$this->observability_handler::record_event(
-							'mcp.component.registration_failed',
-							array(
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'error_type'     => get_class( $e ),
-								'server_id'      => $this->server_id,
-							)
-						);
+					// Track successful prompt registration
+					$this->observability_handler::record_event(
+						'mcp.component.registered',
+						array(
+							'component_type' => 'prompt',
+							'component_name' => $prompt_item,
+							'server_id'      => $this->server_id,
+						)
+					);
+				} catch ( \InvalidArgumentException $e ) {
+					if ( $this->error_handler ) {
+						$this->error_handler->log( $e->getMessage(), array( "McpPromptBuilder::{$prompt_item}" ) );
 					}
+
+					// Track prompt registration failure
+					$this->observability_handler::record_event(
+						'mcp.component.registration_failed',
+						array(
+							'component_type' => 'prompt',
+							'component_name' => $prompt_item,
+							'error_type'     => get_class( $e ),
+							'server_id'      => $this->server_id,
+						)
+					);
+				}
+			} else {
+				// Treat as ability name (legacy behavior)
+				try {
+					// Use RegisterMcpPrompt to handle all validation and processing.
+					$prompt = RegisterAbilityAsMcpPrompt::make( $prompt_item, $this );
+
+					// Add the processed prompts to this server.
+					$this->prompts[ $prompt->get_name() ] = $prompt;
+
+					// Track successful prompt registration.
+					$this->observability_handler::record_event(
+						'mcp.component.registered',
+						array(
+							'component_type' => 'prompt',
+							'component_name' => $prompt_item,
+							'server_id'      => $this->server_id,
+						)
+					);
+				} catch ( \InvalidArgumentException $e ) {
+					if ( $this->error_handler ) {
+						$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
+					}
+
+					// Track prompt registration failure.
+					$this->observability_handler::record_event(
+						'mcp.component.registration_failed',
+						array(
+							'component_type' => 'prompt',
+							'component_name' => $prompt_item,
+							'error_type'     => get_class( $e ),
+							'server_id'      => $this->server_id,
+						)
+					);
 				}
 			}
 		}
@@ -456,7 +459,7 @@ class McpServer {
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return McpResource[]
+	 * @return \WP\MCP\Domain\Resources\McpResource[]
 	 */
 	public function get_resources(): array {
 		return $this->resources;
@@ -476,7 +479,7 @@ class McpServer {
 	 *
 	 * @param string $tool_name Tool name.
 	 *
-	 * @return McpTool|null
+	 * @return \WP\MCP\Domain\Tools\McpTool|null
 	 */
 	public function get_tool( string $tool_name ): ?McpTool {
 		return $this->tools[ $tool_name ] ?? null;
@@ -487,7 +490,7 @@ class McpServer {
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
-	 * @return McpResource|null
+	 * @return \WP\MCP\Domain\Resources\McpResource|null
 	 */
 	public function get_resource( string $resource_uri ): ?McpResource {
 		return $this->resources[ $resource_uri ] ?? null;
@@ -498,7 +501,7 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return McpPrompt|null
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
 	 */
 	public function get_prompt( string $prompt_name ): ?McpPrompt {
 		return $this->prompts[ $prompt_name ] ?? null;
@@ -560,13 +563,13 @@ class McpServer {
 	 *
 	 * @param array $mcp_transports Array of MCP transport class names to initialize.
 	 *
-	 * @throws Exception If any transport class does not implement McpTransportInterface.
+	 * @throws \Exception If any transport class does not implement McpTransportInterface.
 	 */
 	public function initialize_transport( array $mcp_transports ): void {
 		foreach ( $mcp_transports as $mcp_transport ) {
 			// Check for interface implementation
 			if ( ! in_array( McpTransportInterface::class, class_implements( $mcp_transport ) ?: array(), true ) ) {
-				throw new Exception(
+				throw new \Exception(
 					esc_html__( 'MCP transport class must implement the McpTransportInterface.', 'mcp-adapter' )
 				);
 			}
@@ -580,7 +583,7 @@ class McpServer {
 	/**
 	 * Create transport context with all required dependencies.
 	 *
-	 * @return McpTransportContext
+	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
 	private function create_transport_context(): McpTransportContext {
 		// Create handlers

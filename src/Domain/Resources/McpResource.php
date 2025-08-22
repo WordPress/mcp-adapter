@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
-use InvalidArgumentException;
 use WP\MCP\Core\McpServer;
 use WP_Ability;
 
@@ -83,7 +82,7 @@ class McpResource {
 	/**
 	 * The MCP server instance this resource belongs to.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp_server;
 
@@ -185,7 +184,7 @@ class McpResource {
 	/**
 	 * Get the ability name.
 	 *
-	 * @return WP_Ability|null
+	 * @return \WP_Ability|null
 	 */
 	public function get_ability(): ?WP_Ability {
 		return wp_get_ability( $this->ability );
@@ -234,9 +233,11 @@ class McpResource {
 	public function set_text( ?string $text ): void {
 		$this->text = $text;
 		// Clear blob content if setting text.
-		if ( ! is_null( $text ) ) {
-			$this->blob = null;
+		if ( is_null( $text ) ) {
+			return;
 		}
+
+		$this->blob = null;
 	}
 
 	/**
@@ -249,9 +250,11 @@ class McpResource {
 	public function set_blob( ?string $blob ): void {
 		$this->blob = $blob;
 		// Clear text content if setting blob.
-		if ( ! is_null( $blob ) ) {
-			$this->text = null;
+		if ( is_null( $blob ) ) {
+			return;
 		}
+
+		$this->text = null;
 	}
 
 	/**
@@ -291,7 +294,7 @@ class McpResource {
 	/**
 	 * Get the MCP server instance this resource belongs to.
 	 *
-	 * @return McpServer
+	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
 		return $this->mcp_server;
@@ -348,10 +351,10 @@ class McpResource {
 	 * Create an McpResource instance from an array.
 	 *
 	 * @param array     $data Array containing resource data.
-	 * @param McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return self
-	 * @throws InvalidArgumentException If required fields are missing or validation fails.
+	 * @throws \WP\MCP\Domain\Resources\InvalidArgumentException If required fields are missing or validation fails.
 	 */
 	public static function from_array( array $data, McpServer $mcp_server ): self {
 		$resource = new self(
@@ -393,10 +396,10 @@ class McpResource {
 	 *
 	 * @param string $context Optional context for error messages.
 	 *
-	 * @return McpResource
-	 * @throws InvalidArgumentException If validation fails.
+	 * @return \WP\MCP\Domain\Resources\McpResource
+	 * @throws \WP\MCP\Domain\Resources\InvalidArgumentException If validation fails.
 	 */
-	public function validate( string $context = '' ): McpResource {
+	public function validate( string $context = '' ): self {
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}

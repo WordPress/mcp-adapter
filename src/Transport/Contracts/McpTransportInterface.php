@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Contracts;
 
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP_Error;
 
 /**
  * Interface for MCP transport protocols.
@@ -24,16 +23,16 @@ interface McpTransportInterface {
 	/**
 	 * Initialize the transport with provided context.
 	 *
-	 * @param McpTransportContext $context Dependency injection container.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context Dependency injection container.
 	 */
 	public function __construct( McpTransportContext $context );
 
 	/**
 	 * Check if the user has permission to access the MCP API.
 	 *
-	 * @return bool|WP_Error True if allowed, WP_Error or false if not.
+	 * @return bool|\WP_Error True if allowed, WP_Error or false if not.
 	 */
-	public function check_permission(): WP_Error|bool;
+	public function check_permission(): \WP_Error|bool;
 
 	/**
 	 * Handle incoming requests.

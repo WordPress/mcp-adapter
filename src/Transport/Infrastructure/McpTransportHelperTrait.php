@@ -28,7 +28,7 @@ trait McpTransportHelperTrait {
 	 */
 	protected function get_transport_name(): string {
 		// Get the class name without namespace.
-		$class_name = substr( strrchr( get_class( $this ), '\\' ), 1 );
+		$class_name = substr( strrchr( static::class, '\\' ), 1 );
 
 		// Remove common suffixes and convert to lowercase.
 		$transport_name = strtolower(

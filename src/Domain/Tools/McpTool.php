@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
-use InvalidArgumentException;
 use WP\MCP\Core\McpServer;
 use WP_Ability;
 
@@ -76,7 +75,7 @@ class McpTool {
 	/**
 	 * The MCP server instance this tool belongs to.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp_server;
 
@@ -112,7 +111,7 @@ class McpTool {
 	/**
 	 * Get the ability name.
 	 *
-	 * @return WP_Ability|null
+	 * @return \WP_Ability|null
 	 */
 	public function get_ability(): ?WP_Ability {
 		return wp_get_ability( $this->ability );
@@ -253,7 +252,7 @@ class McpTool {
 	/**
 	 * Get the MCP server instance this tool belongs to.
 	 *
-	 * @return McpServer
+	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
 		return $this->mcp_server;
@@ -262,7 +261,7 @@ class McpTool {
 	/**
 	 * Set the MCP server instance this tool belongs to.
 	 *
-	 * @param McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return void
 	 */
@@ -303,10 +302,10 @@ class McpTool {
 	 * Create an McpTool instance from an array.
 	 *
 	 * @param array     $data Array containing tool data.
-	 * @param McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return self
-	 * @throws InvalidArgumentException If required fields are missing or validation fails.
+	 * @throws \WP\MCP\Domain\Tools\InvalidArgumentException If required fields are missing or validation fails.
 	 */
 	public static function from_array( array $data, McpServer $mcp_server ): self {
 		$tool = new self(
@@ -330,7 +329,7 @@ class McpTool {
 	 * @param string $context Optional context for error messages.
 	 *
 	 * @return self Returns the validated tool instance.
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public function validate( string $context = '' ): self {
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {

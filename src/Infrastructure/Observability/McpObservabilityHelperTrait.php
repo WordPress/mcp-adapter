@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Infrastructure\Observability;
 
-use Throwable;
-
 /**
  * Trait McpObservabilityHelperTrait
  *
@@ -96,12 +94,12 @@ trait McpObservabilityHelperTrait {
 	 * Record an error event with standardized error categorization.
 	 *
 	 * @param string     $base_event The base event name (e.g., 'mcp.tool.execution').
-	 * @param Throwable $exception The exception that occurred.
+	 * @param \Throwable $exception The exception that occurred.
 	 * @param array      $additional_tags Additional context tags.
 	 *
 	 * @return void
 	 */
-	public static function record_error_event( string $base_event, Throwable $exception, array $additional_tags = array() ): void {
+	public static function record_error_event( string $base_event, \Throwable $exception, array $additional_tags = array() ): void {
 		$error_tags = array_merge(
 			array(
 				'error_type'         => get_class( $exception ),
@@ -117,11 +115,11 @@ trait McpObservabilityHelperTrait {
 	/**
 	 * Categorize an exception into a general error category.
 	 *
-	 * @param Throwable $exception The exception to categorize.
+	 * @param \Throwable $exception The exception to categorize.
 	 *
 	 * @return string
 	 */
-	public static function categorize_error( Throwable $exception ): string {
+	public static function categorize_error( \Throwable $exception ): string {
 		return match ( get_class( $exception ) ) {
 			'InvalidArgumentException' => 'validation',
 			'RuntimeException' => 'execution',
