@@ -2,7 +2,7 @@
 /**
  * Abstract base class for building MCP prompts.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

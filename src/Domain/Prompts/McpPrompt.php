@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Prompt class for representing MCP prompts according to the specification.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

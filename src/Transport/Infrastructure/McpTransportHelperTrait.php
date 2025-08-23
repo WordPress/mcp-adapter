@@ -2,7 +2,7 @@
 /**
  * Helper trait for MCP transport implementations providing shared utility methods.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Server class for managing server-specific tools, resources, and prompts.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

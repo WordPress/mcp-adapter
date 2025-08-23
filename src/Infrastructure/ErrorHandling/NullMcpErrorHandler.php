@@ -2,7 +2,7 @@
 /**
  * NullMcpErrorHandler class for handling MCP errors without logging.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

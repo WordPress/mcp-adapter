@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Tool class for representing MCP tools according to the specification.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

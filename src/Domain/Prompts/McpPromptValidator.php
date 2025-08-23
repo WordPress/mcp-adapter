@@ -2,7 +2,7 @@
 /**
  * MCP Prompt Validator class for validating MCP prompts according to the specification.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

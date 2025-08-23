@@ -2,7 +2,7 @@
 /**
  * ErrorLogMcpErrorHandler class for logging MCP errors to PHP error log.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

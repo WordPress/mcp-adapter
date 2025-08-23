@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );
@@ -19,13 +19,13 @@ use WP\MCP\Core\McpServer;
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  */
-class McpAdapter {
+class McpAdapterRegistry {
 	/**
 	 * Registry instance
 	 *
-	 * @var McpAdapter|null
+	 * @var McpAdapterRegistry|null
 	 */
-	private static ?McpAdapter $instance = null;
+	private static ?McpAdapterRegistry $instance = null;
 
 	/**
 	 * The initialized flag.
@@ -123,9 +123,9 @@ class McpAdapter {
 	/**
 	 * Get the registry instance
 	 *
-	 * @return McpAdapter|null Returns null if initialization failed due to missing dependencies.
+	 * @return McpAdapterRegistry|null Returns null if initialization failed due to missing dependencies.
 	 */
-	public static function instance(): ?McpAdapter {
+	public static function instance(): ?McpAdapterRegistry {
 		if ( null === self::$instance && ! self::$initialization_failed ) {
 			self::$instance = new self();
 		}
@@ -188,7 +188,7 @@ class McpAdapter {
 	 * @param array         $prompts Prompts to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @return McpAdapter
+	 * @return McpAdapterRegistry
 	 * @throws Exception If the server already exists or if called outside of the mcp_adapter_init action.
 	 */
 	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ): self {

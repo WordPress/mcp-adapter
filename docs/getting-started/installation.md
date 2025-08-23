@@ -27,7 +27,7 @@ and works in any WordPress environment.
    // In your main plugin file or theme's functions.php
    
    // Check if the class isn't already loaded by another plugin
-   if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+   if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
        // Load the Jetpack autoloader
        if ( is_file( ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php' ) ) {
            require_once ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
@@ -38,7 +38,7 @@ and works in any WordPress environment.
 3. **Verify the installation**:
    ```php
    // Test that the adapter is available
-   if ( class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+   if ( class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
        error_log( 'MCP Adapter loaded successfully' );
    } else {
        error_log( 'MCP Adapter failed to load' );
@@ -84,7 +84,7 @@ class MyMcpPlugin {
     }
     
     private function load_mcp_adapter() {
-        if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+        if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
             $autoloader_path = ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
             if ( is_file( $autoloader_path ) ) {
                 require_once $autoloader_path;
@@ -131,10 +131,10 @@ If your project uses Composer, you can install the adapter for enhanced dependen
    // If using Composer autoloading
    require_once __DIR__ . '/vendor/autoload.php';
    
-   use WP\MCP\Core\McpAdapter;
+   use WP\MCP\Core\McpAdapterRegistry;
    
    // The adapter is now available
-   $adapter = McpAdapter::instance();
+   $adapter = McpAdapterRegistry::instance();
    ```
 
 #### Composer Benefits
@@ -171,7 +171,7 @@ For system-wide implementations, the adapter can be installed as part of the mu-
 // In wp-content/mu-plugins/my-mcp-plugin/my-mcp-plugin.php
 
 // Load the MCP adapter from the shared library location
-if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
     $autoloader_path = ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
     if ( is_file( $autoloader_path ) ) {
         require_once $autoloader_path;
@@ -191,11 +191,11 @@ Create a simple test to ensure everything is working:
 <?php
 // Add this to a plugin or theme temporarily
 add_action( 'wp_loaded', function() {
-    if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+    if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
         wp_die( 'MCP Adapter not loaded' );
     }
     
-    $adapter = \WP\MCP\Core\McpAdapter::instance();
+    $adapter = \WP\MCP\Core\McpAdapterRegistry::instance();
     error_log( 'MCP Adapter version: ' . $adapter->get_version() );
     
     // Test basic functionality

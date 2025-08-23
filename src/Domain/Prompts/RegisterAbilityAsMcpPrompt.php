@@ -2,7 +2,7 @@
 /**
  * RegisterAbilityAsMcpPrompt class for converting WordPress abilities to MCP prompts.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 namespace WP\MCP\Domain\Prompts;

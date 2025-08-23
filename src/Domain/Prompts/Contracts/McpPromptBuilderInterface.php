@@ -2,7 +2,7 @@
 /**
  * Interface for MCP Prompt Builders.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

@@ -2,7 +2,7 @@
 /**
  * NullMcpObservabilityHandler class for handling MCP observability without tracking.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

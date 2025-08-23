@@ -36,7 +36,7 @@ if ( ! is_file( $autoloader_path ) ) {
 }
 
 // Verify loading
-if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
     error_log( 'MCP Adapter classes not available after loading autoloader' );
 }
 ```
@@ -59,12 +59,12 @@ find wp-content/lib/mcp-adapter/ -type d -exec chmod 755 {} \;
 // Ensure MCP Adapter loads before your plugin
 add_action( 'plugins_loaded', function() {
     // Load MCP Adapter first
-    if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+    if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
         require_once ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
     }
     
     // Then initialize your MCP functionality
-    if ( class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+    if ( class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
         // Your MCP setup code
     } else {
         error_log( 'MCP Adapter failed to load' );
@@ -140,8 +140,8 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
 ```php
 // Check if server was registered
 add_action( 'init', function() {
-    if ( class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
-        $adapter = \WP\MCP\Core\McpAdapter::instance();
+    if ( class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
+        $adapter = \WP\MCP\Core\McpAdapterRegistry::instance();
         $servers = $adapter->get_servers();
         
         error_log( 'Registered MCP servers: ' . implode( ', ', array_keys( $servers ) ) );
@@ -915,10 +915,10 @@ add_action( 'rest_api_init', function() {
         register_rest_route( 'mcp-debug/v1', '/info', [
             'methods' => 'GET',
             'callback' => function() {
-                $adapter = \WP\MCP\Core\McpAdapter::instance();
+                $adapter = \WP\MCP\Core\McpAdapterRegistry::instance();
                 
                 return [
-                    'mcp_adapter_loaded' => class_exists( 'WP\MCP\Core\McpAdapter' ),
+                    'mcp_adapter_loaded' => class_exists( 'WP\MCP\Core\McpAdapterRegistry' ),
                     'abilities_api_loaded' => function_exists( 'wp_register_ability' ),
                     'servers' => array_keys( $adapter->get_servers() ),
                     'php_version' => PHP_VERSION,

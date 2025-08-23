@@ -3,7 +3,7 @@
  * MCP REST Transport for WordPress.
  * The REST transport requires the mcp-wordpress-remote proxy to be used with your MCP client.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

@@ -27,7 +27,7 @@ Add this to your plugin or theme's main file:
 ```php
 <?php
 // Check if the class isn't already loaded by another plugin
-if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+if ( ! class_exists( 'WP\MCP\Core\McpAdapterRegistry' ) ) {
     // Load the Jetpack autoloader
     if ( is_file( ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php' ) ) {
         require_once ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
@@ -99,7 +99,7 @@ add_action( 'abilities_api_init', function() {
 Now let's create an MCP server that exposes this ability:
 
 ```php
-use WP\MCP\Core\McpAdapter;
+use WP\MCP\Core\McpAdapterRegistry;
 
 // Hook into the MCP adapter initialization
 add_action( 'mcp_adapter_init', function( $adapter ) {

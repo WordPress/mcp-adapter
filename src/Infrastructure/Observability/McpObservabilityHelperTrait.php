@@ -2,7 +2,7 @@
 /**
  * Helper trait for MCP observability handlers providing shared utility methods.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

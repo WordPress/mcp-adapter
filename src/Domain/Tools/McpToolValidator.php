@@ -2,7 +2,7 @@
 /**
  * MCP Tool Validator class for validating MCP tools according to the specification.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

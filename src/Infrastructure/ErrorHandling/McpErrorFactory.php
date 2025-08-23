@@ -2,7 +2,7 @@
 /**
  * Factory class for creating MCP error responses.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

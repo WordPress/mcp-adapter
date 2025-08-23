@@ -2,7 +2,7 @@
 /**
  * System method handlers for MCP requests.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

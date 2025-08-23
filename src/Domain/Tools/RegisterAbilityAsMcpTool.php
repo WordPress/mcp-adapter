@@ -2,7 +2,7 @@
 /**
  * RegisterAbilityAsMcpTool class for converting WordPress abilities to MCP tools.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );
@@ -18,7 +18,7 @@ use WP_Ability;
  *
  * This class registers a WordPress ability as an MCP tool.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 class RegisterAbilityAsMcpTool {
 

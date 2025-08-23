@@ -2,7 +2,7 @@
 /**
  * Service for routing MCP requests to appropriate handlers.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

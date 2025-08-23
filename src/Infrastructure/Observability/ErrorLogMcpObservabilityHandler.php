@@ -2,7 +2,7 @@
 /**
  * ErrorLogMcpObservabilityHandler class for logging MCP observability metrics to PHP error log.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

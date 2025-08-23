@@ -2,7 +2,7 @@
 /**
  * RegisterAbilityAsMcpResource class for converting WordPress abilities to MCP resources.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

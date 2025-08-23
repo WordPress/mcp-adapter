@@ -2,7 +2,7 @@
 /**
  * Interface for MCP transport protocols.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );

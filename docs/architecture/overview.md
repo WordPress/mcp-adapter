@@ -396,7 +396,7 @@ if ($error_handler) {
 The `McpAdapter` class uses the singleton pattern to ensure a single point of coordination:
 
 ```php
-use WP\MCP\Core\McpAdapter;
+use WP\MCP\Core\McpAdapterRegistry;
 
 class McpAdapter {
     private static ?McpAdapter $instance = null;

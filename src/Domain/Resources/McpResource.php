@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Resource class for representing MCP resources according to the specification.
  *
- * @package McpAdapter
+ * @package McpAdapterRegistry
  */
 
 declare( strict_types=1 );
