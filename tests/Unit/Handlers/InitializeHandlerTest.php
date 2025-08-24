@@ -14,15 +14,15 @@ final class InitializeHandlerTest extends TestCase {
 
 	public function test_handle_returns_expected_shape(): void {
 		$server = new McpServer(
-			server_id: 'test',
-			server_route_namespace: 'mcp/v1',
-			server_route: '/mcp',
-			server_name: 'Test Server',
-			server_description: 'Desc',
-			server_version: '1.0.0',
-			mcp_transports: array(),
-			error_handler: DummyErrorHandler::class,
-			observability_handler: DummyObservabilityHandler::class,
+			'test',
+			'mcp/v1',
+			'/mcp',
+			'Test Server',
+			'Desc',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
 		);
 
 		$handler = new InitializeHandler( $server );

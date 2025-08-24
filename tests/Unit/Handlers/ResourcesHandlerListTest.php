@@ -24,16 +24,16 @@ final class ResourcesHandlerListTest extends TestCase {
 		wp_set_current_user( 1 );
 
 		$server = new McpServer(
-			server_id: 'srv',
-			server_route_namespace: 'mcp/v1',
-			server_route: '/mcp',
-			server_name: 'Srv',
-			server_description: 'desc',
-			server_version: '0.0.1',
-			mcp_transports: array(),
-			error_handler: DummyErrorHandler::class,
-			observability_handler: DummyObservabilityHandler::class,
-			resources: array( 'test/resource' ),
+			'srv',
+			'mcp/v1',
+			'/mcp',
+			'Srv',
+			'desc',
+			'0.0.1',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
+			array( 'test/resource' ),
 		);
 
 		$handler = new ResourcesHandler( $server );
