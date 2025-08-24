@@ -71,8 +71,7 @@
 		}
 	},
 	"require": {
-		"php": ">=7.4",
-		"automattic/jetpack-autoloader": "^5.0"
+		"php": "^7.4 || ^8.0"
 	},
 	"require-dev": {
 		"automattic/vipwpcs": "^3.0",
@@ -80,14 +79,13 @@
 		"phpcompatibility/phpcompatibility-wp": "^2.1",
 		"phpunit/phpunit": "^9.6",
 		"slevomat/coding-standard": "^8.0",
+		"wp-phpunit/wp-phpunit": "^6.5",
 		"wpackagist-plugin/plugin-check": "^1.6",
 		"yoast/phpunit-polyfills": "^4.0"
 	},
 	"scripts": {
 		"lint:php": "phpcs",
 		"lint:php:fix": "phpcbf",
-		"test": "vendor/bin/phpunit -c phpunit.xml.dist",
-		"test:install": "bash bin/install-wp-tests.sh mcp_adapter_test root \"\" localhost latest true",
-		"test:install:env": "bash bin/install-wp-tests.sh ${DB_NAME:-mcp_adapter_test} ${DB_USER:-root} \"${DB_PASS:-}\" ${DB_HOST:-localhost} ${WP_VERSION:-latest} ${SKIP_DB_CREATE:-true}"
+		"test": "phpunit --strict-coverage"
 	}
 }

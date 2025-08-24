@@ -55,9 +55,16 @@ You can use Docker and the `wp-env` tool to set up a local development environme
    ## Then install the NPM dependencies:
    npm install
 
-   # Then install the composer dependencies:
+   # If you are using Composer locally, also run:
    composer install
    ```
+
+3. Start the local development environment:
+   ```bash
+   npm run wp-env start
+   ```
+
+The WordPress development site will be available at http://localhost:8888 and the WP Admin Dashboard will be available at http://localhost:8888/wp-admin/. You can log in to the admin using the username `admin` and password `password`.
 
 ### Useful Commands
 
@@ -66,9 +73,45 @@ You can use Docker and the `wp-env` tool to set up a local development environme
 - `composer install`: Install PHP dependencies.
 - `npm install`: Install JavaScript dependencies.
 
+#### Accessing the Local Environment
+
+- `npm run wp-env start`: Start the local development environment.
+- `npm run wp-env stop`: Stop the local development environment.
+- `npm run wp-env run tests-cli YOUR_CMD_HERE`: Run WP-CLI commands in the local environment.
+
+For more information on using `wp-env`, see the [wp-env documentation](https://developer.wordpress.org/block-editor/packages/packages-env/).
+
 #### Linting and Formatting
 
 - `npm run lint:php`: Runs PHPCS linting on the PHP code.
 - `npm run lint:php:fix`: Autofixes PHPCS linting issues.
 - `npm run format`: Formats non-PHP files using Prettier.
 
+### Running Tests
+
+PHPUnit tests can be run using the following command:
+
+```bash
+npm run test:php
+```
+
+To generate a code coverage report, make sure to start the testing environment with coverage mode enabled:
+
+```bash
+npm run env start -- --xdebug=coverage
+
+npm run test:php
+```
+
+You should see the html coverage report in the `tests/_output/html` directory and the clover XML report in `tests/_output/php-coverage.xml`.
+
+### Building the plugin for distribution
+
+To build the plugin for distribution, you can use the following command:
+
+```bash
+# IMPORTANT!: Make sure you've cleaned up any dev-dependencies from Composer first:
+composer install --no-dev
+
+npm run plugin-zip
+```

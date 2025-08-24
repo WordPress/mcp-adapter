@@ -8,6 +8,7 @@
 
 	<!-- What to scan: include any root-level PHP files, and the /src folder -->
 	<file>./src/</file>
+	<file>./mcp-adapter.php</file>
 
 	<!-- These are excluded from the above paths.-->
 	<exclude-pattern>**/build/**</exclude-pattern>

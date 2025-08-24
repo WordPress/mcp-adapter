@@ -11,12 +11,26 @@
 		"npm": ">=10.2.3"
 	},
 	"devDependencies": {
-		"@wordpress/scripts": "^30.22.0",
-		"@wordpress/prettier-config": "^4.29.0"
+		"@wordpress/env": "^10.28.0",
+		"@wordpress/scripts": "^30.21.0",
+		"@wordpress/prettier-config": "^4.28.0"
 	},
+	"files": [
+		"src",
+		"vendor",
+		"LICENSE",
+		"CHANGELOG.md",
+		"README.md",
+		"readme.txt",
+		"mcp-adapter.php"
+	],
 	"scripts": {
+		"build": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer install --no-dev --optimize-autoloader",
+		"plugin-zip": "wp-scripts plugin-zip",
 		"format": "wp-scripts format",
-		"lint:php": "composer run-script lint:php",
-		"lint:php:fix": "composer run-script lint:php:fix"
+		"lint:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php",
+		"lint:php:fix": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:fix",
+		"test:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
+		"wp-env": "wp-env"
 	}
 }

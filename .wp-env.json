@@ -1,0 +1,20 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
+	"core": null,
+	"plugins": ["WordPress/abilities-api", "./."],
+	"env": {
+		"development": {
+			"config": {
+				"WP_DEVELOPMENT_MODE": "plugin"
+			}
+		},
+		"tests": {
+			"config": {
+				"FS_METHOD": "direct"
+			},
+			"mappings": {
+				"/wp-content/plugins/mcp-adapter": "."
+			}
+		}
+	}
+}
