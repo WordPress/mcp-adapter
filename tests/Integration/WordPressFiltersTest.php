@@ -15,15 +15,15 @@ final class WordPressFiltersTest extends TestCase {
 		add_filter( 'mcp_validation_enabled', '__return_false' );
 
 		$server = new McpServer(
-			server_id: 'srv',
-			server_route_namespace: 'mcp/v1',
-			server_route: '/mcp',
-			server_name: 'Srv',
-			server_description: 'desc',
-			server_version: '0.0.1',
-			mcp_transports: array(),
-			error_handler: DummyErrorHandler::class,
-			observability_handler: DummyObservabilityHandler::class,
+			'srv',
+			'mcp/v1',
+			'/mcp',
+			'Srv',
+			'desc',
+			'0.0.1',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
 		);
 
 		$this->assertFalse( $server->is_mcp_validation_enabled() );

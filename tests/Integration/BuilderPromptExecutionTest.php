@@ -63,15 +63,15 @@ final class BuilderPromptExecutionTest extends TestCase {
 
 	private function makeServer(): McpServer {
 		return new McpServer(
-			server_id: 'test-srv',
-			server_route_namespace: 'mcp/v1',
-			server_route: '/mcp',
-			server_name: 'Test Server',
-			server_description: 'Test server for builder prompts',
-			server_version: '1.0.0',
-			mcp_transports: array(),
-			error_handler: DummyErrorHandler::class,
-			observability_handler: DummyObservabilityHandler::class,
+			'test-srv',
+			'mcp/v1',
+			'/mcp',
+			'Test Server',
+			'Test server for builder prompts',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
 		);
 	}
 
