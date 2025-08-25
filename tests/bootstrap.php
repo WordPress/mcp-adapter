@@ -2,7 +2,7 @@
 /**
  * Bootstrap the PHPUnit tests.
  *
- * @package abilities-api
+ * @package mcp-adapter
  *
  * phpcs:disable WordPress.NamingConventions.PrefixAllGlobals
  * phpcs:disable WordPressVIPMinimum.Files.IncludingFile.UsingVariable
