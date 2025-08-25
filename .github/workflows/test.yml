@@ -153,3 +153,112 @@ jobs:
         with:
           path: mcp-adapter/tests/_output
           key: 'phpstan-result-cache-${{ runner.os }}-date-${{ steps.get-date.outputs.date }}'
+
+  # Runs the PHPUnit tests for WordPress.
+  #
+  # Performs the following steps:
+  # - Sets environment variables.
+  # - Checks out the repository.
+  # - Sets up PHP.
+  # - Installs Composer dependencies.
+  # - Sets up Node.js.
+  # - Installs npm dependencies.
+  # - Starts the WordPress Docker testing environment (with or without Xdebug coverage).
+  # - Logs PHP and WordPress versions from the container.
+  # - Runs PHPUnit tests (with coverage if enabled).
+  # - Uploads code coverage report to Codecov.io (if coverage is enabled).
+  # - Uploads HTML coverage report as an artifact (if coverage is enabled).
+  phpunit:
+    name: Test PHP ${{ matrix.php }} WP ${{ matrix.wp }}${{ matrix.coverage && ' with coverage' || '' }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.3', '8.2', '8.1', '8.0', '7.4']
+        wp: [latest, trunk]
+        coverage: [false]
+        include:
+          - php: '8.4'
+            wp: latest
+            coverage: true
+    env:
+      WP_ENV_PHP_VERSION: ${{ matrix.php }}
+      WP_ENV_CORE: ${{ matrix.wp == 'trunk' && 'WordPress/WordPress' || format( 'https://wordpress.org/wordpress-{0}.zip', matrix.wp ) }}
+
+    steps:
+      - name: Configure environment variables
+        run: |
+          echo "PHP_FPM_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "PHP_FPM_GID=$(id -g)" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
+          persist-credentials: false
+
+      ##
+      # This allows Composer dependencies to be installed using a single step.
+      #
+      # Since the tests are currently run within the Docker containers where the PHP version varies,
+      # the same PHP version needs to be configured for the action runner machine so that the correct
+      # dependency versions are installed and cached.
+      ##
+      - name: Set up PHP
+        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        with:
+          php-version: '${{ matrix.php }}'
+          coverage: none
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          cache: 'npm'
+          node-version-file: '.nvmrc'
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Start the Docker testing environment
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          command: |
+            if [ "${{ matrix.coverage }}" == "true" ]; then
+            npm run wp-env start -- --xdebug=coverage
+            else
+            npm run wp-env start
+            fi
+
+      - name: Log versions
+        run: |
+          npm run wp-env -- run cli php -- -v
+          npm run wp-env -- run cli wp core version
+
+      - name: Run PHPUnit tests${{ matrix.coverage && ' with coverage report' || '' }}
+        id: phpunit
+        run: |
+          npm run test:php
+
+      # @TODO: Reenable once a Codecov token has been configured.
+      # - name: Upload code coverage report
+      #   continue-on-error: true
+      #   if: ${{ matrix.coverage }}
+      #   uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}
+      #     files: tests/_output/php-coverage.xml
+      #     flags: unit
+      #     fail_ci_if_error: true
+
+      - name: Upload HTML coverage report as artifact
+        if: ${{ matrix.coverage }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: wp-code-coverage-${{ matrix.php }}-${{ matrix.wp }}
+          path: tests/_output/html
+          overwrite: true
