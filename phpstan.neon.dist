@@ -20,7 +20,7 @@ parameters:
 		bootstrapFiles:
 			- mcp-adapter.php
 		paths:
-				- src/
+				- includes/
 		scanDirectories:
 			- ../abilities-api
 		excludePaths:

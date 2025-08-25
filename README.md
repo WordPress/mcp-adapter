@@ -123,7 +123,7 @@ patterns for various use cases.
 ### Component Overview
 
 ```
-./src
+./includes/
 │   # Core system components
 ├── Core/
 │   ├── McpAdapter.php # Main registry and server management

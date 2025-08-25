@@ -156,7 +156,7 @@ If your project uses Composer, you can install the adapter for enhanced dependen
     },
     "autoload": {
         "psr-4": {
-            "MyCompany\\MyPlugin\\": "src/"
+            "MyCompany\\MyPlugin\\": "includes/"
         }
     }
 }

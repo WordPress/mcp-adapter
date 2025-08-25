@@ -16,7 +16,7 @@
 		"@wordpress/prettier-config": "^4.29.0"
 	},
 	"files": [
-		"src",
+		"includes",
 		"vendor",
 		"LICENSE",
 		"CHANGELOG.md",

@@ -23,7 +23,7 @@
 	</testsuites>
 	<coverage processUncoveredFiles="false">
 		<include>
-			<directory suffix=".php">src</directory>
+			<directory suffix=".php">includes</directory>
 			<file>mcp-adapter.php</file>
 		</include>
 		<report>

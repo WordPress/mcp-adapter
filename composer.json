@@ -61,7 +61,7 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"WP\\MCP\\": "src/"
+			"WP\\MCP\\": "includes/"
 		}
 	},
 	"autoload-dev": {

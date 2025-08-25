@@ -6,8 +6,8 @@
 >
 	<description>Sniffs for the MCP Adapter plugin</description>
 
-	<!-- What to scan: include any root-level PHP files, and the /src folder -->
-	<file>./src/</file>
+	<!-- What to scan: include any root-level PHP files, and the /includes folder -->
+	<file>./includes/</file>
 	<file>./mcp-adapter.php</file>
 
 	<!-- These are excluded from the above paths.-->

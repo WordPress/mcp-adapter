@@ -44,7 +44,7 @@ function constants(): void {
 }
 
 constants();
-require_once __DIR__ . '/src/Autoloader.php';
+require_once __DIR__ . '/includes/Autoloader.php';
 
 // If autoloader failed, we cannot proceed.
 if ( ! Autoloader::autoload() ) {
