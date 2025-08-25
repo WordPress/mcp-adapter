@@ -71,7 +71,7 @@ final class Autoloader {
 			add_action(
 				$hook,
 				static function () {
-						$error_message = __( 'MCP Adapter: The Composer autoloader was not found. If you installed the plugin from the GitHub source code, make sure to run `composer install`.', 'mcp-adapter' );
+					$error_message = __( 'MCP Adapter: The Composer autoloader was not found. If you installed the plugin from the GitHub source code, make sure to run `composer install`.', 'mcp-adapter' );
 
 					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 						error_log( esc_html( $error_message ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- This is a development notice.
