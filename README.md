@@ -272,7 +272,7 @@ Until the plugin is available on Packagist, you will need to add the repository 
     {
       "type": "vcs",
       "url": "https://github.com/WordPress/abilities-api.git"
-    }
+    },
     {
       "type": "vcs",
       "url": "https://github.com/WordPress/mcp-adapter.git"
