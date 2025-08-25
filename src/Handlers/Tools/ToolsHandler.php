@@ -325,7 +325,7 @@ class ToolsHandler {
 	/**
 	 * Categorize an exception into a general error category.
 	 *
-	 * @param \Exception $exception The exception to categorize.
+	 * @param \Throwable $exception The exception to categorize.
 	 *
 	 * @return string
 	 */

@@ -140,7 +140,7 @@ class McpServer {
 	 * @param array                                               $prompts Optional prompts to register during construction.
 	 * @param callable|null                                       $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @throws \WP\MCP\Core\Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
+	 * @throws \Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
 	 */
 	public function __construct(
 		string $server_id,
@@ -168,7 +168,7 @@ class McpServer {
 		$this->server_version         = $server_version;
 
 		// Validate and set transport permission callback
-		if ( $transport_permission_callback !== null && ! is_callable( $transport_permission_callback ) ) {
+		if ( null !== $transport_permission_callback && ! is_callable( $transport_permission_callback ) ) {
 			throw new \InvalidArgumentException(
 				esc_html__( 'Transport permission callback must be callable.', 'mcp-adapter' )
 			);

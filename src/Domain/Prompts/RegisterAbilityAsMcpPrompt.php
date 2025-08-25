@@ -54,7 +54,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt Returns prompt instance if valid
-	 * @throws \WP\MCP\Domain\Prompts\InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	public static function make( string $ability_name, McpServer $mcp_server ): McpPrompt {
 		$prompt = new self( $ability_name, $mcp_server );

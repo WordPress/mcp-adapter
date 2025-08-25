@@ -354,7 +354,7 @@ class McpResource {
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return self
-	 * @throws \WP\MCP\Domain\Resources\InvalidArgumentException If required fields are missing or validation fails.
+	 * @throws \InvalidArgumentException If required fields are missing or validation fails.
 	 */
 	public static function from_array( array $data, McpServer $mcp_server ): self {
 		$resource = new self(
@@ -397,7 +397,7 @@ class McpResource {
 	 * @param string $context Optional context for error messages.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource
-	 * @throws \WP\MCP\Domain\Resources\InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public function validate( string $context = '' ): self {
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {

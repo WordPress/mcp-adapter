@@ -55,7 +55,7 @@ class RegisterAbilityAsMcpResource {
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource Returns resource instance if valid
-	 * @throws \WP\MCP\Domain\Resources\InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	public static function make( string $ability_name, McpServer $mcp_server ): McpResource {
 		$resource = new self( $ability_name, $mcp_server );

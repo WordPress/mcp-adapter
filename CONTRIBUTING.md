@@ -85,6 +85,7 @@ For more information on using `wp-env`, see the [wp-env documentation](https://d
 
 - `npm run lint:php`: Runs PHPCS linting on the PHP code.
 - `npm run lint:php:fix`: Autofixes PHPCS linting issues.
+- `npm run lint:php:stan`: Runs PHPStan static analysis on the PHP code.
 - `npm run format`: Formats non-PHP files using Prettier.
 
 ### Running Tests

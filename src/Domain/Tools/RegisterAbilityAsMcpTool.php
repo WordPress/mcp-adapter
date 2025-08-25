@@ -49,7 +49,7 @@ class RegisterAbilityAsMcpTool {
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 *
 	 * @return \WP\MCP\Domain\Tools\McpTool returns a new instance of McpTool.
-	 * @throws \WP\MCP\Domain\Tools\InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	public static function make( string $ability_name, McpServer $mcp_server ): McpTool {
 		$tool = new self( $ability_name, $mcp_server );

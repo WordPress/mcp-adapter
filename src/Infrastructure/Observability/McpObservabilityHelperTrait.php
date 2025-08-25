@@ -82,8 +82,8 @@ trait McpObservabilityHelperTrait {
 
 		// Convert to lowercase and replace spaces/special chars with dots.
 		$metric = strtolower( $metric );
-		$metric = preg_replace( '/[^a-z0-9_\.]/', '.', $metric );
-		$metric = preg_replace( '/\.+/', '.', $metric ); // Remove duplicate dots.
+		$metric = (string) preg_replace( '/[^a-z0-9_\.]/', '.', $metric );
+		$metric = (string) preg_replace( '/\.+/', '.', $metric ); // Remove duplicate dots.
 		$metric = trim( $metric, '.' ); // Remove leading/trailing dots.
 
 		return $metric;

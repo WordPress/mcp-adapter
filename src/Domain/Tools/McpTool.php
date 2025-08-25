@@ -305,7 +305,7 @@ class McpTool {
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return self
-	 * @throws \WP\MCP\Domain\Tools\InvalidArgumentException If required fields are missing or validation fails.
+	 * @throws \InvalidArgumentException If required fields are missing or validation fails.
 	 */
 	public static function from_array( array $data, McpServer $mcp_server ): self {
 		$tool = new self(

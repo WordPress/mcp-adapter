@@ -264,7 +264,7 @@ class McpPrompt {
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt Returns a new McpPrompt instance.
-	 * @throws \WP\MCP\Domain\Prompts\InvalidArgumentException If required fields are missing or validation fails.
+	 * @throws \InvalidArgumentException If required fields are missing or validation fails.
 	 */
 	public static function from_array( array $data, McpServer $mcp_server ): self {
 		$prompt = new self(
@@ -359,10 +359,10 @@ class McpPrompt {
 	 * @param array $arguments The arguments passed to the prompt.
 	 *
 	 * @return array The prompt response.
-	 * @throws \WP\MCP\Domain\Prompts\Exception If this prompt is not builder-based.
+	 * @throws \Exception If this prompt is not builder-based.
 	 */
 	public function execute_direct( array $arguments ): array {
-		throw new \WP\MCP\Domain\Prompts\Exception( 'This prompt does not support direct execution' );
+		throw new \Exception( 'This prompt does not support direct execution' );
 	}
 
 	/**
@@ -371,9 +371,9 @@ class McpPrompt {
 	 * @param array $arguments The arguments passed to the prompt.
 	 *
 	 * @return bool True if execution is allowed.
-	 * @throws \WP\MCP\Domain\Prompts\Exception If this prompt is not builder-based.
+	 * @throws \Exception If this prompt is not builder-based.
 	 */
 	public function check_permission_direct( array $arguments ): bool {
-		throw new \WP\MCP\Domain\Prompts\Exception( 'This prompt does not support direct permission checking' );
+		throw new \Exception( 'This prompt does not support direct permission checking' );
 	}
 }
