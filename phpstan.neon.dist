@@ -15,7 +15,7 @@ parameters:
 		# Configuration
 		level: 8
 		phpVersion:
-			min: 80100 # @todo drop to 7.4
+			min: 70400
 			max: 80400
 		paths:
 				- src/
