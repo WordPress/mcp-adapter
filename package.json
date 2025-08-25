@@ -11,9 +11,9 @@
 		"npm": ">=10.2.3"
 	},
 	"devDependencies": {
-		"@wordpress/env": "^10.28.0",
-		"@wordpress/scripts": "^30.21.0",
-		"@wordpress/prettier-config": "^4.28.0"
+		"@wordpress/env": "^10.29.0",
+		"@wordpress/scripts": "^30.22.0",
+		"@wordpress/prettier-config": "^4.29.0"
 	},
 	"files": [
 		"src",
@@ -30,6 +30,7 @@
 		"format": "wp-scripts format",
 		"lint:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php",
 		"lint:php:fix": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:fix",
+		"lint:php:stan": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:stan",
 		"test:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
 		"wp-env": "wp-env"
 	}

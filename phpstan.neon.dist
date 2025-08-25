@@ -1,0 +1,31 @@
+parameters:
+		# Rules
+		treatPhpDocTypesAsCertain: false
+		inferPrivatePropertyTypeFromConstructor: true
+		checkExplicitMixedMissingReturn: true
+		checkFunctionNameCase: true
+		checkInternalClassCaseSensitivity: true
+		checkTooWideReturnTypesInProtectedAndPublicMethods: true
+		polluteScopeWithAlwaysIterableForeach: false
+		polluteScopeWithLoopInitialAssignments: false
+		reportAlwaysTrueInLastCondition: true
+		reportStaticMethodSignatures: true
+		reportWrongPhpDocTypeInVarTag: true
+
+		# Configuration
+		level: 8
+		phpVersion:
+			min: 70400
+			max: 80400
+		paths:
+				- src/
+		scanDirectories:
+			- ../abilities-api
+		excludePaths:
+			analyse:
+				- tests/
+				- vendor/
+			analyseAndScan:
+				- node_modules (?)
+
+		ignoreErrors:
