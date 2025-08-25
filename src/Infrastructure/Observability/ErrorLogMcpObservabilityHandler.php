@@ -82,7 +82,7 @@ class ErrorLogMcpObservabilityHandler implements Contracts\McpObservabilityHandl
 		}
 
 		$formatted = array_map(
-			function ( $key, $value ) {
+			static function ( $key, $value ) {
 				return sprintf( '%s=%s', $key, $value );
 			},
 			array_keys( $tags ),

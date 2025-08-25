@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
-use InvalidArgumentException;
 use WP\MCP\Core\McpServer;
 use WP_Ability;
 
@@ -32,14 +31,14 @@ class RegisterAbilityAsMcpTool {
 	/**
 	 * The WordPress ability instance.
 	 *
-	 * @var WP_Ability|null
+	 * @var \WP_Ability|null
 	 */
 	private ?WP_Ability $ability;
 
 	/**
 	 * The MCP server.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp_server;
 
@@ -47,10 +46,10 @@ class RegisterAbilityAsMcpTool {
 	 * Make a new instance of the class.
 	 *
 	 * @param string    $ability_name The ability name.
-	 * @param McpServer $mcp_server The MCP server.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 *
-	 * @return McpTool returns a new instance of McpTool.
-	 * @throws InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @return \WP\MCP\Domain\Tools\McpTool returns a new instance of McpTool.
+	 * @throws \WP\MCP\Domain\Tools\InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	public static function make( string $ability_name, McpServer $mcp_server ): McpTool {
 		$tool = new self( $ability_name, $mcp_server );
@@ -62,7 +61,7 @@ class RegisterAbilityAsMcpTool {
 	 * Constructor.
 	 *
 	 * @param string    $ability_name The ability name.
-	 * @param McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 */
 	public function __construct( string $ability_name, McpServer $mcp_server ) {
 		$this->ability_name = $ability_name;
@@ -74,11 +73,11 @@ class RegisterAbilityAsMcpTool {
 	 * Get the MCP tool data array.
 	 *
 	 * @return array
-	 * @throws InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	public function get_data(): array {
 		if ( ! $this->is_ability() ) {
-			throw new InvalidArgumentException( 'WordPress ability does not exist or could not be loaded' );
+			throw new \InvalidArgumentException( 'WordPress ability does not exist or could not be loaded' );
 		}
 
 		$tool_data = array(
@@ -130,8 +129,8 @@ class RegisterAbilityAsMcpTool {
 	/**
 	 * Get the MCP tool instance.
 	 *
-	 * @throws InvalidArgumentException If WordPress ability doesn't exist or validation fails.
-	 * @return McpTool The validated MCP tool instance.
+	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @return \WP\MCP\Domain\Tools\McpTool The validated MCP tool instance.
 	 */
 	public function get_tool(): McpTool {
 		return McpTool::from_array( $this->get_data(), $this->mcp_server );

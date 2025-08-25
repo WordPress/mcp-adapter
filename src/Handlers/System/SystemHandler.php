@@ -19,14 +19,14 @@ class SystemHandler {
 	/**
 	 * The WordPress MCP instance.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param McpServer $mcp The WordPress MCP instance.
+	 * @param \WP\MCP\Core\McpServer $mcp The WordPress MCP instance.
 	 */
 	public function __construct( McpServer $mcp ) {
 		$this->mcp = $mcp;

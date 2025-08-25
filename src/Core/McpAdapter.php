@@ -9,12 +9,10 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
-use Exception;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
-use WP\MCP\Core\McpServer;
 
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
@@ -23,9 +21,9 @@ class McpAdapter {
 	/**
 	 * Registry instance
 	 *
-	 * @var McpAdapter|null
+	 * @var \WP\MCP\Core\McpAdapter|null
 	 */
-	private static ?McpAdapter $instance = null;
+	private static ?self $instance = null;
 
 	/**
 	 * The initialized flag.
@@ -51,7 +49,7 @@ class McpAdapter {
 	/**
 	 * Registered servers
 	 *
-	 * @var McpServer[]
+	 * @var \WP\MCP\Core\McpServer[]
 	 */
 	private array $servers = array();
 
@@ -66,14 +64,16 @@ class McpAdapter {
 	 * Constructor
 	 */
 	private function __construct() {
-		if ( ! self::$initialized && ! self::$initialization_failed ) {
-			if ( ! $this->check_dependencies() ) {
-				self::$initialization_failed = true;
-				return;
-			}
-			add_action( 'rest_api_init', array( $this, 'mcp_adapter_init' ), 20000 );
-			self::$initialized = true;
+		if ( self::$initialized || self::$initialization_failed ) {
+			return;
 		}
+
+		if ( ! $this->check_dependencies() ) {
+			self::$initialization_failed = true;
+			return;
+		}
+		add_action( 'rest_api_init', array( $this, 'mcp_adapter_init' ), 20000 );
+		self::$initialized = true;
 	}
 
 	/**
@@ -114,18 +114,20 @@ class McpAdapter {
 			return;
 		}
 
-		if ( ! $this->has_triggered_init ) {
-			do_action( 'mcp_adapter_init', $this );
-			$this->has_triggered_init = true;
+		if ( $this->has_triggered_init ) {
+			return;
 		}
+
+		do_action( 'mcp_adapter_init', $this );
+		$this->has_triggered_init = true;
 	}
 
 	/**
 	 * Get the registry instance
 	 *
-	 * @return McpAdapter|null Returns null if initialization failed due to missing dependencies.
+	 * @return \WP\MCP\Core\McpAdapter|null Returns null if initialization failed due to missing dependencies.
 	 */
-	public static function instance(): ?McpAdapter {
+	public static function instance(): ?self {
 		if ( null === self::$instance && ! self::$initialization_failed ) {
 			self::$instance = new self();
 		}
@@ -188,8 +190,8 @@ class McpAdapter {
 	 * @param array         $prompts Prompts to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @return McpAdapter
-	 * @throws Exception If the server already exists or if called outside of the mcp_adapter_init action.
+	 * @return \WP\MCP\Core\McpAdapter
+	 * @throws \Exception If the server already exists or if called outside of the mcp_adapter_init action.
 	 */
 	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ): self {
 
@@ -200,7 +202,7 @@ class McpAdapter {
 
 		// Validate error handler class implements McpErrorHandlerInterface.
 		if ( ! in_array( McpErrorHandlerInterface::class, class_implements( $error_handler ) ?: array(), true ) ) {
-			throw new Exception(
+			throw new \Exception(
 				esc_html__( 'Error handler class must implement the McpErrorHandlerInterface.', 'mcp-adapter' )
 			);
 		}
@@ -212,18 +214,18 @@ class McpAdapter {
 
 		// Validate observability handler class implements McpObservabilityHandlerInterface.
 		if ( ! in_array( McpObservabilityHandlerInterface::class, class_implements( $observability_handler ) ?: array(), true ) ) {
-			throw new Exception(
+			throw new \Exception(
 				esc_html__( 'Observability handler class must implement the McpObservabilityHandlerInterface interface.', 'mcp-adapter' )
 			);
 		}
 
 		if ( ! doing_action( 'mcp_adapter_init' ) ) {
-			throw new Exception(
+			throw new \Exception(
 				esc_html__( 'MCP Server creation must be done during mcp_adapter_init action.', 'mcp-adapter' )
 			);
 		}
 		if ( isset( $this->servers[ $server_id ] ) ) {
-			throw new Exception(
+			throw new \Exception(
 			// translators: %s: server ID.
 				sprintf( esc_html__( 'Server with ID "%s" already exists.', 'mcp-adapter' ), esc_html( $server_id ) )
 			);
@@ -269,7 +271,7 @@ class McpAdapter {
 	 *
 	 * @param string $server_id Server ID.
 	 *
-	 * @return McpServer|null
+	 * @return \WP\MCP\Core\McpServer|null
 	 */
 	public function get_server( string $server_id ): ?McpServer {
 		return $this->servers[ $server_id ] ?? null;
@@ -278,7 +280,7 @@ class McpAdapter {
 	/**
 	 * Get all registered servers
 	 *
-	 * @return McpServer[]
+	 * @return \WP\MCP\Core\McpServer[]
 	 */
 	public function get_servers(): array {
 		return $this->servers;

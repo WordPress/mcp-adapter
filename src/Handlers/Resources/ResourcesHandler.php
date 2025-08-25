@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Resources;
 
-use Throwable;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
@@ -20,14 +19,14 @@ class ResourcesHandler {
 	/**
 	 * The WordPress MCP instance.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param McpServer $mcp The WordPress MCP instance.
+	 * @param \WP\MCP\Core\McpServer $mcp The WordPress MCP instance.
 	 */
 	public function __construct( McpServer $mcp ) {
 		$this->mcp = $mcp;
@@ -40,7 +39,7 @@ class ResourcesHandler {
 	 * hardening, this handler can also enforce authentication when the
 	 * `mcp_enforce_handler_auth` filter returns true.
 	 *
-	 * @return null|array Returns error if permission denied, null if allowed.
+	 * @return array|null Returns error if permission denied, null if allowed.
 	 */
 	private function check_permission(): null|array {
 		$enforce_handler_auth = (bool) apply_filters( 'mcp_enforce_handler_auth', false );
@@ -130,7 +129,7 @@ class ResourcesHandler {
 			return array(
 				'contents' => $contents,
 			);
-		} catch ( Throwable $exception ) {
+		} catch ( \Throwable $exception ) {
 			if ( $this->mcp->error_handler ) {
 				$this->mcp->error_handler->log(
 					'Error reading resource',

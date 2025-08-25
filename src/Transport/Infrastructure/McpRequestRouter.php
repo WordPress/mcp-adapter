@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
-use Throwable;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
@@ -23,14 +22,14 @@ class McpRequestRouter {
 	/**
 	 * The transport context.
 	 *
-	 * @var McpTransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
 	private McpTransportContext $context;
 
 	/**
 	 * Initialize the request router.
 	 *
-	 * @param McpTransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct(
 		McpTransportContext $context
@@ -98,8 +97,7 @@ class McpRequestRouter {
 			$this->context->observability_handler::record_event( 'mcp.request.success', $common_tags );
 
 			return $result;
-
-		} catch ( Throwable $exception ) {
+		} catch ( \Throwable $exception ) {
 			// Track failed request.
 			$error_tags = array_merge(
 				$common_tags,
@@ -109,7 +107,6 @@ class McpRequestRouter {
 
 			// Create error response from exception.
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )['error'] );
-
 		} finally {
 			// Track request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.

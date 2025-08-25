@@ -1,0 +1,23 @@
+{
+	"name": "mcp-adapter",
+	"type": "module",
+	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/WordPress/mcp-adapter.git"
+	},
+	"engines": {
+		"node": ">=20.10.0",
+		"npm": ">=10.2.3"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^30.22.0",
+		"@wordpress/prettier-config": "^4.29.0"
+	},
+	"scripts": {
+		"format": "wp-scripts format",
+		"lint:php": "composer run-script lint:php",
+		"lint:php:fix": "composer run-script lint:php:fix",
+		"lint:php:stan": "composer run-script lint:php:stan"
+	}
+}

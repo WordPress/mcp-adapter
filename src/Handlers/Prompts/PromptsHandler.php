@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Prompts;
 
-use Exception;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
@@ -20,14 +19,14 @@ class PromptsHandler {
 	/**
 	 * The WordPress MCP instance.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param McpServer $mcp The WordPress MCP instance.
+	 * @param \WP\MCP\Core\McpServer $mcp The WordPress MCP instance.
 	 */
 	public function __construct( McpServer $mcp ) {
 		$this->mcp = $mcp;
@@ -40,7 +39,7 @@ class PromptsHandler {
 	 * hardening, this handler can also enforce authentication when the
 	 * `mcp_enforce_handler_auth` filter returns true.
 	 *
-	 * @return null|array Returns error if permission denied, null if allowed.
+	 * @return array|null Returns error if permission denied, null if allowed.
 	 */
 	private function check_permission(): null|array {
 		$enforce_handler_auth = (bool) apply_filters( 'mcp_enforce_handler_auth', false );
@@ -113,17 +112,17 @@ class PromptsHandler {
 				}
 
 				return $prompt->execute_direct( $arguments );
-			} else {
-				// Traditional ability-based execution
-				$ability        = $prompt->get_ability();
-				$has_permission = $ability->has_permission( $arguments );
-				if ( ! $has_permission ) {
-					return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
-				}
-
-				return $ability->execute( $arguments );
 			}
-		} catch ( Exception $e ) {
+
+			// Traditional ability-based execution
+			$ability        = $prompt->get_ability();
+			$has_permission = $ability->has_permission( $arguments );
+			if ( ! $has_permission ) {
+				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
+			}
+
+			return $ability->execute( $arguments );
+		} catch ( \Throwable $e ) {
 			if ( $this->mcp->error_handler ) {
 				$this->mcp->error_handler->log(
 					'Prompt execution failed',

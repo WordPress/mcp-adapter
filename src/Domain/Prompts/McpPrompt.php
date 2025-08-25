@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
-use InvalidArgumentException;
 use WP\MCP\Core\McpServer;
 use WP_Ability;
 
@@ -61,7 +60,7 @@ class McpPrompt {
 	/**
 	 * The MCP server instance this prompt belongs to.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp_server;
 
@@ -127,7 +126,7 @@ class McpPrompt {
 	/**
 	 * Get the ability name.
 	 *
-	 * @return WP_Ability|null
+	 * @return \WP_Ability|null
 	 */
 	public function get_ability(): ?WP_Ability {
 		return wp_get_ability( $this->ability );
@@ -187,7 +186,7 @@ class McpPrompt {
 	public function remove_argument( string $name ): void {
 		$this->arguments = array_filter(
 			$this->arguments,
-			function ( $argument ) use ( $name ) {
+			static function ( $argument ) use ( $name ) {
 				return ( $argument['name'] ?? '' ) !== $name;
 			}
 		);
@@ -262,12 +261,12 @@ class McpPrompt {
 	 * Create an McpPrompt instance from an array.
 	 *
 	 * @param array     $data Array containing prompt data.
-	 * @param McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
-	 * @return McpPrompt Returns a new McpPrompt instance.
-	 * @throws InvalidArgumentException If required fields are missing or validation fails.
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt Returns a new McpPrompt instance.
+	 * @throws \WP\MCP\Domain\Prompts\InvalidArgumentException If required fields are missing or validation fails.
 	 */
-	public static function from_array( array $data, McpServer $mcp_server ): McpPrompt {
+	public static function from_array( array $data, McpServer $mcp_server ): self {
 		$prompt = new self(
 			$data['ability'] ?? '',
 			$data['name'] ?? '',
@@ -287,7 +286,7 @@ class McpPrompt {
 	 * @param string $context Optional context for error messages.
 	 *
 	 * @return self Returns the validated tool instance.
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public function validate( string $context = '' ): self {
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
@@ -328,7 +327,7 @@ class McpPrompt {
 	/**
 	 * Get the MCP server instance this tool belongs to.
 	 *
-	 * @return McpServer
+	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
 		return $this->mcp_server;
@@ -337,7 +336,7 @@ class McpPrompt {
 	/**
 	 * Set the MCP server instance this tool belongs to.
 	 *
-	 * @param McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
 	 * @return void
 	 */
@@ -360,10 +359,10 @@ class McpPrompt {
 	 * @param array $arguments The arguments passed to the prompt.
 	 *
 	 * @return array The prompt response.
-	 * @throws Exception If this prompt is not builder-based.
+	 * @throws \WP\MCP\Domain\Prompts\Exception If this prompt is not builder-based.
 	 */
 	public function execute_direct( array $arguments ): array {
-		throw new Exception( 'This prompt does not support direct execution' );
+		throw new \WP\MCP\Domain\Prompts\Exception( 'This prompt does not support direct execution' );
 	}
 
 	/**
@@ -372,9 +371,9 @@ class McpPrompt {
 	 * @param array $arguments The arguments passed to the prompt.
 	 *
 	 * @return bool True if execution is allowed.
-	 * @throws Exception If this prompt is not builder-based.
+	 * @throws \WP\MCP\Domain\Prompts\Exception If this prompt is not builder-based.
 	 */
 	public function check_permission_direct( array $arguments ): bool {
-		throw new Exception( 'This prompt does not support direct permission checking' );
+		throw new \WP\MCP\Domain\Prompts\Exception( 'This prompt does not support direct permission checking' );
 	}
 }

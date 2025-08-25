@@ -11,10 +11,10 @@ namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
-use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
+use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
+use WP\MCP\Handlers\Tools\ToolsHandler;
 
 /**
  * Transport context object for dependency injection.
@@ -27,14 +27,14 @@ class McpTransportContext {
 	/**
 	 * Initialize the transport context.
 	 *
-	 * @param McpServer             $mcp_server The MCP server instance.
-	 * @param InitializeHandler     $initialize_handler The initialize handler.
-	 * @param ToolsHandler          $tools_handler The tools handler.
-	 * @param ResourcesHandler      $resources_handler The resources handler.
-	 * @param PromptsHandler        $prompts_handler The prompts handler.
-	 * @param SystemHandler         $system_handler The system handler.
+	 * @param \WP\MCP\Core\McpServer             $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Handlers\Initialize\InitializeHandler     $initialize_handler The initialize handler.
+	 * @param \WP\MCP\Handlers\Tools\ToolsHandler          $tools_handler The tools handler.
+	 * @param \WP\MCP\Handlers\Resources\ResourcesHandler      $resources_handler The resources handler.
+	 * @param \WP\MCP\Handlers\Prompts\PromptsHandler        $prompts_handler The prompts handler.
+	 * @param \WP\MCP\Handlers\System\SystemHandler         $system_handler The system handler.
 	 * @param string                $observability_handler The observability handler class name.
-	 * @param McpRequestRouter|null $request_router The request router service.
+	 * @param \WP\MCP\Transport\Infrastructure\McpRequestRouter|null $request_router The request router service.
 	 * @param callable|null         $transport_permission_callback Optional custom permission callback for transport-level authentication.
 	 */
 	public function __construct(

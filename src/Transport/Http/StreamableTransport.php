@@ -11,13 +11,10 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Http;
 
-use Throwable;
-use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Contracts\McpTransportInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
-use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -32,7 +29,7 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * The transport context.
 	 *
-	 * @var McpTransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
 	private McpTransportContext $context;
 	/**
@@ -45,7 +42,7 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Initialize the class and register routes
 	 *
-	 * @param McpTransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct( McpTransportContext $context ) {
 		$this->context = $context;
@@ -70,16 +67,16 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Check if the user has permission to access the MCP API
 	 *
-	 * @param WP_REST_Request|null $request The request object.
+	 * @param \WP_REST_Request|null $request The request object.
 	 *
-	 * @return bool|WP_Error
+	 * @return bool|\WP_Error
 	 */
-	public function check_permission( ?WP_REST_Request $request = null ): WP_Error|bool {
+	public function check_permission( ?WP_REST_Request $request = null ): \WP_Error|bool {
 		// Use custom permission callback if provided
 		if ( null !== $this->context->transport_permission_callback ) {
 			try {
 				return call_user_func( $this->context->transport_permission_callback, $request );
-			} catch ( Throwable $e ) {
+			} catch ( \Throwable $e ) {
 				// Log error and fall back to default
 				if ( $this->context->mcp_server->error_handler ) {
 					$this->context->mcp_server->error_handler->log(
@@ -106,7 +103,7 @@ class StreamableTransport implements McpTransportInterface {
 	 *
 	 * @param mixed $request The request object.
 	 *
-	 * @return WP_REST_Response
+	 * @return \WP_REST_Response
 	 */
 	public function handle_request( mixed $request ): WP_REST_Response {
 		// Handle preflight requests.
@@ -128,9 +125,9 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Handle POST requests
 	 *
-	 * @param WP_REST_Request $request The request object.
+	 * @param \WP_REST_Request $request The request object.
 	 *
-	 * @return WP_REST_Response
+	 * @return \WP_REST_Response
 	 */
 	private function handle_post_request( WP_REST_Request $request ): WP_REST_Response {
 		try {
@@ -186,13 +183,15 @@ class StreamableTransport implements McpTransportInterface {
 			$results        = array();
 			$has_initialize = false;
 			foreach ( $messages as $message ) {
-				if ( isset( $message['method'] ) && isset( $message['id'] ) ) {
-					$this->request_id = (int) $message['id'];
-					if ( 'initialize' === $message['method'] ) {
-						$has_initialize = true;
-					}
-					$results[] = $this->process_message( $message );
+				if ( ! isset( $message['method'] ) || ! isset( $message['id'] ) ) {
+					continue;
 				}
+
+				$this->request_id = (int) $message['id'];
+				if ( 'initialize' === $message['method'] ) {
+					$has_initialize = true;
+				}
+				$results[] = $this->process_message( $message );
 			}
 
 			// Return single result or batch.
@@ -205,8 +204,7 @@ class StreamableTransport implements McpTransportInterface {
 			);
 
 			return new WP_REST_Response( $response_body, 200, $headers );
-
-		} catch ( Throwable $exception ) {
+		} catch ( \Throwable $exception ) {
 			// Log the error using the error handler if available.
 			if ( $this->context->mcp_server->error_handler ) {
 				$this->context->mcp_server->error_handler->log( 'Unexpected error in handle_post_request', array( 'exception' => $exception->getMessage() ) );

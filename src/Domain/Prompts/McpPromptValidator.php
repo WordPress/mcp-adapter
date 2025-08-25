@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
-use InvalidArgumentException;
-
 /**
  * Validates MCP prompts against the Model Context Protocol specification.
  *
@@ -28,7 +26,7 @@ class McpPromptValidator {
 	 * @param string $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public static function validate_prompt_data( array $prompt_data, string $context = '' ): void {
 		$validation_errors = self::get_validation_errors( $prompt_data );
@@ -40,18 +38,18 @@ class McpPromptValidator {
 				__( 'Prompt validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			throw new InvalidArgumentException( esc_html( $error_message ) );
+			throw new \InvalidArgumentException( esc_html( $error_message ) );
 		}
 	}
 
 	/**
 	 * Validate an McpPrompt instance against the MCP schema.
 	 *
-	 * @param McpPrompt $prompt The prompt instance to validate.
+	 * @param \WP\MCP\Domain\Prompts\McpPrompt $prompt The prompt instance to validate.
 	 * @param string    $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public static function validate_prompt_instance( McpPrompt $prompt, string $context = '' ): void {
 		self::validate_prompt_uniqueness( $prompt, $context );
@@ -62,10 +60,10 @@ class McpPromptValidator {
 	/**
 	 * Validate that the resource is unique within the MCP server.
 	 *
-	 * @param McpPrompt $prompt The resource instance to validate.
+	 * @param \WP\MCP\Domain\Prompts\McpPrompt $prompt The resource instance to validate.
 	 * @param string    $context Optional context for error messages.
 	 *
-	 * @throws InvalidArgumentException If the resource URI is not unique.
+	 * @throws \InvalidArgumentException If the resource URI is not unique.
 	 */
 	public static function validate_prompt_uniqueness( McpPrompt $prompt, string $context = '' ): void {
 		$this_prompt_name  = $prompt->get_name();
@@ -77,7 +75,7 @@ class McpPromptValidator {
 				__( "Prompt name '%s' is not unique. It already exists in the MCP server.", 'mcp-adapter' ),
 				$this_prompt_name
 			);
-			throw new InvalidArgumentException( esc_html( $error_message ) );
+			throw new \InvalidArgumentException( esc_html( $error_message ) );
 		}
 	}
 
@@ -183,13 +181,15 @@ class McpPromptValidator {
 			}
 
 			// Check optional required field
-			if ( isset( $argument['required'] ) && ! is_bool( $argument['required'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %s: argument name */
-					__( 'Prompt argument \'%s\' required field must be a boolean if provided', 'mcp-adapter' ),
-					$argument['name']
-				);
+			if ( ! isset( $argument['required'] ) || is_bool( $argument['required'] ) ) {
+				continue;
 			}
+
+			$errors[] = sprintf(
+			/* translators: %s: argument name */
+				__( 'Prompt argument \'%s\' required field must be a boolean if provided', 'mcp-adapter' ),
+				$argument['name']
+			);
 		}
 
 		return $errors;
@@ -246,9 +246,11 @@ class McpPromptValidator {
 
 			// Validate content
 			$content_errors = self::get_content_validation_errors( $message['content'], $index );
-			if ( ! empty( $content_errors ) ) {
-				$errors = array_merge( $errors, $content_errors );
+			if ( empty( $content_errors ) ) {
+				continue;
 			}
+
+			$errors = array_merge( $errors, $content_errors );
 		}
 
 		return $errors;

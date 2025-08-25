@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
-use InvalidArgumentException;
-
 /**
  * Validates MCP resources against the Model Context Protocol specification.
  *
@@ -28,7 +26,7 @@ class McpResourceValidator {
 	 * @param string $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public static function validate_resource_data( array $resource_data, string $context = '' ): void {
 		$validation_errors = self::get_validation_errors( $resource_data );
@@ -40,18 +38,18 @@ class McpResourceValidator {
 				__( 'Resource validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			throw new InvalidArgumentException( esc_html( $error_message ) );
+			throw new \InvalidArgumentException( esc_html( $error_message ) );
 		}
 	}
 
 	/**
 	 * Validate an McpResource instance against the MCP schema.
 	 *
-	 * @param McpResource $the_resource The resource instance to validate.
+	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
 	 * @param string      $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public static function validate_resource_instance( McpResource $the_resource, string $context = '' ): void {
 		self::validate_resource_uniqueness( $the_resource, $context );
@@ -61,10 +59,10 @@ class McpResourceValidator {
 	/**
 	 * Validate that the resource is unique within the MCP server.
 	 *
-	 * @param McpResource $the_resource The resource instance to validate.
+	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
 	 * @param string      $context Optional context for error messages.
 	 *
-	 * @throws InvalidArgumentException If the resource URI is not unique.
+	 * @throws \InvalidArgumentException If the resource URI is not unique.
 	 */
 	public static function validate_resource_uniqueness( McpResource $the_resource, string $context = '' ): void {
 		$this_resource_uri = $the_resource->get_uri();
@@ -76,7 +74,7 @@ class McpResourceValidator {
 				__( 'Resource URI \'%s\' is not unique. It already exists in the MCP server.', 'mcp-adapter' ),
 				$this_resource_uri
 			);
-			throw new InvalidArgumentException( esc_html( $error_message ) );
+			throw new \InvalidArgumentException( esc_html( $error_message ) );
 		}
 	}
 

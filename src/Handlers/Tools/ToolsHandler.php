@@ -9,11 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Tools;
 
-use Exception;
-use Throwable;
 use WP\MCP\Core\McpServer;
-use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
  * Handles tools-related MCP methods.
@@ -22,14 +20,14 @@ class ToolsHandler {
 	/**
 	 * The WordPress MCP instance.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param McpServer $mcp The WordPress MCP instance.
+	 * @param \WP\MCP\Core\McpServer $mcp The WordPress MCP instance.
 	 */
 	public function __construct( McpServer $mcp ) {
 		$this->mcp = $mcp;
@@ -97,9 +95,11 @@ class ToolsHandler {
 		// Clean parameters arguments.
 		if ( ! empty( $request_params['arguments'] ) ) {
 			foreach ( $request_params['arguments'] as $key => $value ) {
-				if ( empty( $value ) || 'null' === $value ) {
-					unset( $request_params['arguments'][ $key ] );
+				if ( ! empty( $value ) && 'null' !== $value ) {
+					continue;
 				}
+
+				unset( $request_params['arguments'][ $key ] );
 			}
 		}
 
@@ -132,8 +132,7 @@ class ToolsHandler {
 			}
 
 			return $response;
-
-		} catch ( Throwable $exception ) {
+		} catch ( \Throwable $exception ) {
 			if ( $this->mcp->error_handler ) {
 				$this->mcp->error_handler->log(
 					'Error calling tool',
@@ -151,7 +150,7 @@ class ToolsHandler {
 	/**
 	 * Sanitize tool data for JSON encoding by removing callback functions and other problematic data.
 	 *
-	 * @param McpTool $tool Raw tool data.
+	 * @param \WP\MCP\Domain\Tools\McpTool $tool Raw tool data.
 	 *
 	 * @return array Sanitized tool data safe for JSON encoding.
 	 */
@@ -242,7 +241,7 @@ class ToolsHandler {
 
 				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for tool: ' . $tool_name )['error'] );
 			}
-		} catch ( Exception $e ) {
+		} catch ( \Throwable $e ) {
 			if ( $this->mcp->error_handler ) {
 				$this->mcp->error_handler->log(
 					'Error running ability permission callback',
@@ -282,7 +281,7 @@ class ToolsHandler {
 			);
 
 			return $result;
-		} catch ( Exception $e ) {
+		} catch ( \Throwable $e ) {
 			if ( $this->mcp->error_handler ) {
 				$this->mcp->error_handler->log(
 					'Tool execution failed',
@@ -312,11 +311,11 @@ class ToolsHandler {
 	/**
 	 * Categorize an exception into a general error category.
 	 *
-	 * @param Exception $exception The exception to categorize.
+	 * @param \Exception $exception The exception to categorize.
 	 *
 	 * @return string
 	 */
-	private function categorize_error( Exception $exception ): string {
+	private function categorize_error( \Throwable $exception ): string {
 		return match ( get_class( $exception ) ) {
 			'InvalidArgumentException' => 'validation',
 			'RuntimeException' => 'execution',

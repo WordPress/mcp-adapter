@@ -1,4 +1,4 @@
-<?php //phpcs:ignoreFile
+<?php
 
 declare(strict_types=1);
 
@@ -11,57 +11,50 @@ use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
-final class ResourcesHandlerReadTest extends TestCase
-{
-    public static function set_up_before_class(): void
-    {
-        parent::set_up_before_class();
-        do_action('abilities_api_init');
-        DummyAbility::register_all();
-    }
+final class ResourcesHandlerReadTest extends TestCase {
 
-    public function test_missing_uri_returns_error(): void
-    {
-        wp_set_current_user(1);
-        $server = $this->makeServer(['test/resource']);
-        $handler = new ResourcesHandler($server);
-        $res = $handler->read_resource(['params' => []]);
-        $this->assertArrayHasKey('error', $res);
-    }
+	public static function set_up_before_class(): void {
+		parent::set_up_before_class();
+		do_action( 'abilities_api_init' );
+		DummyAbility::register_all();
+	}
 
-    public function test_unknown_resource_returns_error(): void
-    {
-        wp_set_current_user(1);
-        $server = $this->makeServer();
-        $handler = new ResourcesHandler($server);
-        $res = $handler->read_resource(['params' => ['uri' => 'WordPress://missing']]);
-        $this->assertArrayHasKey('error', $res);
-    }
+	public function test_missing_uri_returns_error(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+		$res     = $handler->read_resource( array( 'params' => array() ) );
+		$this->assertArrayHasKey( 'error', $res );
+	}
 
-    public function test_successful_read_returns_contents(): void
-    {
-        wp_set_current_user(1);
-        $server = $this->makeServer(['test/resource']);
-        $handler = new ResourcesHandler($server);
-        $res = $handler->read_resource(['params' => ['uri' => 'WordPress://local/resource-1']]);
-        $this->assertArrayHasKey('contents', $res);
-    }
+	public function test_unknown_resource_returns_error(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer();
+		$handler = new ResourcesHandler( $server );
+		$res     = $handler->read_resource( array( 'params' => array( 'uri' => 'WordPress://missing' ) ) );
+		$this->assertArrayHasKey( 'error', $res );
+	}
 
-    private function makeServer(array $resources = []): McpServer
-    {
-        return new McpServer(
-            server_id: 'srv',
-            server_route_namespace: 'mcp/v1',
-            server_route: '/mcp',
-            server_name: 'Srv',
-            server_description: 'desc',
-            server_version: '0.0.1',
-            mcp_transports: [],
-            error_handler: DummyErrorHandler::class,
-            observability_handler: DummyObservabilityHandler::class,
-            resources: $resources,
-        );
-    }
+	public function test_successful_read_returns_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+		$res     = $handler->read_resource( array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) ) );
+		$this->assertArrayHasKey( 'contents', $res );
+	}
+
+	private function makeServer( array $resources = array() ): McpServer {
+		return new McpServer(
+			server_id: 'srv',
+			server_route_namespace: 'mcp/v1',
+			server_route: '/mcp',
+			server_name: 'Srv',
+			server_description: 'desc',
+			server_version: '0.0.1',
+			mcp_transports: array(),
+			error_handler: DummyErrorHandler::class,
+			observability_handler: DummyObservabilityHandler::class,
+			resources: $resources,
+		);
+	}
 }
-
-

@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
-use InvalidArgumentException;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP_Ability;
 
@@ -52,14 +51,14 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Build and return the MCP prompt instance.
 	 *
-	 * @return McpPrompt The built prompt.
-	 * @throws InvalidArgumentException If validation fails.
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt The built prompt.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public function build(): McpPrompt {
 		$this->configure();
 
 		if ( empty( $this->name ) ) {
-			throw new InvalidArgumentException( 'Prompt name is required' );
+			throw new \InvalidArgumentException( 'Prompt name is required' );
 		}
 
 		// Create a synthetic ability name for the prompt
@@ -67,7 +66,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 
 		// Create a builder-based prompt that completely bypasses abilities
 		$builder = $this;
-		$prompt = new class(
+		$prompt  = new class(
 			$synthetic_ability,
 			$this->name,
 			$this->title,

@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
-use InvalidArgumentException;
 use stdClass;
 
 /**
@@ -29,7 +28,7 @@ class McpToolValidator {
 	 * @param string $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public static function validate_tool_data( array $tool_data, string $context = '' ): void {
 		$validation_errors = self::get_validation_errors( $tool_data );
@@ -41,18 +40,18 @@ class McpToolValidator {
 				__( 'Tool validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			throw new InvalidArgumentException( esc_html( $error_message ) );
+			throw new \InvalidArgumentException( esc_html( $error_message ) );
 		}
 	}
 
 	/**
 	 * Validate an McpTool instance against the MCP schema.
 	 *
-	 * @param McpTool $tool The tool instance to validate.
+	 * @param \WP\MCP\Domain\Tools\McpTool $tool The tool instance to validate.
 	 * @param string  $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If validation fails.
+	 * @throws \InvalidArgumentException If validation fails.
 	 */
 	public static function validate_tool_instance( McpTool $tool, string $context = '' ): void {
 		self::validate_tool_uniqueness( $tool, $context );
@@ -185,14 +184,16 @@ class McpToolValidator {
 				}
 
 				// Each property should have a type (though not strictly required by JSON Schema).
-				if ( isset( $property['type'] ) && ! is_string( $property['type'] ) ) {
-					$errors[] = sprintf(
-					/* translators: %1$s: field name, %2$s: property name */
-						__( 'Tool %1$s property \'%2$s\' type must be a string', 'mcp-adapter' ),
-						$field_name,
-						$property_name
-					);
+				if ( ! isset( $property['type'] ) || is_string( $property['type'] ) ) {
+					continue;
 				}
+
+				$errors[] = sprintf(
+				/* translators: %1$s: field name, %2$s: property name */
+					__( 'Tool %1$s property \'%2$s\' type must be a string', 'mcp-adapter' ),
+					$field_name,
+					$property_name
+				);
 			}
 		}
 
@@ -209,14 +210,16 @@ class McpToolValidator {
 				}
 
 				// Check that required fields exist in properties (if properties are defined).
-				if ( isset( $schema['properties'] ) && ! isset( $schema['properties'][ $required_field ] ) ) {
-					$errors[] = sprintf(
-					/* translators: %1$s: field name, %2$s: required field */
-						__( 'Tool %1$s required field \'%2$s\' does not exist in properties', 'mcp-adapter' ),
-						$field_name,
-						$required_field
-					);
+				if ( ! isset( $schema['properties'] ) || isset( $schema['properties'][ $required_field ] ) ) {
+					continue;
 				}
+
+				$errors[] = sprintf(
+				/* translators: %1$s: field name, %2$s: required field */
+					__( 'Tool %1$s required field \'%2$s\' does not exist in properties', 'mcp-adapter' ),
+					$field_name,
+					$required_field
+				);
 			}
 		}
 
@@ -263,11 +266,11 @@ class McpToolValidator {
 	/**
 	 * Validate that the tool name is unique within the server.
 	 *
-	 * @param McpTool $tool The tool instance to validate.
+	 * @param \WP\MCP\Domain\Tools\McpTool $tool The tool instance to validate.
 	 * @param string  $context Optional context for error messages.
 	 *
 	 * @return void
-	 * @throws InvalidArgumentException If the tool name is not unique.
+	 * @throws \InvalidArgumentException If the tool name is not unique.
 	 */
 	public static function validate_tool_uniqueness( McpTool $tool, string $context = '' ): void {
 		$this_tool_name = $tool->get_name();
@@ -283,7 +286,7 @@ class McpToolValidator {
 				$this_tool_name,
 				$server->get_server_id()
 			);
-			throw new InvalidArgumentException( esc_html( $error_message ) );
+			throw new \InvalidArgumentException( esc_html( $error_message ) );
 		}
 	}
 }
