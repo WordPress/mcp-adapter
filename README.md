@@ -381,6 +381,8 @@ if ( ! defined( 'WP_MCP_VERSION' ) || version_compare( WP_MCP_VERSION, '0.1.0', 
 
 ### Creating an MCP Server
 
+To create an MCP server, register a callback function to the `mcp_adapter_init` action hook. This callback function can accept one parameter, `$adapter`, which is an instance of the McpAdapter class that is used to create the MCP server.
+
 ```php
 add_action('mcp_adapter_init', function($adapter) {
     $adapter->create_server(
