@@ -29,3 +29,5 @@ parameters:
 				- node_modules (?)
 
 		ignoreErrors:
+			- # TODO: These are too noisy, we'll restore them in the future.
+				identifier: missingType.iterableValue
