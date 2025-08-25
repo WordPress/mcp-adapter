@@ -17,6 +17,8 @@ parameters:
 		phpVersion:
 			min: 70400
 			max: 80400
+		bootstrapFiles:
+			- mcp-adapter.php
 		paths:
 				- src/
 		scanDirectories:
