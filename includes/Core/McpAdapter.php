@@ -2,7 +2,7 @@
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  *
- * @package McpAdapter
+ * @package WP\MCP\Core
  */
 
 declare( strict_types=1 );
@@ -17,34 +17,13 @@ use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  */
-class McpAdapter {
+final class McpAdapter {
 	/**
 	 * Registry instance
 	 *
-	 * @var \WP\MCP\Core\McpAdapter|null
+	 * @var \WP\MCP\Core\McpAdapter
 	 */
-	private static ?self $instance = null;
-
-	/**
-	 * The initialized flag.
-	 *
-	 * @var bool
-	 */
-	private static bool $initialized = false;
-
-	/**
-	 * Flag to track if initialization failed due to missing dependencies.
-	 *
-	 * @var bool
-	 */
-	private static bool $initialization_failed = false;
-
-	/**
-	 * Stores the reason for initialization failure.
-	 *
-	 * @var string[]
-	 */
-	private static array $initialization_errors = array();
+	private static self $instance;
 
 	/**
 	 * Registered servers
@@ -54,146 +33,51 @@ class McpAdapter {
 	private array $servers = array();
 
 	/**
-	 * The has triggered init flag.
+	 * Initialize the registry
 	 *
-	 * @var bool
+	 * @internal For use by instance initialization only.
 	 */
-	private bool $has_triggered_init = false;
-
-	/**
-	 * Constructor
-	 */
-	private function __construct() {
-		if ( self::$initialized || self::$initialization_failed ) {
-			return;
-		}
-
-		if ( ! $this->check_dependencies() ) {
-			self::$initialization_failed = true;
-			return;
-		}
-		add_action( 'rest_api_init', array( $this, 'mcp_adapter_init' ), 20000 );
-		self::$initialized = true;
-	}
-
-	/**
-	 * Check if all required dependencies are available.
-	 *
-	 * @return bool True if all dependencies are met, false otherwise.
-	 */
-	private function check_dependencies(): bool {
-		$errors = array();
-
-		// Check if we're in a WordPress environment.
-		if ( ! defined( 'ABSPATH' ) ) {
-			$errors[] = 'WordPress environment not detected (ABSPATH not defined)';
-		}
-
-		// Check if Abilities API is available.
-		if ( ! function_exists( 'wp_register_ability' ) ) {
-			$errors[] = 'Abilities API not available (wp_register_ability function not found)';
-		}
-
-		// Store errors for later retrieval.
-		self::$initialization_errors = $errors;
-
-		// Log errors if any.
-		if ( ! empty( $errors ) ) {
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Initialize the MCP adapter.
-	 */
-	public function mcp_adapter_init(): void {
-		// Bail early if initialization failed.
-		if ( self::$initialization_failed ) {
-			return;
-		}
-
-		if ( $this->has_triggered_init ) {
-			return;
-		}
-
+	public function init(): void {
 		do_action( 'mcp_adapter_init', $this );
-		$this->has_triggered_init = true;
 	}
 
 	/**
 	 * Get the registry instance
 	 *
-	 * @return \WP\MCP\Core\McpAdapter|null Returns null if initialization failed due to missing dependencies.
+	 * @return \WP\MCP\Core\McpAdapter
 	 */
-	public static function instance(): ?self {
-		if ( null === self::$instance && ! self::$initialization_failed ) {
+	public static function instance(): self {
+		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
+
+			// Defer initialization until after the REST API.
+			add_action( 'rest_api_init', array( self::$instance, 'init' ), 20000 );
 		}
 
 		return self::$instance;
 	}
 
 	/**
-	 * Check if the MCP adapter is available (dependencies are met).
-	 *
-	 * @return bool True if the adapter is available, false otherwise.
-	 */
-	public static function is_available(): bool {
-		return ! self::$initialization_failed;
-	}
-
-	/**
-	 * Get the initialization errors if any.
-	 *
-	 * @return string[] Array of error messages.
-	 */
-	public static function get_initialization_errors(): array {
-		return self::$initialization_errors;
-	}
-
-	/**
-	 * Get detailed dependency status for troubleshooting.
-	 *
-	 * @return array Array with dependency status information.
-	 */
-	public static function get_dependency_status(): array {
-		return array(
-			'is_available'            => self::is_available(),
-			'wordpress_detected'      => defined( 'ABSPATH' ),
-			'abilities_api_available' => function_exists( 'wp_register_ability' ),
-			'initialization_errors'   => self::$initialization_errors,
-			'debug_info'              => array(
-				'php_version'       => PHP_VERSION,
-				'wordpress_version' => function_exists( 'get_bloginfo' ) ? get_bloginfo( 'version' ) : 'Unknown',
-				'wp_debug'          => defined( 'WP_DEBUG' ) ? WP_DEBUG : false,
-				'wp_debug_log'      => defined( 'WP_DEBUG_LOG' ) ? WP_DEBUG_LOG : false,
-			),
-		);
-	}
-
-	/**
 	 * Create and register a new MCP server.
 	 *
-	 * @param string        $server_id Unique identifier for the server.
+	 * @param string        $server_id              Unique identifier for the server.
 	 * @param string        $server_route_namespace Server route namespace.
-	 * @param string        $server_route Server route.
-	 * @param string        $server_name Server name.
-	 * @param string        $server_description Server description.
-	 * @param string        $server_version Server version.
-	 * @param array         $mcp_transports Array of classes that extend the BaseTransport.
-	 * @param string|null   $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
-	 * @param string|null   $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
+	 * @param string        $server_route           Server route.
+	 * @param string        $server_name            Server name.
+	 * @param string        $server_description     Server description.
+	 * @param string        $server_version         Server version.
+	 * @param array         $mcp_transports         Array of classes that extend the BaseTransport.
+	 * @param ?class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>         $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
+	 * @param ?class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
 	 * @param array         $tools Ability names to register as tools.
 	 * @param array         $resources Resources to register.
 	 * @param array         $prompts Prompts to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @return \WP\MCP\Core\McpAdapter
+	 * @return true|\WP_Error True on success, WP_Error on failure.
 	 * @throws \Exception If the server already exists or if called outside of the mcp_adapter_init action.
 	 */
-	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ): self {
+	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ) {
 
 		// Use NullMcpErrorHandler if no error handler is provided.
 		if ( ! $error_handler ) {
@@ -224,6 +108,7 @@ class McpAdapter {
 				esc_html__( 'MCP Server creation must be done during mcp_adapter_init action.', 'mcp-adapter' )
 			);
 		}
+
 		if ( isset( $this->servers[ $server_id ] ) ) {
 			throw new \Exception(
 			// translators: %s: server ID.

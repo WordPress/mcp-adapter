@@ -20,9 +20,9 @@ final class Plugin {
 	/**
 	 * The one true plugin.
 	 *
-	 * @var ?static
+	 * @var static
 	 */
-	private static $instance;
+	private static self $instance;
 
 	/**
 	 * {@inheritDoc}
@@ -47,7 +47,36 @@ final class Plugin {
 	 * Setup the plugin.
 	 */
 	private function setup(): void {
+		// Bail if dependencies are not met.
+		if ( ! $this->has_dependencies() ) {
+			return;
+		}
+
 		McpAdapter::instance();
+	}
+
+	/**
+	 * Check if all required dependencies are available.
+	 *
+	 * Will log an admin notice if dependencies are missing.
+	 *
+	 * @return bool True if all dependencies are met, false otherwise.
+	 */
+	private function has_dependencies(): bool {
+		// Check if Abilities API is available.
+		if ( ! function_exists( 'wp_register_ability' ) ) {
+			wp_admin_notice(
+				__( 'Abilities API not available (wp_register_ability function not found)', 'mcp-adapter' ),
+				array(
+					'type'    => 'error',
+					'dismiss' => false,
+				),
+			);
+
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
