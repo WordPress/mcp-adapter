@@ -74,10 +74,10 @@ final class McpAdapter {
 	 * @param array         $prompts Prompts to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @return true|\WP_Error True on success, WP_Error on failure.
+	 * @return \WP\MCP\Core\McpAdapter
 	 * @throws \Exception If the server already exists or if called outside of the mcp_adapter_init action.
 	 */
-	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ) {
+	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ): self {
 
 		// Use NullMcpErrorHandler if no error handler is provided.
 		if ( ! $error_handler ) {
