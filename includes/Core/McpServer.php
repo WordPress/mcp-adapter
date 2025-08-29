@@ -273,6 +273,7 @@ class McpServer {
 			if ( ! is_string( $ability_name ) ) {
 				continue;
 			}
+
 			try {
 				$ability = wp_get_ability( $ability_name );
 
