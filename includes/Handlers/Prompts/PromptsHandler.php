@@ -124,7 +124,7 @@ class PromptsHandler {
 			 */
 			$ability        = $prompt->get_ability();
 			$has_permission = $ability->has_permission( $arguments );
-			if ( ! $has_permission ) {
+			if ( true !== $has_permission ) {
 				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
 			}
 

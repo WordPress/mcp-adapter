@@ -248,7 +248,7 @@ class ToolsHandler {
 		// Run ability Permission Callback.
 		try {
 			$has_permission = $ability->has_permission( $args );
-			if ( ! $has_permission ) {
+			if ( true !== $has_permission ) {
 				// Track permission denied event.
 				$this->mcp->observability_handler::record_event(
 					'mcp.tool.permission_denied',

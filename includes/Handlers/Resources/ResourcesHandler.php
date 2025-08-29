@@ -129,7 +129,10 @@ class ResourcesHandler {
 		$ability = $resource->get_ability();
 
 		try {
-			$ability->has_permission( $request_params );
+			$has_permission = $ability->has_permission( $request_params );
+			if ( true !== $has_permission ) {
+				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for resource: ' . $resource->get_name() )['error'] );
+			}
 
 			$contents = $ability->execute( $request_params );
 
