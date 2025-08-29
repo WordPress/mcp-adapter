@@ -65,12 +65,17 @@ final class Plugin {
 	private function has_dependencies(): bool {
 		// Check if Abilities API is available.
 		if ( ! function_exists( 'wp_register_ability' ) ) {
-			wp_admin_notice(
-				__( 'Abilities API not available (wp_register_ability function not found)', 'mcp-adapter' ),
-				array(
-					'type'    => 'error',
-					'dismiss' => false,
-				),
+			add_action(
+				'admin_notices',
+				static function () {
+					wp_admin_notice(
+						__( 'Abilities API not available (wp_register_ability function not found)', 'mcp-adapter' ),
+						array(
+							'type'    => 'error',
+							'dismiss' => false,
+						),
+					);
+				}
 			);
 
 			return false;
