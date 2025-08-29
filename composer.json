@@ -32,8 +32,6 @@
 		},
 		"sort-packages": true,
 		"optimize-autoloader": true,
-		"classmap-authoritative": false,
-		"apcu-autoloader": false,
 		"preferred-install": "dist",
 		"allow-plugins": {
 			"automattic/jetpack-autoloader": true,
