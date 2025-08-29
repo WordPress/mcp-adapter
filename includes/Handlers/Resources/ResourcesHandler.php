@@ -121,7 +121,7 @@ class ResourcesHandler {
 		}
 
 		/**
-		 * Assume tools can only be registered with valid abilities.
+		 * Assume resources can only be registered with valid abilities.
 		 * If not, the has_permission() will let us know in the try-catch block.
 		 *
 		 * @var \WP_Ability $ability
