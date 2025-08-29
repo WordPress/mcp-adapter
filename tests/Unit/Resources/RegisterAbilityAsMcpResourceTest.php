@@ -34,13 +34,10 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 	}
 
 	public function test_make_builds_resource_from_ability(): void {
-		$resource = RegisterAbilityAsMcpResource::make( 'test/resource', $this->makeServer() );
+		$ability  = wp_get_ability( 'test/resource' );
+		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
 		$arr      = $resource->to_array();
 		$this->assertSame( 'WordPress://local/resource-1', $arr['uri'] );
-	}
-
-	public function test_make_invalid_ability_throws(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		RegisterAbilityAsMcpResource::make( 'test/missing', $this->makeServer() );
+		$this->assertSame( $ability, $resource->get_ability() );
 	}
 }

@@ -120,8 +120,15 @@ class ResourcesHandler {
 			return array( 'error' => McpErrorFactory::resource_not_found( $request_id, $uri )['error'] );
 		}
 
+		/**
+		 * Assume tools can only be registered with valid abilities.
+		 * If not, the has_permission() will let us know in the try-catch block.
+		 *
+		 * @var \WP_Ability $ability
+		 */
+		$ability = $resource->get_ability();
+
 		try {
-			$ability = $resource->get_ability();
 			$ability->has_permission( $request_params );
 
 			$contents = $ability->execute( $request_params );

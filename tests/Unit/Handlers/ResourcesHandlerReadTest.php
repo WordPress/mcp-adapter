@@ -54,6 +54,7 @@ final class ResourcesHandlerReadTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
+			array(),
 			$resources,
 		);
 	}

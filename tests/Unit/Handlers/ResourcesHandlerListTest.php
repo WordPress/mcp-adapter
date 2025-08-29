@@ -33,6 +33,7 @@ final class ResourcesHandlerListTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
+			array(),
 			array( 'test/resource' ),
 		);
 

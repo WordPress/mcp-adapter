@@ -273,9 +273,14 @@ class McpServer {
 			if ( ! is_string( $ability_name ) ) {
 				continue;
 			}
-
 			try {
-				$tool = RegisterAbilityAsMcpTool::make( $ability_name, $this );
+				$ability = wp_get_ability( $ability_name );
+
+				if ( ! $ability ) {
+					throw new \InvalidArgumentException( esc_html( "WordPress ability '{$ability_name}' does not exist." ) );
+				}
+
+				$tool = RegisterAbilityAsMcpTool::make( $ability, $this );
 				// Add the processed tools to this server.
 				$this->tools[ $tool->get_name() ] = $tool;
 
@@ -321,7 +326,13 @@ class McpServer {
 			}
 
 			try {
-				$resource = RegisterAbilityAsMcpResource::make( $ability_name, $this );
+				$ability = wp_get_ability( $ability_name );
+
+				if ( ! $ability ) {
+					throw new \InvalidArgumentException( esc_html( "WordPress ability '{$ability_name}' does not exist." ) );
+				}
+
+				$resource = RegisterAbilityAsMcpResource::make( $ability, $this );
 				// Add the processed resources to this server.
 				$this->resources[ $resource->get_uri() ] = $resource;
 
@@ -412,8 +423,14 @@ class McpServer {
 			} else {
 				// Treat as ability name (legacy behavior)
 				try {
+					$ability = wp_get_ability( $prompt_item );
+
+					if ( ! $ability ) {
+						throw new \InvalidArgumentException( esc_html( "WordPress ability '{$prompt_item}' does not exist." ) );
+					}
+
 					// Use RegisterMcpPrompt to handle all validation and processing.
-					$prompt = RegisterAbilityAsMcpPrompt::make( $prompt_item, $this );
+					$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this );
 
 					// Add the processed prompts to this server.
 					$this->prompts[ $prompt->get_name() ] = $prompt;

@@ -34,14 +34,11 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 	}
 
 	public function test_make_builds_prompt_from_ability(): void {
-		$prompt = RegisterAbilityAsMcpPrompt::make( 'test/prompt', $this->makeServer() );
-		$arr    = $prompt->to_array();
+		$ability = wp_get_ability( 'test/prompt' );
+		$prompt  = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
+		$arr     = $prompt->to_array();
 		$this->assertSame( 'test-prompt', $arr['name'] );
 		$this->assertArrayHasKey( 'arguments', $arr );
-	}
-
-	public function test_make_invalid_ability_throws(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		RegisterAbilityAsMcpPrompt::make( 'test/missing', $this->makeServer() );
+		$this->assertSame( $ability, $prompt->get_ability() );
 	}
 }

@@ -34,14 +34,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 	}
 
 	public function test_make_builds_tool_from_ability(): void {
-		$tool = RegisterAbilityAsMcpTool::make( 'test/always-allowed', $this->makeServer() );
-		$arr  = $tool->to_array();
+		$ability = wp_get_ability( 'test/always-allowed' );
+		$tool    = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$arr     = $tool->to_array();
 		$this->assertSame( 'test-always-allowed', $arr['name'] );
 		$this->assertArrayHasKey( 'inputSchema', $arr );
-	}
-
-	public function test_make_invalid_ability_throws(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		RegisterAbilityAsMcpTool::make( 'test/missing', $this->makeServer() );
 	}
 }
