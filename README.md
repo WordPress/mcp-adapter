@@ -2,15 +2,16 @@
 
 [*Part of the **AI Building Blocks for WordPress** initiative*](https://make.wordpress.org/ai/2025/07/17/ai-building-blocks)
 
-A canonical plugin for WordPress that provides the adapter for the WordPress Abilities API, enabling WordPress abilities to be exposed as
-MCP (Model Context Protocol) tools, resources, and prompts. This adapter serves as the foundation for integrating
-WordPress capabilities with AI agents through the MCP specification.
+A canonical plugin for WordPress that provides bidirectional integration with the Model Context Protocol (MCP). It enables WordPress abilities to be exposed as MCP tools, resources, and prompts, **and** allows WordPress to connect to external MCP servers and use their capabilities as local abilities. This adapter serves as the foundation for integrating WordPress capabilities with AI agents through the MCP specification.
 
 ## Overview
 
-The MCP Adapter bridges the gap between WordPress's Abilities API and the Model Context Protocol (MCP), allowing
-WordPress applications to expose their functionality to AI agents in a standardized, secure, and extensible way. It
-provides a clean abstraction layer that converts WordPress abilities into MCP-compatible interfaces.
+The MCP Adapter bridges the gap between WordPress's Abilities API and the Model Context Protocol (MCP), enabling bidirectional integration:
+
+**Server Mode**: Expose WordPress abilities to AI agents as MCP tools, resources, and prompts.
+**Client Mode**: Connect to external MCP servers and use their capabilities as local WordPress abilities.
+
+This provides a clean abstraction layer that seamlessly integrates WordPress with the broader MCP ecosystem.
 
 **Built for Extensibility**: The adapter ships with production-ready REST API and streaming transport protocols, plus a
 default error handling system. However, it's designed to be easily extended - create custom transport protocols for
@@ -21,8 +22,14 @@ systems.
 
 ### Core Functionality
 
+**MCP Server Features:**
 - **Ability-to-MCP Conversion**: Automatically converts WordPress abilities into MCP tools, resources, and prompts
 - **Multi-Server Management**: Create and manage multiple MCP servers with unique configurations
+
+**MCP Client Features:**
+- **Remote MCP Integration**: Connect to external MCP servers and consume their capabilities
+- **Ability Registration**: Remote MCP tools, resources, and prompts become local WordPress abilities
+- **Multi-Client Management**: Connect to multiple external MCP servers simultaneously
 - **Extensible Transport Layer**:
     - **Built-in Transports**: REST API (`RestTransport`) and Streaming (`StreamableTransport`) protocols included
     - **Custom Transport Support**: Implement `McpTransportInterface` to create custom communication protocols
@@ -402,6 +409,76 @@ add_action('mcp_adapter_init', function($adapter) {
         []                               // Prompts (optional)
     );
 });
+```
+
+### Creating an MCP Client
+
+To connect to external MCP servers, register a callback function to the `mcp_client_init` action hook:
+
+```php
+add_action('mcp_client_init', function($adapter) {
+    $adapter->create_client(
+        'ai-service',                    // Unique client identifier
+        'https://api.example.com/mcp',   // External MCP server URL
+        [                                // Client configuration
+            'auth' => [
+                'type'  => 'bearer',
+                'token' => 'your-api-token',
+            ],
+            'timeout' => 30,
+        ]
+    );
+});
+```
+
+Once connected, remote MCP capabilities automatically become available as WordPress abilities:
+
+```php
+// Remote MCP tool becomes a WordPress ability
+$result = wp_execute_ability('mcp_ai-service/analyze-content', [
+    'content' => 'Text to analyze',
+    'type'    => 'sentiment'
+]);
+
+// Remote MCP resource becomes a WordPress ability  
+$data = wp_execute_ability('mcp_ai-service/resource/user-profile', []);
+
+// Remote MCP prompt becomes a WordPress ability
+$prompt = wp_execute_ability('mcp_ai-service/prompt/seo-analysis', [
+    'url' => 'https://example.com'
+]);
+```
+
+### Client Authentication
+
+The MCP client supports multiple authentication methods:
+
+```php
+// Bearer token authentication
+$config = [
+    'auth' => [
+        'type'  => 'bearer',
+        'token' => 'your-bearer-token'
+    ]
+];
+
+// API key authentication
+$config = [
+    'auth' => [
+        'type'   => 'api_key',
+        'key'    => 'your-api-key',
+        'header' => 'X-API-Key'  // Optional, defaults to X-API-Key
+    ]
+];
+
+// Basic authentication
+$config = [
+    'auth' => [
+        'type'     => 'basic',
+        'username' => 'your-username',
+        'password' => 'your-password'
+    ]
+];
 ```
 
 ## Advanced Usage

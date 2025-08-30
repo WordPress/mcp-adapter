@@ -15,7 +15,7 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 
 /**
- * WordPress MCP Registry - Main class for managing multiple MCP servers.
+ * WordPress MCP Registry - Main class for managing multiple MCP servers and clients.
  */
 class McpAdapter {
 	/**
@@ -52,6 +52,13 @@ class McpAdapter {
 	 * @var \WP\MCP\Core\McpServer[]
 	 */
 	private array $servers = array();
+
+	/**
+	 * Registered clients
+	 *
+	 * @var \WP\MCP\Core\McpClient[]
+	 */
+	private array $clients = array();
 
 	/**
 	 * The has triggered init flag.
@@ -119,6 +126,7 @@ class McpAdapter {
 		}
 
 		do_action( 'mcp_adapter_init', $this );
+		do_action( 'mcp_client_init', $this );
 		$this->has_triggered_init = true;
 	}
 
@@ -284,5 +292,275 @@ class McpAdapter {
 	 */
 	public function get_servers(): array {
 		return $this->servers;
+	}
+
+	/**
+	 * Create and register a new MCP client.
+	 *
+	 * @param string      $client_id   Unique identifier for the client.
+	 * @param string      $server_url  MCP server URL to connect to.
+	 * @param array       $config      Client configuration (auth, timeouts, etc.).
+	 * @param string|null $error_handler The error handler class name.
+	 * @param string|null $observability_handler The observability handler class name.
+	 * @return \WP\MCP\Core\McpClient|\WP_Error Client instance or error.
+	 * @throws \Exception If the client already exists or invalid handlers.
+	 */
+	public function create_client( string $client_id, string $server_url, array $config = array(), ?string $error_handler = null, ?string $observability_handler = null ) {
+
+		// Use default handlers if not provided.
+		if ( ! $error_handler ) {
+			$error_handler = NullMcpErrorHandler::class;
+		}
+
+		if ( ! $observability_handler ) {
+			$observability_handler = NullMcpObservabilityHandler::class;
+		}
+
+		// Validate error handler class implements McpErrorHandlerInterface.
+		if ( ! in_array( McpErrorHandlerInterface::class, class_implements( $error_handler ) ?: array(), true ) ) {
+			return new \WP_Error(
+				'invalid_error_handler',
+				esc_html__( 'Error handler class must implement the McpErrorHandlerInterface.', 'mcp-adapter' )
+			);
+		}
+
+		// Validate observability handler class implements McpObservabilityHandlerInterface.
+		if ( ! in_array( McpObservabilityHandlerInterface::class, class_implements( $observability_handler ) ?: array(), true ) ) {
+			return new \WP_Error(
+				'invalid_observability_handler',
+				esc_html__( 'Observability handler class must implement the McpObservabilityHandlerInterface interface.', 'mcp-adapter' )
+			);
+		}
+
+		if ( ! doing_action( 'mcp_client_init' ) ) {
+			return new \WP_Error(
+				'invalid_timing',
+				esc_html__( 'MCP Client creation must be done during mcp_client_init action.', 'mcp-adapter' )
+			);
+		}
+
+		if ( isset( $this->clients[ $client_id ] ) ) {
+			return new \WP_Error(
+				'client_exists',
+				// translators: %s: client ID.
+				sprintf( esc_html__( 'Client with ID "%s" already exists.', 'mcp-adapter' ), esc_html( $client_id ) )
+			);
+		}
+
+		// Create client instance.
+		$client = new McpClient(
+			$client_id,
+			$server_url,
+			$config,
+			new $error_handler(),
+			new $observability_handler()
+		);
+
+		// Track client creation.
+		$observability_handler::record_event(
+			'mcp.client.created',
+			array(
+				'client_id'  => $client_id,
+				'server_url' => $server_url,
+				'connected'  => $client->is_connected(),
+			)
+		);
+
+		// Add client to registry.
+		$this->clients[ $client_id ] = $client;
+
+		// Register remote capabilities as local abilities.
+		$this->register_remote_abilities( $client );
+
+		return $client;
+	}
+
+	/**
+	 * Get a client by ID.
+	 *
+	 * @param string $client_id Client ID.
+	 * @return \WP\MCP\Core\McpClient|null
+	 */
+	public function get_client( string $client_id ): ?McpClient {
+		return $this->clients[ $client_id ] ?? null;
+	}
+
+	/**
+	 * Get all registered clients.
+	 *
+	 * @return \WP\MCP\Core\McpClient[]
+	 */
+	public function get_clients(): array {
+		return $this->clients;
+	}
+
+	/**
+	 * Register remote MCP capabilities as local WordPress abilities.
+	 *
+	 * @param McpClient $client MCP client instance.
+	 * @return void
+	 */
+	private function register_remote_abilities( McpClient $client ): void {
+		if ( ! $client->is_connected() ) {
+			return;
+		}
+
+		$client_id = $client->get_client_id();
+		$prefix = 'mcp_' . sanitize_key( $client_id ) . '/';
+
+		// Register tools as abilities.
+		$tools = $client->list_tools();
+		if ( ! is_wp_error( $tools ) && isset( $tools['tools'] ) ) {
+			foreach ( $tools['tools'] as $tool ) {
+				$tool_name = $tool['name'] ?? '';
+				if ( empty( $tool_name ) ) {
+					continue;
+				}
+
+				$ability_name = $prefix . $tool_name;
+
+				wp_register_ability(
+					$ability_name,
+					array(
+						'description'         => $tool['description'] ?? "Remote MCP tool: {$tool_name}",
+						'input_schema'        => $tool['inputSchema'] ?? array( 'type' => 'object' ),
+						'output_schema'       => array(
+							'type'       => 'object',
+							'properties' => array(
+								'content' => array(
+									'type'  => 'array',
+									'items' => array( 'type' => 'object' ),
+								),
+							),
+						),
+						'execute_callback'    => function ( $args ) use ( $client, $tool_name ) {
+							return $client->call_tool( $tool_name, $args );
+						},
+						'permission_callback' => function () {
+							return apply_filters( 'mcp_client_permission', is_user_logged_in() );
+						},
+						'context'             => array(
+							'type'      => 'mcp_remote_tool',
+							'client_id' => $client_id,
+							'tool_name' => $tool_name,
+						),
+					)
+				);
+			}
+		}
+
+		// Register resources as abilities.
+		$resources = $client->list_resources();
+		if ( ! is_wp_error( $resources ) && isset( $resources['resources'] ) ) {
+			foreach ( $resources['resources'] as $resource ) {
+				$resource_uri = $resource['uri'] ?? '';
+				if ( empty( $resource_uri ) ) {
+					continue;
+				}
+
+				$ability_name = $prefix . 'resource/' . sanitize_title( str_replace( array( '://', '/' ), '_', $resource_uri ) );
+
+				wp_register_ability(
+					$ability_name,
+					array(
+						'description'         => $resource['description'] ?? "Remote MCP resource: {$resource_uri}",
+						'input_schema'        => array( 'type' => 'object' ),
+						'output_schema'       => array(
+							'type'       => 'object',
+							'properties' => array(
+								'contents' => array( 'type' => 'array' ),
+							),
+						),
+						'execute_callback'    => function ( $args ) use ( $client, $resource_uri ) {
+							return $client->read_resource( $resource_uri );
+						},
+						'permission_callback' => function () {
+							return apply_filters( 'mcp_client_permission', is_user_logged_in() );
+						},
+						'context'             => array(
+							'type'         => 'mcp_remote_resource',
+							'client_id'    => $client_id,
+							'resource_uri' => $resource_uri,
+						),
+					)
+				);
+			}
+		}
+
+		// Register prompts as abilities.
+		$prompts = $client->list_prompts();
+		if ( ! is_wp_error( $prompts ) && isset( $prompts['prompts'] ) ) {
+			foreach ( $prompts['prompts'] as $prompt ) {
+				$prompt_name = $prompt['name'] ?? '';
+				if ( empty( $prompt_name ) ) {
+					continue;
+				}
+
+				$ability_name = $prefix . 'prompt/' . $prompt_name;
+
+				wp_register_ability(
+					$ability_name,
+					array(
+						'description'         => $prompt['description'] ?? "Remote MCP prompt: {$prompt_name}",
+						'input_schema'        => $this->convert_prompt_arguments( $prompt['arguments'] ?? array() ),
+						'output_schema'       => array(
+							'type'       => 'object',
+							'properties' => array(
+								'messages' => array( 'type' => 'array' ),
+							),
+						),
+						'execute_callback'    => function ( $args ) use ( $client, $prompt_name ) {
+							return $client->get_prompt( $prompt_name, $args );
+						},
+						'permission_callback' => function () {
+							return apply_filters( 'mcp_client_permission', is_user_logged_in() );
+						},
+						'context'             => array(
+							'type'        => 'mcp_remote_prompt',
+							'client_id'   => $client_id,
+							'prompt_name' => $prompt_name,
+						),
+					)
+				);
+			}
+		}
+	}
+
+	/**
+	 * Convert MCP prompt arguments to JSON schema.
+	 *
+	 * @param array $arguments MCP prompt arguments.
+	 * @return array JSON schema.
+	 */
+	private function convert_prompt_arguments( array $arguments ): array {
+		$properties = array();
+		$required = array();
+
+		foreach ( $arguments as $arg ) {
+			$name = $arg['name'] ?? '';
+			if ( empty( $name ) ) {
+				continue;
+			}
+
+			$properties[ $name ] = array(
+				'type'        => 'string',
+				'description' => $arg['description'] ?? '',
+			);
+
+			if ( $arg['required'] ?? false ) {
+				$required[] = $name;
+			}
+		}
+
+		$schema = array(
+			'type'       => 'object',
+			'properties' => $properties,
+		);
+
+		if ( ! empty( $required ) ) {
+			$schema['required'] = $required;
+		}
+
+		return $schema;
 	}
 }
