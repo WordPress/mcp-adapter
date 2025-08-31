@@ -7,7 +7,7 @@
 
 declare( strict_types=1 );
 
-namespace WP\MCP\Admin;
+namespace WP\MCP\Demo\Admin;
 
 use WP\MCP\Core\McpAdapter;
 
