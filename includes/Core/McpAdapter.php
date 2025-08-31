@@ -446,11 +446,6 @@ class McpAdapter {
 						'permission_callback' => function () {
 							return apply_filters( 'mcp_client_permission', is_user_logged_in() );
 						},
-						'context'             => array(
-							'type'      => 'mcp_remote_tool',
-							'client_id' => $client_id,
-							'tool_name' => $tool_name,
-						),
 					)
 				);
 			}
@@ -485,11 +480,6 @@ class McpAdapter {
 						'permission_callback' => function () {
 							return apply_filters( 'mcp_client_permission', is_user_logged_in() );
 						},
-						'context'             => array(
-							'type'         => 'mcp_remote_resource',
-							'client_id'    => $client_id,
-							'resource_uri' => $resource_uri,
-						),
 					)
 				);
 			}

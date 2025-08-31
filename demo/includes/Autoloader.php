@@ -35,7 +35,7 @@ class Autoloader {
 		}
 
 		$relative_class = substr( $class_name, strlen( 'WP\\MCP\\Demo\\' ) );
-		$file_path = WP_MCP_DEMO_DIR . 'includes/' . str_replace( '\\', DIRECTORY_SEPARATOR, $relative_class ) . '.php';
+		$file_path = plugin_dir_path( __DIR__ ) . 'includes/' . str_replace( '\\', DIRECTORY_SEPARATOR, $relative_class ) . '.php';
 
 		if ( file_exists( $file_path ) ) {
 			require_once $file_path;
