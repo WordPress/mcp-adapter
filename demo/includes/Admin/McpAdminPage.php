@@ -12,9 +12,9 @@ namespace WP\MCP\Demo\Admin;
 use WP\MCP\Core\McpAdapter;
 
 /**
- * Settings page for MCP servers and clients.
+ * Admin page for MCP servers and clients.
  */
-class McpTestPage {
+class McpAdminPage {
 
 	/**
 	 * Initialize the settings page.
@@ -85,23 +85,28 @@ class McpTestPage {
 		?>
 		<div class="wrap">
 			<h1>MCP Integration</h1>
-			<p>Manage bidirectional MCP integration: connect to external servers and expose WordPress abilities.</p>
+			<p>Manage bidirectional MCP integration: connect to external MCP servers and expose WordPress capabilities as MCP servers.</p>
+			
+			<?php $mcp_servers = $this->get_registered_mcp_servers(); ?>
+			<p style="color: #666; margin-bottom: 20px;">
+				Currently running <strong><?php echo count( $mcp_servers ); ?></strong> MCP servers with <strong><?php echo count( $this->get_available_abilities() ); ?></strong> available abilities and <strong><?php echo count( $this->get_registered_mcp_clients() ); ?></strong> active client connections.
+			</p>
 			
 			<div class="nav-tab-wrapper">
-				<a href="#connected" class="nav-tab nav-tab-active" onclick="showTab('connected')">Connected Servers</a>
-				<a href="#exposed" class="nav-tab" onclick="showTab('exposed')">Exposed Server</a>
+				<a href="#exposed" class="nav-tab nav-tab-active" onclick="showTab('exposed')">MCP Servers</a>
+				<a href="#connected" class="nav-tab" onclick="showTab('connected')">MCP Clients</a>
 			</div>
 
-			<!-- Connected Servers Tab -->
+			<!-- MCP Clients Tab -->
 			<div id="connected-tab" class="tab-content">
-				<h2>Connected MCP Clients</h2>
-				<p>External MCP servers that your WordPress site connects to as a client. Their tools, resources, and prompts become available as WordPress abilities.</p>
+				<h2>MCP Client Connections</h2>
+				<p>External MCP servers that WordPress connects to as a client. Remote tools, resources, and prompts become available as WordPress abilities.</p>
 				
 				<?php $mcp_clients = $this->get_registered_mcp_clients(); ?>
 				<?php if ( empty( $mcp_clients ) ) : ?>
 					<div class="mcp-section">
 						<div class="mcp-section-content">
-							<p><em>No MCP clients are currently registered. Clients will appear here once they are created via code.</em></p>
+							<p><em>No MCP client connections are currently active. Client connections will appear here once they are configured via code.</em></p>
 						</div>
 					</div>
 				<?php else : ?>
@@ -131,7 +136,7 @@ class McpTestPage {
 								
 								<?php if ( $client_info['connected'] ) : ?>
 									<div style="margin-top: 15px;">
-										<h5>Remote Capabilities Available as WordPress Abilities:</h5>
+										<h5>Remote MCP Capabilities Available as WordPress Abilities:</h5>
 										<?php 
 										$registered_abilities = $this->get_client_registered_abilities( $client_id );
 										if ( ! empty( $registered_abilities ) ) : ?>
@@ -149,7 +154,7 @@ class McpTestPage {
 												<?php endforeach; ?>
 											</ul>
 										<?php else : ?>
-											<p><em>No abilities registered yet. Tools and resources from this server are automatically registered with the <code>mcp-<?php echo esc_html( $client_id ); ?>/</code> prefix.</em></p>
+											<p><em>No abilities registered yet. MCP tools, resources, and prompts from this server are automatically registered with the <code>mcp-<?php echo esc_html( $client_id ); ?>/</code> prefix.</em></p>
 										<?php endif; ?>
 									</div>
 								<?php endif; ?>
@@ -159,25 +164,25 @@ class McpTestPage {
 				<?php endif; ?>
 				
 				<div class="mcp-section">
-					<div class="mcp-section-header">Client Configuration</div>
+					<div class="mcp-section-header">MCP Client Configuration</div>
 					<div class="mcp-section-content">
-						<p>MCP clients and their connections to external servers are configured via code using the <code>mcp_client_init</code> action hook.</p>
+						<p>MCP client connections to external servers are configured programmatically using the <code>mcp_client_init</code> action hook.</p>
 						
-						<h4>How to Configure Clients:</h4>
+						<h4>How to Configure MCP Clients:</h4>
 						<ol>
 							<li><strong>Edit your theme's functions.php</strong> or create a custom plugin</li>
 							<li>Use the <code>mcp_client_init</code> action hook</li>
 							<li>Create clients using <code>$adapter->create_client()</code></li>
-							<li>Remote capabilities become WordPress abilities automatically</li>
+							<li>Remote MCP capabilities become WordPress abilities automatically</li>
 						</ol>
 						
 						<h4>Example:</h4>
 						<pre><code>add_action( 'mcp_client_init', function( $adapter ) {
     $client = $adapter->create_client(
         'wpcom-domains',       // Client ID
-        'https://wpcom-domains-mcp.a8cai.workers.dev/mcp',  // WordPress Domains MCP server
+        'https://wpcom-domains-mcp.a8cai.workers.dev/mcp',  // External MCP server URL
         array(
-            'timeout' => 30,   // No authentication required
+            'timeout' => 30,   // Configuration options
         )
     );
 } );</code></pre>
@@ -187,16 +192,14 @@ class McpTestPage {
 				</div>
 			</div>
 
-			<!-- Exposed Server Tab -->
+			<!-- MCP Servers Tab -->
 			<div id="exposed-tab" class="tab-content">
 				<h2>WordPress MCP Servers</h2>
-				<p>Your WordPress site exposes these MCP servers that external clients can connect to:</p>
-				
-				<?php $mcp_servers = $this->get_registered_mcp_servers(); ?>
+				<p>MCP servers that your WordPress site exposes for external MCP clients to connect to:</p>
 				<?php if ( empty( $mcp_servers ) ) : ?>
 					<div class="mcp-section">
 						<div class="mcp-section-content">
-							<p><em>No MCP servers are currently registered. Servers will appear here once they are created via code.</em></p>
+							<p><em>No MCP servers are currently exposed. MCP servers will appear here once they are configured via code.</em></p>
 						</div>
 					</div>
 				<?php else : ?>
@@ -237,7 +240,7 @@ class McpTestPage {
 										</div>
 										
 										<div class="connection-instructions">
-											<h5>Connect External Clients:</h5>
+											<h5>Connect External MCP Clients:</h5>
 											<pre><code>{
   "mcpServers": {
     "<?php echo esc_js( $server_id ); ?>": {
@@ -254,36 +257,16 @@ class McpTestPage {
 				<?php endif; ?>
 				
 				<div class="mcp-section">
-					<div class="mcp-section-header">Overall Statistics</div>
+					<div class="mcp-section-header">MCP Server Configuration</div>
 					<div class="mcp-section-content">
-						<div class="mcp-stats">
-							<div class="mcp-stat">
-								<div class="mcp-stat-number"><?php echo count( $mcp_servers ); ?></div>
-								<div class="mcp-stat-label">MCP Servers</div>
-							</div>
-							<div class="mcp-stat">
-								<div class="mcp-stat-number"><?php echo count( $this->get_available_abilities() ); ?></div>
-								<div class="mcp-stat-label">Available Abilities</div>
-							</div>
-							<div class="mcp-stat">
-								<div class="mcp-stat-number"><?php echo count( $servers ); ?></div>
-								<div class="mcp-stat-label">Connected Clients</div>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<div class="mcp-section">
-					<div class="mcp-section-header">Server Configuration</div>
-					<div class="mcp-section-content">
-						<p>MCP servers and their exposed abilities are configured via code. Server configuration must be done programmatically using the <code>mcp_adapter_init</code> action hook.</p>
+						<p>MCP servers and their exposed capabilities are configured programmatically using the <code>mcp_adapter_init</code> action hook.</p>
 						
-						<h4>How to Configure Servers:</h4>
+						<h4>How to Configure MCP Servers:</h4>
 						<ol>
 							<li><strong>Edit your theme's functions.php</strong> or create a custom plugin</li>
 							<li>Use the <code>mcp_adapter_init</code> action hook</li>
 							<li>Register abilities using <code>wp_register_ability()</code></li>
-							<li>Create servers using <code>$adapter->create_server()</code></li>
+							<li>Create MCP servers using <code>$adapter->create_server()</code></li>
 						</ol>
 						
 						<h4>Example:</h4>
@@ -297,8 +280,9 @@ class McpTestPage {
         '1.0.0',              // Version
         [ RestTransport::class ],
         null, null,
-        [ 'my_ability' ],      // Abilities to expose
-        [], []
+        [ 'my_tool_ability' ],      // Tools to expose
+        [ 'my_resource_ability' ],  // Resources to expose
+        [ 'my_prompt_ability' ]     // Prompts to expose
     );
 } );</code></pre>
 						
@@ -327,10 +311,10 @@ class McpTestPage {
 			
 			// Initialize based on URL hash
 			var hash = window.location.hash.substring(1);
-			if (hash === 'exposed') {
-				showTab('exposed');
-			} else {
+			if (hash === 'connected') {
 				showTab('connected');
+			} else {
+				showTab('exposed');
 			}
 			
 			// Server form functions

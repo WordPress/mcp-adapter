@@ -5,7 +5,8 @@
  * @package MCP\Demo
  */
 
-// Simple monitored transport that logs requests/responses
+// Example: Simple monitored transport (not active)
+/*
 class MonitoredRestTransport extends \WP\MCP\Transport\Http\RestTransport {
     
     public function handle( \WP\MCP\Transport\Infrastructure\McpTransportContext $context ): \WP_REST_Response {
@@ -25,7 +26,7 @@ class MonitoredRestTransport extends \WP\MCP\Transport\Http\RestTransport {
     }
 }
 
-// Example: Use monitored transport
+// Example: How to use monitored transport (not active)
 add_action( 'mcp_adapter_init', function( $adapter ) {
     $adapter->create_server(
         'monitored-server',
@@ -44,3 +45,4 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         array()
     );
 } );
+*/

@@ -5,7 +5,8 @@
  * @package MCP\Demo
  */
 
-// Simple custom observability handler
+// Example: Simple custom observability handler
+/*
 class SimpleMcpObservabilityHandler implements \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface {
     
     public static function record_event( string $event_name, array $context = array() ): void {
@@ -17,14 +18,14 @@ class SimpleMcpObservabilityHandler implements \WP\MCP\Infrastructure\Observabil
     }
 }
 
-// Example: Server with custom observability
+// Example: How to use custom observability with servers (not active)
 add_action( 'mcp_adapter_init', function( $adapter ) {
     $adapter->create_server(
         'monitored-server',
         'mcp',
         'monitored',
         'Monitored Server',
-        'MCP server with custom observability tracking',
+        'Server with custom observability tracking',
         '1.0.0',
         array(
             \WP\MCP\Transport\Http\RestTransport::class,
@@ -36,14 +37,4 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         array()
     );
 } );
-
-// Example: Client with custom observability  
-add_action( 'mcp_client_init', function( $adapter ) {
-    $adapter->create_client(
-        'monitored-client',
-        'https://wpcom-domains-mcp.a8cai.workers.dev/mcp',
-        array( 'timeout' => 30 ),
-        null, // default error handler
-        SimpleMcpObservabilityHandler::class // custom observability
-    );
-} );
+*/

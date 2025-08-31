@@ -2,58 +2,44 @@
 /**
  * Example usage of MCP Server functionality.
  *
+ * Note: The demo plugin creates two main servers automatically:
+ * - Content Management Server (mcp/content)  
+ * - Analytics Server (mcp/analytics)
+ *
  * @package MCP\Demo
  */
 
-// Example 1: Basic MCP Server
+// Example 1: Create a custom MCP Server (commented out - demo plugin creates servers)
+/*
 add_action( 'mcp_adapter_init', function( $adapter ) {
     $adapter->create_server(
-        'basic-server',
+        'custom-server',
         'mcp',
-        'basic',
-        'Basic WordPress Server',
-        'Simple MCP server exposing WordPress abilities',
-        '1.0.0',
-        array(
-            \WP\MCP\Transport\Http\RestTransport::class,
-        ),
-        null, // default error handler
-        null, // default observability handler
-        array(), // auto-discover abilities as tools
-        array(), // no resources
-        array()  // no prompts
-    );
-} );
-
-// Example 2: Public MCP Server (no authentication)
-add_action( 'mcp_adapter_init', function( $adapter ) {
-    $adapter->create_server(
-        'public-server',
-        'mcp',
-        'public',
-        'Public WordPress Server',
-        'Public MCP server - no authentication required',
+        'custom',
+        'Custom Server',
+        'Example of creating a custom MCP server',
         '1.0.0',
         array(
             \WP\MCP\Transport\Http\RestTransport::class,
         ),
         null,
         null,
-        array(), // auto-discover abilities
-        array(),
-        array(),
-        function() { return true; } // public access
+        array( 'your-ability-name' ), // specify abilities to expose
+        array(), // resources
+        array()  // prompts
     );
 } );
+*/
 
-// Example 3: Admin-only MCP Server
+// Example 2: Server with custom permissions (commented out)
+/*
 add_action( 'mcp_adapter_init', function( $adapter ) {
     $adapter->create_server(
         'admin-server',
         'mcp',
         'admin',
-        'Admin WordPress Server',
-        'Admin-only MCP server for management operations',
+        'Admin Server',
+        'Admin-only MCP server',
         '1.0.0',
         array(
             \WP\MCP\Transport\Http\RestTransport::class,
@@ -63,6 +49,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         array(),
         array(),
         array(),
-        function() { return current_user_can( 'manage_options' ); }
+        function() { return current_user_can( 'manage_options' ); } // admin only
     );
 } );
+*/

@@ -6,15 +6,26 @@ the design decisions that enable flexible, scalable MCP integration with WordPre
 ## Table of Contents
 
 1. [System Architecture](#system-architecture)
-2. [Component Relationships](#component-relationships)
-3. [Data Flow](#data-flow)
-4. [Design Patterns](#design-patterns)
-5. [Extension Points](#extension-points)
+2. [Bidirectional Architecture](#bidirectional-architecture)
+3. [Component Relationships](#component-relationships)
+4. [Data Flow](#data-flow)
+5. [Design Patterns](#design-patterns)
+6. [Extension Points](#extension-points)
 
 ## System Architecture
 
 The MCP Adapter follows a layered architecture that cleanly separates concerns and provides multiple extension points
-for customization.
+for customization. The system supports **bidirectional MCP integration**: WordPress can both expose its abilities as MCP servers and connect to external MCP servers as a client.
+
+## Bidirectional Architecture
+
+The MCP Adapter provides two primary integration modes:
+
+### Server Mode (Exposing WordPress Abilities)
+WordPress abilities are exposed to external MCP clients through standardized MCP protocols.
+
+### Client Mode (Consuming External MCP Servers)
+WordPress connects to external MCP servers and consumes their tools, resources, and prompts as local abilities.
 
 ### High-Level Architecture
 
@@ -98,6 +109,35 @@ flowchart TD
     class database,users,content,plugins wordpressStyle
 ```
 
+### Bidirectional Integration Flow
+
+The MCP Adapter now supports bidirectional integration, allowing both server and client modes:
+
+```mermaid
+sequenceDiagram
+    participant ExternalServer as External MCP Server
+    participant McpClient as WordPress MCP Client
+    participant AbilitiesAPI as WordPress Abilities API
+    participant McpServer as WordPress MCP Server
+    participant ExternalClient as External MCP Client
+
+    Note over ExternalServer, ExternalClient: Bidirectional MCP Integration
+
+    %% Client Mode Flow
+    ExternalServer->>McpClient: Expose tools/resources/prompts
+    McpClient->>AbilitiesAPI: Auto-register remote capabilities as local abilities
+    Note right of AbilitiesAPI: Remote MCP tools become<br/>WordPress abilities with<br/>mcp-{client-id}/ prefix
+
+    %% Server Mode Flow  
+    AbilitiesAPI->>McpServer: Local abilities registered
+    McpServer->>ExternalClient: Expose as MCP tools/resources/prompts
+    ExternalClient->>McpServer: Execute MCP requests
+    McpServer->>AbilitiesAPI: Execute local abilities
+    
+    %% Unified Experience
+    Note over McpClient, McpServer: Both remote and local abilities<br/>use the same WordPress API
+```
+
 ### Core Component Interaction
 
 The following diagram shows how the main components interact within the MCP Adapter system:
@@ -156,6 +196,16 @@ sequenceDiagram
     - Server-specific error handling
     - Validation coordination
     - Request routing to appropriate components
+
+#### McpClient (Client Instance)
+
+- **Purpose**: Individual MCP client connecting to external MCP servers
+- **Responsibilities**:
+    - External server connection management
+    - Authentication handling (bearer, API key, basic)
+    - Remote capability discovery and registration
+    - Automatic ability registration with `mcp-{client-id}/` prefix
+    - Connection health monitoring and error handling
 
 #### Transport Layer
 
@@ -544,6 +594,63 @@ class RegisterAbilityAsMcpPrompt {
 - Simplified testing and mocking
 - Enhanced performance for complex prompts
 
+### Client Pattern (External MCP Integration)
+
+The MCP Client pattern enables consuming external MCP servers:
+
+```php
+use WP\MCP\Core\McpClient;
+use WP\MCP\Core\McpAdapter;
+
+class McpClient {
+    private string $client_id;
+    private string $server_url;
+    private array $config;
+    
+    public function connect(): WP_Error|bool {
+        // Establish connection to external MCP server
+        $response = $this->discover_capabilities();
+        
+        if ( is_wp_error( $response ) ) {
+            return $response;
+        }
+        
+        // Auto-register remote capabilities as WordPress abilities
+        $this->register_remote_abilities( $response['tools'], $response['resources'], $response['prompts'] );
+        
+        return true;
+    }
+    
+    private function register_remote_abilities( array $tools, array $resources, array $prompts ): void {
+        foreach ( $tools as $tool ) {
+            wp_register_ability( "mcp-{$this->client_id}/{$tool['name']}", [
+                'label' => $tool['description'],
+                'description' => $tool['description'],
+                'input_schema' => $tool['inputSchema'] ?? [],
+                'execute_callback' => function( $input ) use ( $tool ) {
+                    return $this->execute_remote_tool( $tool['name'], $input );
+                },
+                'permission_callback' => function() {
+                    return apply_filters( 'mcp_client_permission', true, $this->client_id );
+                }
+            ]);
+        }
+    }
+}
+
+// Usage in McpAdapter
+add_action( 'mcp_client_init', function( $adapter ) {
+    $client = $adapter->create_client( 'wpcom-domains', 'https://wpcom-domains-mcp.a8cai.workers.dev/mcp' );
+    // Remote tools automatically become: mcp-wpcom-domains/searchdomains, etc.
+});
+```
+
+**Benefits of Client Pattern**:
+- Seamless integration of external MCP capabilities
+- Automatic ability registration with namespacing
+- Consistent WordPress API usage for remote and local abilities
+- Built-in error handling and connection management
+
 ### Adapter Pattern (WordPress Integration)
 
 The core adapter pattern bridges WordPress abilities and MCP protocols:
@@ -695,6 +802,46 @@ class McpToolValidator {
         return $this->validate_tool_structure( $tool );
     }
 }
+```
+
+### Custom MCP Client Integration
+
+Create clients for specialized external MCP servers:
+
+```php
+use WP\MCP\Core\McpAdapter;
+
+// Connect to WordPress Domains MCP server
+add_action( 'mcp_client_init', function( $adapter ) {
+    $client = $adapter->create_client(
+        'wpcom-domains',                                    // Client ID
+        'https://wpcom-domains-mcp.a8cai.workers.dev/mcp', // Server URL
+        [                                                   // Configuration
+            'timeout' => 30,
+            'auth' => [                                    // Optional authentication
+                'type' => 'bearer',
+                'token' => 'your-token-here'
+            ]
+        ],
+        MyCustomErrorHandler::class,                       // Custom error handler
+        MyCustomObservabilityHandler::class              // Custom observability
+    );
+});
+
+// Use remote capabilities as WordPress abilities
+add_action( 'init', function() {
+    // Remote MCP tools become WordPress abilities automatically
+    $result = wp_execute_ability( 'mcp-wpcom-domains/searchdomains', [
+        'query' => 'example.com'
+    ] );
+    
+    if ( ! is_wp_error( $result ) ) {
+        // Handle domain search results
+        foreach ( $result['domains'] as $domain ) {
+            echo "Available: {$domain['name']} - {$domain['price']}\n";
+        }
+    }
+});
 ```
 
 This architecture enables both simple integrations and complex enterprise deployments while maintaining clean separation

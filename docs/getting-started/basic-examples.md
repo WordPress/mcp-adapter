@@ -1,7 +1,7 @@
 # Basic Examples
 
 This guide provides simple, working examples to help you understand how to create different types of MCP components
-using the WordPress MCP Adapter.
+using the WordPress MCP Adapter, including both server and client functionality.
 
 ## Example 1: Simple Tool - Post Creator
 
