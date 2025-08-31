@@ -405,8 +405,13 @@ class McpAdapter {
 			return;
 		}
 
+		if ( ! function_exists( 'wp_register_ability' ) ) {
+			return;
+		}
+
 		$client_id = $client->get_client_id();
-		$prefix = 'mcp_' . sanitize_key( $client_id ) . '/';
+		// Use dashes instead of underscores for ability names (Abilities API requirement)
+		$prefix = 'mcp-' . sanitize_key( $client_id ) . '/';
 
 		// Register tools as abilities.
 		$tools = $client->list_tools();
@@ -417,11 +422,13 @@ class McpAdapter {
 					continue;
 				}
 
-				$ability_name = $prefix . $tool_name;
+				// Convert tool name to lowercase for Abilities API compatibility
+				$ability_name = $prefix . strtolower( $tool_name );
 
-				wp_register_ability(
+				$result = wp_register_ability(
 					$ability_name,
 					array(
+						'label'               => ucwords( str_replace( array( '-', '_' ), ' ', $tool_name ) ),
 						'description'         => $tool['description'] ?? "Remote MCP tool: {$tool_name}",
 						'input_schema'        => $tool['inputSchema'] ?? array( 'type' => 'object' ),
 						'output_schema'       => array(
@@ -463,6 +470,7 @@ class McpAdapter {
 				wp_register_ability(
 					$ability_name,
 					array(
+						'label'               => 'Resource: ' . basename( $resource_uri ),
 						'description'         => $resource['description'] ?? "Remote MCP resource: {$resource_uri}",
 						'input_schema'        => array( 'type' => 'object' ),
 						'output_schema'       => array(
@@ -487,80 +495,9 @@ class McpAdapter {
 			}
 		}
 
-		// Register prompts as abilities.
-		$prompts = $client->list_prompts();
-		if ( ! is_wp_error( $prompts ) && isset( $prompts['prompts'] ) ) {
-			foreach ( $prompts['prompts'] as $prompt ) {
-				$prompt_name = $prompt['name'] ?? '';
-				if ( empty( $prompt_name ) ) {
-					continue;
-				}
-
-				$ability_name = $prefix . 'prompt/' . $prompt_name;
-
-				wp_register_ability(
-					$ability_name,
-					array(
-						'description'         => $prompt['description'] ?? "Remote MCP prompt: {$prompt_name}",
-						'input_schema'        => $this->convert_prompt_arguments( $prompt['arguments'] ?? array() ),
-						'output_schema'       => array(
-							'type'       => 'object',
-							'properties' => array(
-								'messages' => array( 'type' => 'array' ),
-							),
-						),
-						'execute_callback'    => function ( $args ) use ( $client, $prompt_name ) {
-							return $client->get_prompt( $prompt_name, $args );
-						},
-						'permission_callback' => function () {
-							return apply_filters( 'mcp_client_permission', is_user_logged_in() );
-						},
-						'context'             => array(
-							'type'        => 'mcp_remote_prompt',
-							'client_id'   => $client_id,
-							'prompt_name' => $prompt_name,
-						),
-					)
-				);
-			}
-		}
+		// Note: Remote MCP prompts are handled directly by the MCP server infrastructure
+		// rather than being converted to WordPress abilities. This matches the pattern
+		// used in McpServer.php where prompts are their own entity type.
 	}
 
-	/**
-	 * Convert MCP prompt arguments to JSON schema.
-	 *
-	 * @param array $arguments MCP prompt arguments.
-	 * @return array JSON schema.
-	 */
-	private function convert_prompt_arguments( array $arguments ): array {
-		$properties = array();
-		$required = array();
-
-		foreach ( $arguments as $arg ) {
-			$name = $arg['name'] ?? '';
-			if ( empty( $name ) ) {
-				continue;
-			}
-
-			$properties[ $name ] = array(
-				'type'        => 'string',
-				'description' => $arg['description'] ?? '',
-			);
-
-			if ( $arg['required'] ?? false ) {
-				$required[] = $name;
-			}
-		}
-
-		$schema = array(
-			'type'       => 'object',
-			'properties' => $properties,
-		);
-
-		if ( ! empty( $required ) ) {
-			$schema['required'] = $required;
-		}
-
-		return $schema;
-	}
 }

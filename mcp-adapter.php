@@ -44,6 +44,12 @@ function constants(): void {
 }
 
 constants();
+
+// Load the Abilities API first (only if not already loaded)
+if ( ! defined( 'WP_ABILITIES_API_DIR' ) && file_exists( __DIR__ . '/vendor/wordpress/abilities-api/abilities-api.php' ) ) {
+	require_once __DIR__ . '/vendor/wordpress/abilities-api/abilities-api.php';
+}
+
 require_once __DIR__ . '/includes/Autoloader.php';
 
 // If autoloader failed, we cannot proceed.

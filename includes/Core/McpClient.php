@@ -69,6 +69,20 @@ class McpClient {
 	private array $capabilities = array();
 
 	/**
+	 * MCP session ID for DeepWiki and similar servers.
+	 *
+	 * @var string|null
+	 */
+	private ?string $session_id = null;
+
+	/**
+	 * Transport protocol (sse or mcp).
+	 *
+	 * @var string
+	 */
+	private string $transport = 'mcp';
+
+	/**
 	 * Constructor.
 	 *
 	 * @param string                           $client_id             Client identifier.
@@ -90,6 +104,14 @@ class McpClient {
 		$this->error_handler         = $error_handler;
 		$this->observability_handler = $observability_handler;
 
+		// Detect transport protocol from URL
+		if ( strpos( $server_url, '/sse' ) !== false ) {
+			$this->transport = 'sse';
+		} elseif ( strpos( $server_url, '/mcp' ) !== false ) {
+			$this->transport = 'mcp';
+		}
+
+
 		// Auto-connect on construction
 		$this->connect();
 	}
@@ -101,6 +123,7 @@ class McpClient {
 	 */
 	public function connect(): bool {
 		$start_time = microtime( true );
+
 
 		try {
 			// Simple handshake request
@@ -117,6 +140,8 @@ class McpClient {
 			) );
 
 			if ( is_wp_error( $response ) ) {
+				$error_msg = 'MCP Initialize Request Failed: ' . $response->get_error_message();
+				error_log( $error_msg );
 				$this->error_handler->log(
 					'Failed to connect to MCP server',
 					array(
@@ -128,8 +153,19 @@ class McpClient {
 				return false;
 			}
 
-			$this->connected = true;
-			$this->capabilities = $response['capabilities'] ?? array();
+			// Handle successful response
+			if ( $response ) {
+				$this->connected = true;
+				$this->capabilities = $response['capabilities'] ?? array();
+				
+				// Extract session ID if provided (for DeepWiki compatibility)
+				if ( isset( $response['sessionId'] ) ) {
+					$this->session_id = $response['sessionId'];
+				}
+				
+			} else {
+				return false;
+			}
 
 			// Record connection
 			$duration = ( microtime( true ) - $start_time ) * 1000;
@@ -179,30 +215,77 @@ class McpClient {
 			'id'      => $request_id,
 		);
 
+		// Set headers based on transport protocol
+		if ( $this->transport === 'sse' ) {
+			$headers = array(
+				'Content-Type' => 'application/json',
+				'Accept'       => 'text/event-stream',
+				'Cache-Control' => 'no-cache',
+			);
+			error_log( 'MCP Client: Using SSE transport headers' );
+		} else {
+			$headers = array(
+				'Content-Type' => 'application/json',
+				'Accept'       => 'application/json, text/event-stream',
+			);
+			
+			// Only add session ID for /mcp transport, but NOT for initialize requests
+			if ( $method === 'initialize' && ! $this->session_id ) {
+				$this->session_id = $this->generate_session_id();
+			}
+			
+			// DeepWiki requires that initialize requests do NOT include session ID
+			if ( $this->session_id && $method !== 'initialize' ) {
+				$headers['Mcp-Session-Id'] = $this->session_id;
+			}
+		}
+
+		// Use POST for both SSE and MCP (based on working curl test)
+		$timeout = $this->config['timeout'] ?? 30;
+		
+		// For SSE, use shorter timeout since it's a streaming connection
+		if ( $this->transport === 'sse' ) {
+			$timeout = min( $timeout, 5 ); // Max 5 seconds for SSE initial response
+		}
+		
 		$args = array(
 			'method'    => 'POST',
-			'headers'   => array(
-				'Content-Type' => 'application/json',
-				'Accept'       => 'application/json',
-			),
+			'headers'   => $headers,
 			'body'      => wp_json_encode( $request_body ),
-			'timeout'   => $this->config['timeout'] ?? 30,
+			'timeout'   => $timeout,
 			'sslverify' => $this->config['ssl_verify'] ?? true,
 		);
+		
 
 		// Add authentication if configured
 		if ( isset( $this->config['auth'] ) ) {
 			$args['headers'] = array_merge( $args['headers'], $this->get_auth_headers() );
 		}
 
-		$response = wp_remote_post( $this->server_url, $args );
+		
+		// Use cURL directly for SSE to handle streaming properly
+		if ( $this->transport === 'sse' ) {
+			$response = $this->send_sse_request( $this->server_url, $args );
+		} else {
+			$response = wp_remote_post( $this->server_url, $args );
+		}
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}
 
 		$response_body = wp_remote_retrieve_body( $response );
-		$decoded = json_decode( $response_body, true );
+		$http_code = wp_remote_retrieve_response_code( $response );
+		
+		// Handle response based on transport protocol and content
+		if ( $this->transport === 'sse' || strpos( $response_body, 'event: message' ) !== false ) {
+			$decoded = $this->parse_sse_response( $response_body );
+			if ( ! $decoded ) {
+				return new \WP_Error( 'sse_parse_error', 'Failed to parse SSE response' );
+			}
+		} else {
+			$decoded = json_decode( $response_body, true );
+		}
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
 			return new \WP_Error( 'json_error', 'Invalid JSON response' );
@@ -353,5 +436,106 @@ class McpClient {
 	 */
 	public function get_capabilities(): array {
 		return $this->capabilities;
+	}
+
+	/**
+	 * Send SSE request using cURL for proper streaming support.
+	 *
+	 * @param string $url Request URL.
+	 * @param array  $args Request arguments.
+	 * @return array|WP_Error Response array or error.
+	 */
+	private function send_sse_request( string $url, array $args ) {
+		if ( ! function_exists( 'curl_init' ) ) {
+			return new \WP_Error( 'curl_missing', 'cURL is required for SSE support' );
+		}
+
+		$ch = curl_init();
+		curl_setopt_array( $ch, array(
+			CURLOPT_URL            => $url,
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_POST           => true,
+			CURLOPT_POSTFIELDS     => $args['body'],
+			CURLOPT_TIMEOUT        => $args['timeout'],
+			CURLOPT_SSL_VERIFYPEER => $args['sslverify'],
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_MAXREDIRS      => 3,
+		) );
+
+		// Set headers
+		$curl_headers = array();
+		foreach ( $args['headers'] as $key => $value ) {
+			$curl_headers[] = $key . ': ' . $value;
+		}
+		curl_setopt( $ch, CURLOPT_HTTPHEADER, $curl_headers );
+
+
+		$response_body = curl_exec( $ch );
+		$http_code = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		$curl_error = curl_error( $ch );
+		curl_close( $ch );
+
+		if ( $curl_error ) {
+			return new \WP_Error( 'curl_error', $curl_error );
+		}
+
+		// Return in WordPress HTTP response format
+		return array(
+			'response' => array( 'code' => $http_code ),
+			'body'     => $response_body,
+		);
+	}
+
+	/**
+	 * Generate a unique session ID for MCP requests.
+	 *
+	 * @return string Generated session ID.
+	 */
+	private function generate_session_id(): string {
+		// Try different session ID formats for DeepWiki compatibility
+		return uniqid();
+	}
+
+	/**
+	 * Parse Server-Sent Events response format.
+	 *
+	 * @param string $sse_body SSE response body.
+	 * @return array|null Parsed JSON data or null if no message found.
+	 */
+	private function parse_sse_response( string $sse_body ): ?array {
+		
+		$lines = explode( "\n", $sse_body );
+		$current_event = null;
+		$current_data = '';
+		$parsed_messages = array();
+		
+		foreach ( $lines as $line ) {
+			$line = trim( $line );
+			
+			if ( strpos( $line, 'event: ' ) === 0 ) {
+				$current_event = substr( $line, 7 );
+			} elseif ( strpos( $line, 'data: ' ) === 0 ) {
+				$current_data = substr( $line, 6 );
+				
+				// If this is a message event with JSON data, parse it
+				if ( $current_event === 'message' && ! empty( $current_data ) ) {
+					$decoded = json_decode( $current_data, true );
+					if ( $decoded ) {
+						// For initialize responses, return the result
+						if ( isset( $decoded['result'] ) ) {
+							return $decoded['result'];
+						}
+						// For other responses, return the full decoded response
+						return $decoded;
+					}
+				}
+			} elseif ( empty( $line ) ) {
+				// Empty line indicates end of event
+				$current_event = null;
+				$current_data = '';
+			}
+		}
+		
+		return null;
 	}
 }
