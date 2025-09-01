@@ -143,6 +143,7 @@ class ToolsHandler {
 				$response['content'][0]['mimeType'] = $result['mimeType'] ?? 'image/png';
 			} else {
 				$response['content'][0]['text'] = wp_json_encode( $result );
+				$response['structuredContent'] = $result;
 			}
 
 			return $response;
