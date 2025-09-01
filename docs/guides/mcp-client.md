@@ -50,7 +50,11 @@ add_action( 'mcp_client_init', function( $adapter ) {
 });
 ```
 
-### Step 2: Verify Connection
+### Step 2: Automatic Initialization
+
+The `mcp_client_init` action is automatically triggered during MCP Adapter initialization. You don't need to manually trigger this action.
+
+### Step 3: Verify Connection
 
 Check that the client connection was successful:
 
@@ -62,6 +66,18 @@ add_action( 'init', function() {
     }
 }, 999 ); // Late priority to ensure abilities are registered
 ```
+
+### Step 4: Understanding Ability Registration
+
+When a client connects successfully, the MCP Adapter automatically:
+
+1. **Discovers remote capabilities** by calling the MCP server's list methods
+2. **Registers tools and resources** as WordPress abilities with the prefix `mcp-{client-id}/`
+3. **Converts tool names to lowercase** for Abilities API compatibility
+4. **Sets up execution callbacks** that proxy requests to the remote MCP server
+5. **Applies permission checks** using the `mcp_client_permission` filter
+
+**Note:** Remote MCP prompts are not automatically registered as WordPress abilities. They are handled directly by the MCP server infrastructure.
 
 ## Authentication Methods
 
@@ -168,14 +184,7 @@ add_action( 'mcp_client_init', function( $adapter ) {
             
             // Connection settings
             'timeout'     => 30,         // Request timeout in seconds
-            'retry_count' => 3,          // Number of retry attempts
-            'retry_delay' => 1,          // Delay between retries (seconds)
-            
-            // SSL settings
-            'verify_ssl' => true,        // Verify SSL certificates
-            
-            // User agent
-            'user_agent' => 'WordPress MCP Client/1.0',
+            'ssl_verify'  => true,       // Verify SSL certificates
         ],
         MyCustomErrorHandler::class,     // Custom error handler (optional)
         MyCustomObservabilityHandler::class // Custom observability (optional)
@@ -189,10 +198,9 @@ add_action( 'mcp_client_init', function( $adapter ) {
 |--------|------|---------|-------------|
 | `auth` | array | `[]` | Authentication configuration |
 | `timeout` | int | `30` | Request timeout in seconds |
-| `retry_count` | int | `3` | Number of retry attempts on failure |
-| `retry_delay` | int | `1` | Delay between retries in seconds |
-| `verify_ssl` | bool | `true` | Whether to verify SSL certificates |
-| `user_agent` | string | `'WordPress MCP Client/1.0'` | User agent string |
+| `ssl_verify` | bool | `true` | Whether to verify SSL certificates |
+
+**Note:** The client automatically handles connection retries and user agent strings internally. Custom retry logic and user agent configuration are not supported in the current implementation.
 
 ## Working with Remote Abilities
 
@@ -262,6 +270,8 @@ foreach ( $remote_abilities as $ability_name ) {
 
 ### Client-Level Error Handling
 
+**Note:** Custom error handlers must be class names that implement the `McpErrorHandlerInterface`. The handler class will be instantiated automatically.
+
 ```php
 add_action( 'mcp_client_init', function( $adapter ) {
     $client = $adapter->create_client(
@@ -273,14 +283,8 @@ add_action( 'mcp_client_init', function( $adapter ) {
                 'token' => 'token',
             ],
         ],
-        // Custom error handler for this client
-        function( $message, $context, $type ) {
-            // Log errors to a specific file for this client
-            error_log( "[MCP Client error-handled-service] {$type}: {$message} | " . wp_json_encode( $context ), 3, '/var/log/mcp-client-errors.log' );
-            
-            // Send to monitoring system
-            MyMonitoringSystem::send_error( $message, $context, $type );
-        }
+        // Custom error handler class for this client
+        MyCustomErrorHandler::class
     );
 });
 ```
@@ -313,23 +317,21 @@ add_action( 'init', function() {
 
 ### Connection Health Monitoring
 
+**Note:** The `is_connected()` method reflects the connection status at the time the client was created. It does not perform real-time health checks. For production environments, consider implementing custom health check logic.
+
 ```php
 // Monitor client connection health
 add_action( 'wp_loaded', function() {
     $adapter = \WP\MCP\Core\McpAdapter::instance();
-    $clients = $adapter->get_clients(); // Hypothetical method
+    $clients = $adapter->get_clients();
     
     foreach ( $clients as $client_id => $client ) {
         if ( ! $client->is_connected() ) {
             error_log( "MCP client {$client_id} is disconnected" );
             
-            // Attempt to reconnect
-            $reconnected = $client->reconnect();
-            if ( $reconnected ) {
-                error_log( "Successfully reconnected MCP client {$client_id}" );
-            } else {
-                error_log( "Failed to reconnect MCP client {$client_id}" );
-            }
+            // Note: Automatic reconnection is not currently supported
+            // You may need to recreate the client or implement custom reconnection logic
+            error_log( "MCP client {$client_id} is disconnected - manual intervention required" );
         }
     }
 });
@@ -584,13 +586,8 @@ add_action( 'mcp_client_init', function( $adapter ) {
                 'token' => 'your-token',
             ],
         ],
-        // Debug error handler
-        function( $message, $context, $type ) {
-            if ( strpos( $message, 'auth' ) !== false || strpos( $message, '401' ) !== false ) {
-                error_log( "Authentication issue detected: {$message}" );
-                error_log( "Context: " . wp_json_encode( $context ) );
-            }
-        }
+        // Debug error handler class
+        MyDebugErrorHandler::class
     );
 } );
 ```
@@ -676,14 +673,20 @@ add_action( 'admin_menu', function() {
             echo '<h1>MCP Client Status</h1>';
             
             $adapter = \WP\MCP\Core\McpAdapter::instance();
-            // This would require implementing a get_clients() method
+            $clients = $adapter->get_clients();
             
             echo '<table class="widefat">';
             echo '<thead><tr><th>Client ID</th><th>Server URL</th><th>Status</th><th>Last Check</th></tr></thead>';
             echo '<tbody>';
             
-            // Display client status information
-            echo '<tr><td colspan="4">Client status information would go here</td></tr>';
+            foreach ( $clients as $client_id => $client ) {
+                echo '<tr>';
+                echo '<td>' . esc_html( $client_id ) . '</td>';
+                echo '<td>' . esc_html( $client->get_server_url() ) . '</td>';
+                echo '<td>' . ( $client->is_connected() ? 'Connected' : 'Disconnected' ) . '</td>';
+                echo '<td>' . esc_html( current_time( 'mysql' ) ) . '</td>';
+                echo '</tr>';
+            }
             
             echo '</tbody>';
             echo '</table>';
@@ -692,6 +695,29 @@ add_action( 'admin_menu', function() {
     );
 } );
 ```
+
+## Limitations and Known Issues
+
+### Current Limitations
+
+1. **No Automatic Reconnection**: The client does not automatically reconnect if the connection is lost. You must recreate the client manually.
+
+2. **Limited Configuration Options**: Only `timeout`, `ssl_verify`, and `auth` are supported. Retry logic and user agent customization are handled internally.
+
+3. **Connection Status**: The `is_connected()` method only reflects the initial connection status, not real-time health.
+
+4. **Prompt Registration**: Remote MCP prompts are not automatically registered as WordPress abilities.
+
+5. **Error Handler Requirements**: Custom error handlers must be class names that implement `McpErrorHandlerInterface`, not callable functions.
+
+### Future Enhancements
+
+The following features may be added in future versions:
+- Automatic reconnection with exponential backoff
+- Additional configuration options (retry count, delay, user agent)
+- Real-time connection health monitoring
+- Support for registering remote prompts as abilities
+- Callable function support for error handlers
 
 ## Next Steps
 

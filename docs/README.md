@@ -74,6 +74,12 @@ Detailed API documentation and specifications.
 2. Start with [Transport Permissions](guides/transport-permissions.md) for custom authentication
 3. Follow [Custom Transports](guides/custom-transports.md) for specialized protocols
 
+### I Want to Connect to External MCP Servers
+
+1. Read the [MCP Client Guide](guides/mcp-client.md) for connecting to external services
+2. Review [Authentication Methods](guides/mcp-client.md#authentication-methods) for secure connections
+3. Check [Real-World Examples](guides/mcp-client.md#real-world-examples) for practical implementations
+
 ### I'm Having Issues
 
 1. Check [Common Issues](troubleshooting/common-issues.md) for your specific problem
@@ -90,6 +96,7 @@ Detailed API documentation and specifications.
 ### Core Concepts
 
 - **MCP Protocol Integration**: How WordPress abilities become AI-accessible tools, resources, and prompts
+- **MCP Client Integration**: Connect WordPress to external MCP servers and consume their capabilities
 - **Transport Layers**: REST API, streaming, and custom communication protocols
 - **Error Handling**: Production-ready error management and monitoring
 - **Security & Permissions**: Proper authentication and authorization patterns with [Transport Permissions](guides/transport-permissions.md)
@@ -105,6 +112,7 @@ Detailed API documentation and specifications.
 
 - **Content Management**: AI-powered post creation and management
 - **Data Access**: Exposing WordPress data as MCP resources
+- **External Service Integration**: Connecting to weather APIs, news services, and domain registrars
 - **Guidance Systems**: AI advisory prompts for SEO, performance, and strategy
 - **Custom Integrations**: Product-specific MCP implementations
 
@@ -155,6 +163,28 @@ wp_register_ability( 'my-plugin/seo-recommendations', [
         return generate_seo_analysis( $input );
     }
 ]);
+```
+
+### External MCP Client Connection
+
+```php
+// Connect to external MCP server and use its capabilities
+add_action( 'mcp_client_init', function( $adapter ) {
+    $client = $adapter->create_client(
+        'weather-service',
+        'https://api.weather.com/mcp',
+        [
+            'auth' => [
+                'type'  => 'api_key',
+                'key'   => 'your-api-key',
+            ],
+        ]
+    );
+    
+    // Remote tools become WordPress abilities:
+    // - mcp-weather-service/current-weather
+    // - mcp-weather-service/forecast
+});
 ```
 
 ## Best Practices Covered

@@ -11,6 +11,7 @@ namespace WP\MCP\Demo;
 
 use WP\MCP\Core\McpAdapter;
 use WP\MCP\Demo\Admin\McpAdminPage;
+use WP\MCP\Demo\Admin\DashboardWidget;
 
 /**
  * MCP Adapter Demo Plugin
@@ -43,6 +44,9 @@ final class DemoPlugin {
 		if ( is_admin() ) {
 			$admin_page = new McpAdminPage();
 			$admin_page->init();
+			
+			$dashboard_widget = new DashboardWidget();
+			$dashboard_widget->init();
 		}
 		
 		// Register demo abilities during the correct action

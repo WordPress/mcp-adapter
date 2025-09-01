@@ -22,6 +22,15 @@ The demo plugin adds an admin page under **Settings > MCP Settings** that provid
 - **Testing Tools**: Interactive testing of MCP functionality
 - **Real-time Monitoring**: View server status and connection details
 
+### Dashboard Widget
+
+A clean dashboard widget that displays MCP status information:
+
+- **Server Status**: List of configured MCP servers with capability counts (tools, resources, prompts)
+- **Client Connections**: Connected MCP clients with connection status and server URLs  
+- **Quick Actions**: Direct access to MCP settings and manual refresh functionality
+- **Core WordPress Styling**: Matches WordPress dashboard widgets exactly using minimal custom CSS
+
 ### Demo Abilities
 
 The plugin registers several example abilities that demonstrate different MCP integration patterns:
@@ -85,10 +94,12 @@ See the [examples README](examples/README.md) for detailed information about the
 demo/
 ├── mcp-adapter-demo.php    # Main plugin file
 ├── includes/
-│   ├── DemoPlugin.php      # Core plugin class
-│   ├── Autoloader.php      # PSR-4 autoloader
+│   ├── DemoPlugin.php          # Core plugin class
+│   ├── Autoloader.php          # PSR-4 autoloader
 │   └── Admin/
-│       └── McpTestPage.php # Admin interface implementation
+│       ├── McpTestPage.php     # Admin interface implementation
+│       ├── DashboardWidget.php # Dashboard widget functionality
+│       └── assets/             # CSS and JavaScript files
 └── examples/               # Standalone usage examples
 ```
 
