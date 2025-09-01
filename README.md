@@ -4,8 +4,6 @@
 
 A canonical plugin for WordPress that provides bidirectional integration with the Model Context Protocol (MCP). It enables WordPress abilities to be exposed as MCP tools, resources, and prompts, **and** allows WordPress to connect to external MCP servers and use their capabilities as local abilities. This adapter serves as the foundation for integrating WordPress capabilities with AI agents through the MCP specification.
 
-**Includes Demo Plugin**: A complete demonstration plugin showcasing real-world usage patterns, admin interface, and practical examples.
-
 ## Overview
 
 The MCP Adapter bridges the gap between WordPress's Abilities API and the Model Context Protocol (MCP), enabling bidirectional integration:
@@ -388,7 +386,7 @@ if ( ! defined( 'WP_MCP_VERSION' ) || version_compare( WP_MCP_VERSION, '0.1.0', 
 
 ## Basic Usage
 
-**Note**: For complete working examples, see the included [demo plugin](demo/) which provides practical implementations and an admin interface for testing MCP functionality.
+**Note**: For complete working examples with admin interface, see the separate [MCP Adapter Demo Plugin](https://github.com/WordPress/mcp-adapter-demo) which provides practical implementations and testing tools.
 
 ### Creating an MCP Server
 
