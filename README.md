@@ -4,7 +4,7 @@
 
 A canonical plugin for WordPress that provides the adapter for the WordPress Abilities API, enabling WordPress abilities to be exposed as
 MCP (Model Context Protocol) tools, resources, and prompts. This adapter serves as the foundation for integrating
-WordPress capabilities with AI agents through the MCP specification.
+WordPress abilities with AI agents through the MCP specification.
 
 ## Overview
 

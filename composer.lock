@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a93f7b0607452bfd5a7dca4c4b1ab0d5",
+    "content-hash": "152ced40e029fe53fa4aec344dec806e",
     "packages": [],
     "packages-dev": [
         {
@@ -1123,6 +1123,38 @@
                 "source": "https://github.com/phpstan/extension-installer/tree/1.4.3"
             },
             "time": "2024-09-04T20:21:43+00:00"
+        },
+        {
+            "name": "phpstan/php-8-stubs",
+            "version": "0.4.24",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpstan/php-8-stubs.git",
+                "reference": "40dea0d7d8c3ee7afa2aee7c71a5d78a53506b2e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/php-8-stubs/zipball/40dea0d7d8c3ee7afa2aee7c71a5d78a53506b2e",
+                "reference": "40dea0d7d8c3ee7afa2aee7c71a5d78a53506b2e",
+                "shasum": ""
+            },
+            "type": "library",
+            "autoload": {
+                "classmap": [
+                    "Php8StubsMap.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT",
+                "PHP-3.01"
+            ],
+            "description": "PHP stubs extracted from php-src",
+            "support": {
+                "issues": "https://github.com/phpstan/php-8-stubs/issues",
+                "source": "https://github.com/phpstan/php-8-stubs/tree/0.4.24"
+            },
+            "time": "2025-08-27T00:22:10+00:00"
         },
         {
             "name": "phpstan/phpdoc-parser",

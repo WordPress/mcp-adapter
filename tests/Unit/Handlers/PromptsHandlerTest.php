@@ -30,6 +30,8 @@ final class PromptsHandlerTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
+			array(),
+			array(),
 			$prompts,
 		);
 	}

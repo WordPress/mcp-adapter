@@ -114,10 +114,17 @@ class PromptsHandler {
 				return $prompt->execute_direct( $arguments );
 			}
 
-			// Traditional ability-based execution
+			/**
+			 * Traditional ability-based execution
+			 *
+			 * Assume non-builder based prompts can only be registered with valid abilities.
+			 * If not, the has_permission() will let us know.
+			 *
+			 * @var \WP_Ability $ability
+			 */
 			$ability        = $prompt->get_ability();
 			$has_permission = $ability->has_permission( $arguments );
-			if ( ! $has_permission ) {
+			if ( true !== $has_permission ) {
 				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
 			}
 

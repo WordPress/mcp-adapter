@@ -120,9 +120,19 @@ class ResourcesHandler {
 			return array( 'error' => McpErrorFactory::resource_not_found( $request_id, $uri )['error'] );
 		}
 
+		/**
+		 * Assume resources can only be registered with valid abilities.
+		 * If not, the has_permission() will let us know in the try-catch block.
+		 *
+		 * @var \WP_Ability $ability
+		 */
+		$ability = $resource->get_ability();
+
 		try {
-			$ability = $resource->get_ability();
-			$ability->has_permission( $request_params );
+			$has_permission = $ability->has_permission( $request_params );
+			if ( true !== $has_permission ) {
+				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for resource: ' . $resource->get_name() )['error'] );
+			}
 
 			$contents = $ability->execute( $request_params );
 

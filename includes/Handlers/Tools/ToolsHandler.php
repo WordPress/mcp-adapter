@@ -237,12 +237,18 @@ class ToolsHandler {
 			return array( 'error' => McpErrorFactory::tool_not_found( $request_id, $tool_name )['error'] );
 		}
 
+		/**
+		 * Assume tools can only be registered with valid abilities.
+		 * If not, the has_permission() will let us know in the try-catch block.
+		 *
+		 * @var \WP_Ability $ability
+		 */
 		$ability = $tool->get_ability();
 
 		// Run ability Permission Callback.
 		try {
 			$has_permission = $ability->has_permission( $args );
-			if ( ! $has_permission ) {
+			if ( true !== $has_permission ) {
 				// Track permission denied event.
 				$this->mcp->observability_handler::record_event(
 					'mcp.tool.permission_denied',

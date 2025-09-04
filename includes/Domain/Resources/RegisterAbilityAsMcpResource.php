@@ -26,13 +26,12 @@ use WP_Ability;
  * )
  */
 class RegisterAbilityAsMcpResource {
-
 	/**
-	 * The ability name.
+	 * The WordPress ability instance.
 	 *
-	 * @var string
+	 * @var \WP_Ability
 	 */
-	private string $ability_name;
+	private WP_Ability $ability;
 
 	/**
 	 * The MCP server.
@@ -42,23 +41,16 @@ class RegisterAbilityAsMcpResource {
 	private McpServer $mcp_server;
 
 	/**
-	 * The WordPress ability instance.
-	 *
-	 * @var \WP_Ability|null
-	 */
-	private ?WP_Ability $ability;
-
-	/**
 	 * Make a new instance of the class.
 	 *
-	 * @param string    $ability_name The ability name.
+	 * @param \WP_Ability            $ability    The ability.
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource Returns resource instance if valid
 	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
-	public static function make( string $ability_name, McpServer $mcp_server ): McpResource {
-		$resource = new self( $ability_name, $mcp_server );
+	public static function make( WP_Ability $ability, McpServer $mcp_server ): McpResource {
+		$resource = new self( $ability, $mcp_server );
 
 		return $resource->get_resource();
 	}
@@ -66,13 +58,12 @@ class RegisterAbilityAsMcpResource {
 	/**
 	 * Constructor.
 	 *
-	 * @param string    $ability_name The ability name.
+	 * @param \WP_Ability            $ability    The ability.
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 */
-	public function __construct( string $ability_name, McpServer $mcp_server ) {
-		$this->ability_name = $ability_name;
-		$this->mcp_server   = $mcp_server;
-		$this->ability      = wp_get_ability( $ability_name );
+	private function __construct( WP_Ability $ability, McpServer $mcp_server ) {
+		$this->mcp_server = $mcp_server;
+		$this->ability    = $ability;
 	}
 
 	/**
@@ -82,10 +73,6 @@ class RegisterAbilityAsMcpResource {
 	 * @throws \InvalidArgumentException If URI is not found in ability meta.
 	 */
 	public function get_uri(): string {
-		if ( ! $this->ability ) {
-			throw new \InvalidArgumentException( 'WordPress ability does not exist or could not be loaded' );
-		}
-
 		$ability_meta = $this->ability->get_meta();
 
 		// First try to get URI from ability meta
@@ -94,20 +81,16 @@ class RegisterAbilityAsMcpResource {
 		}
 
 		// If not found in meta, throw an error since URI should be provided in ability meta
-		throw new \InvalidArgumentException( esc_html( "Resource URI not found in ability meta for '{$this->ability_name}'. URI must be provided in ability meta data." ) );
+		throw new \InvalidArgumentException( esc_html( "Resource URI not found in ability meta for '{$this->ability->get_name()}'. URI must be provided in ability meta data." ) );
 	}
 
 	/**
 	 * Get the MCP resource data array.
 	 *
-	 * @return array
+	 * @return array<string,mixed>
 	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
-	public function get_data(): array {
-		if ( ! $this->is_ability() ) {
-			throw new \InvalidArgumentException( 'WordPress ability does not exist or could not be loaded' );
-		}
-
+	private function get_data(): array {
 		$resource_data = array(
 			'ability' => $this->ability->get_name(),
 			'uri'     => $this->get_uri(),
@@ -150,7 +133,7 @@ class RegisterAbilityAsMcpResource {
 	 * Get resource content from the ability.
 	 * This method should be implemented based on how abilities provide resource content.
 	 *
-	 * @return array Array with 'text', 'blob', and/or 'mimeType' keys
+	 * @return array<string,mixed> Array with 'text', 'blob', and/or 'mimeType' keys
 	 */
 	private function get_ability_content(): array {
 		// @todo: Probably this can be improved so it will not be loaded when the resource list is called
@@ -175,22 +158,13 @@ class RegisterAbilityAsMcpResource {
 	}
 
 	/**
-	 * Check if the WordPress ability exists and was successfully loaded.
-	 *
-	 * @return bool
-	 */
-	public function is_ability(): bool {
-		return $this->ability instanceof WP_Ability;
-	}
-
-	/**
 	 * Validate the MCP resource data and throw exception if invalid.
 	 * Uses the centralized McpResourceValidator for consistent validation.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource Returns the MCP resource instance if valid.
 	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
-	public function get_resource(): McpResource {
+	private function get_resource(): McpResource {
 		return McpResource::from_array( $this->get_data(), $this->mcp_server );
 	}
 }
