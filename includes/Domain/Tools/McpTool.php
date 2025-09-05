@@ -275,7 +275,9 @@ class McpTool {
 	 * @return array
 	 */
 	public function to_array(): array {
-		$input_schema_for_json = empty( $this->input_schema ) ? (object) array() : $this->input_schema;
+		$input_schema_for_json = empty( $this->input_schema )
+			? array( 'type' => 'object' )
+			: $this->input_schema;
 
 		$tool_data = array(
 			'name'        => $this->name,
