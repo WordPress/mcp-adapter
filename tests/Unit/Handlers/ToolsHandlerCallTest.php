@@ -62,6 +62,7 @@ final class ToolsHandlerCallTest extends TestCase {
 						'a' => '',
 						'b' => 'null',
 						'c' => 'ok',
+						'd' => 0,
 					),
 				),
 			)
@@ -73,7 +74,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame(
 			array(
 				'ok'   => true,
-				'echo' => array( 'c' => 'ok' ),
+				'echo' => array( 'c' => 'ok', 'd' => 0 ),
 			),
 			$payload
 		);
