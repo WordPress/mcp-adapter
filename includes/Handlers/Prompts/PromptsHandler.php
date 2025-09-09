@@ -111,7 +111,13 @@ class PromptsHandler {
 					return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
 				}
 
-				return $prompt->execute_direct( $arguments );
+				$result = $prompt->execute_direct( $arguments );
+
+				if ( is_wp_error( $result ) ) {
+					return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing prompt' )['error'] );
+				}
+
+				return $result;
 			}
 
 			/**
@@ -128,7 +134,13 @@ class PromptsHandler {
 				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
 			}
 
-			return $ability->execute( $arguments );
+			$result = $ability->execute( $arguments );
+
+			if ( is_wp_error( $result ) ) {
+				return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing prompt' )['error'] );
+			}
+
+			return $result;
 		} catch ( \Throwable $e ) {
 			if ( $this->mcp->error_handler ) {
 				$this->mcp->error_handler->log(

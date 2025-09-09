@@ -136,6 +136,10 @@ class ResourcesHandler {
 
 			$contents = $ability->execute( $request_params );
 
+			if ( is_wp_error( $contents ) ) {
+				return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error reading resource' )['error'] );
+			}
+
 			return array(
 				'contents' => $contents,
 			);

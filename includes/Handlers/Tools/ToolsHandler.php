@@ -291,6 +291,10 @@ class ToolsHandler {
 		try {
 			$result = $ability->execute( $args );
 
+			if ( is_wp_error( $result ) ) {
+				return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing tool' )['error'] );
+			}
+
 			// Track successful tool execution.
 			$this->mcp->observability_handler::record_event(
 				'mcp.tool.execution_success',
