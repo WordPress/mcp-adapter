@@ -154,6 +154,66 @@ final class DummyAbility {
 				),
 			)
 		);
+
+		// WP_Error tool: returns WP_Error object
+		wp_register_ability(
+			'test/wp-error-tool',
+			array(
+				'label'               => 'WP Error Tool',
+				'description'         => 'Returns a WP_Error object',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return new \WP_Error( 'test_error', 'This is a test error message', array( 'data' => 'test' ) );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+			)
+		);
+
+		// WP_Error resource: returns WP_Error object
+		wp_register_ability(
+			'test/wp-error-resource',
+			array(
+				'label'               => 'WP Error Resource',
+				'description'         => 'Returns a WP_Error object',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return new \WP_Error( 'resource_error', 'Resource could not be loaded', array( 'uri' => 'WordPress://error/resource' ) );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => 'WordPress://error/resource',
+				),
+			)
+		);
+
+		// WP_Error prompt: returns WP_Error object
+		wp_register_ability(
+			'test/wp-error-prompt',
+			array(
+				'label'               => 'WP Error Prompt',
+				'description'         => 'Returns a WP_Error object',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return new \WP_Error( 'prompt_error', 'Prompt could not be executed', array( 'input' => $input ) );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'arguments' => array(
+						array(
+							'name'        => 'query',
+							'description' => 'Query parameter',
+							'required'    => false,
+						),
+					),
+				),
+			)
+		);
 	}
 
 	public static function unregister_all(): void {
@@ -165,6 +225,9 @@ final class DummyAbility {
 			'test/image',
 			'test/resource',
 			'test/prompt',
+			'test/wp-error-tool',
+			'test/wp-error-resource',
+			'test/wp-error-prompt',
 		);
 
 		// Ensure abilities API is initialized so the registry exists
