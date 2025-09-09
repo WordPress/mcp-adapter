@@ -110,9 +110,11 @@ class ToolsHandler {
 		if ( ! empty( $request_params['arguments'] ) ) {
 			foreach ( $request_params['arguments'] as $key => $value ) {
 				// Only remove truly empty values (null, empty strings) but preserve valid falsy values like 0
-				if ( null === $value || '' === $value || 'null' === $value ) {
-					unset( $request_params['arguments'][ $key ] );
+				if ( null !== $value && '' !== $value && 'null' !== $value ) {
+					continue;
 				}
+
+				unset( $request_params['arguments'][ $key ] );
 			}
 		}
 
