@@ -161,8 +161,9 @@ sequenceDiagram
 
 - **Purpose**: Communication protocol implementation with dependency injection
 - **Built-in Options**:
-    - `RestTransport`: RESTful HTTP API implementation for mcp-wordpress-remote proxy
-    - `StreamableTransport`: JSON-RPC 2.0 streaming implementation (requires OAuth2.1)
+    - `HttpTransport`: Unified MCP 2025-06-18 Streamable HTTP transport (recommended)
+    - `RestTransport`: Legacy REST API implementation (deprecated)
+    - `StreamableTransport`: Legacy streaming implementation (deprecated)
 - **Architecture**: Interface-based with `McpTransportContext` for dependency injection
 - **Customization**: Implement `McpTransportInterface` for custom protocols
 
@@ -225,9 +226,10 @@ graph TB
     end
     
     subgraph "Transport Layer"
-        T1["RestTransport"]
-        T2["StreamableTransport"]
-        T3["Custom Transport"]
+        T1["HttpTransport (Recommended)"]
+        T2["RestTransport (Deprecated)"]
+        T3["StreamableTransport (Deprecated)"]
+        T4["Custom Transport"]
     end
     
     subgraph "MCP Adapter Core"
@@ -456,8 +458,9 @@ Different transport implementations use the strategy pattern:
 use WP\MCP\Transport\Contracts\McpTransportInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
-use WP\MCP\Transport\Http\RestTransport;
-use WP\MCP\Transport\Http\StreamableTransport;
+use WP\MCP\Transport\HttpTransport;
+use WP\MCP\Transport\Http\RestTransport; // Deprecated
+use WP\MCP\Transport\Http\StreamableTransport; // Deprecated
 
 interface McpTransportInterface {
     public function __construct( McpTransportContext $context );
@@ -466,6 +469,14 @@ interface McpTransportInterface {
     public function register_routes(): void;
 }
 
+// Recommended: HttpTransport (MCP 2025-06-18 compliant)
+class HttpTransport implements McpTransportInterface {
+    use McpTransportHelperTrait;
+    // Unified transport for both proxy and direct clients
+    // Implements MCP 2025-06-18 Streamable HTTP specification
+}
+
+// Deprecated: RestTransport 
 class RestTransport implements McpTransportInterface {
     use McpTransportHelperTrait;
     
@@ -485,6 +496,7 @@ class RestTransport implements McpTransportInterface {
     }
 }
 
+// Deprecated: StreamableTransport
 class StreamableTransport implements McpTransportInterface {
     use McpTransportHelperTrait;
     
