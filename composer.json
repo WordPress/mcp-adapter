@@ -2,7 +2,7 @@
 	"name": "wordpress/mcp-adapter",
 	"description": "Adapter for Abilities API, letting WordPress abilities to be used as MCP tools, resources or prompts",
 	"license": "GPL-2.0-or-later",
-	"type": "library",
+	"type": "wordpress-plugin",
 	"keywords": [
 		"wordpress",
 		"mcp",
