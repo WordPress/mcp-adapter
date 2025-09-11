@@ -424,11 +424,7 @@ class McpPromptValidator {
 		}
 
 		// Only allow letters, numbers, hyphens, and underscores
-		if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $name ) ) {
-			return false;
-		}
-
-		return true;
+		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
 	}
 
 	/**
@@ -450,11 +446,7 @@ class McpPromptValidator {
 		}
 
 		// Only allow letters, numbers, hyphens, and underscores
-		if ( ! preg_match( '/^[a-zA-Z0-9_-]+$/', $name ) ) {
-			return false;
-		}
-
-		return true;
+		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
 	}
 
 	/**
