@@ -25,7 +25,6 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpRequestRouter;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**

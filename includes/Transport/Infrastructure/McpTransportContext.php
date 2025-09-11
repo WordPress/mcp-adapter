@@ -115,12 +115,12 @@ class McpTransportContext {
 		foreach ( $properties as $name => $value ) {
 				$this->$name = $value;
 		}
-		
+
 		// If request_router is provided, we're done
 		if ( isset( $properties['request_router'] ) ) {
 			return;
 		}
-		
+
 		// Create request_router if not provided
 		$this->request_router = new \WP\MCP\Transport\Infrastructure\McpRequestRouter( $this );
 	}

@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\System;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
