@@ -344,7 +344,8 @@ class McpResource {
 	 * @return string
 	 */
 	public function to_json(): string {
-		return wp_json_encode( $this->to_array() );
+		$json = wp_json_encode( $this->to_array() );
+		return false !== $json ? $json : '{}';
 	}
 
 	/**
