@@ -184,9 +184,9 @@ class HttpTransport implements McpTransportInterface {
 			}
 
 			// Handle single message or batch (MCP spec allows both)
-			$messages = is_array( $body ) && isset( $body[0] ) ? $body : array( $body );
-			$results  = array();
-			$has_requests = false;
+			$messages          = is_array( $body ) && isset( $body[0] ) ? $body : array( $body );
+			$results           = array();
+			$has_requests      = false;
 			$has_notifications = false;
 
 			foreach ( $messages as $message ) {
@@ -221,7 +221,6 @@ class HttpTransport implements McpTransportInterface {
 			);
 
 			return new WP_REST_Response( $response_body, 200, $headers );
-
 		} catch ( \Throwable $exception ) {
 			// Log the error
 			if ( $this->context->mcp_server->error_handler ) {
@@ -250,7 +249,7 @@ class HttpTransport implements McpTransportInterface {
 		$params     = $message['params'] ?? array();
 
 		// Handle initialize request specially (creates session for direct clients)
-		if ( $method === 'initialize' ) {
+		if ( 'initialize' === $method ) {
 			return $this->handle_initialize_request( $message, $request );
 		}
 
@@ -378,12 +377,15 @@ class HttpTransport implements McpTransportInterface {
 				$session_id = $this->create_session( $params['clientInfo'] ?? array() );
 
 				// Add session header to response
-				add_filter( 'rest_post_dispatch', function( $response ) use ( $session_id ) {
-					if ( $response instanceof WP_REST_Response ) {
-						$response->header( 'Mcp-Session-Id', $session_id );
+				add_filter(
+					'rest_post_dispatch',
+					static function ( $response ) use ( $session_id ) {
+						if ( $response instanceof WP_REST_Response ) {
+							$response->header( 'Mcp-Session-Id', $session_id );
+						}
+						return $response;
 					}
-					return $response;
-				} );
+				);
 			}
 		}
 
@@ -492,5 +494,4 @@ class HttpTransport implements McpTransportInterface {
 		// TODO: Implement proper origin validation
 		return true;
 	}
-
 }
