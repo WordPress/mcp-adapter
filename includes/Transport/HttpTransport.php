@@ -72,7 +72,7 @@ class HttpTransport implements McpTransportInterface {
 	/**
 	 * Check if the user has permission to access the MCP API
 	 *
-	 * @param \WP_REST_Request|null $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>>|null $request The request object.
 	 *
 	 * @return bool|\WP_Error
 	 */
@@ -460,7 +460,7 @@ class HttpTransport implements McpTransportInterface {
 	/**
 	 * Get CORS headers for the response
 	 *
-	 * @param \WP_REST_Request $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
 	 * @return array
 	 */
@@ -475,7 +475,7 @@ class HttpTransport implements McpTransportInterface {
 	/**
 	 * Get appropriate CORS origin
 	 *
-	 * @param \WP_REST_Request $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
 	 * @return string
 	 */

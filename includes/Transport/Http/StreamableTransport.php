@@ -71,7 +71,7 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Check if the user has permission to access the MCP API
 	 *
-	 * @param \WP_REST_Request|null $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>>|null $request The request object.
 	 *
 	 * @return bool|\WP_Error
 	 */
@@ -129,7 +129,7 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Handle POST requests
 	 *
-	 * @param \WP_REST_Request $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
 	 * @return \WP_REST_Response
 	 */
