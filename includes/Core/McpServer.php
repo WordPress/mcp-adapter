@@ -613,25 +613,7 @@ class McpServer {
 		$prompts_handler    = new PromptsHandler( $this );
 		$system_handler     = new SystemHandler( $this );
 
-		// Create context for the router first (without router to avoid circular dependency)
-		$router_context = new McpTransportContext(
-			array(
-				'mcp_server'                    => $this,
-				'initialize_handler'            => $initialize_handler,
-				'tools_handler'                 => $tools_handler,
-				'resources_handler'             => $resources_handler,
-				'prompts_handler'               => $prompts_handler,
-				'system_handler'                => $system_handler,
-				'observability_handler'         => $this->observability_handler,
-				'request_router'                => null,
-				'transport_permission_callback' => $this->transport_permission_callback,
-			)
-		);
-
-		// Create the router
-		$request_router = new McpRequestRouter( $router_context );
-
-		// Create the final context with the router
+		// Create the context - the router will be created automatically
 		return new McpTransportContext(
 			array(
 				'mcp_server'                    => $this,
@@ -641,7 +623,6 @@ class McpServer {
 				'prompts_handler'               => $prompts_handler,
 				'system_handler'                => $system_handler,
 				'observability_handler'         => $this->observability_handler,
-				'request_router'                => $request_router,
 				'transport_permission_callback' => $this->transport_permission_callback,
 			)
 		);

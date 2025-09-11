@@ -590,24 +590,7 @@ final class HttpTransportTest extends TestCase {
 		$prompts_handler    = new PromptsHandler( $server );
 		$system_handler     = new SystemHandler( $server );
 
-		// Create context for the router first (without router to avoid circular dependency)
-		$router_context = new McpTransportContext(
-			array(
-				'mcp_server'            => $server,
-				'initialize_handler'    => $initialize_handler,
-				'tools_handler'         => $tools_handler,
-				'resources_handler'     => $resources_handler,
-				'prompts_handler'       => $prompts_handler,
-				'system_handler'        => $system_handler,
-				'observability_handler' => DummyObservabilityHandler::class,
-				'request_router'        => null,
-			)
-		);
-
-		// Create the router
-		$request_router = new McpRequestRouter( $router_context );
-
-		// Create the final context with the router
+		// Create the context - the router will be created automatically
 		return new McpTransportContext(
 			array(
 				'mcp_server'            => $server,
@@ -617,7 +600,6 @@ final class HttpTransportTest extends TestCase {
 				'prompts_handler'       => $prompts_handler,
 				'system_handler'        => $system_handler,
 				'observability_handler' => DummyObservabilityHandler::class,
-				'request_router'        => $request_router,
 			)
 		);
 	}

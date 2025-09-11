@@ -87,7 +87,7 @@ class McpTransportContext {
 	/**
 	 * The request router service.
 	 */
-	public ?\WP\MCP\Transport\Infrastructure\McpRequestRouter $request_router;
+	public \WP\MCP\Transport\Infrastructure\McpRequestRouter $request_router;
 
 	/**
 	 * Optional custom permission callback for transport-level authentication.
@@ -107,7 +107,7 @@ class McpTransportContext {
 	 *   prompts_handler: \WP\MCP\Handlers\Prompts\PromptsHandler,
 	 *   system_handler: \WP\MCP\Handlers\System\SystemHandler,
 	 *   observability_handler: string,
-	 *   request_router?: \WP\MCP\Transport\Infrastructure\McpRequestRouter|null,
+	 *   request_router?: \WP\MCP\Transport\Infrastructure\McpRequestRouter,
 	 *   transport_permission_callback?: callable|null
 	 * } $properties Properties to set on the context.
 	 */
@@ -115,5 +115,13 @@ class McpTransportContext {
 		foreach ( $properties as $name => $value ) {
 				$this->$name = $value;
 		}
+		
+		// If request_router is provided, we're done
+		if ( isset( $properties['request_router'] ) ) {
+			return;
+		}
+		
+		// Create request_router if not provided
+		$this->request_router = new \WP\MCP\Transport\Infrastructure\McpRequestRouter( $this );
 	}
 }
