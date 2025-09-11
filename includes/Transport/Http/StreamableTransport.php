@@ -47,7 +47,7 @@ class StreamableTransport implements McpTransportInterface {
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct( McpTransportContext $context ) {
-		_deprecated_class( __CLASS__, '', '\WP\MCP\Transport\HttpTransport' );
+		_deprecated_class( self::class, '', '\WP\MCP\Transport\HttpTransport' );
 
 		$this->context = $context;
 		add_action( 'rest_api_init', array( $this, 'register_routes' ), 20002 );
@@ -184,18 +184,14 @@ class StreamableTransport implements McpTransportInterface {
 			}
 
 			// Process requests and return JSON response.
-			$results        = array();
-			$has_initialize = false;
+			$results = array();
 			foreach ( $messages as $message ) {
 				if ( ! isset( $message['method'] ) || ! isset( $message['id'] ) ) {
 					continue;
 				}
 
 				$this->request_id = (int) $message['id'];
-				if ( 'initialize' === $message['method'] ) {
-					$has_initialize = true;
-				}
-				$results[] = $this->process_message( $message );
+				$results[]        = $this->process_message( $message );
 			}
 
 			// Return single result or batch.

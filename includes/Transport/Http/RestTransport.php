@@ -40,7 +40,7 @@ class RestTransport implements McpTransportInterface {
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct( McpTransportContext $context ) {
-		_deprecated_class( __CLASS__, '', '\WP\MCP\Transport\HttpTransport' );
+		_deprecated_class( self::class, '', '\WP\MCP\Transport\HttpTransport' );
 
 		$this->context = $context;
 		add_action( 'rest_api_init', array( $this, 'register_routes' ), 20001 );
