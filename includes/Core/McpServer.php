@@ -23,6 +23,7 @@ use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
+use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Contracts\McpTransportInterface;
 use WP\MCP\Transport\Infrastructure\McpRequestRouter;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
@@ -167,12 +168,7 @@ class McpServer {
 		$this->server_description     = $server_description;
 		$this->server_version         = $server_version;
 
-		// Validate and set transport permission callback
-		if ( null !== $transport_permission_callback && ! is_callable( $transport_permission_callback ) ) {
-			throw new \InvalidArgumentException(
-				esc_html__( 'Transport permission callback must be callable.', 'mcp-adapter' )
-			);
-		}
+		// Set transport permission callback (already validated by type system)
 		$this->transport_permission_callback = $transport_permission_callback;
 
 		// Instantiate error handler
@@ -182,7 +178,12 @@ class McpServer {
 			$this->error_handler = new NullMcpErrorHandler();
 		}
 
-		$this->observability_handler = $observability_handler;
+		// Instantiate observability handler
+		if ( $observability_handler && class_exists( $observability_handler ) ) {
+			$this->observability_handler = $observability_handler;
+		} else {
+			$this->observability_handler = NullMcpObservabilityHandler::class;
+		}
 
 		// Register tools, resources, and prompts if provided.
 		if ( ! empty( $tools ) ) {
@@ -382,6 +383,7 @@ class McpServer {
 			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
 				try {
 					// Create instance of the prompt builder class
+					/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
 					$builder = new $prompt_item();
 					$prompt  = $builder->build();
 
