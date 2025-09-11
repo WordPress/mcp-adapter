@@ -58,8 +58,6 @@ class HttpTransport implements McpTransportInterface {
 	 */
 	public function register_routes(): void {
 		// Single endpoint that handles all HTTP methods per MCP spec
-		error_log($this->context->mcp_server->get_server_route_namespace());
-		error_log($this->context->mcp_server->get_server_route());
 		register_rest_route(
 			$this->context->mcp_server->get_server_route_namespace(),
 			$this->context->mcp_server->get_server_route(),
