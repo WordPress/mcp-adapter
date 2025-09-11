@@ -82,8 +82,8 @@ class McpRequestRouter {
 		try {
 			$result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method );
 
-			// Handle array error formats.
-			if ( is_array( $result ) && isset( $result['error'] ) ) {
+			// Handle error formats.
+			if ( isset( $result['error'] ) ) {
 				// Track failed request.
 				$error_code = $result['error']['code'] ?? -32603;
 				$error_tags = array_merge(
