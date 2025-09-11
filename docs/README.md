@@ -121,7 +121,7 @@ $adapter->create_server(
     'Content Management Server',
     'AI-powered content creation',
     '1.0.0',
-    [ \WP\MCP\Transport\McpRestTransport::class ],
+    [ \WP\MCP\Transport\HttpTransport::class ],
     \WP\MCP\ErrorHandlers\ErrorLogMcpErrorHandler::class,
     \WP\MCP\ObservabilityHandlers\NullMcpObservabilityHandler::class,
     [ 'my-plugin/create-post' ]

@@ -111,7 +111,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'A simple MCP server for demonstration',    // Description
         '1.0.0',                                    // Version
         [                                           // Transport methods
-            \WP\MCP\Transport\Http\RestTransport::class,
+            \WP\MCP\Transport\HttpTransport::class,
         ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
         [                                           // Abilities to expose as tools

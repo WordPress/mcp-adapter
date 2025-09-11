@@ -195,7 +195,7 @@ add_action('mcp_adapter_init', function($adapter) {
         'My MCP Server',
         'Description',
         '1.0.0',
-        [\WP\MCP\Transport\Http\RestTransport::class],
+        [\WP\MCP\Transport\HttpTransport::class],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
         [\WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class],
         ['my-plugin/my-tool']

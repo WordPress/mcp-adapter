@@ -26,7 +26,7 @@ McpAdapter::instance()->create_server(
     'My MCP Server',
     'Server description',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null, // error handler
     null, // observability handler
     ['my-plugin/tool']
@@ -47,7 +47,7 @@ McpAdapter::instance()->create_server(
     'Admin MCP Server',
     'Admin-only server',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null, // error handler
     null, // observability handler
     ['my-plugin/admin-tool'],
@@ -97,7 +97,7 @@ McpAdapter::instance()->create_server(
     'Admin Server',
     'Admin-only server',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null,
     null,
     ['my-plugin/edit-post'], // This ability checks edit_posts capability
@@ -137,7 +137,7 @@ McpAdapter::instance()->create_server(
     'Content Server',
     'Content management server',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null,
     null,
     ['my-plugin/edit-post', 'my-plugin/delete-post'],
@@ -178,7 +178,7 @@ McpAdapter::instance()->create_server(
     'Content Server',
     'Content management',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null,
     null,
     ['my-plugin/edit-post'],
@@ -362,7 +362,7 @@ McpAdapter::instance()->create_server(
     'API MCP Server',
     'API key authentication',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null,
     null,
     ['my-plugin/api-tool'],
@@ -506,7 +506,7 @@ McpAdapter::instance()->create_server(
     'Managed Server',
     'Using permission manager class',
     '1.0.0',
-    [RestTransport::class],
+    [\WP\MCP\Transport\HttpTransport::class],
     null,
     null,
     ['my-plugin/tool'],
@@ -690,7 +690,7 @@ If you previously created custom transport classes for authentication, you can n
 ### Before (Custom Transport)
 
 ```php
-class AdminOnlyTransport extends RestTransport {
+class AdminOnlyTransport extends \WP\MCP\Transport\HttpTransport {
     public function check_permission(): WP_Error|bool {
         return current_user_can('manage_options');
     }
@@ -720,7 +720,7 @@ McpAdapter::instance()->create_server(
     'Admin Server',
     'Description',
     '1.0.0',
-    [RestTransport::class], // Standard transport
+    [\WP\MCP\Transport\HttpTransport::class], // Standard transport
     null,
     null,
     ['tool'],

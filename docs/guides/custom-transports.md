@@ -1,8 +1,18 @@
 # Custom Transport Layers
 
-This guide covers how to implement custom transport layers for the MCP Adapter. While the adapter includes
-production-ready REST API and streaming transports, you may need custom protocols for specific requirements,
-infrastructure, or integration patterns.
+This guide covers how to implement custom transport layers for the MCP Adapter. The adapter includes a
+production-ready unified HTTP transport that implements MCP 2025-06-18 Streamable HTTP specification,
+but you may need custom protocols for specific requirements, infrastructure, or integration patterns.
+
+## ⚠️ Transport Class Updates
+
+**Important**: The transport classes have been updated for MCP 2025-06-18 compliance:
+
+- ✅ **`HttpTransport`** - New unified transport (recommended)
+- ❌ **`RestTransport`** - Deprecated, use `HttpTransport` instead  
+- ❌ **`StreamableTransport`** - Deprecated, use `HttpTransport` instead
+
+The new `HttpTransport` provides all functionality of both deprecated classes with full MCP 2025-06-18 compliance.
 
 ## Table of Contents
 
@@ -50,7 +60,7 @@ infrastructure, or integration patterns.
 Here's how an enterprise transport implementation might look:
 
 ```php
-class EnterpriseRestTransport extends \WP\MCP\Transport\Http\RestTransport {
+class EnterpriseHttpTransport extends \WP\MCP\Transport\HttpTransport {
     // Custom routing for enterprise infrastructure
     // Integration with API gateways and proxies
     // Enterprise-specific authentication
@@ -370,7 +380,7 @@ If you have custom transports only for authentication:
 
 ```php
 // ❌ Custom transport just for auth
-class AdminTransport extends RestTransport {
+class AdminTransport extends \WP\MCP\Transport\HttpTransport {
     public function check_permission(): bool {
         return current_user_can('manage_options');
     }
@@ -379,7 +389,7 @@ class AdminTransport extends RestTransport {
 // ✅ Use transport permissions instead
 McpAdapter::instance()->create_server(
     'server-id', 'namespace', 'route', 'name', 'desc', '1.0.0',
-    [RestTransport::class], // Standard transport
+    [\WP\MCP\Transport\HttpTransport::class], // Standard transport
     null, null, ['tools'], [], [],
     function(): bool { return current_user_can('manage_options'); } // Permission callback
 );

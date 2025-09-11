@@ -105,7 +105,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'Content Management Server',
         'MCP server for content creation and management',
         '1.0.0',
-        [ \WP\MCP\Transport\Http\RestTransport::class ],
+        [ \WP\MCP\Transport\HttpTransport::class ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
         [ 'my-plugin/create-post' ] // Expose as tool
     );
@@ -249,7 +249,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'Site Information Server',
         'Provides site statistics and information',
         '1.0.0',
-        [ \WP\MCP\Transport\Http\RestTransport::class ],
+        [ \WP\MCP\Transport\HttpTransport::class ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
         [], // No tools
         [ 'my-plugin/site-stats' ], // Expose as resource
@@ -444,7 +444,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'SEO Advisory Server',
         'Provides SEO analysis and recommendations',
         '1.0.0',
-        [ \WP\MCP\Transport\Http\RestTransport::class ],
+        [ \WP\MCP\Transport\HttpTransport::class ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
         [], // No tools
         [], // No resources
@@ -506,7 +506,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'Complete MCP Server',
         'Demonstrates tools, resources, and prompts together',
         '1.0.0',
-        [ \WP\MCP\Transport\Http\RestTransport::class ],
+        [ \WP\MCP\Transport\HttpTransport::class ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
         [ 'my-plugin/create-post' ],              // Tools
         [ 'my-plugin/site-stats' ],               // Resources
@@ -560,7 +560,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'Monitored MCP Server',
         'Server with custom observability',
         '1.0.0',
-        [ \WP\MCP\Transport\Http\RestTransport::class ],
+        [ \WP\MCP\Transport\HttpTransport::class ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
         [ 'my-plugin/create-post' ],
         [],

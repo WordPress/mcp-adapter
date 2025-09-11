@@ -121,7 +121,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
             'Test Server',
             'Testing server creation',
             '1.0.0',
-            [ \WP\MCP\Transport\Http\RestTransport::class ],
+            [ \WP\MCP\Transport\HttpTransport::class ],
             \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
             []
         );
@@ -221,7 +221,7 @@ add_action( 'rest_api_init', function() {
 
 ```php
 // Debug authentication in your transport
-class DebugTransport extends \WP\MCP\Transport\Http\RestTransport {
+class DebugTransport extends \WP\MCP\Transport\HttpTransport {
     public function check_permissions( \WP_REST_Request $request ): bool {
         $auth_header = $request->get_header( 'authorization' );
         $user_id = get_current_user_id();
@@ -326,7 +326,7 @@ add_action( 'mcp_adapter_init', function() {
 #### 2. Add Connection Debugging
 
 ```php
-class DebuggingTransport extends \WP\MCP\Transport\Http\RestTransport {
+class DebuggingTransport extends \WP\MCP\Transport\HttpTransport {
     public function handle_request( \WP_REST_Request $request ) {
         $start_time = microtime( true );
         
@@ -368,7 +368,7 @@ class DebuggingTransport extends \WP\MCP\Transport\Http\RestTransport {
 
 ```php
 // Add CORS support to your transport
-class CorsEnabledTransport extends \WP\MCP\Transport\Http\RestTransport {
+class CorsEnabledTransport extends \WP\MCP\Transport\HttpTransport {
     public function register_routes(): void {
         parent::register_routes();
         
