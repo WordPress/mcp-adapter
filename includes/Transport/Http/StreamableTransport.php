@@ -22,6 +22,8 @@ use WP_REST_Server;
 /**
  * The WordPress MCP Streamable HTTP Transport class.
  * Uses JSON-RPC 2.0 format for direct streamable connections.
+ *
+ * @deprecated Use HttpTransport instead. This class is deprecated and will be removed in a future version.
  */
 class StreamableTransport implements McpTransportInterface {
 	use McpTransportHelperTrait;
@@ -45,6 +47,8 @@ class StreamableTransport implements McpTransportInterface {
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct( McpTransportContext $context ) {
+		_deprecated_class( __CLASS__, '', '\WP\MCP\Transport\HttpTransport' );
+
 		$this->context = $context;
 		add_action( 'rest_api_init', array( $this, 'register_routes' ), 20002 );
 	}

@@ -21,6 +21,8 @@ use WP_REST_Server;
  *
  * Registers REST API routes for the Model Context Protocol (MCP) REST transport.
  * Uses WordPress-style responses for REST transport via mcp-wordpress-remote.
+ *
+ * @deprecated Use HttpTransport instead. This class is deprecated and will be removed in a future version.
  */
 class RestTransport implements McpTransportInterface {
 	use McpTransportHelperTrait;
@@ -38,6 +40,8 @@ class RestTransport implements McpTransportInterface {
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct( McpTransportContext $context ) {
+		_deprecated_class( __CLASS__, '', '\WP\MCP\Transport\HttpTransport' );
+
 		$this->context = $context;
 		add_action( 'rest_api_init', array( $this, 'register_routes' ), 20001 );
 	}
