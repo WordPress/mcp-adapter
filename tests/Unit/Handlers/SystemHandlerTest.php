@@ -24,7 +24,7 @@ final class SystemHandlerTest extends TestCase {
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
 		);
-		$handler = new SystemHandler( $server );
+		$handler = new SystemHandler();
 		$this->assertSame( array(), $handler->ping() );
 	}
 
@@ -40,7 +40,7 @@ final class SystemHandlerTest extends TestCase {
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
 		);
-		$handler = new SystemHandler( $server );
+		$handler = new SystemHandler();
 		$res     = $handler->set_logging_level( array( 'params' => array() ) );
 		$this->assertArrayHasKey( 'error', $res );
 	}
@@ -57,7 +57,7 @@ final class SystemHandlerTest extends TestCase {
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
 		);
-		$handler = new SystemHandler( $server );
+		$handler = new SystemHandler();
 		$this->assertTrue( $handler->complete()['success'] );
 		$this->assertArrayHasKey( 'roots', $handler->list_roots() );
 	}

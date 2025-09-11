@@ -611,7 +611,7 @@ class McpServer {
 		$tools_handler      = new ToolsHandler( $this );
 		$resources_handler  = new ResourcesHandler( $this );
 		$prompts_handler    = new PromptsHandler( $this );
-		$system_handler     = new SystemHandler( $this );
+		$system_handler     = new SystemHandler();
 
 		// Create the context - the router will be created automatically
 		return new McpTransportContext(

@@ -17,19 +17,10 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
  */
 class SystemHandler {
 	/**
-	 * The WordPress MCP instance.
-	 *
-	 * @var \WP\MCP\Core\McpServer
-	 */
-	private McpServer $mcp;
-
-	/**
 	 * Constructor.
-	 *
-	 * @param \WP\MCP\Core\McpServer $mcp The WordPress MCP instance.
 	 */
-	public function __construct( McpServer $mcp ) {
-		$this->mcp = $mcp;
+	public function __construct() {
+		// System handlers don't require any dependencies
 	}
 
 	/**

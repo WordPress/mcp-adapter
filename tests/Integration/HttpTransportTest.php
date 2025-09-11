@@ -588,7 +588,7 @@ final class HttpTransportTest extends TestCase {
 		$tools_handler      = new ToolsHandler( $server );
 		$resources_handler  = new ResourcesHandler( $server );
 		$prompts_handler    = new PromptsHandler( $server );
-		$system_handler     = new SystemHandler( $server );
+		$system_handler     = new SystemHandler();
 
 		// Create the context - the router will be created automatically
 		return new McpTransportContext(
