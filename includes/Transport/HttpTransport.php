@@ -119,9 +119,9 @@ class HttpTransport implements McpTransportInterface {
 	 *
 	 * @param mixed $request The request object.
 	 *
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 */
-	public function handle_request( $request ) {
+	public function handle_request( $request ): WP_REST_Response {
 		$method = $request->get_method();
 
 		// Handle preflight requests (CORS)
