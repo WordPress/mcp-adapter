@@ -16,6 +16,7 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Contracts\McpTransportInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
+use WP\MCP\Transport\Infrastructure\McpSessionManager;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -338,8 +339,18 @@ class HttpTransport implements McpTransportInterface {
 			);
 		}
 
-		// Terminate the session by deleting the transient
-		delete_transient( "mcp_session_{$session_id}" );
+		// Get current user
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return new WP_REST_Response(
+				McpErrorFactory::invalid_request( 0, 'User not authenticated' ),
+				401,
+				$this->get_cors_headers( $request )
+			);
+		}
+
+		// Terminate the session
+		McpSessionManager::delete_session( $user_id, $session_id );
 
 		return new WP_REST_Response( null, 200, $this->get_cors_headers( $request ) );
 	}
@@ -376,16 +387,16 @@ class HttpTransport implements McpTransportInterface {
 				// Create new session for all clients (proxy and direct)
 				$session_id = $this->create_session( $params['clientInfo'] ?? array() );
 
-				// Add session header to response
-				add_filter(
-					'rest_post_dispatch',
-					static function ( $response ) use ( $session_id ) {
-						if ( $response instanceof WP_REST_Response ) {
-							$response->header( 'Mcp-Session-Id', $session_id );
-						}
-						return $response;
-					}
-				);
+				if ( $session_id ) {
+					$this->add_session_header_to_response( $session_id );
+				} else {
+					// Failed to create session (user not authenticated)
+					return array(
+						'jsonrpc' => '2.0',
+						'id'      => $request_id,
+						'error'   => McpErrorFactory::invalid_request( 0, 'User authentication required for session creation' ),
+					);
+				}
 			}
 		}
 
@@ -421,40 +432,36 @@ class HttpTransport implements McpTransportInterface {
 			return McpErrorFactory::invalid_request( 0, 'Missing Mcp-Session-Id header' );
 		}
 
-		// All sessions are now managed by WordPress - check transients
-		$session_data = get_transient( "mcp_session_{$session_id}" );
-
-		if ( false === $session_data ) {
-			return McpErrorFactory::invalid_request( 0, 'Invalid or expired session' );
+		// Get current user
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return McpErrorFactory::invalid_request( 0, 'User not authenticated' );
 		}
 
-		// Session found - update last activity and refresh expiration
-		$session_data['last_activity'] = time();
-		set_transient( "mcp_session_{$session_id}", $session_data, self::SESSION_EXPIRATION );
+		// Validate session using McpSessionManager
+		if ( ! McpSessionManager::validate_session( $user_id, $session_id ) ) {
+			return McpErrorFactory::invalid_request( 0, 'Invalid or expired session' );
+		}
 
 		return true;
 	}
 
 	/**
-	 * Create a new session using WordPress transients
+	 * Create a new session using user meta
 	 *
 	 * @param array $client_info The client information from initialize request.
 	 *
-	 * @return string The session ID.
+	 * @return string|false The session ID on success, false on failure.
 	 */
-	private function create_session( array $client_info ): string {
-		$session_id = wp_generate_uuid4();
+	private function create_session( array $client_info ) {
+		// Get current user
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return false;
+		}
 
-		$session_data = array(
-			'created_at'    => time(),
-			'last_activity' => time(),
-			'client_info'   => $client_info,
-		);
-
-		// Store session as transient with automatic expiration
-		set_transient( "mcp_session_{$session_id}", $session_data, self::SESSION_EXPIRATION );
-
-		return $session_id;
+		// Create session using McpSessionManager
+		return McpSessionManager::create_session( $user_id, $client_info );
 	}
 
 	/**
@@ -493,5 +500,23 @@ class HttpTransport implements McpTransportInterface {
 	private function is_allowed_origin( string $origin ): bool {
 		// TODO: Implement proper origin validation
 		return true;
+	}
+
+	/**
+	 * Add session header to the REST response.
+	 *
+	 * @param string $session_id The session ID to add to the response header.
+	 * @return void
+	 */
+	private function add_session_header_to_response( string $session_id ): void {
+		add_filter(
+			'rest_post_dispatch',
+			static function ( $response ) use ( $session_id ) {
+				if ( $response instanceof WP_REST_Response ) {
+					$response->header( 'Mcp-Session-Id', $session_id );
+				}
+				return $response;
+			}
+		);
 	}
 }
