@@ -130,16 +130,14 @@ class PromptsHandler {
 
 			return $ability->execute( $arguments );
 		} catch ( \Throwable $e ) {
-			if ( $this->mcp->error_handler ) {
-				$this->mcp->error_handler->log(
-					'Prompt execution failed',
-					array(
-						'prompt_name' => $prompt_name,
-						'arguments'   => $arguments,
-						'error'       => $e->getMessage(),
-					)
-				);
-			}
+			$this->mcp->error_handler->log(
+				'Prompt execution failed',
+				array(
+					'prompt_name' => $prompt_name,
+					'arguments'   => $arguments,
+					'error'       => $e->getMessage(),
+				)
+			);
 
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )['error'] );
 		}

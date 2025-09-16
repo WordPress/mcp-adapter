@@ -140,15 +140,13 @@ class ResourcesHandler {
 				'contents' => $contents,
 			);
 		} catch ( \Throwable $exception ) {
-			if ( $this->mcp->error_handler ) {
-				$this->mcp->error_handler->log(
-					'Error reading resource',
-					array(
-						'uri'       => $uri,
-						'exception' => $exception->getMessage(),
-					)
-				);
-			}
+			$this->mcp->error_handler->log(
+				'Error reading resource',
+				array(
+					'uri'       => $uri,
+					'exception' => $exception->getMessage(),
+				)
+			);
 
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Failed to read resource' )['error'] );
 		}

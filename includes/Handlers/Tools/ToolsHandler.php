@@ -148,15 +148,13 @@ class ToolsHandler {
 
 			return $response;
 		} catch ( \Throwable $exception ) {
-			if ( $this->mcp->error_handler ) {
-				$this->mcp->error_handler->log(
-					'Error calling tool',
-					array(
-						'tool'      => $request_params['name'],
-						'exception' => $exception->getMessage(),
-					)
-				);
-			}
+			$this->mcp->error_handler->log(
+				'Error calling tool',
+				array(
+					'tool'      => $request_params['name'],
+					'exception' => $exception->getMessage(),
+				)
+			);
 
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' )['error'] );
 		}
@@ -217,14 +215,12 @@ class ToolsHandler {
 
 		// Check if the tool exists.
 		if ( ! $tool ) {
-			if ( $this->mcp->error_handler ) {
-				$this->mcp->error_handler->log(
-					'Tool not found',
-					array(
-						'tool' => $tool_name,
-					)
-				);
-			}
+			$this->mcp->error_handler->log(
+				'Tool not found',
+				array(
+					'tool' => $tool_name,
+				)
+			);
 
 			// Track tool not found event.
 			$this->mcp->observability_handler::record_event(
@@ -263,15 +259,13 @@ class ToolsHandler {
 				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for tool: ' . $tool_name )['error'] );
 			}
 		} catch ( \Throwable $e ) {
-			if ( $this->mcp->error_handler ) {
-				$this->mcp->error_handler->log(
-					'Error running ability permission callback',
-					array(
-						'ability'   => $ability->get_name(),
-						'exception' => $e->getMessage(),
-					)
-				);
-			}
+			$this->mcp->error_handler->log(
+				'Error running ability permission callback',
+				array(
+					'ability'   => $ability->get_name(),
+					'exception' => $e->getMessage(),
+				)
+			);
 
 			// Track permission check error event.
 			$this->mcp->observability_handler::record_event(
@@ -303,15 +297,13 @@ class ToolsHandler {
 
 			return $result;
 		} catch ( \Throwable $e ) {
-			if ( $this->mcp->error_handler ) {
-				$this->mcp->error_handler->log(
-					'Tool execution failed',
-					array(
-						'tool'      => $tool_name,
-						'exception' => $e->getMessage(),
-					)
-				);
-			}
+			$this->mcp->error_handler->log(
+				'Tool execution failed',
+				array(
+					'tool'      => $tool_name,
+					'exception' => $e->getMessage(),
+				)
+			);
 
 			// Track tool execution error event.
 			$this->mcp->observability_handler::record_event(
