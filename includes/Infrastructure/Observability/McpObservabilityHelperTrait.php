@@ -84,9 +84,9 @@ trait McpObservabilityHelperTrait {
 		$metric = strtolower( $metric );
 		$metric = (string) preg_replace( '/[^a-z0-9_\.]/', '.', $metric );
 		$metric = (string) preg_replace( '/\.+/', '.', $metric ); // Remove duplicate dots.
-		$metric = trim( $metric, '.' ); // Remove leading/trailing dots.
+		// Remove leading/trailing dots.
 
-		return $metric;
+		return trim( $metric, '.' );
 	}
 
 	/**
