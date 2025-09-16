@@ -9,23 +9,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
-use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Prompts\McpPrompt;
-use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
-use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Domain\Tools\McpTool;
-use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
-use WP\MCP\Handlers\Initialize\InitializeHandler;
-use WP\MCP\Handlers\Prompts\PromptsHandler;
-use WP\MCP\Handlers\Resources\ResourcesHandler;
-use WP\MCP\Handlers\System\SystemHandler;
-use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
+use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
-use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\MCP\Transport\Infrastructure\TransportContext;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -74,32 +65,25 @@ class McpServer {
 	private string $server_version;
 
 	/**
-	 * Tools registered to this server.
+	 * Component registry for managing tools, resources, and prompts.
 	 *
-	 * @var array
+	 * @var McpComponentRegistry
 	 */
-	private array $tools = array();
+	private McpComponentRegistry $component_registry;
 
 	/**
-	 * Resources registered to this server.
+	 * Transport factory for initializing transports.
 	 *
-	 * @var array
+	 * @var McpTransportFactory
 	 */
-	private array $resources = array();
-
-	/**
-	 * Prompts registered to this server.
-	 *
-	 * @var array
-	 */
-	private array $prompts = array();
+	private McpTransportFactory $transport_factory;
 
 	/**
 	 * Error handler instance.
 	 *
-	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null
+	 * @var McpErrorHandlerInterface
 	 */
-	public ?McpErrorHandlerInterface $error_handler;
+	public McpErrorHandlerInterface $error_handler;
 
 	/**
 	 * Observability handler class name (e.g., NullMcpObservabilityHandler::class).
@@ -133,8 +117,8 @@ class McpServer {
 	 * @param string                                              $server_description Server description.
 	 * @param string                                              $server_version Server version.
 	 * @param array                                               $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
-	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
-	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
+	 * @param class-string<McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
+	 * @param class-string<McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
 	 * @param array                                               $tools Optional ability names to register as tools during construction.
 	 * @param array                                               $resources Optional resources to register during construction.
 	 * @param array                                               $prompts Optional prompts to register during construction.
@@ -184,18 +168,29 @@ class McpServer {
 			$this->observability_handler = NullMcpObservabilityHandler::class;
 		}
 
+		// Initialize component registry
+		$this->component_registry = new McpComponentRegistry(
+			$this,
+			$this->error_handler,
+			$this->observability_handler,
+			$this->mcp_validation_enabled
+		);
+
+		// Initialize transport factory
+		$this->transport_factory = new McpTransportFactory( $this );
+
 		// Register tools, resources, and prompts if provided.
 		if ( ! empty( $tools ) ) {
-			$this->register_tools( $tools );
+			$this->component_registry->register_tools( $tools );
 		}
 		if ( ! empty( $resources ) ) {
-			$this->register_resources( $resources );
+			$this->component_registry->register_resources( $resources );
 		}
 		if ( ! empty( $prompts ) ) {
-			$this->register_prompts( $prompts );
+			$this->component_registry->register_prompts( $prompts );
 		}
 
-		$this->initialize_transport( $mcp_transports );
+		$this->transport_factory->initialize_transports( $mcp_transports );
 	}
 
 	/**
@@ -262,6 +257,15 @@ class McpServer {
 	}
 
 	/**
+	 * Get the observability handler class name.
+	 *
+	 * @return string
+	 */
+	public function get_observability_handler(): string {
+		return $this->observability_handler;
+	}
+
+	/**
 	 * Register tools to this server.
 	 *
 	 * @param array $abilities Array of ability names to convert to MCP tools.
@@ -269,201 +273,29 @@ class McpServer {
 	 * @return void
 	 */
 	public function register_tools( array $abilities ): void {
-		foreach ( $abilities as $ability_name ) {
-			if ( ! is_string( $ability_name ) ) {
-				continue;
-			}
-
-			try {
-				$ability = wp_get_ability( $ability_name );
-
-				if ( ! $ability ) {
-					throw new \InvalidArgumentException( esc_html( "WordPress ability '{$ability_name}' does not exist." ) );
-				}
-
-				$tool = RegisterAbilityAsMcpTool::make( $ability, $this );
-				// Add the processed tools to this server.
-				$this->tools[ $tool->get_name() ] = $tool;
-
-				// Track successful tool registration.
-				$this->observability_handler::record_event(
-					'mcp.component.registered',
-					array(
-						'component_type' => 'tool',
-						'component_name' => $ability_name,
-						'server_id'      => $this->server_id,
-					)
-				);
-			} catch ( \InvalidArgumentException $e ) {
-				if ( $this->error_handler ) {
-					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$ability_name}" ) );
-				}
-
-				// Track tool registration failure.
-				$this->observability_handler::record_event(
-					'mcp.component.registration_failed',
-					array(
-						'component_type' => 'tool',
-						'component_name' => $ability_name,
-						'error_type'     => get_class( $e ),
-						'server_id'      => $this->server_id,
-					)
-				);
-			}
-		}
+		$this->component_registry->register_tools( $abilities );
 	}
 
 	/**
-	 * Register a resource to this server.
+	 * Register resources to this server.
 	 *
 	 * @param array $abilities Array of ability names to convert to MCP resources.
 	 *
 	 * @return void
 	 */
 	public function register_resources( array $abilities ): void {
-		foreach ( $abilities as $ability_name ) {
-			if ( ! is_string( $ability_name ) ) {
-				continue;
-			}
-
-			try {
-				$ability = wp_get_ability( $ability_name );
-
-				if ( ! $ability ) {
-					throw new \InvalidArgumentException( esc_html( "WordPress ability '{$ability_name}' does not exist." ) );
-				}
-
-				$resource = RegisterAbilityAsMcpResource::make( $ability, $this );
-				// Add the processed resources to this server.
-				$this->resources[ $resource->get_uri() ] = $resource;
-
-				// Track successful resource registration.
-				$this->observability_handler::record_event(
-					'mcp.component.registered',
-					array(
-						'component_type' => 'resource',
-						'component_name' => $ability_name,
-						'server_id'      => $this->server_id,
-					)
-				);
-			} catch ( \InvalidArgumentException $e ) {
-				if ( $this->error_handler ) {
-					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
-				}
-
-				// Track resource registration failure.
-				$this->observability_handler::record_event(
-					'mcp.component.registration_failed',
-					array(
-						'component_type' => 'resource',
-						'component_name' => $ability_name,
-						'error_type'     => get_class( $e ),
-						'server_id'      => $this->server_id,
-					)
-				);
-			}
-		}
+		$this->component_registry->register_resources( $abilities );
 	}
 
 	/**
-	 * Register a prompt to this server.
+	 * Register prompts to this server.
 	 *
 	 * @param array $prompts Array of prompts to register. Can be ability names (strings) or prompt builder class names.
 	 *
 	 * @return void
 	 */
 	public function register_prompts( array $prompts ): void {
-		foreach ( $prompts as $prompt_item ) {
-			if ( ! is_string( $prompt_item ) ) {
-				continue;
-			}
-
-			// Check if it's a class that implements McpPromptBuilderInterface
-			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
-				try {
-					// Create instance of the prompt builder class
-					/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
-					$builder = new $prompt_item();
-					$prompt  = $builder->build();
-
-					// Set the MCP server after building
-					$prompt->set_mcp_server( $this );
-
-					// Validate if validation is enabled
-					if ( $this->is_mcp_validation_enabled() ) {
-						$prompt->validate( "McpPromptBuilder::{$prompt_item}" );
-					}
-
-					// Add the prompt to this server
-					$this->prompts[ $prompt->get_name() ] = $prompt;
-
-					// Track successful prompt registration
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'server_id'      => $this->server_id,
-						)
-					);
-				} catch ( \InvalidArgumentException $e ) {
-					if ( $this->error_handler ) {
-						$this->error_handler->log( $e->getMessage(), array( "McpPromptBuilder::{$prompt_item}" ) );
-					}
-
-					// Track prompt registration failure
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->server_id,
-						)
-					);
-				}
-			} else {
-				// Treat as ability name (legacy behavior)
-				try {
-					$ability = wp_get_ability( $prompt_item );
-
-					if ( ! $ability ) {
-						throw new \InvalidArgumentException( esc_html( "WordPress ability '{$prompt_item}' does not exist." ) );
-					}
-
-					// Use RegisterMcpPrompt to handle all validation and processing.
-					$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this );
-
-					// Add the processed prompts to this server.
-					$this->prompts[ $prompt->get_name() ] = $prompt;
-
-					// Track successful prompt registration.
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'server_id'      => $this->server_id,
-						)
-					);
-				} catch ( \InvalidArgumentException $e ) {
-					if ( $this->error_handler ) {
-						$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
-					}
-
-					// Track prompt registration failure.
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->server_id,
-						)
-					);
-				}
-			}
-		}
+		$this->component_registry->register_prompts( $prompts );
 	}
 
 	/**
@@ -472,16 +304,16 @@ class McpServer {
 	 * @return array
 	 */
 	public function get_tools(): array {
-		return $this->tools;
+		return $this->component_registry->get_tools();
 	}
 
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource[]
+	 * @return McpResource[]
 	 */
 	public function get_resources(): array {
-		return $this->resources;
+		return $this->component_registry->get_resources();
 	}
 
 	/**
@@ -490,7 +322,7 @@ class McpServer {
 	 * @return array
 	 */
 	public function get_prompts(): array {
-		return $this->prompts;
+		return $this->component_registry->get_prompts();
 	}
 
 	/**
@@ -498,10 +330,10 @@ class McpServer {
 	 *
 	 * @param string $tool_name Tool name.
 	 *
-	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 * @return McpTool|null
 	 */
 	public function get_tool( string $tool_name ): ?McpTool {
-		return $this->tools[ $tool_name ] ?? null;
+		return $this->component_registry->get_tool( $tool_name );
 	}
 
 	/**
@@ -509,10 +341,10 @@ class McpServer {
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 * @return McpResource|null
 	 */
 	public function get_resource( string $resource_uri ): ?McpResource {
-		return $this->resources[ $resource_uri ] ?? null;
+		return $this->component_registry->get_resource( $resource_uri );
 	}
 
 	/**
@@ -520,10 +352,10 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 * @return McpPrompt|null
 	 */
 	public function get_prompt( string $prompt_name ): ?McpPrompt {
-		return $this->prompts[ $prompt_name ] ?? null;
+		return $this->component_registry->get_prompt( $prompt_name );
 	}
 
 	/**
@@ -534,13 +366,7 @@ class McpServer {
 	 * @return bool True if removed, false if not found.
 	 */
 	public function remove_tool( string $tool_name ): bool {
-		if ( isset( $this->tools[ $tool_name ] ) ) {
-			unset( $this->tools[ $tool_name ] );
-
-			return true;
-		}
-
-		return false;
+		return $this->component_registry->remove_tool( $tool_name );
 	}
 
 	/**
@@ -551,13 +377,7 @@ class McpServer {
 	 * @return bool True if removed, false if not found.
 	 */
 	public function remove_resource( string $resource_uri ): bool {
-		if ( isset( $this->resources[ $resource_uri ] ) ) {
-			unset( $this->resources[ $resource_uri ] );
-
-			return true;
-		}
-
-		return false;
+		return $this->component_registry->remove_resource( $resource_uri );
 	}
 
 	/**
@@ -568,13 +388,7 @@ class McpServer {
 	 * @return bool True if removed, false if not found.
 	 */
 	public function remove_prompt( string $prompt_name ): bool {
-		if ( isset( $this->prompts[ $prompt_name ] ) ) {
-			unset( $this->prompts[ $prompt_name ] );
-
-			return true;
-		}
-
-		return false;
+		return $this->component_registry->remove_prompt( $prompt_name );
 	}
 
 	/**
@@ -585,46 +399,16 @@ class McpServer {
 	 * @throws \Exception If any transport class does not implement McpTransportInterface.
 	 */
 	public function initialize_transport( array $mcp_transports ): void {
-		foreach ( $mcp_transports as $mcp_transport ) {
-			// Check for interface implementation
-			if ( ! in_array( McpTransportInterface::class, class_implements( $mcp_transport ) ?: array(), true ) ) {
-				throw new \Exception(
-					esc_html__( 'MCP transport class must implement the McpTransportInterface.', 'mcp-adapter' )
-				);
-			}
-
-			// Interface-based instantiation with dependency injection
-			$context = $this->create_transport_context();
-			new $mcp_transport( $context );
-		}
+		$this->transport_factory->initialize_transports( $mcp_transports );
 	}
 
 	/**
 	 * Create transport context with all required dependencies.
 	 *
-	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
+	 * @return TransportContext
 	 */
-	private function create_transport_context(): McpTransportContext {
-		// Create handlers
-		$initialize_handler = new InitializeHandler( $this );
-		$tools_handler      = new ToolsHandler( $this );
-		$resources_handler  = new ResourcesHandler( $this );
-		$prompts_handler    = new PromptsHandler( $this );
-		$system_handler     = new SystemHandler();
-
-		// Create the context - the router will be created automatically
-		return new McpTransportContext(
-			array(
-				'mcp_server'                    => $this,
-				'initialize_handler'            => $initialize_handler,
-				'tools_handler'                 => $tools_handler,
-				'resources_handler'             => $resources_handler,
-				'prompts_handler'               => $prompts_handler,
-				'system_handler'                => $system_handler,
-				'observability_handler'         => $this->observability_handler,
-				'transport_permission_callback' => $this->transport_permission_callback,
-			)
-		);
+	public function create_transport_context(): TransportContext {
+		return $this->transport_factory->create_transport_context();
 	}
 
 	/**
