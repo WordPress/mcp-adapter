@@ -45,27 +45,13 @@ class InitializeHandler {
 			'version' => $this->mcp->get_server_version(),
 		);
 
+		// MCP 2025-06-18 compliant capabilities
 		$capabilities = array(
-			'tools'      => array(
-				'list' => true,
-				'call' => true,
-			),
-			'resources'  => array(
-				'list'        => true,
-				'subscribe'   => true,
-				'listChanged' => true,
-			),
-			'prompts'    => array(
-				'list'        => true,
-				'get'         => true,
-				'listChanged' => true,
-			),
-			'logging'    => new stdClass(),
-			'completion' => new stdClass(),
-			'roots'      => array(
-				'list'        => true,
-				'listChanged' => true,
-			),
+			'tools'       => new stdClass(), // Empty object indicates support
+			'resources'   => new stdClass(), // Basic resources support without listChanged/subscribe
+			'prompts'     => new stdClass(), // Basic prompts support without listChanged
+			'logging'     => new stdClass(), // Server supports sending log messages to client
+			'completions' => new stdClass(), // Server supports argument autocompletion (note: plural!)
 		);
 
 		// Send the response according to JSON-RPC 2.0 and InitializeResult schema.

@@ -49,9 +49,7 @@ class SystemHandler {
 
 		// @todo: Implement logging level setting logic here.
 
-		return array(
-			'success' => true,
-		);
+		return array();
 	}
 
 	/**
@@ -64,9 +62,7 @@ class SystemHandler {
 	public function complete( int $request_id = 0 ): array {
 		// Implement completion logic here.
 
-		return array(
-			'success' => true,
-		);
+		return array();
 	}
 
 	/**
