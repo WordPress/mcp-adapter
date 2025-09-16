@@ -184,13 +184,14 @@ class McpToolValidator {
 				}
 
 				// Each property should have a type (though not strictly required by JSON Schema).
-				if ( ! isset( $property['type'] ) || is_string( $property['type'] ) ) {
+				if ( ! isset( $property['type'] ) || is_string( $property['type'] ) || is_array( $property['type'] ) ) {
 					continue;
 				}
 
+				// If type is neither string nor array, it's invalid.
 				$errors[] = sprintf(
 				/* translators: %1$s: field name, %2$s: property name */
-					__( 'Tool %1$s property \'%2$s\' type must be a string', 'mcp-adapter' ),
+					__( 'Tool %1$s property \'%2$s\' type must be a string or array of strings (union type)', 'mcp-adapter' ),
 					$field_name,
 					$property_name
 				);
