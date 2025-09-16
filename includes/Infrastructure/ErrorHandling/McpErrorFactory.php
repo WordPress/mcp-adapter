@@ -27,15 +27,16 @@ class McpErrorFactory {
 	public const INTERNAL_ERROR   = -32603;
 
 	/**
-	 * MCP-specific error codes (above -32000 as per JSON-RPC spec).
+	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
+	 * Using conservative, well-established error codes only.
 	 */
-	public const MCP_DISABLED       = -32000;
-	public const MISSING_PARAMETER  = -32001;
-	public const RESOURCE_NOT_FOUND = -32002;
-	public const TOOL_NOT_FOUND     = -32003;
-	public const PROMPT_NOT_FOUND   = -32004;
-	public const PERMISSION_DENIED  = -32008;
-	public const UNAUTHORIZED       = -32010;
+	public const SERVER_ERROR       = -32000; // Generic server error (includes MCP disabled)
+	public const TIMEOUT_ERROR      = -32001; // Request timeout
+	public const RESOURCE_NOT_FOUND = -32002; // Resource not found
+	public const TOOL_NOT_FOUND     = -32003; // Tool not found
+	public const PROMPT_NOT_FOUND   = -32004; // Prompt not found
+	public const PERMISSION_DENIED  = -32008; // Access denied/forbidden
+	public const UNAUTHORIZED       = -32010; // Authentication required
 
 	/**
 	 * Create a standardized JSON-RPC error response.
@@ -162,8 +163,28 @@ class McpErrorFactory {
 	public static function mcp_disabled( int $id ): array {
 		return self::create_error_response(
 			$id,
-			self::MCP_DISABLED,
+			self::SERVER_ERROR,
 			__( 'MCP functionality is currently disabled', 'mcp-adapter' )
+		);
+	}
+
+	/**
+	 * Create a validation error response (uses standard invalid params error).
+	 *
+	 * @param int    $id The request ID.
+	 * @param string $details Validation error details.
+	 *
+	 * @return array
+	 */
+	public static function validation_error( int $id, string $details ): array {
+		return self::create_error_response(
+			$id,
+			self::INVALID_PARAMS,
+			sprintf(
+				/* translators: %s: validation details */
+				__( 'Validation error: %s', 'mcp-adapter' ),
+				$details
+			)
 		);
 	}
 
@@ -178,7 +199,7 @@ class McpErrorFactory {
 	public static function missing_parameter( int $id, string $parameter ): array {
 		return self::create_error_response(
 			$id,
-			self::MISSING_PARAMETER,
+			self::INVALID_PARAMS,
 			sprintf(
 				/* translators: %s: parameter name */
 				__( 'Missing required parameter: %s', 'mcp-adapter' ),
