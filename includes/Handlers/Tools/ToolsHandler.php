@@ -235,12 +235,16 @@ class ToolsHandler {
 		}
 
 		/**
-		 * Assume tools can only be registered with valid abilities.
-		 * If not, the has_permission() will let us know in the try-catch block.
+		 * Get the ability - may be null for layered tools.
 		 *
-		 * @var \WP_Ability $ability
+		 * @var \WP_Ability|null $ability
 		 */
 		$ability = $tool->get_ability();
+
+		// Handle layered tools that don't have WordPress abilities
+		if ( null === $ability ) {
+			return $this->handle_layered_tool_execution( $tool_name, $args, $request_id );
+		}
 
 		// Run ability Permission Callback.
 		try {
@@ -318,6 +322,143 @@ class ToolsHandler {
 			);
 
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing tool' )['error'] );
+		}
+	}
+
+	/**
+	 * Handle execution of layered tools that don't use WordPress abilities.
+	 *
+	 * @param string $tool_name  The tool name.
+	 * @param array  $args       The arguments.
+	 * @param int    $request_id The request ID for JSON-RPC.
+	 *
+	 * @return array
+	 */
+	private function handle_layered_tool_execution( string $tool_name, array $args, int $request_id ): array {
+		// Basic permission check - for now, just check if user is logged in
+		if ( ! is_user_logged_in() ) {
+			return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for tool: ' . $tool_name )['error'] );
+		}
+
+		try {
+			switch ( $tool_name ) {
+				case 'discover_abilities':
+					return $this->execute_discover_abilities( $args );
+
+				case 'get_ability_info':
+					return $this->execute_get_ability_info( $args );
+
+				case 'execute_ability':
+					return $this->execute_ability( $args );
+
+				default:
+					return array( 'error' => McpErrorFactory::tool_not_found( $request_id, $tool_name )['error'] );
+			}
+		} catch ( \Throwable $e ) {
+			$this->mcp->error_handler->log(
+				'Layered tool execution failed',
+				array(
+					'tool'      => $tool_name,
+					'exception' => $e->getMessage(),
+				)
+			);
+
+			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing layered tool' )['error'] );
+		}
+	}
+
+	/**
+	 * Execute the discover_abilities tool.
+	 *
+	 * @param array $args The arguments.
+	 *
+	 * @return array
+	 */
+	private function execute_discover_abilities( array $args ): array {
+		// Get all registered abilities
+		$all_abilities  = wp_get_abilities();
+		$abilities_list = array();
+
+		foreach ( $all_abilities as $ability ) {
+			$abilities_list[] = array(
+				'name'        => $ability->get_name(),
+				'label'       => $ability->get_label(),
+				'description' => $ability->get_description(),
+			);
+		}
+
+		return array(
+			'abilities' => $abilities_list,
+		);
+	}
+
+	/**
+	 * Execute the get_ability_info tool.
+	 *
+	 * @param array $args The arguments.
+	 *
+	 * @return array
+	 */
+	private function execute_get_ability_info( array $args ): array {
+		$ability_name = $args['ability_name'] ?? '';
+
+		if ( empty( $ability_name ) ) {
+			throw new \InvalidArgumentException( 'ability_name is required' );
+		}
+
+		$ability = wp_get_ability( $ability_name );
+
+		if ( ! $ability ) {
+			throw new \InvalidArgumentException( esc_html( "Ability '{$ability_name}' not found" ) );
+		}
+
+		return array(
+			'name'          => $ability->get_name(),
+			'label'         => $ability->get_label(),
+			'description'   => $ability->get_description(),
+			'input_schema'  => $ability->get_input_schema(),
+			'output_schema' => $ability->get_output_schema(),
+			'meta'          => $ability->get_meta(),
+		);
+	}
+
+	/**
+	 * Execute the execute_ability tool.
+	 *
+	 * @param array $args The arguments.
+	 *
+	 * @return array
+	 */
+	private function execute_ability( array $args ): array {
+		$ability_name = $args['ability_name'] ?? '';
+		$parameters   = $args['parameters'] ?? array();
+
+		if ( empty( $ability_name ) ) {
+			throw new \InvalidArgumentException( 'ability_name is required' );
+		}
+
+		$ability = wp_get_ability( $ability_name );
+
+		if ( ! $ability ) {
+			return array( 'error' => McpErrorFactory::tool_not_found( 0, "Ability '{$ability_name}'" )['error'] );
+		}
+
+		// Check permissions
+		$has_permission = $ability->has_permission( $parameters );
+		if ( true !== $has_permission ) {
+			return array( 'error' => McpErrorFactory::permission_denied( 0, "Access denied for ability '{$ability_name}'" )['error'] );
+		}
+
+		// Execute the ability
+		try {
+			$result = $ability->execute( $parameters );
+
+			return array(
+				'success' => true,
+				'data'    => $result,
+			);
+		} catch ( \Throwable $e ) {
+			return array( 'error' => McpErrorFactory::internal_error( 0, $e->getMessage() )['error'] );
 		}
 	}
 
