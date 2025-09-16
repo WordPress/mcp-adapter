@@ -24,14 +24,14 @@ class McpTransportFactory {
 	/**
 	 * MCP Server instance.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp_server;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param McpServer $mcp_server MCP server instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
 	 */
 	public function __construct( McpServer $mcp_server ) {
 		$this->mcp_server = $mcp_server;
@@ -62,7 +62,7 @@ class McpTransportFactory {
 	/**
 	 * Create transport context with all required dependencies.
 	 *
-	 * @return TransportContext
+	 * @return \WP\MCP\Transport\Infrastructure\TransportContext
 	 */
 	public function create_transport_context(): TransportContext {
 		// Create handlers

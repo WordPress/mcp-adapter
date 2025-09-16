@@ -27,14 +27,14 @@ class StdioServerBridge {
 	/**
 	 * The MCP server to expose via STDIO.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $server;
 
 	/**
 	 * Request router for handling MCP requests.
 	 *
-	 * @var RequestRouter
+	 * @var \WP\MCP\Transport\Infrastructure\RequestRouter
 	 */
 	private RequestRouter $request_router;
 
@@ -48,7 +48,7 @@ class StdioServerBridge {
 	/**
 	 * Initialize the STDIO server bridge.
 	 *
-	 * @param McpServer $server The MCP server to expose.
+	 * @param \WP\MCP\Core\McpServer $server The MCP server to expose.
 	 */
 	public function __construct( McpServer $server ) {
 		$this->server = $server;
@@ -301,7 +301,7 @@ class StdioServerBridge {
 	/**
 	 * Create a request router for the server.
 	 *
-	 * @return RequestRouter
+	 * @return \WP\MCP\Transport\Infrastructure\RequestRouter
 	 */
 	private function create_request_router(): RequestRouter {
 		// Create transport context using server's infrastructure
@@ -321,7 +321,7 @@ class StdioServerBridge {
 	/**
 	 * Get the server this bridge is exposing.
 	 *
-	 * @return McpServer
+	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_server(): McpServer {
 		return $this->server;

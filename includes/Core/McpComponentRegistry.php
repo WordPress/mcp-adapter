@@ -46,14 +46,14 @@ class McpComponentRegistry {
 	/**
 	 * MCP Server instance.
 	 *
-	 * @var McpServer
+	 * @var \WP\MCP\Core\McpServer
 	 */
 	private McpServer $mcp_server;
 
 	/**
 	 * Error handler instance.
 	 *
-	 * @var McpErrorHandlerInterface
+	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 */
 	private McpErrorHandlerInterface $error_handler;
 
@@ -74,8 +74,8 @@ class McpComponentRegistry {
 	/**
 	 * Constructor.
 	 *
-	 * @param McpServer $mcp_server MCP server instance.
-	 * @param McpErrorHandlerInterface $error_handler Error handler instance.
+	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler Error handler instance.
 	 * @param string                                                                     $observability_handler Observability handler class name.
 	 * @param bool                                                                       $mcp_validation_enabled Whether MCP validation is enabled.
 	 */
@@ -208,7 +208,7 @@ class McpComponentRegistry {
 			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
 				try {
 					// Create instance of the prompt builder class
-					/** @var McpPromptBuilderInterface $builder */
+					/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
 					$builder = new $prompt_item();
 					$prompt  = $builder->build();
 
@@ -300,7 +300,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all resources registered to the server.
 	 *
-	 * @return McpResource[]
+	 * @return \WP\MCP\Domain\Resources\McpResource[]
 	 */
 	public function get_resources(): array {
 		return $this->resources;
@@ -320,7 +320,7 @@ class McpComponentRegistry {
 	 *
 	 * @param string $tool_name Tool name.
 	 *
-	 * @return McpTool|null
+	 * @return \WP\MCP\Domain\Tools\McpTool|null
 	 */
 	public function get_tool( string $tool_name ): ?McpTool {
 		return $this->tools[ $tool_name ] ?? null;
@@ -331,7 +331,7 @@ class McpComponentRegistry {
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
-	 * @return McpResource|null
+	 * @return \WP\MCP\Domain\Resources\McpResource|null
 	 */
 	public function get_resource( string $resource_uri ): ?McpResource {
 		return $this->resources[ $resource_uri ] ?? null;
@@ -342,7 +342,7 @@ class McpComponentRegistry {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return McpPrompt|null
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
 	 */
 	public function get_prompt( string $prompt_name ): ?McpPrompt {
 		return $this->prompts[ $prompt_name ] ?? null;

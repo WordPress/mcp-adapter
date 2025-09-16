@@ -22,14 +22,14 @@ final class McpAdapter {
 	/**
 	 * Registry instance
 	 *
-	 * @var McpAdapter
+	 * @var \WP\MCP\Core\McpAdapter
 	 */
 	private static self $instance;
 
 	/**
 	 * Registered servers
 	 *
-	 * @var McpServer[]
+	 * @var \WP\MCP\Core\McpServer[]
 	 */
 	private array $servers = array();
 
@@ -70,7 +70,7 @@ final class McpAdapter {
 	/**
 	 * Get the registry instance
 	 *
-	 * @return McpAdapter
+	 * @return \WP\MCP\Core\McpAdapter
 	 */
 	public static function instance(): self {
 		if ( ! isset( self::$instance ) ) {
@@ -93,14 +93,14 @@ final class McpAdapter {
 	 * @param string        $server_description     Server description.
 	 * @param string        $server_version         Server version.
 	 * @param array         $mcp_transports         Array of classes that extend the BaseTransport.
-	 * @param ?class-string<McpErrorHandlerInterface>         $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
-	 * @param ?class-string<McpObservabilityHandlerInterface> $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
+	 * @param ?class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>         $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
+	 * @param ?class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
 	 * @param array         $tools Ability names to register as tools.
 	 * @param array         $resources Resources to register.
 	 * @param array         $prompts Prompts to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @return McpAdapter
+	 * @return \WP\MCP\Core\McpAdapter
 	 * @throws \Exception If the server already exists or if called outside of the mcp_adapter_init action.
 	 */
 	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ): self {
@@ -182,7 +182,7 @@ final class McpAdapter {
 	 *
 	 * @param string $server_id Server ID.
 	 *
-	 * @return McpServer|null
+	 * @return \WP\MCP\Core\McpServer|null
 	 */
 	public function get_server( string $server_id ): ?McpServer {
 		return $this->servers[ $server_id ] ?? null;
@@ -191,7 +191,7 @@ final class McpAdapter {
 	/**
 	 * Get all registered servers
 	 *
-	 * @return McpServer[]
+	 * @return \WP\MCP\Core\McpServer[]
 	 */
 	public function get_servers(): array {
 		return $this->servers;

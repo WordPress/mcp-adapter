@@ -14,7 +14,6 @@ use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
-use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\TransportContext;
 
@@ -67,21 +66,21 @@ class McpServer {
 	/**
 	 * Component registry for managing tools, resources, and prompts.
 	 *
-	 * @var McpComponentRegistry
+	 * @var \WP\MCP\Core\McpComponentRegistry
 	 */
 	private McpComponentRegistry $component_registry;
 
 	/**
 	 * Transport factory for initializing transports.
 	 *
-	 * @var McpTransportFactory
+	 * @var \WP\MCP\Core\McpTransportFactory
 	 */
 	private McpTransportFactory $transport_factory;
 
 	/**
 	 * Error handler instance.
 	 *
-	 * @var McpErrorHandlerInterface
+	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 */
 	public McpErrorHandlerInterface $error_handler;
 
@@ -117,8 +116,8 @@ class McpServer {
 	 * @param string                                              $server_description Server description.
 	 * @param string                                              $server_version Server version.
 	 * @param array                                               $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
-	 * @param class-string<McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
-	 * @param class-string<McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
+	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
+	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
 	 * @param array                                               $tools Optional ability names to register as tools during construction.
 	 * @param array                                               $resources Optional resources to register during construction.
 	 * @param array                                               $prompts Optional prompts to register during construction.
@@ -310,7 +309,7 @@ class McpServer {
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return McpResource[]
+	 * @return \WP\MCP\Domain\Resources\McpResource[]
 	 */
 	public function get_resources(): array {
 		return $this->component_registry->get_resources();
@@ -330,7 +329,7 @@ class McpServer {
 	 *
 	 * @param string $tool_name Tool name.
 	 *
-	 * @return McpTool|null
+	 * @return \WP\MCP\Domain\Tools\McpTool|null
 	 */
 	public function get_tool( string $tool_name ): ?McpTool {
 		return $this->component_registry->get_tool( $tool_name );
@@ -341,7 +340,7 @@ class McpServer {
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
-	 * @return McpResource|null
+	 * @return \WP\MCP\Domain\Resources\McpResource|null
 	 */
 	public function get_resource( string $resource_uri ): ?McpResource {
 		return $this->component_registry->get_resource( $resource_uri );
@@ -352,7 +351,7 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return McpPrompt|null
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
 	 */
 	public function get_prompt( string $prompt_name ): ?McpPrompt {
 		return $this->component_registry->get_prompt( $prompt_name );
@@ -405,7 +404,7 @@ class McpServer {
 	/**
 	 * Create transport context with all required dependencies.
 	 *
-	 * @return TransportContext
+	 * @return \WP\MCP\Transport\Infrastructure\TransportContext
 	 */
 	public function create_transport_context(): TransportContext {
 		return $this->transport_factory->create_transport_context();
