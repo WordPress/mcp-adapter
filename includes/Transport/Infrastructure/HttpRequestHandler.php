@@ -1,0 +1,298 @@
+<?php
+/**
+ * HTTP Request Handler for MCP Transport
+ *
+ * @package McpAdapter
+ */
+
+declare( strict_types=1 );
+
+namespace WP\MCP\Transport\Infrastructure;
+
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+
+/**
+ * Handles HTTP request routing and processing for MCP transports.
+ *
+ * Centralizes request routing logic to eliminate duplication and provide
+ * consistent request handling across transport implementations.
+ *
+ */
+class HttpRequestHandler {
+
+	/**
+	 * The transport context.
+	 *
+	 * @var \WP\MCP\Transport\Infrastructure\TransportContext
+	 */
+	public TransportContext $transport_context;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $transport_context The transport context.
+	 */
+	public function __construct( TransportContext $transport_context ) {
+		$this->transport_context = $transport_context;
+	}
+
+	/**
+	 * Route HTTP request to appropriate handler.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return \WP_REST_Response HTTP response.
+	 */
+	public function handle_request( HttpRequestContext $context ): \WP_REST_Response {
+		// Handle POST requests (sending MCP messages to server)
+		if ( 'POST' === $context->method ) {
+			return $this->handle_mcp_request( $context );
+		}
+
+		// Handle GET requests (listening for messages from server via SSE)
+		if ( 'GET' === $context->method ) {
+			return $this->handle_sse_request( $context );
+		}
+
+		// Handle DELETE requests (session termination)
+		if ( 'DELETE' === $context->method ) {
+			return $this->handle_session_termination( $context );
+		}
+
+		// Method not allowed
+		return new \WP_REST_Response(
+			McpErrorFactory::internal_error( 0, 'Method not allowed' ),
+			405
+		);
+	}
+
+
+	/**
+	 * Handle MCP POST requests.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return \WP_REST_Response MCP response.
+	 */
+	private function handle_mcp_request( HttpRequestContext $context ): \WP_REST_Response {
+		try {
+			// Validate request body
+			if ( null === $context->body ) {
+				return new \WP_REST_Response(
+					McpErrorFactory::parse_error( 0, 'Invalid JSON in request body' ),
+					400
+				);
+			}
+
+			return $this->process_mcp_messages( $context );
+		} catch ( \Throwable $exception ) {
+			$this->transport_context->mcp_server->error_handler->log(
+				'Unexpected error in handle_mcp_request',
+				array(
+					'transport' => static::class,
+					'server_id' => $this->transport_context->mcp_server->get_server_id(),
+					'error'     => $exception->getMessage(),
+				)
+			);
+
+			return new \WP_REST_Response(
+				McpErrorFactory::internal_error( 0, 'Handler error occurred' ),
+				500
+			);
+		}
+	}
+
+	/**
+	 * Process MCP messages using JsonRpcResponseBuilder.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return \WP_REST_Response MCP response.
+	 */
+	private function process_mcp_messages( HttpRequestContext $context ): \WP_REST_Response {
+		$is_batch_request = JsonRpcResponseBuilder::is_batch_request( $context->body );
+		$messages         = JsonRpcResponseBuilder::normalize_messages( $context->body );
+
+		$response_body = JsonRpcResponseBuilder::process_messages(
+			$messages,
+			$is_batch_request,
+			function ( array $message ) use ( $context ) {
+				return $this->process_single_message( $message, $context );
+			}
+		);
+
+		return new \WP_REST_Response( $response_body, 200 );
+	}
+
+	/**
+	 * Process a single MCP message.
+	 *
+	 * @param array              $message The MCP JSON-RPC message.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return array|null JSON-RPC response or null for notifications.
+	 */
+	private function process_single_message( array $message, HttpRequestContext $context ): ?array {
+		// Validate JSON-RPC message format
+		$validation = McpErrorFactory::validate_jsonrpc_message( $message );
+		if ( isset( $validation['error'] ) ) {
+			return $validation;
+		}
+
+		// Handle notifications (no response required)
+		if ( isset( $message['method'] ) && ! isset( $message['id'] ) ) {
+			return null; // Notifications don't get a response
+		}
+
+		// Process requests with IDs
+		if ( isset( $message['method'] ) && isset( $message['id'] ) ) {
+			return $this->process_jsonrpc_request( $message, $context );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Process a JSON-RPC request message.
+	 *
+	 * @param array              $message The JSON-RPC message.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return array JSON-RPC response.
+	 */
+	private function process_jsonrpc_request( array $message, HttpRequestContext $context ): array {
+		$request_id = (int) $message['id'];
+		$method     = $message['method'];
+		$params     = $message['params'] ?? array();
+
+		// Handle initialize request (no session validation required)
+		if ( 'initialize' === $method ) {
+			return $this->handle_initialize_request( $message, $context );
+		}
+
+		// Validate session for all other requests
+		$session_validation = HttpSessionValidator::validate_session( $context );
+		if ( true !== $session_validation ) {
+			return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
+		}
+
+		// Route the request through the transport context
+		$result = $this->transport_context->request_router->route_request(
+			$method,
+			$params,
+			$request_id,
+			$this->get_transport_name()
+		);
+
+		// Format response based on result
+		if ( isset( $result['error'] ) ) {
+			return JsonRpcResponseBuilder::create_error_response( $request_id, $result['error'] );
+		}
+
+		return JsonRpcResponseBuilder::create_success_response( $request_id, $result );
+	}
+
+	/**
+	 * Handle initialize requests with session creation.
+	 *
+	 * @param array              $message The initialize message.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return array JSON-RPC response.
+	 */
+	private function handle_initialize_request( array $message, HttpRequestContext $context ): array {
+		$request_id = (int) $message['id'];
+		$params     = $message['params'] ?? array();
+
+		// Route the initialize request
+		$result = $this->transport_context->request_router->route_request(
+			'initialize',
+			$params,
+			$request_id,
+			$this->get_transport_name()
+		);
+
+		// Create session if initialize was successful and no existing session
+		if ( ! isset( $result['error'] ) && ! $context->session_id ) {
+			$session_result = HttpSessionValidator::create_session( $params['clientInfo'] ?? array() );
+
+			if ( is_array( $session_result ) ) {
+				// Session creation failed, return error
+				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_result );
+			}
+
+			$this->add_session_header_to_response( $session_result );
+		}
+
+		// Format response
+		if ( isset( $result['error'] ) ) {
+			return JsonRpcResponseBuilder::create_error_response( $request_id, $result['error'] );
+		}
+
+		return JsonRpcResponseBuilder::create_success_response( $request_id, $result );
+	}
+
+	/**
+	 * Handle GET requests (SSE streaming).
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return \WP_REST_Response SSE response.
+	 */
+	private function handle_sse_request( HttpRequestContext $context ): \WP_REST_Response {
+		// SSE streaming not yet implemented
+		return new \WP_REST_Response(
+			McpErrorFactory::internal_error( 0, 'SSE streaming not yet implemented' ),
+			405
+		);
+	}
+
+	/**
+	 * Handle DELETE requests (session termination).
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return \WP_REST_Response Termination response.
+	 */
+	private function handle_session_termination( HttpRequestContext $context ): \WP_REST_Response {
+		$result = HttpSessionValidator::terminate_session( $context );
+
+		if ( true !== $result ) {
+			$status_code = is_array( $result ) && isset( $result['code'] ) && -32600 === $result['code'] ? 400 : 401;
+			return new \WP_REST_Response( $result, $status_code );
+		}
+
+		return new \WP_REST_Response( null, 200 );
+	}
+
+	/**
+	 * Get transport name for observability.
+	 *
+	 * @return string Transport name.
+	 */
+	private function get_transport_name(): string {
+		$class_name     = substr( (string) strrchr( static::class, '\\' ), 1 );
+		$transport_name = strtolower( str_replace( array( 'RequestHandler', 'Handler' ), '', $class_name ) );
+		return ! empty( $transport_name ) ? $transport_name : 'http';
+	}
+
+	/**
+	 * Add session header to the REST response.
+	 *
+	 * @param string $session_id The session ID to add to the response header.
+	 *
+	 * @return void
+	 */
+	private function add_session_header_to_response( string $session_id ): void {
+		add_filter(
+			'rest_post_dispatch',
+			static function ( $response ) use ( $session_id ) {
+				if ( $response instanceof \WP_REST_Response ) {
+					$response->header( 'Mcp-Session-Id', $session_id );
+				}
+
+				return $response;
+			}
+		);
+	}
+}
