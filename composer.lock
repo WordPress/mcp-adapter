@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "152ced40e029fe53fa4aec344dec806e",
+    "content-hash": "242e822bd9a3c1b6d52d56a60de533c7",
     "packages": [],
     "packages-dev": [
         {
@@ -661,23 +661,67 @@
             "time": "2025-07-16T06:41:00+00:00"
         },
         {
+            "name": "php-stubs/wp-cli-stubs",
+            "version": "v2.12.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-stubs/wp-cli-stubs.git",
+                "reference": "af16401e299a3fd2229bd0fa9a037638a4174a9d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-stubs/wp-cli-stubs/zipball/af16401e299a3fd2229bd0fa9a037638a4174a9d",
+                "reference": "af16401e299a3fd2229bd0fa9a037638a4174a9d",
+                "shasum": ""
+            },
+            "require": {
+                "php-stubs/wordpress-stubs": "^4.7 || ^5.0 || ^6.0"
+            },
+            "require-dev": {
+                "php": "~7.3 || ~8.0",
+                "php-stubs/generator": "^0.8.0"
+            },
+            "suggest": {
+                "symfony/polyfill-php73": "Symfony polyfill backporting some PHP 7.3+ features to lower PHP versions",
+                "szepeviktor/phpstan-wordpress": "WordPress extensions for PHPStan"
+            },
+            "type": "library",
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "WP-CLI function and class declaration stubs for static analysis.",
+            "homepage": "https://github.com/php-stubs/wp-cli-stubs",
+            "keywords": [
+                "PHPStan",
+                "static analysis",
+                "wordpress",
+                "wp-cli"
+            ],
+            "support": {
+                "issues": "https://github.com/php-stubs/wp-cli-stubs/issues",
+                "source": "https://github.com/php-stubs/wp-cli-stubs/tree/v2.12.0"
+            },
+            "time": "2025-06-10T09:58:05+00:00"
+        },
+        {
             "name": "phpcompatibility/php-compatibility",
             "version": "dev-develop",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCompatibility/PHPCompatibility.git",
-                "reference": "6e10469b0f3827862b37df2ac2b7ec4580ce888f"
+                "reference": "771535284869cd4f3ff178c292c032b804738771"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCompatibility/PHPCompatibility/zipball/6e10469b0f3827862b37df2ac2b7ec4580ce888f",
-                "reference": "6e10469b0f3827862b37df2ac2b7ec4580ce888f",
+                "url": "https://api.github.com/repos/PHPCompatibility/PHPCompatibility/zipball/771535284869cd4f3ff178c292c032b804738771",
+                "reference": "771535284869cd4f3ff178c292c032b804738771",
                 "shasum": ""
             },
             "require": {
                 "php": ">=5.4",
-                "phpcsstandards/phpcsutils": "^1.1.0",
-                "squizlabs/php_codesniffer": "^3.13.0"
+                "phpcsstandards/phpcsutils": "^1.1.2",
+                "squizlabs/php_codesniffer": "^3.13.3 || ^4.0"
             },
             "replace": {
                 "wimg/php-compatibility": "*"
@@ -685,10 +729,10 @@
             "require-dev": {
                 "php-parallel-lint/php-console-highlighter": "^1.0.0",
                 "php-parallel-lint/php-parallel-lint": "^1.4.0",
-                "phpcsstandards/phpcsdevcs": "^1.1.3",
-                "phpcsstandards/phpcsdevtools": "^1.2.0",
+                "phpcsstandards/phpcsdevcs": "^1.1.6",
+                "phpcsstandards/phpcsdevtools": "^1.2.3",
                 "phpunit/phpunit": "^4.8.36 || ^5.7.21 || ^6.0 || ^7.0 || ^8.0 || ^9.3.4 || ^10.5.32 || ^11.3.3",
-                "yoast/phpunit-polyfills": "^1.0.5 || ^2.0 || ^3.0"
+                "yoast/phpunit-polyfills": "^1.1.5 || ^2.0.5 || ^3.1.0"
             },
             "suggest": {
                 "roave/security-advisories": "dev-master || Helps prevent installing dependencies with known security issues."
@@ -752,7 +796,7 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2025-08-20T03:33:09+00:00"
+            "time": "2025-09-09T21:00:45+00:00"
         },
         {
             "name": "phpcompatibility/phpcompatibility-paragonie",
@@ -903,22 +947,22 @@
         },
         {
             "name": "phpcsstandards/phpcsextra",
-            "version": "1.4.0",
+            "version": "1.4.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCSStandards/PHPCSExtra.git",
-                "reference": "fa4b8d051e278072928e32d817456a7fdb57b6ca"
+                "reference": "882b8c947ada27eb002870fe77fee9ce0a454cdb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCSStandards/PHPCSExtra/zipball/fa4b8d051e278072928e32d817456a7fdb57b6ca",
-                "reference": "fa4b8d051e278072928e32d817456a7fdb57b6ca",
+                "url": "https://api.github.com/repos/PHPCSStandards/PHPCSExtra/zipball/882b8c947ada27eb002870fe77fee9ce0a454cdb",
+                "reference": "882b8c947ada27eb002870fe77fee9ce0a454cdb",
                 "shasum": ""
             },
             "require": {
                 "php": ">=5.4",
-                "phpcsstandards/phpcsutils": "^1.1.0",
-                "squizlabs/php_codesniffer": "^3.13.0 || ^4.0"
+                "phpcsstandards/phpcsutils": "^1.1.2",
+                "squizlabs/php_codesniffer": "^3.13.4 || ^4.0"
             },
             "require-dev": {
                 "php-parallel-lint/php-console-highlighter": "^1.0",
@@ -981,26 +1025,26 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2025-06-14T07:40:39+00:00"
+            "time": "2025-09-05T06:54:52+00:00"
         },
         {
             "name": "phpcsstandards/phpcsutils",
-            "version": "1.1.1",
+            "version": "1.1.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCSStandards/PHPCSUtils.git",
-                "reference": "f7eb16f2fa4237d5db9e8fed8050239bee17a9bd"
+                "reference": "b22b59e3d9ec8fe4953e42c7d59117c6eae70eae"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCSStandards/PHPCSUtils/zipball/f7eb16f2fa4237d5db9e8fed8050239bee17a9bd",
-                "reference": "f7eb16f2fa4237d5db9e8fed8050239bee17a9bd",
+                "url": "https://api.github.com/repos/PHPCSStandards/PHPCSUtils/zipball/b22b59e3d9ec8fe4953e42c7d59117c6eae70eae",
+                "reference": "b22b59e3d9ec8fe4953e42c7d59117c6eae70eae",
                 "shasum": ""
             },
             "require": {
                 "dealerdirect/phpcodesniffer-composer-installer": "^0.4.1 || ^0.5 || ^0.6.2 || ^0.7 || ^1.0",
                 "php": ">=5.4",
-                "squizlabs/php_codesniffer": "^3.13.0 || ^4.0"
+                "squizlabs/php_codesniffer": "^3.13.3 || ^4.0"
             },
             "require-dev": {
                 "ext-filter": "*",
@@ -1074,7 +1118,7 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2025-08-10T01:04:45+00:00"
+            "time": "2025-09-05T00:00:03+00:00"
         },
         {
             "name": "phpstan/extension-installer",
@@ -1126,16 +1170,16 @@
         },
         {
             "name": "phpstan/php-8-stubs",
-            "version": "0.4.24",
+            "version": "0.4.28",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/php-8-stubs.git",
-                "reference": "40dea0d7d8c3ee7afa2aee7c71a5d78a53506b2e"
+                "reference": "b8d55cfe8a25803f3ae843e3a85507a889a3ab86"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/php-8-stubs/zipball/40dea0d7d8c3ee7afa2aee7c71a5d78a53506b2e",
-                "reference": "40dea0d7d8c3ee7afa2aee7c71a5d78a53506b2e",
+                "url": "https://api.github.com/repos/phpstan/php-8-stubs/zipball/b8d55cfe8a25803f3ae843e3a85507a889a3ab86",
+                "reference": "b8d55cfe8a25803f3ae843e3a85507a889a3ab86",
                 "shasum": ""
             },
             "type": "library",
@@ -1152,22 +1196,22 @@
             "description": "PHP stubs extracted from php-src",
             "support": {
                 "issues": "https://github.com/phpstan/php-8-stubs/issues",
-                "source": "https://github.com/phpstan/php-8-stubs/tree/0.4.24"
+                "source": "https://github.com/phpstan/php-8-stubs/tree/0.4.28"
             },
-            "time": "2025-08-27T00:22:10+00:00"
+            "time": "2025-09-09T00:21:52+00:00"
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "2.2.0",
+            "version": "2.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "b9e61a61e39e02dd90944e9115241c7f7e76bfd8"
+                "reference": "1e0cd5370df5dd2e556a36b9c62f62e555870495"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/b9e61a61e39e02dd90944e9115241c7f7e76bfd8",
-                "reference": "b9e61a61e39e02dd90944e9115241c7f7e76bfd8",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/1e0cd5370df5dd2e556a36b9c62f62e555870495",
+                "reference": "1e0cd5370df5dd2e556a36b9c62f62e555870495",
                 "shasum": ""
             },
             "require": {
@@ -1199,22 +1243,22 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.2.0"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.0"
             },
-            "time": "2025-07-13T07:04:09+00:00"
+            "time": "2025-08-30T15:50:23+00:00"
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.1.22",
+            "version": "2.1.26",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan.git",
-                "reference": "41600c8379eb5aee63e9413fe9e97273e25d57e4"
+                "reference": "b13345001a8553ec405b7741be0c6b8d7f8b5bf5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/41600c8379eb5aee63e9413fe9e97273e25d57e4",
-                "reference": "41600c8379eb5aee63e9413fe9e97273e25d57e4",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/b13345001a8553ec405b7741be0c6b8d7f8b5bf5",
+                "reference": "b13345001a8553ec405b7741be0c6b8d7f8b5bf5",
                 "shasum": ""
             },
             "require": {
@@ -1259,7 +1303,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-08-04T19:17:37+00:00"
+            "time": "2025-09-16T11:33:46+00:00"
         },
         {
             "name": "phpstan/phpstan-deprecation-rules",
@@ -1629,16 +1673,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "9.6.25",
+            "version": "9.6.27",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "049c011e01be805202d8eebedef49f769a8ec7b7"
+                "reference": "0a9aa4440b6a9528cf360071502628d717af3e0a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/049c011e01be805202d8eebedef49f769a8ec7b7",
-                "reference": "049c011e01be805202d8eebedef49f769a8ec7b7",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/0a9aa4440b6a9528cf360071502628d717af3e0a",
+                "reference": "0a9aa4440b6a9528cf360071502628d717af3e0a",
                 "shasum": ""
             },
             "require": {
@@ -1712,7 +1756,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.6.25"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/9.6.27"
             },
             "funding": [
                 {
@@ -1736,7 +1780,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-08-20T14:38:31+00:00"
+            "time": "2025-09-14T06:18:03+00:00"
         },
         {
             "name": "sebastian/cli-parser",
@@ -2796,32 +2840,32 @@
         },
         {
             "name": "slevomat/coding-standard",
-            "version": "8.20.0",
+            "version": "8.22.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/slevomat/coding-standard.git",
-                "reference": "b4f9f02edd4e6a586777f0cabe8d05574323f3eb"
+                "reference": "1dd80bf3b93692bedb21a6623c496887fad05fec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/b4f9f02edd4e6a586777f0cabe8d05574323f3eb",
-                "reference": "b4f9f02edd4e6a586777f0cabe8d05574323f3eb",
+                "url": "https://api.github.com/repos/slevomat/coding-standard/zipball/1dd80bf3b93692bedb21a6623c496887fad05fec",
+                "reference": "1dd80bf3b93692bedb21a6623c496887fad05fec",
                 "shasum": ""
             },
             "require": {
                 "dealerdirect/phpcodesniffer-composer-installer": "^0.6.2 || ^0.7 || ^1.1.2",
                 "php": "^7.4 || ^8.0",
-                "phpstan/phpdoc-parser": "^2.2.0",
-                "squizlabs/php_codesniffer": "^3.13.2"
+                "phpstan/phpdoc-parser": "^2.3.0",
+                "squizlabs/php_codesniffer": "^3.13.4"
             },
             "require-dev": {
                 "phing/phing": "3.0.1|3.1.0",
                 "php-parallel-lint/php-parallel-lint": "1.4.0",
-                "phpstan/phpstan": "2.1.19",
+                "phpstan/phpstan": "2.1.24",
                 "phpstan/phpstan-deprecation-rules": "2.0.3",
                 "phpstan/phpstan-phpunit": "2.0.7",
                 "phpstan/phpstan-strict-rules": "2.0.6",
-                "phpunit/phpunit": "9.6.8|10.5.48|11.4.4|11.5.27|12.2.7"
+                "phpunit/phpunit": "9.6.8|10.5.48|11.4.4|11.5.36|12.3.10"
             },
             "type": "phpcodesniffer-standard",
             "extra": {
@@ -2845,7 +2889,7 @@
             ],
             "support": {
                 "issues": "https://github.com/slevomat/coding-standard/issues",
-                "source": "https://github.com/slevomat/coding-standard/tree/8.20.0"
+                "source": "https://github.com/slevomat/coding-standard/tree/8.22.1"
             },
             "funding": [
                 {
@@ -2857,20 +2901,20 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-07-26T15:35:10+00:00"
+            "time": "2025-09-13T08:53:30+00:00"
         },
         {
             "name": "squizlabs/php_codesniffer",
-            "version": "3.13.2",
+            "version": "3.13.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCSStandards/PHP_CodeSniffer.git",
-                "reference": "5b5e3821314f947dd040c70f7992a64eac89025c"
+                "reference": "ad545ea9c1b7d270ce0fc9cbfb884161cd706119"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/5b5e3821314f947dd040c70f7992a64eac89025c",
-                "reference": "5b5e3821314f947dd040c70f7992a64eac89025c",
+                "url": "https://api.github.com/repos/PHPCSStandards/PHP_CodeSniffer/zipball/ad545ea9c1b7d270ce0fc9cbfb884161cd706119",
+                "reference": "ad545ea9c1b7d270ce0fc9cbfb884161cd706119",
                 "shasum": ""
             },
             "require": {
@@ -2941,7 +2985,7 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2025-06-17T22:17:01+00:00"
+            "time": "2025-09-05T05:47:09+00:00"
         },
         {
             "name": "szepeviktor/phpstan-wordpress",

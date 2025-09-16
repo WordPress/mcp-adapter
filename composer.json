@@ -74,11 +74,12 @@
 	},
 	"require-dev": {
 		"automattic/vipwpcs": "^3.0",
+		"php-stubs/wp-cli-stubs": "^2.12",
 		"phpcompatibility/php-compatibility": "10.x-dev as 9.99.99",
 		"phpcompatibility/phpcompatibility-wp": "^2.1",
 		"phpstan/extension-installer": "^1.3",
-		"phpstan/phpstan": "^2.1.22",
 		"phpstan/php-8-stubs": "^0.4.24",
+		"phpstan/phpstan": "^2.1.22",
 		"phpstan/phpstan-deprecation-rules": "^2.0.3",
 		"phpunit/phpunit": "^9.6",
 		"slevomat/coding-standard": "^8.0",

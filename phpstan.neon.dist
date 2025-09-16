@@ -19,6 +19,7 @@ parameters:
 			max: 80400
 		bootstrapFiles:
 			- mcp-adapter.php
+			- vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
 		paths:
 			- includes/
 		scanFiles:
