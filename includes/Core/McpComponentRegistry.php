@@ -142,6 +142,51 @@ class McpComponentRegistry {
 	}
 
 	/**
+	 * Register a McpTool instance directly to the server.
+	 *
+	 * @param \WP\MCP\Domain\Tools\McpTool $tool The tool instance to register.
+	 *
+	 * @return void
+	 */
+	public function add_tool( McpTool $tool ): void {
+		try {
+			// Validate if validation is enabled
+			if ( $this->mcp_validation_enabled ) {
+				$tool->validate( "McpComponentRegistry::add_tool::{$tool->get_name()}" );
+			}
+
+			// Set the MCP server
+			$tool->set_mcp_server( $this->mcp_server );
+
+			// Add the tool to this server
+			$this->tools[ $tool->get_name() ] = $tool;
+
+			// Track successful tool registration
+			$this->observability_handler::record_event(
+				'mcp.component.registered',
+				array(
+					'component_type' => 'tool',
+					'component_name' => $tool->get_name(),
+					'server_id'      => $this->mcp_server->get_server_id(),
+				)
+			);
+		} catch ( \InvalidArgumentException $e ) {
+			$this->error_handler->log( $e->getMessage(), array( "McpComponentRegistry::add_tool::{$tool->get_name()}" ) );
+
+			// Track tool registration failure
+			$this->observability_handler::record_event(
+				'mcp.component.registration_failed',
+				array(
+					'component_type' => 'tool',
+					'component_name' => $tool->get_name(),
+					'error_type'     => get_class( $e ),
+					'server_id'      => $this->mcp_server->get_server_id(),
+				)
+			);
+		}
+	}
+
+	/**
 	 * Register resources to the server.
 	 *
 	 * @param array $abilities Array of ability names to convert to MCP resources.

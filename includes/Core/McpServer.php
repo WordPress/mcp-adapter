@@ -181,6 +181,17 @@ class McpServer {
 		// Register tools, resources, and prompts if provided.
 		if ( ! empty( $tools ) ) {
 			$this->component_registry->register_tools( $tools );
+		} else {
+			// Auto-register layered tools when no specific tools are provided
+			$this->component_registry->add_tool(
+				LayeredToolsFactory::create_discovery_tool( $this )
+			);
+			$this->component_registry->add_tool(
+				LayeredToolsFactory::create_planning_tool( $this )
+			);
+			$this->component_registry->add_tool(
+				LayeredToolsFactory::create_execution_tool( $this )
+			);
 		}
 		if ( ! empty( $resources ) ) {
 			$this->component_registry->register_resources( $resources );
