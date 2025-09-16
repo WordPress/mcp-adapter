@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
+use WP\MCP\Cli\McpCommand;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
@@ -21,16 +22,23 @@ final class McpAdapter {
 	/**
 	 * Registry instance
 	 *
-	 * @var \WP\MCP\Core\McpAdapter
+	 * @var McpAdapter
 	 */
 	private static self $instance;
 
 	/**
 	 * Registered servers
 	 *
-	 * @var \WP\MCP\Core\McpServer[]
+	 * @var McpServer[]
 	 */
 	private array $servers = array();
+
+	/**
+	 * Track if adapter has been initialized to prevent duplicate initialization
+	 *
+	 * @var bool
+	 */
+	private static bool $initialized = false;
 
 	/**
 	 * Initialize the registry
@@ -38,20 +46,38 @@ final class McpAdapter {
 	 * @internal For use by instance initialization only.
 	 */
 	public function init(): void {
+		if ( self::$initialized ) {
+			return;
+		}
+
 		do_action( 'mcp_adapter_init', $this );
+		$this->register_wp_cli_commands();
+		self::$initialized = true;
+	}
+
+	/**
+	 * Ensure adapter is initialized (can be called multiple times safely)
+	 *
+	 * This method is safe to call from both REST API and WP-CLI contexts.
+	 * It will only initialize once regardless of how many times it's called.
+	 *
+	 * @return void
+	 */
+	public function ensure_initialized(): void {
+		$this->init();
 	}
 
 	/**
 	 * Get the registry instance
 	 *
-	 * @return \WP\MCP\Core\McpAdapter
+	 * @return McpAdapter
 	 */
 	public static function instance(): self {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
 
-			// Defer initialization until after the REST API.
-			add_action( 'rest_api_init', array( self::$instance, 'init' ), 20000 );
+			// Initialize for REST API requests with reasonable priority
+			add_action( 'rest_api_init', array( self::$instance, 'init' ), 15 );
 		}
 
 		return self::$instance;
@@ -165,9 +191,35 @@ final class McpAdapter {
 	/**
 	 * Get all registered servers
 	 *
-	 * @return \WP\MCP\Core\McpServer[]
+	 * @return McpServer[]
 	 */
 	public function get_servers(): array {
 		return $this->servers;
+	}
+
+	/**
+	 * Register WP-CLI commands if WP-CLI is available
+	 *
+	 * @internal For use by adapter initialization only.
+	 */
+	private function register_wp_cli_commands(): void {
+		// Only register if WP-CLI is available
+		if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) ) {
+			return;
+		}
+
+		if ( ! class_exists( 'WP_CLI' ) ) {
+			return;
+		}
+
+		call_user_func(
+			array( 'WP_CLI', 'add_command' ),
+			'mcp-adapter',
+			McpCommand::class,
+			array(
+				'shortdesc' => 'Manage MCP servers via WP-CLI.',
+				'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport for subprocess communication.',
+			)
+		);
 	}
 }
