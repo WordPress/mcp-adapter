@@ -10,11 +10,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Http;
 
-use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
-use WP_REST_Response;
-use WP_REST_Server;
+use WP\MCP\Transport\Contracts\McpRestTransportInterface;
+use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
 
 /**
  * Class McpRestTransport
@@ -24,26 +22,30 @@ use WP_REST_Server;
  *
  * @deprecated Use HttpTransport instead. This class is deprecated and will be removed in a future version.
  */
-class RestTransport implements McpTransportInterface {
-	use McpTransportHelperTrait;
+class RestTransport implements McpRestTransportInterface {
+	use TransportHelperTrait;
 
 	/**
 	 * The transport context.
 	 *
-	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\TransportContext
 	 */
-	private McpTransportContext $context;
+	private TransportContext $context;
 
 	/**
 	 * Initialize the class and register routes
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $context The transport context.
 	 */
-	public function __construct( McpTransportContext $context ) {
+	public function __construct( TransportContext $context ) {
 		_deprecated_class( self::class, '', '\WP\MCP\Transport\HttpTransport' );
 
 		$this->context = $context;
-		add_action( 'rest_api_init', array( $this, 'register_routes' ), 20001 );
+
+		// Register routes directly since we're already in the correct context
+		// For REST API: constructor runs during mcp_adapter_init which runs during rest_api_init
+		// For WP-CLI: routes not needed (uses STDIO), registration may fail silently
+		$this->register_routes();
 	}
 
 	/**
@@ -55,7 +57,7 @@ class RestTransport implements McpTransportInterface {
 			$this->context->mcp_server->get_server_route_namespace(),
 			$this->context->mcp_server->get_server_route(),
 			array(
-				'methods'             => WP_REST_Server::CREATABLE,
+				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'handle_request' ),
 				'permission_callback' => array( $this, 'check_permission' ),
 			)
@@ -65,25 +67,24 @@ class RestTransport implements McpTransportInterface {
 	/**
 	 * Check if the user has permission to access the MCP API
 	 *
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 * @return bool|\WP_Error
 	 */
-	public function check_permission() {
+	public function check_permission( \WP_REST_Request $request ) {
 		// Use custom permission callback if provided
 		if ( null !== $this->context->transport_permission_callback ) {
 			try {
 				return call_user_func( $this->context->transport_permission_callback );
 			} catch ( \Throwable $e ) {
 				// Log error and fall back to default
-				if ( $this->context->mcp_server->error_handler ) {
-					$this->context->mcp_server->error_handler->log(
-						'Transport permission callback failed',
-						array(
-							'transport' => static::class,
-							'server_id' => $this->context->mcp_server->get_server_id(),
-							'error'     => $e->getMessage(),
-						)
-					);
-				}
+				$this->context->mcp_server->error_handler->log(
+					'Transport permission callback failed',
+					array(
+						'transport' => static::class,
+						'server_id' => $this->context->mcp_server->get_server_id(),
+						'error'     => $e->getMessage(),
+					)
+				);
 
 				// Fall back to secure default
 				return is_user_logged_in();
@@ -97,16 +98,16 @@ class RestTransport implements McpTransportInterface {
 	/**
 	 * Handle all MCP requests
 	 *
-	 * @param mixed $request The request.
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request.
 	 *
-	 * @return \WP_REST_Response|\WP_Error
+	 * @return \WP_REST_Response
 	 */
-	public function handle_request( $request ) {
+	public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
 		$message = $request->get_json_params();
 
 		$validation = $this->validate_rest_message( is_array( $message ) ? $message : array() );
 		if ( true !== $validation ) {
-			return $validation;
+			return new \WP_REST_Response( $validation->get_error_data(), $validation->get_error_data()['status'] ?? 400 );
 		}
 
 		$method = $message['method'];
@@ -117,7 +118,8 @@ class RestTransport implements McpTransportInterface {
 
 		// Check if the result contains an error.
 		if ( isset( $result['error'] ) ) {
-			return $this->format_error_response( $result );
+			$error = $this->format_error_response( $result );
+			return new \WP_REST_Response( $error->get_error_data(), $error->get_error_data()['status'] ?? 500 );
 		}
 
 		return $this->format_success_response( $result );
@@ -149,7 +151,7 @@ class RestTransport implements McpTransportInterface {
 	 *
 	 * @return \WP_REST_Response
 	 */
-	protected function format_success_response( array $result, int $request_id = 0 ): WP_REST_Response {
+	protected function format_success_response( array $result, int $request_id = 0 ): \WP_REST_Response {
 		return rest_ensure_response( $result );
 	}
 

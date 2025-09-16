@@ -12,9 +12,9 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Http;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
+use WP\MCP\Transport\Contracts\McpRestTransportInterface;
+use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -25,15 +25,15 @@ use WP_REST_Server;
  *
  * @deprecated Use HttpTransport instead. This class is deprecated and will be removed in a future version.
  */
-class StreamableTransport implements McpTransportInterface {
-	use McpTransportHelperTrait;
+class StreamableTransport implements McpRestTransportInterface {
+	use TransportHelperTrait;
 
 	/**
 	 * The transport context.
 	 *
-	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\TransportContext
 	 */
-	private McpTransportContext $context;
+	private TransportContext $context;
 	/**
 	 * The request ID.
 	 *
@@ -44,13 +44,17 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Initialize the class and register routes
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $context The transport context.
 	 */
-	public function __construct( McpTransportContext $context ) {
+	public function __construct( TransportContext $context ) {
 		_deprecated_class( self::class, '', '\WP\MCP\Transport\HttpTransport' );
 
 		$this->context = $context;
-		add_action( 'rest_api_init', array( $this, 'register_routes' ), 20002 );
+
+		// Register routes directly since we're already in the correct context
+		// For REST API: constructor runs during mcp_adapter_init which runs during rest_api_init
+		// For WP-CLI: routes not needed (uses STDIO), registration may fail silently
+		$this->register_routes();
 	}
 
 	/**
@@ -71,27 +75,25 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Check if the user has permission to access the MCP API
 	 *
-	 * @param \WP_REST_Request<array<string, mixed>>|null $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
 	 * @return bool|\WP_Error
 	 */
-	public function check_permission( ?WP_REST_Request $request = null ) {
+	public function check_permission( \WP_REST_Request $request ) {
 		// Use custom permission callback if provided
 		if ( null !== $this->context->transport_permission_callback ) {
 			try {
 				return call_user_func( $this->context->transport_permission_callback, $request );
 			} catch ( \Throwable $e ) {
 				// Log error and fall back to default
-				if ( $this->context->mcp_server->error_handler ) {
-					$this->context->mcp_server->error_handler->log(
-						'Transport permission callback failed',
-						array(
-							'transport' => static::class,
-							'server_id' => $this->context->mcp_server->get_server_id(),
-							'error'     => $e->getMessage(),
-						)
-					);
-				}
+				$this->context->mcp_server->error_handler->log(
+					'Transport permission callback failed',
+					array(
+						'transport' => static::class,
+						'server_id' => $this->context->mcp_server->get_server_id(),
+						'error'     => $e->getMessage(),
+					)
+				);
 
 				// Fall back to secure default
 				return is_user_logged_in();
@@ -105,11 +107,11 @@ class StreamableTransport implements McpTransportInterface {
 	/**
 	 * Handle the HTTP request
 	 *
-	 * @param mixed $request The request object.
+	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
 	 * @return \WP_REST_Response
 	 */
-	public function handle_request( $request ): WP_REST_Response {
+	public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
 		// Handle preflight requests.
 		if ( 'OPTIONS' === $request->get_method() ) {
 			return new WP_REST_Response( null );
@@ -206,9 +208,7 @@ class StreamableTransport implements McpTransportInterface {
 			return new WP_REST_Response( $response_body, 200, $headers );
 		} catch ( \Throwable $exception ) {
 			// Log the error using the error handler if available.
-			if ( $this->context->mcp_server->error_handler ) {
-				$this->context->mcp_server->error_handler->log( 'Unexpected error in handle_post_request', array( 'exception' => $exception->getMessage() ) );
-			}
+			$this->context->mcp_server->error_handler->log( 'Unexpected error in handle_post_request', array( 'exception' => $exception->getMessage() ) );
 
 			$error = McpErrorFactory::internal_error( 0, 'Handler error occurred' );
 			return new WP_REST_Response( $error, 500 );
