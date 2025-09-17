@@ -121,6 +121,12 @@ class HttpRequestHandler {
 			}
 		);
 
+		// Determine HTTP status code based on error type
+		if ( ! $is_batch_request && isset( $response_body['error'] ) ) {
+			$http_status = McpErrorFactory::get_http_status_for_error( $response_body );
+			return new \WP_REST_Response( $response_body, $http_status );
+		}
+
 		return new \WP_REST_Response( $response_body, 200 );
 	}
 
@@ -258,8 +264,8 @@ class HttpRequestHandler {
 		$result = HttpSessionValidator::terminate_session( $context );
 
 		if ( true !== $result ) {
-			$status_code = is_array( $result ) && isset( $result['code'] ) && -32600 === $result['code'] ? 400 : 401;
-			return new \WP_REST_Response( $result, $status_code );
+			$http_status = McpErrorFactory::get_http_status_for_error( $result );
+			return new \WP_REST_Response( $result, $http_status );
 		}
 
 		return new \WP_REST_Response( null, 200 );
