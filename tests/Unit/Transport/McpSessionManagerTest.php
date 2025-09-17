@@ -11,7 +11,6 @@ namespace WP\MCP\Tests\Unit\Transport;
 
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\SessionManager;
-use WP_User;
 
 /**
  * Test MCP Session Manager functionality
@@ -50,7 +49,7 @@ final class McpSessionManagerTest extends TestCase {
 	public function tear_down(): void {
 		// Clean up all sessions for test user
 		if ( $this->test_user_id ) {
-			delete_user_meta( $this->test_user_id, 'mcp_sessions' );
+			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions' );
 			wp_delete_user( $this->test_user_id );
 		}
 
@@ -173,14 +172,17 @@ final class McpSessionManagerTest extends TestCase {
 	 */
 	public function test_session_limit_enforcement(): void {
 		// Set a lower limit for testing
-		add_filter( 'mcp_adapter_session_max_per_user', function () {
-			return 3;
-		} );
+		add_filter(
+			'mcp_adapter_session_max_per_user',
+			static function () {
+				return 3;
+			}
+		);
 
 		$session_ids = array();
 
 		// Create sessions up to limit
-		for ( $i = 1; $i <= 3; $i ++ ) {
+		for ( $i = 1; $i <= 3; $i++ ) {
 			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => "client-{$i}" ) );
 			$this->assertIsString( $session_id );
 			$session_ids[] = $session_id;
@@ -287,9 +289,12 @@ final class McpSessionManagerTest extends TestCase {
 	 */
 	public function test_configurable_limits(): void {
 		// Test custom max sessions
-		add_filter( 'mcp_adapter_session_max_per_user', function () {
-			return 2;
-		} );
+		add_filter(
+			'mcp_adapter_session_max_per_user',
+			static function () {
+				return 2;
+			}
+		);
 
 		$session_1 = SessionManager::create_session( $this->test_user_id, array() );
 		$session_2 = SessionManager::create_session( $this->test_user_id, array() );
@@ -301,9 +306,12 @@ final class McpSessionManagerTest extends TestCase {
 		remove_all_filters( 'mcp_adapter_session_max_per_user' );
 
 		// Test custom expiration
-		add_filter( 'mcp_adapter_session_inactivity_timeout', function () {
-			return 1;
-		} ); // 1 second
+		add_filter(
+			'mcp_adapter_session_inactivity_timeout',
+			static function () {
+				return 1;
+			}
+		); // 1 second
 
 		$short_session = SessionManager::create_session( $this->test_user_id, array() );
 		$this->assertIsString( $short_session );
