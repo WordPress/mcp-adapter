@@ -336,7 +336,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all tools registered to the server.
 	 *
-	 * @return array
+	 * @return \WP\MCP\Domain\Tools\McpTool[]
 	 */
 	public function get_tools(): array {
 		return $this->tools;
@@ -354,7 +354,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all prompts registered to the server.
 	 *
-	 * @return array
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt[]
 	 */
 	public function get_prompts(): array {
 		return $this->prompts;
