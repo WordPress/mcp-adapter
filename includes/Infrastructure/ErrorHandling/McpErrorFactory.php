@@ -249,6 +249,26 @@ class McpErrorFactory {
 	}
 
 	/**
+	 * Create a tool not found error response.
+	 *
+	 * @param int    $id The request ID.
+	 * @param string $ability The tool name.
+	 *
+	 * @return array
+	 */
+	public static function ability_not_found( int $id, string $ability ): array {
+		return self::create_error_response(
+			$id,
+			self::TOOL_NOT_FOUND,
+			sprintf(
+				/* translators: %s: tool name */
+				__( 'Ability not found: %s', 'mcp-adapter' ),
+				$ability
+			)
+		);
+	}
+
+	/**
 	 * Create a prompt not found error response.
 	 *
 	 * @param int    $id The request ID.
