@@ -140,22 +140,36 @@ class McpServer {
 		array $prompts = array(),
 		?callable $transport_permission_callback = null
 	) {
-
-		$this->mcp_validation_enabled = apply_filters( 'mcp_validation_enabled', true );
-
-		$this->server_id              = $server_id;
-		$this->server_route_namespace = $server_route_namespace;
-		$this->server_route           = $server_route;
-		$this->server_name            = $server_name;
-		$this->server_description     = $server_description;
-		$this->server_version         = $server_version;
-
-		// Set transport permission callback (already validated by type system)
+		// Store server configuration
+		$this->server_id                     = $server_id;
+		$this->server_route_namespace        = $server_route_namespace;
+		$this->server_route                  = $server_route;
+		$this->server_name                   = $server_name;
+		$this->server_description            = $server_description;
+		$this->server_version                = $server_version;
 		$this->transport_permission_callback = $transport_permission_callback;
 
+		// Setup validation flag. Validation is disabled by default for performance.
+		//Abilities API is also validating all abilities.
+		$this->mcp_validation_enabled = apply_filters( 'mcp_validation_enabled', false );
+
+		// Setup handlers and components
+		$this->setup_handlers( $error_handler, $observability_handler );
+		$this->setup_components( $tools, $resources, $prompts, $mcp_transports );
+	}
+
+	/**
+	 * Setup error and observability handlers.
+	 *
+	 * @param string|null $error_handler Error handler class name.
+	 * @param string|null $observability_handler Observability handler class name.
+	 */
+	private function setup_handlers( ?string $error_handler, ?string $observability_handler ): void {
 		// Instantiate error handler
 		if ( $error_handler && class_exists( $error_handler ) ) {
-			$this->error_handler = new $error_handler();
+			/** @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $handler */
+			$handler             = new $error_handler();
+			$this->error_handler = $handler;
 		} else {
 			$this->error_handler = new NullMcpErrorHandler();
 		}
@@ -166,7 +180,17 @@ class McpServer {
 		} else {
 			$this->observability_handler = NullMcpObservabilityHandler::class;
 		}
+	}
 
+	/**
+	 * Setup component registry and transport factory.
+	 *
+	 * @param array $tools Tools to register.
+	 * @param array $resources Resources to register.
+	 * @param array $prompts Prompts to register.
+	 * @param array $mcp_transports Transport classes to initialize.
+	 */
+	private function setup_components( array $tools, array $resources, array $prompts, array $mcp_transports ): void {
 		// Initialize component registry
 		$this->component_registry = new McpComponentRegistry(
 			$this,
@@ -178,7 +202,22 @@ class McpServer {
 		// Initialize transport factory
 		$this->transport_factory = new McpTransportFactory( $this );
 
-		// Register tools, resources, and prompts if provided.
+		// Register tools, resources, and prompts
+		$this->register_initial_components( $tools, $resources, $prompts );
+
+		// Initialize transports
+		$this->transport_factory->initialize_transports( $mcp_transports );
+	}
+
+	/**
+	 * Register initial tools, resources, and prompts.
+	 *
+	 * @param array $tools Tools to register.
+	 * @param array $resources Resources to register.
+	 * @param array $prompts Prompts to register.
+	 */
+	private function register_initial_components( array $tools, array $resources, array $prompts ): void {
+		// Register tools or add layered tools as default
 		if ( ! empty( $tools ) ) {
 			$this->component_registry->register_tools( $tools );
 		} else {
@@ -193,14 +232,18 @@ class McpServer {
 				LayeredToolsFactory::create_execution_tool( $this )
 			);
 		}
+
+		// Register resources if provided
 		if ( ! empty( $resources ) ) {
 			$this->component_registry->register_resources( $resources );
 		}
-		if ( ! empty( $prompts ) ) {
-			$this->component_registry->register_prompts( $prompts );
+
+		// Register prompts if provided
+		if ( empty( $prompts ) ) {
+			return;
 		}
 
-		$this->transport_factory->initialize_transports( $mcp_transports );
+		$this->component_registry->register_prompts( $prompts );
 	}
 
 	/**
