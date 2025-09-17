@@ -15,7 +15,7 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**
  * Factory for creating and initializing MCP transports.
@@ -89,9 +89,9 @@ class McpTransportFactory {
 	/**
 	 * Create transport context with all required dependencies.
 	 *
-	 * @return \WP\MCP\Transport\Infrastructure\TransportContext
+	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	public function create_transport_context(): TransportContext {
+	public function create_transport_context(): McpTransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $this->mcp_server );
 		$tools_handler      = new ToolsHandler( $this->mcp_server );
@@ -100,7 +100,7 @@ class McpTransportFactory {
 		$system_handler     = new SystemHandler();
 
 		// Create the context - the router will be created automatically
-		return new TransportContext(
+		return new McpTransportContext(
 			array(
 				'mcp_server'                    => $this->mcp_server,
 				'initialize_handler'            => $initialize_handler,

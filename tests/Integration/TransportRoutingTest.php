@@ -16,7 +16,7 @@ use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\Fixtures\DummyTransport;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
-use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 final class TransportRoutingTest extends TestCase {
 
@@ -54,7 +54,7 @@ final class TransportRoutingTest extends TestCase {
 		$this->assertArrayHasKey( 'prompts', $res2 );
 	}
 
-	private function createTransportContext( McpServer $server ): TransportContext {
+	private function createTransportContext( McpServer $server ): McpTransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $server );
 		$tools_handler      = new ToolsHandler( $server );
@@ -63,7 +63,7 @@ final class TransportRoutingTest extends TestCase {
 		$system_handler     = new SystemHandler();
 
 		// Create the context - the router will be created automatically
-		return new TransportContext(
+		return new McpTransportContext(
 			array(
 				'mcp_server'            => $server,
 				'initialize_handler'    => $initialize_handler,

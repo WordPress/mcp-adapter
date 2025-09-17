@@ -22,7 +22,7 @@ use WP\MCP\Handlers\Tools\ToolsHandler;
  * Contains all dependencies needed by transport implementations,
  * promoting loose coupling and easier testing.
  */
-class TransportContext {
+class McpTransportContext {
 
 	/**
 	 * Initialize the transport context.

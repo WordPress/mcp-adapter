@@ -22,7 +22,7 @@ use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\HttpTransport;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
-use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -44,7 +44,7 @@ final class HttpTransportTest extends TestCase {
 
 	private McpServer $server;
 	private HttpTransport $transport;
-	private TransportContext $context;
+	private McpTransportContext $context;
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
@@ -454,7 +454,7 @@ final class HttpTransportTest extends TestCase {
 
 	public function test_permission_callback_integration(): void {
 		// Test with custom permission callback
-		$context_with_permission = new TransportContext(
+		$context_with_permission = new McpTransportContext(
 			array(
 				'mcp_server'                    => $this->context->mcp_server,
 				'initialize_handler'            => $this->context->initialize_handler,
@@ -531,7 +531,7 @@ final class HttpTransportTest extends TestCase {
 		return $request;
 	}
 
-	private function createTransportContext( McpServer $server ): TransportContext {
+	private function createTransportContext( McpServer $server ): McpTransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $server );
 		$tools_handler      = new ToolsHandler( $server );
@@ -540,7 +540,7 @@ final class HttpTransportTest extends TestCase {
 		$system_handler     = new SystemHandler();
 
 		// Create the context - the router will be created automatically
-		return new TransportContext(
+		return new McpTransportContext(
 			array(
 				'mcp_server'            => $server,
 				'initialize_handler'    => $initialize_handler,

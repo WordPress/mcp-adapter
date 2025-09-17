@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Fixtures;
 
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
-use WP\MCP\Transport\Infrastructure\TransportContext;
-use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 
 class DummyTransport implements McpRestTransportInterface {
 
-	use TransportHelperTrait;
+	use McpTransportHelperTrait;
 
-	private TransportContext $context;
+	private McpTransportContext $context;
 
 	public function __construct(
-		TransportContext $context
+		McpTransportContext $context
 	) {
 		$this->context = $context;
 		// No route registration needed for tests

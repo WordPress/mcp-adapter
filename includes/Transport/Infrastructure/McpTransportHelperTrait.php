@@ -10,12 +10,12 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 /**
- * Trait TransportHelperTrait
+ * Trait McpTransportHelperTrait
  *
  * Provides shared utility methods for transport implementations including
  * naming conventions, error creation, and common operations.
  */
-trait TransportHelperTrait {
+trait McpTransportHelperTrait {
 
 	/**
 	 * Get a normalized transport name for tagging purposes.

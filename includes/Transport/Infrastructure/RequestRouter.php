@@ -22,17 +22,17 @@ class RequestRouter {
 	/**
 	 * The transport context.
 	 *
-	 * @var \WP\MCP\Transport\Infrastructure\TransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	private TransportContext $context;
+	private McpTransportContext $context;
 
 	/**
 	 * Initialize the request router.
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
 	public function __construct(
-		TransportContext $context
+		McpTransportContext $context
 	) {
 		$this->context = $context;
 	}

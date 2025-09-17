@@ -11,8 +11,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Http;
 
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
-use WP\MCP\Transport\Infrastructure\TransportContext;
-use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 
 /**
  * Class McpRestTransport
@@ -23,21 +23,21 @@ use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
  * @deprecated Use HttpTransport instead. This class is deprecated and will be removed in a future version.
  */
 class RestTransport implements McpRestTransportInterface {
-	use TransportHelperTrait;
+	use McpTransportHelperTrait;
 
 	/**
 	 * The transport context.
 	 *
-	 * @var \WP\MCP\Transport\Infrastructure\TransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	private TransportContext $context;
+	private McpTransportContext $context;
 
 	/**
 	 * Initialize the class and register routes
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
 	 */
-	public function __construct( TransportContext $context ) {
+	public function __construct( McpTransportContext $context ) {
 		_deprecated_class( self::class, '', '\WP\MCP\Transport\HttpTransport' );
 
 		$this->context = $context;

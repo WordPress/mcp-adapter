@@ -23,16 +23,16 @@ class HttpRequestHandler {
 	/**
 	 * The transport context.
 	 *
-	 * @var \WP\MCP\Transport\Infrastructure\TransportContext
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	public TransportContext $transport_context;
+	public McpTransportContext $transport_context;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $transport_context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context The transport context.
 	 */
-	public function __construct( TransportContext $transport_context ) {
+	public function __construct( McpTransportContext $transport_context ) {
 		$this->transport_context = $transport_context;
 	}
 

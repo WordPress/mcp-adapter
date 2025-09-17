@@ -16,8 +16,8 @@ use WP\MCP\Transport\Contracts\McpRestTransportInterface;
 use WP\MCP\Transport\Infrastructure\AuthenticationValidator;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\HttpRequestHandler;
-use WP\MCP\Transport\Infrastructure\TransportContext;
-use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 
 /**
  * MCP HTTP Transport - Unified transport for both proxy and direct clients
@@ -25,7 +25,7 @@ use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
  * Implements MCP 2025-06-18 Streamable HTTP specification
  */
 class HttpTransport implements McpRestTransportInterface {
-	use TransportHelperTrait;
+	use McpTransportHelperTrait;
 
 	/**
 	 * The HTTP request handler.
@@ -37,9 +37,9 @@ class HttpTransport implements McpRestTransportInterface {
 	/**
 	 * Initialize the class and register routes
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $transport_context The transport context.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context The transport context.
 	 */
-	public function __construct( TransportContext $transport_context ) {
+	public function __construct( McpTransportContext $transport_context ) {
 		$this->request_handler = new HttpRequestHandler( $transport_context );
 
 		// Register routes directly since we're already in the correct context

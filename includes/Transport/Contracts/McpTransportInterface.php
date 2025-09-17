@@ -9,7 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Contracts;
 
-use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**
  * Base interface for MCP transport protocols.
@@ -24,9 +24,9 @@ interface McpTransportInterface {
 	/**
 	 * Initialize the transport with provided context.
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\TransportContext $context Dependency injection container.
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context Dependency injection container.
 	 */
-	public function __construct( TransportContext $context );
+	public function __construct( McpTransportContext $context );
 
 	/**
 	 * Register transport-specific routes.

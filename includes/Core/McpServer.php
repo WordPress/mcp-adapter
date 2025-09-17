@@ -15,7 +15,7 @@ use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
-use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -458,9 +458,9 @@ class McpServer {
 	/**
 	 * Create transport context with all required dependencies.
 	 *
-	 * @return \WP\MCP\Transport\Infrastructure\TransportContext
+	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	public function create_transport_context(): TransportContext {
+	public function create_transport_context(): McpTransportContext {
 		return $this->transport_factory->create_transport_context();
 	}
 
