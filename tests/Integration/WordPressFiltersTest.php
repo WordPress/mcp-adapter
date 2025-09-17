@@ -28,6 +28,6 @@ final class WordPressFiltersTest extends TestCase {
 
 		$this->assertFalse( $server->is_mcp_validation_enabled() );
 
-		remove_filter( 'mcp_validation_enabled', '__return_false' );
+		remove_filter( 'mcp_adapter_validation_enabled', '__return_false' );
 	}
 }

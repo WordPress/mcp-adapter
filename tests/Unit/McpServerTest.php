@@ -84,9 +84,12 @@ final class McpServerTest extends TestCase {
 		$this->assertNotEmpty( $server_tools );
 
 		// Should have layered tools
-		$tool_names = array_map( function( $tool ) {
-			return $tool->get_name();
-		}, $server_tools );
+		$tool_names = array_map(
+			static function ( $tool ) {
+					return $tool->get_name();
+			},
+			$server_tools
+		);
 
 		$this->assertContains( 'discover_abilities', $tool_names );
 		$this->assertContains( 'get_ability_info', $tool_names );
@@ -110,13 +113,13 @@ final class McpServerTest extends TestCase {
 		);
 
 		// Access private property via reflection
-		$reflection = new \ReflectionClass( $server );
+		$reflection          = new \ReflectionClass( $server );
 		$validation_property = $reflection->getProperty( 'mcp_validation_enabled' );
 		$validation_property->setAccessible( true );
 
 		$this->assertTrue( $validation_property->getValue( $server ) );
 
 		// Clean up filter
-		remove_filter( 'mcp_validation_enabled', '__return_true' );
+		remove_filter( 'mcp_adapter_validation_enabled', '__return_true' );
 	}
 }
