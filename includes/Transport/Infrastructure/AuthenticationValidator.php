@@ -27,7 +27,7 @@ class AuthenticationValidator {
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context                     The HTTP request context.
 	 * @param callable|null      $transport_permission_callback Optional custom permission callback.
 	 *
-	 * @return bool|\WP_Error True if permitted, WP_Error if denied.
+	 * @return bool True if permitted, False if denied.
 	 */
 	public static function check_permission( HttpRequestContext $context, ?callable $transport_permission_callback = null ) {
 		// Use custom permission callback if provided
