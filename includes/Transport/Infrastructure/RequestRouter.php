@@ -69,8 +69,6 @@ class RequestRouter {
 			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
 			'resources/list'           => fn() => $this->add_cursor_compatibility( $this->context->resources_handler->list_resources( $request_id ) ),
 			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
-			'resources/subscribe'      => fn() => $this->context->resources_handler->subscribe_resource( $params, $request_id ),
-			'resources/unsubscribe'    => fn() => $this->context->resources_handler->unsubscribe_resource( $params, $request_id ),
 			'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
 			'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
 			'logging/setLevel'         => fn() => $this->context->system_handler->set_logging_level( $params, $request_id ),

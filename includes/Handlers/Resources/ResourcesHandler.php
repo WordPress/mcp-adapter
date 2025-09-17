@@ -110,49 +110,4 @@ class ResourcesHandler {
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Failed to read resource' )['error'] );
 		}
 	}
-
-	/**
-	 * Handle the resources/subscribe request.
-	 *
-	 * @param array $params Request parameters.
-	 * @param int $request_id The request ID for JSON-RPC.
-	 *
-	 * @return array
-	 */
-	public function subscribe_resource( array $params, int $request_id = 0 ): array {
-		// Extract parameters using helper method.
-		$request_params = $this->extract_params( $params );
-
-		if ( ! isset( $request_params['uri'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'uri' )['error'] );
-		}
-
-		// Implement resource subscription logic here.
-		$uri = $request_params['uri'];
-
-		return array(
-			'subscriptionId' => 'sub_' . md5( $uri ),
-		);
-	}
-
-	/**
-	 * Handle the resources/unsubscribe request.
-	 *
-	 * @param array $params Request parameters.
-	 * @param int $request_id The request ID for JSON-RPC.
-	 *
-	 * @return array
-	 */
-	public function unsubscribe_resource( array $params, int $request_id = 0 ): array {
-		// Extract parameters using helper method.
-		$request_params = $this->extract_params( $params );
-
-		if ( ! isset( $request_params['subscriptionId'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'subscriptionId' )['error'] );
-		}
-
-		return array(
-			'success' => true,
-		);
-	}
 }
