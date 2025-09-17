@@ -106,7 +106,7 @@ class ToolsHandler {
 		$request_params = $this->extract_params( $message );
 
 		if ( ! isset( $request_params['name'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, $request_params['name'] )['error'] );
+			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'tool name' )['error'] );
 		}
 
 		try {
@@ -198,13 +198,12 @@ class ToolsHandler {
 	 *
 	 * @return array
 	 */
-	public function handle_tool_call( array $message, int $request_id = 0 ): array {
-		$params    = $this->extract_params( $message );
-		$tool_name = $params['name'] ?? '';
+	public function handle_tool_call( array $params, int $request_id = 0 ): array {
+		$tool_name = $params['name'];
 		$args      = $params['arguments'] ?? array();
 
 		// Get the tool callbacks.
-		$tool = $this->mcp->get_tool( $tool_name );
+		$tool = $this->mcp->get_tool( $params['name'] );
 
 		// Check if the tool exists.
 		if ( ! $tool ) {
