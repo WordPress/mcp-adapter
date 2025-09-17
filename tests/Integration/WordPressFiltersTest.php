@@ -12,7 +12,7 @@ use WP\MCP\Tests\TestCase;
 final class WordPressFiltersTest extends TestCase {
 
 	public function test_validation_toggle_filter_is_respected(): void {
-		add_filter( 'mcp_validation_enabled', '__return_false' );
+		add_filter( 'mcp_adapter_validation_enabled', '__return_false' );
 
 		$server = new McpServer(
 			'srv',
