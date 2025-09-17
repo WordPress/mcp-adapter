@@ -257,7 +257,7 @@ class SessionManager {
 
 			// Session is inactive - remove it
 			unset( $sessions[ $session_id ] );
-			++$removed;
+			++ $removed;
 		}
 
 		if ( $removed > 0 ) {
