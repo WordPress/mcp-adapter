@@ -332,12 +332,15 @@ final class McpAdapter {
 		}
 
 		call_user_func(
-			array( 'WP_CLI', 'add_command' ),
+			array(
+				'WP_CLI',
+				'add_command',
+			),
 			'mcp-adapter',
 			McpCommand::class,
 			array(
 				'shortdesc' => 'Manage MCP servers via WP-CLI.',
-				'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport for subprocess communication.',
+				'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport.',
 			)
 		);
 	}
