@@ -458,7 +458,20 @@ class ToolsHandler {
 				'data'    => $result,
 			);
 		} catch ( \Throwable $e ) {
-			return array( 'error' => McpErrorFactory::internal_error( 0, $e->getMessage() )['error'] );
+			// Log detailed error server-side for debugging
+			$this->mcp->error_handler->log(
+				'Ability execution failed',
+				array(
+					'ability_name' => $ability_name,
+					'parameters'   => $parameters,
+					'error'        => $e->getMessage(),
+					'file'         => $e->getFile(),
+					'line'         => $e->getLine(),
+				)
+			);
+
+			// Return generic error to client (don't leak internal details)
+			return array( 'error' => McpErrorFactory::internal_error( 0, 'Ability execution failed' )['error'] );
 		}
 	}
 
