@@ -189,6 +189,8 @@ class McpServer {
 	 * @param array $resources Resources to register.
 	 * @param array $prompts Prompts to register.
 	 * @param array $mcp_transports Transport classes to initialize.
+	 *
+	 * @throws \Exception
 	 */
 	private function setup_components( array $tools, array $resources, array $prompts, array $mcp_transports ): void {
 		// Initialize component registry
@@ -203,7 +205,7 @@ class McpServer {
 		$this->transport_factory = new McpTransportFactory( $this );
 
 		// Register tools, resources, and prompts
-		$this->register_initial_components( $tools, $resources, $prompts );
+		$this->register_mcp_components( $tools, $resources, $prompts );
 
 		// Initialize transports
 		$this->transport_factory->initialize_transports( $mcp_transports );
@@ -216,7 +218,7 @@ class McpServer {
 	 * @param array $resources Resources to register.
 	 * @param array $prompts Prompts to register.
 	 */
-	private function register_initial_components( array $tools, array $resources, array $prompts ): void {
+	private function register_mcp_components( array $tools, array $resources, array $prompts ): void {
 		// Register tools or add layered tools as default
 		if ( ! empty( $tools ) ) {
 			$this->component_registry->register_tools( $tools );
@@ -319,39 +321,6 @@ class McpServer {
 	}
 
 	/**
-	 * Register tools to this server.
-	 *
-	 * @param array $abilities Array of ability names to convert to MCP tools.
-	 *
-	 * @return void
-	 */
-	public function register_tools( array $abilities ): void {
-		$this->component_registry->register_tools( $abilities );
-	}
-
-	/**
-	 * Register resources to this server.
-	 *
-	 * @param array $abilities Array of ability names to convert to MCP resources.
-	 *
-	 * @return void
-	 */
-	public function register_resources( array $abilities ): void {
-		$this->component_registry->register_resources( $abilities );
-	}
-
-	/**
-	 * Register prompts to this server.
-	 *
-	 * @param array $prompts Array of prompts to register. Can be ability names (strings) or prompt builder class names.
-	 *
-	 * @return void
-	 */
-	public function register_prompts( array $prompts ): void {
-		$this->component_registry->register_prompts( $prompts );
-	}
-
-	/**
 	 * Get all tools registered to this server.
 	 *
 	 * @return array
@@ -409,50 +378,6 @@ class McpServer {
 	 */
 	public function get_prompt( string $prompt_name ): ?McpPrompt {
 		return $this->component_registry->get_prompt( $prompt_name );
-	}
-
-	/**
-	 * Remove a tool from this server.
-	 *
-	 * @param string $tool_name Tool name.
-	 *
-	 * @return bool True if removed, false if not found.
-	 */
-	public function remove_tool( string $tool_name ): bool {
-		return $this->component_registry->remove_tool( $tool_name );
-	}
-
-	/**
-	 * Remove a resource from this server.
-	 *
-	 * @param string $resource_uri Resource URI.
-	 *
-	 * @return bool True if removed, false if not found.
-	 */
-	public function remove_resource( string $resource_uri ): bool {
-		return $this->component_registry->remove_resource( $resource_uri );
-	}
-
-	/**
-	 * Remove a prompt from this server.
-	 *
-	 * @param string $prompt_name Prompt name.
-	 *
-	 * @return bool True if removed, false if not found.
-	 */
-	public function remove_prompt( string $prompt_name ): bool {
-		return $this->component_registry->remove_prompt( $prompt_name );
-	}
-
-	/**
-	 * Initialize MCP transports for this server.
-	 *
-	 * @param array $mcp_transports Array of MCP transport class names to initialize.
-	 *
-	 * @throws \Exception If any transport class does not implement McpTransportInterface.
-	 */
-	public function initialize_transport( array $mcp_transports ): void {
-		$this->transport_factory->initialize_transports( $mcp_transports );
 	}
 
 	/**
