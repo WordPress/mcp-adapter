@@ -59,8 +59,7 @@ class OpenPrompt extends McpPromptBuilder {
 final class BuilderPromptExecutionTest extends TestCase {
 
 	public function test_builder_prompt_execution_through_handler(): void {
-		$server = $this->makeServer();
-		$server->register_prompts( array( OpenPrompt::class ) );
+		$server = $this->makeServer( array(), array(), array( OpenPrompt::class ) );
 
 		$handler = new PromptsHandler( $server );
 
@@ -78,8 +77,7 @@ final class BuilderPromptExecutionTest extends TestCase {
 	}
 
 	public function test_builder_prompt_permission_denied(): void {
-		$server = $this->makeServer();
-		$server->register_prompts( array( AdminOnlyPrompt::class ) );
+		$server = $this->makeServer( array(), array(), array( AdminOnlyPrompt::class ) );
 
 		$handler = new PromptsHandler( $server );
 
@@ -97,10 +95,10 @@ final class BuilderPromptExecutionTest extends TestCase {
 	}
 
 	public function test_mixed_ability_and_builder_prompts(): void {
-		$server = $this->makeServer();
-
 		// Register both builder and ability-based prompts
-		$server->register_prompts(
+		$server = $this->makeServer(
+			array(),
+			array(),
 			array(
 				OpenPrompt::class,           // Builder-based
 				'fake/ability-prompt',       // Ability-based (will fail to register)
@@ -115,8 +113,7 @@ final class BuilderPromptExecutionTest extends TestCase {
 	}
 
 	public function test_builder_prompt_bypasses_abilities_completely(): void {
-		$server = $this->makeServer();
-		$server->register_prompts( array( OpenPrompt::class ) );
+		$server = $this->makeServer( array(), array(), array( OpenPrompt::class ) );
 
 		$prompt = $server->get_prompt( 'open-test' );
 

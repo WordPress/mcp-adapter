@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Prompts;
 
@@ -53,8 +53,7 @@ final class McpPromptBuilderTest extends TestCase {
 	}
 
 	public function test_prompt_can_be_registered_with_server(): void {
-		$server = $this->makeServer();
-		$server->register_prompts( array( TestPrompt::class ) );
+		$server = $this->makeServer( array(), array(), array( TestPrompt::class ) );
 
 		$prompts = $server->get_prompts();
 		$this->assertCount( 1, $prompts );
@@ -66,8 +65,7 @@ final class McpPromptBuilderTest extends TestCase {
 	}
 
 	public function test_prompt_execution_bypasses_abilities(): void {
-		$server = $this->makeServer();
-		$server->register_prompts( array( TestPrompt::class ) );
+		$server = $this->makeServer( array(), array(), array( TestPrompt::class ) );
 
 		$prompt = $server->get_prompt( 'test-prompt' );
 
@@ -93,10 +91,10 @@ final class McpPromptBuilderTest extends TestCase {
 	}
 
 	public function test_mixed_registration_abilities_and_builders(): void {
-		$server = $this->makeServer();
-
 		// This should work with mixed registration (though abilities won't exist in test)
-		$server->register_prompts(
+		$server = $this->makeServer(
+			array(),
+			array(),
 			array(
 				TestPrompt::class,
 				'some/fake-ability', // This will fail but shouldn't break the builder registration
