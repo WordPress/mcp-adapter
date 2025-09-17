@@ -16,13 +16,6 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
  */
 class SystemHandler {
 	/**
-	 * Constructor.
-	 */
-	public function __construct() {
-		// System handlers don't require any dependencies
-	}
-
-	/**
 	 * Handle the ping request.
 	 *
 	 * @param int $request_id The request ID for JSON-RPC.
