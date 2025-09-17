@@ -106,7 +106,7 @@ class ToolsHandler {
 		$request_params = $this->extract_params( $message );
 
 		if ( ! isset( $request_params['name'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'] );
+			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, $request_params['name'] )['error'] );
 		}
 
 		try {
@@ -428,7 +428,7 @@ class ToolsHandler {
 		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
-			return array( 'error' => McpErrorFactory::tool_not_found( 0, "Ability '{$ability_name}'" )['error'] );
+			return array( 'error' => McpErrorFactory::ability_not_found( 0, $ability_name )['error'] );
 		}
 
 		// Check permissions
