@@ -109,6 +109,7 @@ class McpTransportFactory {
 				'prompts_handler'               => $prompts_handler,
 				'system_handler'                => $system_handler,
 				'observability_handler'         => $this->mcp_server->get_observability_handler(),
+				'error_handler'                 => $this->mcp_server->get_error_handler(),
 				'transport_permission_callback' => $this->mcp_server->get_transport_permission_callback(),
 			)
 		);
