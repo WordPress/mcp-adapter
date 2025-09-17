@@ -87,7 +87,7 @@ class McpServer {
 	/**
 	 * Observability handler class name (e.g., NullMcpObservabilityHandler::class).
 	 *
-	 * @var string
+	 * @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
 	 */
 	public string $observability_handler;
 
@@ -318,6 +318,10 @@ class McpServer {
 	 */
 	public function get_observability_handler(): string {
 		return $this->observability_handler;
+	}
+
+	public function get_error_handler(): McpErrorHandlerInterface {
+		return $this->error_handler;
 	}
 
 	/**
