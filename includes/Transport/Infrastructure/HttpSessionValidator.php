@@ -39,12 +39,12 @@ class HttpSessionValidator {
 		// Check user authentication
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return McpErrorFactory::invalid_request( 0, 'User not authenticated' );
+			return McpErrorFactory::unauthorized( 0, 'User not authenticated' );
 		}
 
 		// Validate session using SessionManager
 		if ( ! SessionManager::validate_session( $user_id, $session_id ) ) {
-			return McpErrorFactory::invalid_request( 0, 'Invalid or expired session' );
+			return McpErrorFactory::invalid_params( 0, 'Invalid or expired session' );
 		}
 
 		return true;
@@ -80,7 +80,7 @@ class HttpSessionValidator {
 	public static function create_session( array $client_info = array() ) {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return McpErrorFactory::invalid_request( 0, 'User authentication required for session creation' );
+			return McpErrorFactory::unauthorized( 0, 'User authentication required for session creation' );
 		}
 
 		$session_id = SessionManager::create_session( $user_id, $client_info );
@@ -112,7 +112,7 @@ class HttpSessionValidator {
 		// Validate user authentication
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return McpErrorFactory::invalid_request( 0, 'User not authenticated' );
+			return McpErrorFactory::unauthorized( 0, 'User not authenticated' );
 		}
 
 		// Terminate the session
