@@ -484,7 +484,8 @@ class RestTransport implements McpTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        add_action( 'rest_api_init', array( $this, 'register_routes' ), 20001 );
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function register_routes(): void {
@@ -504,7 +505,8 @@ class StreamableTransport implements McpTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        add_action( 'rest_api_init', array( $this, 'register_routes' ), 20002 );
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function register_routes(): void {
@@ -600,7 +602,8 @@ class MyCustomTransport implements McpTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        add_action( 'rest_api_init', array( $this, 'register_routes' ), 20003 );
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function check_permission(): WP_Error|bool {

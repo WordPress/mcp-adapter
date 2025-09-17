@@ -111,7 +111,8 @@ class ApiKeyTransport implements McpTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        add_action( 'rest_api_init', array( $this, 'register_routes' ), 20003 );
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function register_routes(): void {
@@ -196,7 +197,8 @@ class WebSocketTransport implements McpTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        add_action( 'rest_api_init', array( $this, 'register_routes' ), 20004 );
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function register_routes(): void {
@@ -240,7 +242,8 @@ class QueueTransport implements McpTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        add_action( 'rest_api_init', array( $this, 'register_routes' ), 20005 );
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function register_routes(): void {
