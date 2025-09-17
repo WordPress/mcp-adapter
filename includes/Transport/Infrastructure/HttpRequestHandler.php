@@ -161,7 +161,7 @@ class HttpRequestHandler {
 	 * @return array JSON-RPC response.
 	 */
 	private function process_jsonrpc_request( array $message, HttpRequestContext $context ): array {
-		$request_id = (int) $message['id'];
+		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
 		$method     = $message['method'];
 		$params     = $message['params'] ?? array();
 
@@ -201,7 +201,7 @@ class HttpRequestHandler {
 	 * @return array JSON-RPC response.
 	 */
 	private function handle_initialize_request( array $message, HttpRequestContext $context ): array {
-		$request_id = (int) $message['id'];
+		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
 		$params     = $message['params'] ?? array();
 
 		// Route the initialize request

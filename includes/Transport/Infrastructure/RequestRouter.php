@@ -42,12 +42,12 @@ class RequestRouter {
 	 *
 	 * @param string $method The MCP method name.
 	 * @param array  $params The request parameters.
-	 * @param int    $request_id The request ID (for JSON-RPC).
+	 * @param mixed  $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
 	 *
 	 * @return array
 	 */
-	public function route_request( string $method, array $params, int $request_id = 0, string $transport_name = 'unknown' ): array {
+	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown' ): array {
 		// Track request start time.
 		$start_time = microtime( true );
 
