@@ -46,10 +46,37 @@ class McpTransportFactory {
 	 */
 	public function initialize_transports( array $mcp_transports ): void {
 		foreach ( $mcp_transports as $mcp_transport ) {
+			// Check if class exists
+			if ( ! class_exists( $mcp_transport ) ) {
+				_doing_it_wrong(
+					__FUNCTION__,
+					sprintf(
+						/* translators: %s: Transport class name */
+						esc_html__( 'Transport class "%s" does not exist. Make sure the class is properly autoloaded or included.', 'mcp-adapter' ),
+						esc_html( $mcp_transport )
+					),
+					'1.0.0'
+				);
+				continue;
+			}
+
 			// Check for interface implementation
 			if ( ! in_array( McpTransportInterface::class, class_implements( $mcp_transport ) ?: array(), true ) ) {
+				_doing_it_wrong(
+					__FUNCTION__,
+					sprintf(
+						/* translators: %s: Transport class name */
+						esc_html__( 'Transport class "%s" must implement McpTransportInterface. Check your transport implementation.', 'mcp-adapter' ),
+						esc_html( $mcp_transport )
+					),
+					'1.0.0'
+				);
 				throw new \Exception(
-					esc_html__( 'MCP transport class must implement the McpTransportInterface.', 'mcp-adapter' )
+					sprintf(
+						/* translators: %s: Transport class name */
+						esc_html__( 'MCP transport class "%s" must implement the McpTransportInterface.', 'mcp-adapter' ),
+						esc_html( $mcp_transport )
+					)
 				);
 			}
 
