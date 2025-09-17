@@ -436,7 +436,8 @@ class MyCustomTransport implements McpTransportInterface {
     
     public function __construct(McpTransportContext $context) {
         $this->context = $context;
-        add_action('rest_api_init', [$this, 'register_routes']);
+        // Register routes directly - we're already in the correct context
+        $this->register_routes();
     }
     
     public function register_routes(): void {
