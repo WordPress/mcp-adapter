@@ -4,30 +4,38 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Fixtures;
 
-use WP\MCP\Transport\Contracts\McpTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
+use WP\MCP\Transport\Contracts\McpRestTransportInterface;
+use WP\MCP\Transport\Infrastructure\TransportContext;
+use WP\MCP\Transport\Infrastructure\TransportHelperTrait;
 
-class DummyTransport implements McpTransportInterface {
+class DummyTransport implements McpRestTransportInterface {
 
-	use McpTransportHelperTrait;
+	use TransportHelperTrait;
 
-	private McpTransportContext $context;
+	private TransportContext $context;
 
 	public function __construct(
-		McpTransportContext $context
+		TransportContext $context
 	) {
 		$this->context = $context;
 		// No route registration needed for tests
 	}
 
-	public function check_permission() {
+	/**
+	 * @param \WP_REST_Request<array<string, mixed>> $request
+	 * @return true
+	 */
+	public function check_permission( \WP_REST_Request $request ) {
 		return true;
 	}
 
-	public function handle_request( $request ) {
+	/**
+	 * @param \WP_REST_Request<array<string, mixed>> $request
+	 * @return \WP_REST_Response
+	 */
+	public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
 		// Simple test implementation
-		return array( 'success' => true );
+		return new \WP_REST_Response( array( 'success' => true ) );
 	}
 
 	public function register_routes(): void {

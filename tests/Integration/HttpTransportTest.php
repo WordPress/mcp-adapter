@@ -21,8 +21,8 @@ use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\HttpTransport;
-use WP\MCP\Transport\Infrastructure\McpRequestRouter;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\MCP\Transport\Infrastructure\RequestRouter;
+use WP\MCP\Transport\Infrastructure\TransportContext;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -44,7 +44,7 @@ final class HttpTransportTest extends TestCase {
 
 	private McpServer $server;
 	private HttpTransport $transport;
-	private McpTransportContext $context;
+	private TransportContext $context;
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
@@ -490,17 +490,17 @@ final class HttpTransportTest extends TestCase {
 
 	public function test_permission_callback_integration(): void {
 		// Test with custom permission callback
-		$context_with_permission = new McpTransportContext(
+		$context_with_permission = new TransportContext(
 			array(
-				'mcp_server'            => $this->context->mcp_server,
-				'initialize_handler'    => $this->context->initialize_handler,
-				'tools_handler'         => $this->context->tools_handler,
-				'resources_handler'     => $this->context->resources_handler,
-				'prompts_handler'       => $this->context->prompts_handler,
-				'system_handler'        => $this->context->system_handler,
-				'observability_handler' => $this->context->observability_handler,
-				'request_router'        => $this->context->request_router,
-				'transport_permission_callback' => function() {
+				'mcp_server'                    => $this->context->mcp_server,
+				'initialize_handler'            => $this->context->initialize_handler,
+				'tools_handler'                 => $this->context->tools_handler,
+				'resources_handler'             => $this->context->resources_handler,
+				'prompts_handler'               => $this->context->prompts_handler,
+				'system_handler'                => $this->context->system_handler,
+				'observability_handler'         => $this->context->observability_handler,
+				'request_router'                => $this->context->request_router,
+				'transport_permission_callback' => function () {
 					return false; // Deny access
 				}
 			)
@@ -579,10 +579,11 @@ final class HttpTransportTest extends TestCase {
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_header( 'Accept', 'application/json, text/event-stream' );
 		$request->set_body( json_encode( $body ) );
+
 		return $request;
 	}
 
-	private function createTransportContext( McpServer $server ): McpTransportContext {
+	private function createTransportContext( McpServer $server ): TransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $server );
 		$tools_handler      = new ToolsHandler( $server );
@@ -591,7 +592,7 @@ final class HttpTransportTest extends TestCase {
 		$system_handler     = new SystemHandler();
 
 		// Create the context - the router will be created automatically
-		return new McpTransportContext(
+		return new TransportContext(
 			array(
 				'mcp_server'            => $server,
 				'initialize_handler'    => $initialize_handler,
