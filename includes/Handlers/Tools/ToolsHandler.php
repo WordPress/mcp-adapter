@@ -328,11 +328,6 @@ class ToolsHandler {
 	 * @return array
 	 */
 	private function handle_layered_tool_execution( string $tool_name, array $args, int $request_id ): array {
-		// Basic permission check - for now, just check if user is logged in
-		if ( ! is_user_logged_in() ) {
-			return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for tool: ' . $tool_name )['error'] );
-		}
-
 		try {
 			switch ( $tool_name ) {
 				case 'discover_abilities':
