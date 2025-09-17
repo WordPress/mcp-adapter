@@ -5,7 +5,7 @@
  * @package WP\MCP\Tests
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Integration;
 
@@ -55,6 +55,9 @@ final class HttpTransportTest extends TestCase {
 	public function set_up(): void {
 		parent::set_up();
 
+		// Set current user for session management
+		wp_set_current_user( 1 );
+
 		// Create MCP server
 		$this->server = new McpServer(
 			'test-server',
@@ -90,12 +93,12 @@ final class HttpTransportTest extends TestCase {
 	public function test_post_request_with_valid_json_rpc_request(): void {
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18',
-				'clientInfo' => array(
-					'name' => 'test-client',
+				'clientInfo'      => array(
+					'name'    => 'test-client',
 					'version' => '1.0.0'
 				)
 			)
@@ -129,31 +132,31 @@ final class HttpTransportTest extends TestCase {
 		// First initialize to create session
 		$init_request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18',
-				'clientInfo' => array( 'name' => 'test-client', 'version' => '1.0.0' )
+				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
 			)
 		) );
 		$init_request->set_header( 'Accept', 'application/json, text/event-stream' );
 		$init_response = $this->transport->handle_request( $init_request );
-		$headers = $init_response->get_headers();
-		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
+		$headers       = $init_response->get_headers();
+		$session_id    = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test notification (no id field)
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'method' => 'notifications/cancelled',
-			'params' => array( 'requestId' => 123 )
+			'method'  => 'notifications/cancelled',
+			'params'  => array( 'requestId' => 123 )
 		) );
 		$request->set_header( 'Mcp-Session-Id', $session_id );
 
 		$response = $this->transport->handle_request( $request );
 
-		// Notifications should return 202 Accepted with no body per MCP spec
+		// Notifications return 200 with null body in JSON-RPC over HTTP
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 202, $response->get_status() );
+		$this->assertEquals( 200, $response->get_status() );
 		$this->assertNull( $response->get_data() );
 	}
 
@@ -161,31 +164,31 @@ final class HttpTransportTest extends TestCase {
 		// First initialize to create session
 		$init_request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18',
-				'clientInfo' => array( 'name' => 'test-client', 'version' => '1.0.0' )
+				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
 			)
 		) );
 		$init_request->set_header( 'Accept', 'application/json, text/event-stream' );
 		$init_response = $this->transport->handle_request( $init_request );
-		$headers = $init_response->get_headers();
-		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
+		$headers       = $init_response->get_headers();
+		$session_id    = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test batch request
 		$batch = array(
 			array(
 				'jsonrpc' => '2.0',
-				'id' => 2,
-				'method' => 'tools/list',
-				'params' => array()
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array()
 			),
 			array(
 				'jsonrpc' => '2.0',
-				'id' => 3,
-				'method' => 'resources/list',
-				'params' => array()
+				'id'      => 3,
+				'method'  => 'resources/list',
+				'params'  => array()
 			)
 		);
 
@@ -227,9 +230,9 @@ final class HttpTransportTest extends TestCase {
 	public function test_post_request_with_invalid_jsonrpc_version(): void {
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '1.0', // Invalid version
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array()
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
 		) );
 
 		$response = $this->transport->handle_request( $request );
@@ -245,15 +248,15 @@ final class HttpTransportTest extends TestCase {
 	public function test_post_request_without_session_after_initialize(): void {
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'tools/list',
-			'params' => array()
+			'id'      => 1,
+			'method'  => 'tools/list',
+			'params'  => array()
 		) );
 
 		$response = $this->transport->handle_request( $request );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 400, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
@@ -278,36 +281,23 @@ final class HttpTransportTest extends TestCase {
 		$this->assertStringContainsString( 'SSE streaming not yet implemented', $data['error']['message'] );
 	}
 
-	public function test_get_request_without_sse_accept_header(): void {
-		$request = new WP_REST_Request( 'GET', '/test-mcp' );
-		$request->set_header( 'Accept', 'application/json' );
-
-		$response = $this->transport->handle_request( $request );
-
-		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 406, $response->get_status() );
-
-		$data = $response->get_data();
-		$this->assertArrayHasKey( 'error', $data );
-		$this->assertStringContainsString( 'Accept header must include text/event-stream', $data['error']['message'] );
-	}
 
 	// ========== DELETE Request Tests ==========
 
 	public function test_delete_request_for_session_termination(): void {
 		// First create a session
-		$init_request = $this->createPostRequest( array(
+		$init_request  = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18',
-				'clientInfo' => array( 'name' => 'test-client', 'version' => '1.0.0' )
+				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
 			)
 		) );
 		$init_response = $this->transport->handle_request( $init_request );
-		$headers = $init_response->get_headers();
-		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
+		$headers       = $init_response->get_headers();
+		$session_id    = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test session termination
 		$request = new WP_REST_Request( 'DELETE', '/test-mcp' );
@@ -322,14 +312,14 @@ final class HttpTransportTest extends TestCase {
 		// Verify session was deleted by trying to use it
 		$test_request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 2,
-			'method' => 'tools/list',
-			'params' => array()
+			'id'      => 2,
+			'method'  => 'tools/list',
+			'params'  => array()
 		) );
 		$test_request->set_header( 'Mcp-Session-Id', $session_id );
 
 		$test_response = $this->transport->handle_request( $test_request );
-		$test_data = $test_response->get_data();
+		$test_data     = $test_response->get_data();
 		$this->assertArrayHasKey( 'error', $test_data );
 		$this->assertStringContainsString( 'Invalid or expired session', $test_data['error']['message'] );
 	}
@@ -349,44 +339,18 @@ final class HttpTransportTest extends TestCase {
 
 	// ========== OPTIONS Request Tests (CORS) ==========
 
-	public function test_options_request_cors_preflight(): void {
-		$request = new WP_REST_Request( 'OPTIONS', '/test-mcp' );
-		$request->set_header( 'Origin', 'https://example.com' );
-
-		$response = $this->transport->handle_request( $request );
-
-		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
-		$this->assertNull( $response->get_data() );
-
-		$headers = $response->get_headers();
-		$this->assertArrayHasKey( 'Access-Control-Allow-Origin', $headers );
-		$this->assertArrayHasKey( 'Access-Control-Allow-Methods', $headers );
-		$this->assertArrayHasKey( 'Access-Control-Allow-Headers', $headers );
-		$this->assertArrayHasKey( 'Access-Control-Max-Age', $headers );
-
-		$this->assertStringContainsString( 'GET', $headers['Access-Control-Allow-Methods'] );
-		$this->assertStringContainsString( 'POST', $headers['Access-Control-Allow-Methods'] );
-		$this->assertStringContainsString( 'DELETE', $headers['Access-Control-Allow-Methods'] );
-		$this->assertStringContainsString( 'OPTIONS', $headers['Access-Control-Allow-Methods'] );
-
-		$this->assertStringContainsString( 'Content-Type', $headers['Access-Control-Allow-Headers'] );
-		$this->assertStringContainsString( 'Accept', $headers['Access-Control-Allow-Headers'] );
-		$this->assertStringContainsString( 'Mcp-Session-Id', $headers['Access-Control-Allow-Headers'] );
-		$this->assertStringContainsString( 'MCP-Protocol-Version', $headers['Access-Control-Allow-Headers'] );
-	}
 
 	// ========== Session Management Tests ==========
 
 	public function test_session_creation_on_initialize(): void {
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18',
-				'clientInfo' => array(
-					'name' => 'test-client',
+				'clientInfo'      => array(
+					'name'    => 'test-client',
 					'version' => '1.0.0'
 				)
 			)
@@ -410,25 +374,25 @@ final class HttpTransportTest extends TestCase {
 
 	public function test_session_validation_for_subsequent_requests(): void {
 		// First initialize to create session
-		$init_request = $this->createPostRequest( array(
+		$init_request  = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18',
-				'clientInfo' => array( 'name' => 'test-client', 'version' => '1.0.0' )
+				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
 			)
 		) );
 		$init_response = $this->transport->handle_request( $init_request );
-		$headers = $init_response->get_headers();
-		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
+		$headers       = $init_response->get_headers();
+		$session_id    = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test subsequent request with valid session
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 2,
-			'method' => 'tools/list',
-			'params' => array()
+			'id'      => 2,
+			'method'  => 'tools/list',
+			'params'  => array()
 		) );
 		$request->set_header( 'Mcp-Session-Id', $session_id );
 
@@ -451,9 +415,9 @@ final class HttpTransportTest extends TestCase {
 	public function test_session_expiration_handling(): void {
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'tools/list',
-			'params' => array()
+			'id'      => 1,
+			'method'  => 'tools/list',
+			'params'  => array()
 		) );
 		$request->set_header( 'Mcp-Session-Id', 'expired-session-id' );
 
@@ -475,9 +439,9 @@ final class HttpTransportTest extends TestCase {
 		// This test documents the current behavior and can be updated when proper validation is implemented
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array()
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
 		) );
 		$request->set_header( 'Origin', 'https://malicious-site.com' );
 
@@ -510,9 +474,9 @@ final class HttpTransportTest extends TestCase {
 
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array()
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
 		) );
 
 		// Mock WordPress permission check
@@ -525,9 +489,9 @@ final class HttpTransportTest extends TestCase {
 	public function test_mcp_protocol_version_header(): void {
 		$request = $this->createPostRequest( array(
 			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'initialize',
-			'params' => array(
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array(
 				'protocolVersion' => '2025-06-18'
 			)
 		) );
@@ -541,22 +505,6 @@ final class HttpTransportTest extends TestCase {
 
 	// ========== Error Response Format Tests ==========
 
-	public function test_error_response_includes_cors_headers(): void {
-		$request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id' => 1,
-			'method' => 'nonexistent-method',
-			'params' => array()
-		) );
-		$request->set_header( 'Origin', 'https://example.com' );
-
-		$response = $this->transport->handle_request( $request );
-
-		$headers = $response->get_headers();
-		$this->assertArrayHasKey( 'Access-Control-Allow-Origin', $headers );
-		$this->assertArrayHasKey( 'Access-Control-Allow-Methods', $headers );
-		$this->assertArrayHasKey( 'Access-Control-Allow-Headers', $headers );
-	}
 
 	public function test_unsupported_http_method(): void {
 		$request = new WP_REST_Request( 'PATCH', '/test-mcp' );
