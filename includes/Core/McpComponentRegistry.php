@@ -60,7 +60,7 @@ class McpComponentRegistry {
 	/**
 	 * Observability handler class name.
 	 *
-	 * @var string
+	 * @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
 	 */
 	private string $observability_handler;
 
@@ -108,7 +108,7 @@ class McpComponentRegistry {
 				$ability = wp_get_ability( $ability_name );
 
 				if ( ! $ability ) {
-					throw new \InvalidArgumentException( esc_html( "WordPress ability '{$ability_name}' does not exist." ) );
+					throw new \InvalidArgumentException( "WordPress ability '{$ability_name}' does not exist." );
 				}
 
 				$tool = RegisterAbilityAsMcpTool::make( $ability, $this->mcp_server );
@@ -297,7 +297,7 @@ class McpComponentRegistry {
 					$ability = wp_get_ability( $prompt_item );
 
 					if ( ! $ability ) {
-						throw new \InvalidArgumentException( esc_html( "WordPress ability '{$prompt_item}' does not exist." ) );
+						throw new \InvalidArgumentException( "WordPress ability '{$prompt_item}' does not exist." );
 					}
 
 					// Use RegisterMcpPrompt to handle all validation and processing.
