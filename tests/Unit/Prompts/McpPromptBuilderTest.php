@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Prompts;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
-use WP\MCP\Tests\Fixtures\DummyErrorHandler;
-use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
 // Test prompt class
@@ -38,20 +35,6 @@ class TestPrompt extends McpPromptBuilder {
 }
 
 final class McpPromptBuilderTest extends TestCase {
-
-	private function makeServer(): McpServer {
-		return new McpServer(
-			'srv',
-			'mcp/v1',
-			'/mcp',
-			'Srv',
-			'desc',
-			'0.0.1',
-			array(),
-			DummyErrorHandler::class,
-			DummyObservabilityHandler::class,
-		);
-	}
 
 	public function test_builder_creates_prompt(): void {
 		$builder = new TestPrompt();

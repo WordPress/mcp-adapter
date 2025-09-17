@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Handlers;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
-use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
 final class ToolsHandlerCallTest extends TestCase {
@@ -17,21 +15,6 @@ final class ToolsHandlerCallTest extends TestCase {
 		parent::set_up_before_class();
 		do_action( 'abilities_api_init' );
 		DummyAbility::register_all();
-	}
-
-	private function makeServer( array $tools ): McpServer {
-		return new McpServer(
-			'srv',
-			'mcp/v1',
-			'/mcp',
-			'Srv',
-			'desc',
-			'0.0.1',
-			array(),
-			DummyErrorHandler::class,
-			DummyObservabilityHandler::class,
-			$tools,
-		);
 	}
 
 	public function test_missing_name_returns_missing_parameter_error(): void {

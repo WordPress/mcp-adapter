@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Integration;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
-use WP\MCP\Tests\Fixtures\DummyErrorHandler;
-use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
 // Test prompt that requires admin permissions
@@ -60,20 +57,6 @@ class OpenPrompt extends McpPromptBuilder {
 }
 
 final class BuilderPromptExecutionTest extends TestCase {
-
-	private function makeServer(): McpServer {
-		return new McpServer(
-			'test-srv',
-			'mcp/v1',
-			'/mcp',
-			'Test Server',
-			'Test server for builder prompts',
-			'1.0.0',
-			array(),
-			DummyErrorHandler::class,
-			DummyObservabilityHandler::class,
-		);
-	}
 
 	public function test_builder_prompt_execution_through_handler(): void {
 		$server = $this->makeServer();

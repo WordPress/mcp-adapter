@@ -184,19 +184,4 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$this->assertLessThanOrEqual( -32000, McpErrorFactory::SERVER_ERROR );
 		$this->assertGreaterThanOrEqual( -32099, McpErrorFactory::SERVER_ERROR );
 	}
-
-	private function makeServer( array $tools = array() ): McpServer {
-		return new McpServer(
-			'test',
-			'test/v1',
-			'/test',
-			'Test Server',
-			'Test Description',
-			'1.0.0',
-			array(),
-			DummyErrorHandler::class,
-			DummyObservabilityHandler::class,
-			$tools,
-		);
-	}
 }

@@ -73,21 +73,6 @@ final class McpTransportTest extends TestCase {
 		$this->assertNotEmpty( DummyObservabilityHandler::$timings );
 	}
 
-	private function makeServer( array $tools = array() ): McpServer {
-		return new McpServer(
-			'srv',
-			'mcp/v1',
-			'/mcp',
-			'Srv',
-			'desc',
-			'0.0.1',
-			array(),
-			DummyErrorHandler::class,
-			DummyObservabilityHandler::class,
-			$tools,
-		);
-	}
-
 	private function createTransportContext( McpServer $server ): McpTransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $server );
