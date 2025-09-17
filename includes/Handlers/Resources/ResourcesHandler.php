@@ -10,12 +10,15 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
  * Handles resources-related MCP methods.
  */
 class ResourcesHandler {
+	use HandlerHelperTrait;
+
 	/**
 	 * The WordPress MCP instance.
 	 *
@@ -99,14 +102,14 @@ class ResourcesHandler {
 	/**
 	 * Handle the resources/read request.
 	 *
-	 * @param array $params     Request parameters.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param array $params Request parameters.
+	 * @param int $request_id The request ID for JSON-RPC.
 	 *
 	 * @return array
 	 */
 	public function read_resource( array $params, int $request_id = 0 ): array {
-		// Handle both direct params and nested params structure.
-		$request_params = $params['params'] ?? $params;
+		// Extract parameters using helper method.
+		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['uri'] ) ) {
 			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'uri' )['error'] );
@@ -155,8 +158,8 @@ class ResourcesHandler {
 	/**
 	 * Handle the resources/subscribe request.
 	 *
-	 * @param array $params     Request parameters.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param array $params Request parameters.
+	 * @param int $request_id The request ID for JSON-RPC.
 	 *
 	 * @return array
 	 */
@@ -166,8 +169,8 @@ class ResourcesHandler {
 			return $permission_error;
 		}
 
-		// Handle both direct params and nested params structure.
-		$request_params = $params['params'] ?? $params;
+		// Extract parameters using helper method.
+		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['uri'] ) ) {
 			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'uri' )['error'] );
@@ -184,8 +187,8 @@ class ResourcesHandler {
 	/**
 	 * Handle the resources/unsubscribe request.
 	 *
-	 * @param array $params     Request parameters.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param array $params Request parameters.
+	 * @param int $request_id The request ID for JSON-RPC.
 	 *
 	 * @return array
 	 */
@@ -195,8 +198,8 @@ class ResourcesHandler {
 			return $permission_error;
 		}
 
-		// Handle both direct params and nested params structure.
-		$request_params = $params['params'] ?? $params;
+		// Extract parameters using helper method.
+		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['subscriptionId'] ) ) {
 			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'subscriptionId' )['error'] );

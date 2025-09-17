@@ -10,12 +10,15 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
  * Handles prompts-related MCP methods.
  */
 class PromptsHandler {
+	use HandlerHelperTrait;
+
 	/**
 	 * The WordPress MCP instance.
 	 *
@@ -84,8 +87,8 @@ class PromptsHandler {
 	 * @return array
 	 */
 	public function get_prompt( array $params, int $request_id = 0 ): array {
-		// Handle both direct params and nested params structure.
-		$request_params = $params['params'] ?? $params;
+		// Extract parameters using helper method.
+		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['name'] ) ) {
 			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'] );

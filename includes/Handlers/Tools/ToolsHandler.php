@@ -11,12 +11,15 @@ namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
  * Handles tools-related MCP methods.
  */
 class ToolsHandler {
+	use HandlerHelperTrait;
+
 	/**
 	 * Error categories keyed by throwable class name.
 	 *
@@ -99,22 +102,11 @@ class ToolsHandler {
 	 * @return array
 	 */
 	public function call_tool( array $message, int $request_id = 0 ): array {
-		// Handle both direct params and nested params structure.
-		$request_params = $message['params'] ?? $message;
+		// Extract parameters using helper method.
+		$request_params = $this->extract_params( $message );
 
 		if ( ! isset( $request_params['name'] ) ) {
 			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'] );
-		}
-
-		// Clean parameters arguments.
-		if ( ! empty( $request_params['arguments'] ) ) {
-			foreach ( $request_params['arguments'] as $key => $value ) {
-				if ( ! empty( $value ) && 'null' !== $value ) {
-					continue;
-				}
-
-				unset( $request_params['arguments'][ $key ] );
-			}
 		}
 
 		try {
@@ -207,8 +199,9 @@ class ToolsHandler {
 	 * @return array
 	 */
 	public function handle_tool_call( array $message, int $request_id = 0 ): array {
-		$tool_name = $message['params']['name'] ?? $message['name'] ?? '';
-		$args      = $message['params']['arguments'] ?? $message['arguments'] ?? array();
+		$params    = $this->extract_params( $message );
+		$tool_name = $params['name'] ?? '';
+		$args      = $params['arguments'] ?? array();
 
 		// Get the tool callbacks.
 		$tool = $this->mcp->get_tool( $tool_name );
