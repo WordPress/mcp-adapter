@@ -244,10 +244,7 @@ final class McpAdapter {
 	}
 
 	/**
-	 * Create a default server with layered tools if no servers have been registered.
-	 *
-	 * This method is called with very low priority during mcp_adapter_init to ensure
-	 * plugins have had a chance to register their own servers first.
+	 * Create a default server with layered tools.
 	 *
 	 * The default server configuration can be customized using:
 	 * - mcp_adapter_create_default_server (bool): Whether to create default server (default: true)
