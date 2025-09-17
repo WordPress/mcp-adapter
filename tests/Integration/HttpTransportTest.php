@@ -464,7 +464,7 @@ final class HttpTransportTest extends TestCase {
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
-		$this->assertEquals( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+		$this->assertEquals( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
 		$this->assertStringContainsString( 'Invalid or expired session', $data['error']['message'] );
 	}
 

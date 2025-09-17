@@ -90,7 +90,7 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$result = $handler->call_tool( array( 'params' => array() ) );
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
-		$this->assertSame( McpErrorFactory::MISSING_PARAMETER, $result['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 
 		// Test tool not found error
 		$result = $handler->call_tool( array( 'params' => array( 'name' => 'nonexistent-tool' ) ) );
@@ -163,8 +163,7 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 			McpErrorFactory::METHOD_NOT_FOUND,
 			McpErrorFactory::INVALID_PARAMS,
 			McpErrorFactory::INTERNAL_ERROR,
-			McpErrorFactory::MCP_DISABLED,
-			McpErrorFactory::MISSING_PARAMETER,
+			McpErrorFactory::SERVER_ERROR,
 			McpErrorFactory::RESOURCE_NOT_FOUND,
 			McpErrorFactory::TOOL_NOT_FOUND,
 			McpErrorFactory::PROMPT_NOT_FOUND,
@@ -182,8 +181,8 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$this->assertLessThanOrEqual( -32000, McpErrorFactory::PARSE_ERROR );
 
 		// Test that custom MCP codes are in the implementation-defined range (-32000 to -32099)
-		$this->assertLessThanOrEqual( -32000, McpErrorFactory::MISSING_PARAMETER );
-		$this->assertGreaterThanOrEqual( -32099, McpErrorFactory::MISSING_PARAMETER );
+		$this->assertLessThanOrEqual( -32000, McpErrorFactory::SERVER_ERROR );
+		$this->assertGreaterThanOrEqual( -32099, McpErrorFactory::SERVER_ERROR );
 	}
 
 	private function makeServer( array $tools = array() ): McpServer {

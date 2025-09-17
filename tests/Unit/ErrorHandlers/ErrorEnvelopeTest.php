@@ -22,7 +22,7 @@ final class ErrorEnvelopeTest extends TestCase {
 		$err = McpErrorFactory::missing_parameter( 123, 'test_param' );
 
 		$this->assertSame( 123, $err['id'] );
-		$this->assertSame( McpErrorFactory::MISSING_PARAMETER, $err['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $err['error']['code'] );
 		$this->assertStringContainsString( 'test_param', $err['error']['message'] );
 	}
 
@@ -110,7 +110,7 @@ final class ErrorEnvelopeTest extends TestCase {
 		$err = McpErrorFactory::mcp_disabled( 109 );
 
 		$this->assertSame( 109, $err['id'] );
-		$this->assertSame( McpErrorFactory::MCP_DISABLED, $err['error']['code'] );
+		$this->assertSame( McpErrorFactory::SERVER_ERROR, $err['error']['code'] );
 		$this->assertStringContainsString( 'disabled', $err['error']['message'] );
 	}
 
