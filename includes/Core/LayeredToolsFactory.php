@@ -66,7 +66,7 @@ class LayeredToolsFactory {
 		 * @param array     $filterable_data Tool data array containing title, description, inputSchema, outputSchema, etc. (name is not included).
 		 * @param \WP\MCP\Core\McpServer $server          The MCP server instance.
 		 */
-		$filterable_data = apply_filters( 'mcp_layered_discover_abilities_tool_data', $filterable_data, $server );
+		$filterable_data = apply_filters( 'mcp_adapter_layered_discover_abilities_tool_data', $filterable_data, $server );
 
 		// Add the protected name to the final tool data
 		$tool_data = array_merge( array( 'name' => 'discover_abilities' ), $filterable_data );
@@ -121,7 +121,7 @@ class LayeredToolsFactory {
 		 * @param array     $filterable_data Tool data array containing title, description, inputSchema, outputSchema, etc. (name is not included).
 		 * @param \WP\MCP\Core\McpServer $server          The MCP server instance.
 		 */
-		$filterable_data = apply_filters( 'mcp_layered_get_ability_info_tool_data', $filterable_data, $server );
+		$filterable_data = apply_filters( 'mcp_adapter_layered_get_ability_info_tool_data', $filterable_data, $server );
 
 		// Add the protected name to the final tool data
 		$tool_data = array_merge( array( 'name' => 'get_ability_info' ), $filterable_data );
@@ -182,7 +182,7 @@ class LayeredToolsFactory {
 		 * @param array     $filterable_data Tool data array containing title, description, inputSchema, outputSchema, etc. (name is not included).
 		 * @param \WP\MCP\Core\McpServer $server          The MCP server instance.
 		 */
-		$filterable_data = apply_filters( 'mcp_layered_execute_ability_tool_data', $filterable_data, $server );
+		$filterable_data = apply_filters( 'mcp_adapter_layered_execute_ability_tool_data', $filterable_data, $server );
 
 		// Add the protected name to the final tool data
 		$tool_data = array_merge( array( 'name' => 'execute_ability' ), $filterable_data );

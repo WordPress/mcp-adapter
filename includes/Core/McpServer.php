@@ -151,7 +151,7 @@ class McpServer {
 
 		// Setup validation flag. Validation is disabled by default for performance.
 		//Abilities API is also validating all abilities.
-		$this->mcp_validation_enabled = apply_filters( 'mcp_validation_enabled', false );
+		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 
 		// Setup handlers and components
 		$this->setup_handlers( $error_handler, $observability_handler );
