@@ -68,7 +68,6 @@ class RequestRouter {
 			'tools/list/all'           => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
 			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
 			'resources/list'           => fn() => $this->add_cursor_compatibility( $this->context->resources_handler->list_resources( $request_id ) ),
-			'resources/templates/list' => fn() => $this->add_cursor_compatibility( $this->context->resources_handler->list_resource_templates( $request_id ) ),
 			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
 			'resources/subscribe'      => fn() => $this->context->resources_handler->subscribe_resource( $params, $request_id ),
 			'resources/unsubscribe'    => fn() => $this->context->resources_handler->unsubscribe_resource( $params, $request_id ),

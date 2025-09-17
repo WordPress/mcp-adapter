@@ -56,22 +56,6 @@ class ResourcesHandler {
 	}
 
 	/**
-	 * Handle the resources/templates/list request.
-	 *
-	 * @param int $request_id The request ID for JSON-RPC.
-	 *
-	 * @return array
-	 */
-	public function list_resource_templates( int $request_id = 0 ): array {
-		// Implement resource template listing logic here.
-		$templates = array();
-
-		return array(
-			'templates' => $templates,
-		);
-	}
-
-	/**
 	 * Handle the resources/read request.
 	 *
 	 * @param array $params Request parameters.
