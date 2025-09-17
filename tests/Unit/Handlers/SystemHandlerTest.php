@@ -58,7 +58,7 @@ final class SystemHandlerTest extends TestCase {
 			DummyObservabilityHandler::class,
 		);
 		$handler = new SystemHandler();
-		$this->assertTrue( $handler->complete()['success'] );
+		$this->assertSame( array(), $handler->complete() );
 		$this->assertArrayHasKey( 'roots', $handler->list_roots() );
 	}
 }

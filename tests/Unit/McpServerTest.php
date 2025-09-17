@@ -32,4 +32,91 @@ final class McpServerTest extends TestCase {
 		$this->assertSame( 'Testing server', $server->get_server_description() );
 		$this->assertSame( '0.1.0', $server->get_server_version() );
 	}
+
+	public function test_constructor_properly_sets_up_error_handler(): void {
+		$server = new McpServer(
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Test MCP',
+			'Testing server',
+			'0.1.0',
+			array( DummyTransport::class ),
+			\WP\MCP\Tests\Fixtures\DummyErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+		);
+
+		$this->assertInstanceOf( \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface::class, $server->error_handler );
+		$this->assertInstanceOf( \WP\MCP\Tests\Fixtures\DummyErrorHandler::class, $server->error_handler );
+	}
+
+	public function test_constructor_falls_back_to_null_error_handler(): void {
+		$server = new McpServer(
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Test MCP',
+			'Testing server',
+			'0.1.0',
+			array( DummyTransport::class ),
+			null, // No error handler provided
+			NullMcpObservabilityHandler::class,
+		);
+
+		$this->assertInstanceOf( NullMcpErrorHandler::class, $server->error_handler );
+	}
+
+	public function test_constructor_without_tools_registers_layered_tools(): void {
+		$server = new McpServer(
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Test MCP',
+			'Testing server',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+			array() // Empty tools array
+		);
+
+		$server_tools = $server->get_tools();
+		$this->assertNotEmpty( $server_tools );
+
+		// Should have layered tools
+		$tool_names = array_map( function( $tool ) {
+			return $tool->get_name();
+		}, $server_tools );
+
+		$this->assertContains( 'discover_abilities', $tool_names );
+		$this->assertContains( 'get_ability_info', $tool_names );
+		$this->assertContains( 'execute_ability', $tool_names );
+	}
+
+	public function test_validation_flag_is_configurable(): void {
+		// Test with validation enabled
+		add_filter( 'mcp_adapter_validation_enabled', '__return_true' );
+
+		$server = new McpServer(
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Test MCP',
+			'Testing server',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class
+		);
+
+		// Access private property via reflection
+		$reflection = new \ReflectionClass( $server );
+		$validation_property = $reflection->getProperty( 'mcp_validation_enabled' );
+		$validation_property->setAccessible( true );
+
+		$this->assertTrue( $validation_property->getValue( $server ) );
+
+		// Clean up filter
+		remove_filter( 'mcp_validation_enabled', '__return_true' );
+	}
 }

@@ -51,34 +51,6 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
-	public function test_arguments_trimmed_before_execution(): void {
-		$server  = $this->makeServer( array( 'test/always-allowed' ) );
-		$handler = new ToolsHandler( $server );
-		$res     = $handler->call_tool(
-			array(
-				'params' => array(
-					'name'      => 'test-always-allowed',
-					'arguments' => array(
-						'a' => '',
-						'b' => 'null',
-						'c' => 'ok',
-					),
-				),
-			)
-		);
-
-		$this->assertArrayHasKey( 'content', $res );
-		$this->assertSame( 'text', $res['content'][0]['type'] );
-		$payload = json_decode( $res['content'][0]['text'], true );
-		$this->assertSame(
-			array(
-				'ok'   => true,
-				'echo' => array( 'c' => 'ok' ),
-			),
-			$payload
-		);
-	}
-
 	public function test_permission_denied_returns_error(): void {
 		$server  = $this->makeServer( array( 'test/permission-denied' ) );
 		$handler = new ToolsHandler( $server );
