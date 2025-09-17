@@ -35,24 +35,6 @@ class PromptsHandler {
 		$this->mcp = $mcp;
 	}
 
-	/**
-	 * Check if user has permission to access prompts.
-	 *
-	 * Authorization is primarily handled at the transport level. For additional
-	 * hardening, this handler can also enforce authentication when the
-	 * `mcp_enforce_handler_auth` filter returns true.
-	 *
-	 * @return array|null Returns error if permission denied, null if allowed.
-	 */
-	private function check_permission(): ?array {
-		$enforce_handler_auth = (bool) apply_filters( 'mcp_adapter_enforce_handler_auth', false );
-
-		if ( $enforce_handler_auth && ! is_user_logged_in() ) {
-			return array( 'error' => McpErrorFactory::unauthorized( 0, 'You must be logged in to access prompts.' )['error'] );
-		}
-
-		return null;
-	}
 
 	/**
 	 * Handle the prompts/list request.
@@ -62,11 +44,6 @@ class PromptsHandler {
 	 * @return array
 	 */
 	public function list_prompts( int $request_id = 0 ): array {
-		$permission_error = $this->check_permission();
-		if ( $permission_error ) {
-			return $permission_error;
-		}
-
 		// Get the registered prompts from the MCP instance and extract only the args.
 		$prompts = array();
 		foreach ( $this->mcp->get_prompts() as $prompt ) {
@@ -81,8 +58,8 @@ class PromptsHandler {
 	/**
 	 * Handle the prompts/get request.
 	 *
-	 * @param array $params     Request parameters.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param array $params Request parameters.
+	 * @param int $request_id The request ID for JSON-RPC.
 	 *
 	 * @return array
 	 */

@@ -35,24 +35,6 @@ class ResourcesHandler {
 		$this->mcp = $mcp;
 	}
 
-	/**
-	 * Check if user has permission to access resources.
-	 *
-	 * Authorization is primarily handled at the transport level. For additional
-	 * hardening, this handler can also enforce authentication when the
-	 * `mcp_enforce_handler_auth` filter returns true.
-	 *
-	 * @return array|null Returns error if permission denied, null if allowed.
-	 */
-	private function check_permission(): ?array {
-		$enforce_handler_auth = (bool) apply_filters( 'mcp_adapter_enforce_handler_auth', false );
-
-		if ( $enforce_handler_auth && ! is_user_logged_in() ) {
-			return array( 'error' => McpErrorFactory::unauthorized( 0, 'You must be logged in to access resources.' )['error'] );
-		}
-
-		return null;
-	}
 
 	/**
 	 * Handle the resources/list request.
@@ -62,11 +44,6 @@ class ResourcesHandler {
 	 * @return array
 	 */
 	public function list_resources( int $request_id = 0 ): array {
-		$permission_error = $this->check_permission();
-		if ( $permission_error ) {
-			return $permission_error;
-		}
-
 		// Get the registered resources from the MCP instance and extract only the args.
 		$resources = array();
 		foreach ( $this->mcp->get_resources() as $resource ) {
@@ -86,11 +63,6 @@ class ResourcesHandler {
 	 * @return array
 	 */
 	public function list_resource_templates( int $request_id = 0 ): array {
-		$permission_error = $this->check_permission();
-		if ( $permission_error ) {
-			return $permission_error;
-		}
-
 		// Implement resource template listing logic here.
 		$templates = array();
 
@@ -164,11 +136,6 @@ class ResourcesHandler {
 	 * @return array
 	 */
 	public function subscribe_resource( array $params, int $request_id = 0 ): array {
-		$permission_error = $this->check_permission();
-		if ( $permission_error ) {
-			return $permission_error;
-		}
-
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -193,11 +160,6 @@ class ResourcesHandler {
 	 * @return array
 	 */
 	public function unsubscribe_resource( array $params, int $request_id = 0 ): array {
-		$permission_error = $this->check_permission();
-		if ( $permission_error ) {
-			return $permission_error;
-		}
-
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
