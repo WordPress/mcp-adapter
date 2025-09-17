@@ -79,13 +79,6 @@ final class HttpTransportTest extends TestCase {
 
 		// Create HTTP transport
 		$this->transport = new HttpTransport( $this->context );
-
-		// Mock WordPress functions
-		if ( ! function_exists( 'wp_generate_uuid4' ) ) {
-			function wp_generate_uuid4() {
-				return 'test-session-' . uniqid();
-			}
-		}
 	}
 
 	// ========== POST Request Tests ==========

@@ -44,3 +44,19 @@ tests_add_filter(
 
 // Start up the WP testing environment.
 require $_test_root . '/includes/bootstrap.php';
+
+// Mock WordPress functions that may not be available in test environment.
+if ( ! function_exists( 'wp_generate_uuid4' ) ) {
+	/**
+	 * Mock wp_generate_uuid4 function for testing.
+	 *
+	 * This is a temporary mock for the WordPress function that may not be available
+	 * in the test environment. In a production environment, this function is provided
+	 * by WordPress core.
+	 *
+	 * @return string A test session UUID.
+	 */
+	function wp_generate_uuid4() {
+		return 'test-session-' . uniqid();
+	}
+}
