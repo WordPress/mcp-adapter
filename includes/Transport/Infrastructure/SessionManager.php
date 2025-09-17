@@ -40,33 +40,23 @@ class SessionManager {
 	private const INACTIVITY_TIMEOUT = DAY_IN_SECONDS;
 
 	/**
-	 * Cached configuration values.
-	 *
-	 * @var array<string, int>|null
-	 */
-	private static ?array $cached_config = null;
-
-	/**
-	 * Get cached configuration values.
+	 * Get configuration values.
 	 *
 	 * @return array<string, int> Configuration array.
 	 */
 	private static function get_config(): array {
-		if ( null === self::$cached_config ) {
-			self::$cached_config = array(
-				'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::MAX_SESSIONS ),
-				'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::INACTIVITY_TIMEOUT ),
-			);
-		}
-
-		return self::$cached_config;
+		return array(
+			'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::MAX_SESSIONS ),
+			'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::INACTIVITY_TIMEOUT ),
+		);
 	}
 
 	/**
 	 * Clear an inactive session (internal cleanup).
 	 *
-	 * @param int    $user_id    The user ID.
+	 * @param int $user_id The user ID.
 	 * @param string $session_id The session ID to clear.
+	 *
 	 * @return void
 	 */
 	private static function clear_session( int $user_id, string $session_id ): void {
