@@ -351,7 +351,7 @@ class ToolsHandler {
 				)
 			);
 
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing layered tool' )['error'] );
+			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing tool ' . $tool_name )['error'] );
 		}
 	}
 
