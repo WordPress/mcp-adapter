@@ -104,7 +104,7 @@ class StdioServerBridge {
 				$this->log_to_stderr( 'Error processing request: ' . $e->getMessage() );
 
 				// Send error response
-				$error_response = json_encode(
+				$error_response = wp_json_encode(
 					array(
 						'jsonrpc' => '2.0',
 						'error'   => array(
@@ -256,7 +256,7 @@ class StdioServerBridge {
 			$response['result'] = (object) $result;
 		}
 
-		$json = json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		$json = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		if ( false === $json ) {
 			// Fallback for encoding errors
@@ -295,7 +295,7 @@ class StdioServerBridge {
 			$response['error']['data'] = $data;
 		}
 
-		return json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ?: '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}';
+		return wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ?: '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}';
 	}
 
 	/**
