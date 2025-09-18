@@ -277,9 +277,7 @@ class HttpRequestHandler {
 	 * @return string Transport name.
 	 */
 	private function get_transport_name(): string {
-		$class_name     = substr( (string) strrchr( static::class, '\\' ), 1 );
-		$transport_name = strtolower( str_replace( array( 'RequestHandler', 'Handler' ), '', $class_name ) );
-		return ! empty( $transport_name ) ? $transport_name : 'http';
+		return 'HTTP';
 	}
 
 	/**
