@@ -11,11 +11,10 @@ namespace WP\MCP\Core;
 
 use WP\MCP\Cli\McpCommand;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
-use WP\MCP\Transport\HttpTransport;
+use WP\MCP\Servers\DefaultServer\DefaultServerFactory;
 
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
@@ -52,8 +51,7 @@ final class McpAdapter {
 			return;
 		}
 
-		// Hook into mcp_adapter_init to create default server
-		add_action( 'mcp_adapter_init', array( $this, 'create_default_server' ) );
+		$this->maybe_create_default_server();
 
 		do_action( 'mcp_adapter_init', $this );
 		$this->register_wp_cli_commands();
@@ -244,73 +242,17 @@ final class McpAdapter {
 	}
 
 	/**
-	 * Create a default server with layered tools.
-	 *
-	 * The default server configuration can be customized using:
-	 * - mcp_adapter_create_default_server (bool): Whether to create default server (default: true)
-	 * - mcp_adapter_default_server_config (array): Complete server configuration array
-	 *
-	 * The config array supports the following keys:
-	 * - id (string): Server ID
-	 * - namespace (string): Route namespace
-	 * - route (string): Server route
-	 * - name (string): Server name
-	 * - description (string): Server description
-	 * - version (string): Server version
-	 * - transports (array): Transport classes
-	 * - error_handler (string): Error handler class
-	 * - observability_handler (string): Observability handler class
-	 * - resources (array): Resources to register
-	 * - prompts (array): Prompts to register
+	 * Conditionally create the default server based on filter.
 	 *
 	 * @internal For use by adapter initialization only.
 	 */
-	public function create_default_server(): void {
+	private function maybe_create_default_server(): void {
 		// Allow disabling default server creation
 		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
 			return;
 		}
 
-		// Default configuration
-		$defaults = array(
-			'id'                    => 'mcp-adapter-default-server',
-			'namespace'             => 'mcp-adapter',
-			'route'                 => 'mcp',
-			'name'                  => 'MCP Adapter Default Server',
-			'description'           => 'Default MCP server with layered tools for WordPress abilities discovery and execution',
-			'version'               => 'v1.0.0',
-			'transports'            => array( HttpTransport::class ),
-			'error_handler'         => ErrorLogMcpErrorHandler::class,
-			'observability_handler' => NullMcpObservabilityHandler::class,
-			'resources'             => array(),
-			'prompts'               => array(),
-		);
-
-		// Allow customization through single filter
-		$config = apply_filters( 'mcp_adapter_default_server_config', $defaults );
-
-		// Ensure config is an array and has required values
-		if ( ! is_array( $config ) ) {
-			$config = $defaults;
-		}
-
-		// Merge with defaults to ensure all keys exist
-		$config = wp_parse_args( $config, $defaults );
-
-		$this->create_server(
-			$config['id'],
-			$config['namespace'],
-			$config['route'],
-			$config['name'],
-			$config['description'],
-			$config['version'],
-			$config['transports'],
-			$config['error_handler'],
-			$config['observability_handler'],
-			array(), // Empty tools array = layered tools automatically add required tools
-			array(), // No resources by default
-			array() // No prompts by default
-		);
+		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
 	}
 
 	/**
