@@ -71,7 +71,7 @@ class HttpTransport implements McpRestTransportInterface {
 	 *
 	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
-	 * @return bool|\WP_Error
+	 * @return bool True if the user has permission, false otherwise.
 	 */
 	public function check_permission( \WP_REST_Request $request ) {
 		$context = new HttpRequestContext( $request );
@@ -102,7 +102,22 @@ class HttpTransport implements McpRestTransportInterface {
 		}
 		$user_capability = apply_filters( 'mcp_adapter_default_transport_permission_user_capability', 'read', $context );
 
-		return current_user_can( $user_capability );
+		// Validate that the filtered capability is a non-empty string
+		if ( ! is_string( $user_capability ) || empty( $user_capability ) ) {
+			$user_capability = 'read';
+		}
+
+		$user_has_capability = current_user_can( $user_capability ); // phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is filtered and defaults to 'read'
+
+		if ( ! $user_has_capability ) {
+			$user_id = get_current_user_id();
+			$this->request_handler->transport_context->error_handler->log(
+				sprintf( 'Permission denied for MCP API access. User ID %d does not have capability "%s"', $user_id, $user_capability ),
+				array( 'HttpTransport::check_permission' )
+			);
+		}
+
+		return $user_has_capability;
 	}
 
 	/**

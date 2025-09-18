@@ -585,7 +585,7 @@ final class HttpTransportTest extends TestCase {
 		) );
 
 		// Test changing required capability via filter
-		add_filter( 'mcp_adapter_default_transport_permission', function( $capability ) {
+		add_filter( 'mcp_adapter_default_transport_permission_user_capability', function( $capability ) {
 			return 'manage_options'; // Require admin capability
 		} );
 
@@ -606,7 +606,7 @@ final class HttpTransportTest extends TestCase {
 		$this->assertTrue( $admin_permission, 'Admin should have manage_options capability' );
 
 		// Clean up
-		remove_all_filters( 'mcp_adapter_default_transport_permission' );
+		remove_all_filters( 'mcp_adapter_default_transport_permission_user_capability' );
 		wp_delete_user( $subscriber_id );
 	}
 
@@ -702,6 +702,125 @@ final class HttpTransportTest extends TestCase {
 		$this->assertTrue( $permission_result, 'Should fall back to default permission check' );
 	}
 
+	public function test_permission_denied_logging(): void {
+		// Create a mock error handler that captures log messages
+		$mock_error_handler = $this->getMockBuilder( DummyErrorHandler::class )
+			->onlyMethods( array( 'log' ) )
+			->getMock();
+
+		// Expect the log to be called when permission is denied
+		$mock_error_handler->expects( $this->once() )
+			->method( 'log' )
+			->with(
+				$this->stringContains( 'Permission denied for MCP API access. User ID 0 does not have capability "read"' ),
+				$this->equalTo( array( 'HttpTransport::check_permission' ) )
+			);
+
+		// Create transport with the mock error handler
+		$context_with_error_handler = new McpTransportContext(
+			array(
+				'mcp_server'            => $this->context->mcp_server,
+				'initialize_handler'    => $this->context->initialize_handler,
+				'tools_handler'         => $this->context->tools_handler,
+				'resources_handler'     => $this->context->resources_handler,
+				'prompts_handler'       => $this->context->prompts_handler,
+				'system_handler'        => $this->context->system_handler,
+				'observability_handler' => $this->context->observability_handler,
+				'request_router'        => $this->context->request_router,
+				'error_handler'         => $mock_error_handler,
+			)
+		);
+
+		$transport = new HttpTransport( $context_with_error_handler );
+
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Test with non-logged in user
+		wp_set_current_user( 0 );
+		$permission_result = $transport->check_permission( $request );
+		$this->assertFalse( $permission_result, 'Guest should not have permission' );
+	}
+
+	public function test_capability_filter_with_invalid_value(): void {
+		// Test that invalid capability values are handled gracefully
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Test with filter returning null
+		add_filter( 'mcp_adapter_default_transport_permission_user_capability', function( $capability ) {
+			return null; // Invalid value
+		} );
+
+		wp_set_current_user( 1 );
+		$permission_result = $this->transport->check_permission( $request );
+		$this->assertTrue( $permission_result, 'Should fall back to "read" capability when filter returns null' );
+
+		// Test with filter returning empty string
+		remove_all_filters( 'mcp_adapter_default_transport_permission_user_capability' );
+		add_filter( 'mcp_adapter_default_transport_permission_user_capability', function( $capability ) {
+			return ''; // Invalid value
+		} );
+
+		$permission_result = $this->transport->check_permission( $request );
+		$this->assertTrue( $permission_result, 'Should fall back to "read" capability when filter returns empty string' );
+
+		// Test with filter returning non-string value
+		remove_all_filters( 'mcp_adapter_default_transport_permission_user_capability' );
+		add_filter( 'mcp_adapter_default_transport_permission_user_capability', function( $capability ) {
+			return 123; // Invalid type
+		} );
+
+		$permission_result = $this->transport->check_permission( $request );
+		$this->assertTrue( $permission_result, 'Should fall back to "read" capability when filter returns non-string' );
+
+		// Clean up
+		remove_all_filters( 'mcp_adapter_default_transport_permission_user_capability' );
+	}
+
+	public function test_capability_filter_with_valid_custom_capability(): void {
+		// Test that valid custom capability is properly used
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Test with custom capability
+		add_filter( 'mcp_adapter_default_transport_permission_user_capability', function( $capability ) {
+			return 'manage_options';
+		} );
+
+		// Test with admin user (has manage_options)
+		wp_set_current_user( 1 );
+		$admin_permission = $this->transport->check_permission( $request );
+		$this->assertTrue( $admin_permission, 'Admin should have manage_options capability' );
+
+		// Test with subscriber user (doesn't have manage_options)
+		$subscriber_id = wp_insert_user( array(
+			'user_login' => 'test_subscriber_cap',
+			'user_pass'  => 'password123',
+			'role'       => 'subscriber'
+		) );
+		wp_set_current_user( $subscriber_id );
+		$subscriber_permission = $this->transport->check_permission( $request );
+		$this->assertFalse( $subscriber_permission, 'Subscriber should not have manage_options capability' );
+
+		// Clean up
+		wp_delete_user( $subscriber_id );
+		remove_all_filters( 'mcp_adapter_default_transport_permission_user_capability' );
+		wp_set_current_user( 1 );
+	}
+
 	// ========== Protocol Version Tests ==========
 
 	public function test_mcp_protocol_version_header(): void {
@@ -767,6 +886,7 @@ final class HttpTransportTest extends TestCase {
 				'prompts_handler'       => $prompts_handler,
 				'system_handler'        => $system_handler,
 				'observability_handler' => DummyObservabilityHandler::class,
+				'error_handler'         => new DummyErrorHandler(),
 			)
 		);
 	}
