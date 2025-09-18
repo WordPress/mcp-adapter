@@ -43,6 +43,7 @@ trait HandlerHelperTrait {
 	 */
 	protected function create_error_response( int $code, string $message, int $request_id = 0 ): array {
 		return array(
+			'id'    => $request_id,
 			'error' => array(
 				'code'    => $code,
 				'message' => $message,
