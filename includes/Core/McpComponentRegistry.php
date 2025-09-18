@@ -14,7 +14,6 @@ use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
-use WP\MCP\Domain\Tools\Contracts\McpSystemToolInterface;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
@@ -29,13 +28,6 @@ class McpComponentRegistry {
 	 * @var array
 	 */
 	private array $tools = array();
-
-	/**
-	 * System tool instances keyed by tool name.
-	 *
-	 * @var array<string, \WP\MCP\Domain\Tools\Contracts\McpSystemToolInterface>
-	 */
-	private array $system_tool_instances = array();
 
 	/**
 	 * Resources registered to the server.
@@ -103,9 +95,7 @@ class McpComponentRegistry {
 	/**
 	 * Register tools to the server.
 	 *
-	 * @param array $tools Array of tool items. Can be either:
-	 *                     - System tool class names (implementing McpSystemToolInterface)
-	 *                     - Ability names (strings) to convert to MCP tools
+	 * @param array $tools Array of ability names (strings) to convert to MCP tools.
 	 *
 	 * @return void
 	 */
@@ -115,87 +105,40 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			// Check if it's a class that implements McpSystemToolInterface
-			if ( class_exists( $tool_item ) && in_array( McpSystemToolInterface::class, class_implements( $tool_item ) ?: array(), true ) ) {
-				try {
-					// Create instance of the system tool class
-					/** @var \WP\MCP\Domain\Tools\Contracts\McpSystemToolInterface $system_tool */
-					$system_tool = new $tool_item();
-					$tool        = $system_tool->build( $this->mcp_server );
+			// Treat as ability name
+			try {
+				$ability = wp_get_ability( $tool_item );
 
-					// Set the MCP server after building
-					$tool->set_mcp_server( $this->mcp_server );
-
-					// Validate if validation is enabled
-					if ( $this->mcp_validation_enabled ) {
-						$tool->validate( "McpSystemTool::{$tool_item}" );
-					}
-
-					// Add the tool to this server
-					$this->tools[ $tool->get_name() ] = $tool;
-
-					// Store the system tool instance for execution
-					$this->system_tool_instances[ $tool->get_name() ] = $system_tool;
-
-					// Track successful system tool registration
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'system_tool',
-							'component_name' => $tool_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				} catch ( \InvalidArgumentException $e ) {
-					$this->error_handler->log( $e->getMessage(), array( "McpSystemTool::{$tool_item}" ) );
-
-					// Track system tool registration failure
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'system_tool',
-							'component_name' => $tool_item,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
+				if ( ! $ability ) {
+					throw new \InvalidArgumentException( "WordPress ability '{$tool_item}' does not exist." );
 				}
-			} else {
-				// Treat as ability name (legacy behavior)
-				try {
-					$ability = wp_get_ability( $tool_item );
 
-					if ( ! $ability ) {
-						throw new \InvalidArgumentException( "WordPress ability '{$tool_item}' does not exist." );
-					}
+				$tool = RegisterAbilityAsMcpTool::make( $ability, $this->mcp_server );
+				// Add the processed tools to this server.
+				$this->tools[ $tool->get_name() ] = $tool;
 
-					$tool = RegisterAbilityAsMcpTool::make( $ability, $this->mcp_server );
-					// Add the processed tools to this server.
-					$this->tools[ $tool->get_name() ] = $tool;
+				// Track successful ability tool registration.
+				$this->observability_handler::record_event(
+					'mcp.component.registered',
+					array(
+						'component_type' => 'ability_tool',
+						'component_name' => $tool_item,
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			} catch ( \InvalidArgumentException $e ) {
+				$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
 
-					// Track successful ability tool registration.
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'ability_tool',
-							'component_name' => $tool_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				} catch ( \InvalidArgumentException $e ) {
-					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
-
-					// Track ability tool registration failure.
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'ability_tool',
-							'component_name' => $tool_item,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
+				// Track ability tool registration failure.
+				$this->observability_handler::record_event(
+					'mcp.component.registration_failed',
+					array(
+						'component_type' => 'ability_tool',
+						'component_name' => $tool_item,
+						'error_type'     => get_class( $e ),
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
 			}
 		}
 	}
@@ -450,90 +393,5 @@ class McpComponentRegistry {
 	 */
 	public function get_prompt( string $prompt_name ): ?McpPrompt {
 		return $this->prompts[ $prompt_name ] ?? null;
-	}
-
-	/**
-	 * Remove a tool from the server.
-	 *
-	 * @param string $tool_name Tool name.
-	 *
-	 * @return bool True if removed, false if not found.
-	 */
-	public function remove_tool( string $tool_name ): bool {
-		if ( isset( $this->tools[ $tool_name ] ) ) {
-			unset( $this->tools[ $tool_name ] );
-
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Remove a resource from the server.
-	 *
-	 * @param string $resource_uri Resource URI.
-	 *
-	 * @return bool True if removed, false if not found.
-	 */
-	public function remove_resource( string $resource_uri ): bool {
-		if ( isset( $this->resources[ $resource_uri ] ) ) {
-			unset( $this->resources[ $resource_uri ] );
-
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Remove a prompt from the server.
-	 *
-	 * @param string $prompt_name Prompt name.
-	 *
-	 * @return bool True if removed, false if not found.
-	 */
-	public function remove_prompt( string $prompt_name ): bool {
-		if ( isset( $this->prompts[ $prompt_name ] ) ) {
-			unset( $this->prompts[ $prompt_name ] );
-
-			return true;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Get ability-based tools only (excludes system tools).
-	 *
-	 * This method is useful for discovery tools that should not discover system tools,
-	 * preventing infinite loops and maintaining separation between system and business logic.
-	 *
-	 * @return array Array of abilities information (not McpTool instances).
-	 */
-	public function get_discoverable_abilities(): array {
-		$abilities = wp_get_abilities();
-
-		return array_map(
-			static function ( $ability ) {
-					return array(
-						'name'        => $ability->get_name(),
-						'label'       => $ability->get_label(),
-						'description' => $ability->get_description(),
-					);
-			},
-			$abilities
-		);
-	}
-
-	/**
-	 * Get a system tool instance by name.
-	 *
-	 * @param string $tool_name The name of the system tool.
-	 *
-	 * @return \WP\MCP\Domain\Tools\Contracts\McpSystemToolInterface|null System tool instance or null if not found.
-	 */
-	public function get_system_tool_instance( string $tool_name ): ?McpSystemToolInterface {
-		return $this->system_tool_instances[ $tool_name ] ?? null;
 	}
 }
