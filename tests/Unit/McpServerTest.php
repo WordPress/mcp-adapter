@@ -66,7 +66,7 @@ final class McpServerTest extends TestCase {
 		$this->assertInstanceOf( NullMcpErrorHandler::class, $server->error_handler );
 	}
 
-	public function test_constructor_without_tools_registers_layered_tools(): void {
+	public function test_constructor_without_tools_registers_system_tools(): void {
 		$server = new McpServer(
 			'test-server',
 			'mcp/v1',
@@ -83,7 +83,7 @@ final class McpServerTest extends TestCase {
 		$server_tools = $server->get_tools();
 		$this->assertNotEmpty( $server_tools );
 
-		// Should have layered tools
+		// Should have system tools
 		$tool_names = array_map(
 			static function ( $tool ) {
 					return $tool->get_name();

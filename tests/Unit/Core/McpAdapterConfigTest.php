@@ -93,7 +93,7 @@ final class McpAdapterConfigTest extends TestCase {
 
 		$this->assertNotNull( $server );
 		$this->assertSame( 'MCP Adapter Default Server', $server->get_server_name() );
-		$this->assertSame( 'Default MCP server with layered tools for WordPress abilities discovery and execution', $server->get_server_description() );
+		$this->assertSame( 'Default MCP server with system tools for WordPress abilities discovery and execution', $server->get_server_description() );
 	}
 
 	public function test_default_server_config_partial_override(): void {
@@ -157,7 +157,7 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertSame( 'mcp-adapter', $server->get_server_route_namespace() );
 		$this->assertSame( 'mcp', $server->get_server_route() );
 		$this->assertSame( 'MCP Adapter Default Server', $server->get_server_name() );
-		$this->assertSame( 'Default MCP server with layered tools for WordPress abilities discovery and execution', $server->get_server_description() );
+		$this->assertSame( 'Default MCP server with system tools for WordPress abilities discovery and execution', $server->get_server_description() );
 		$this->assertSame( 'v1.0.0', $server->get_server_version() );
 	}
 
