@@ -514,10 +514,6 @@ class McpComponentRegistry {
 	public function get_discoverable_abilities(): array {
 		$abilities = wp_get_abilities();
 
-		if ( ! is_array( $abilities ) ) {
-			return array();
-		}
-
 		return array_map(
 			static function ( $ability ) {
 					return array(
