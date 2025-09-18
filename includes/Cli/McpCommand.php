@@ -51,6 +51,13 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 * @synopsis [--server=<server-id>] [--user=<id|login|email>]
 	 */
 	public function serve( array $args, array $assoc_args ): void {
+
+		$enable_serve = apply_filters( 'mcp_adapter_enable_stdio_transport', true );
+
+		if ( ! $enable_serve ) {
+			\WP_CLI::error( 'The STDIO transport is disabled. Enable it by setting the "mcp_adapter_enable_stdio_transport" filter to true.' );
+		}
+
 		// Get the MCP adapter instance
 		$adapter = McpAdapter::instance();
 
