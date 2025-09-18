@@ -357,6 +357,7 @@ class ToolsHandler {
 
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing system tool ' . $tool_name )['error'] );
 		}
+		return array( 'error' => McpErrorFactory::tool_not_found( $request_id, $tool_name )['error'] );
 	}
 
 	/**
