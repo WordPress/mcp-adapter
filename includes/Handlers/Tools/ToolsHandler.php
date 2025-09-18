@@ -227,15 +227,22 @@ class ToolsHandler {
 		}
 
 		/**
-		 * Get the ability - may be null for system tools.
+		 * Get the ability
 		 *
-		 * @var \WP_Ability|null $ability
+		 * @var \WP_Ability $ability
 		 */
 		$ability = $tool->get_ability();
 
-		// Handle system tools that don't have WordPress abilities
+		// All tools must have WordPress abilities
 		if ( null === $ability ) {
-			return $this->handle_system_tool_execution( $tool_name, $args, $request_id );
+			$this->mcp->error_handler->log(
+				'Tool without ability found',
+				array(
+					'tool' => $tool_name,
+				)
+			);
+
+			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Tool is not properly configured' )['error'] );
 		}
 
 		// Run ability Permission Callback.
@@ -317,48 +324,6 @@ class ToolsHandler {
 		}
 	}
 
-	/**
-	 * Handle execution of system tools that don't use WordPress abilities.
-	 *
-	 * @param string $tool_name  The tool name.
-	 * @param array  $args       The arguments.
-	 * @param int    $request_id The request ID for JSON-RPC.
-	 *
-	 * @return array
-	 */
-	private function handle_system_tool_execution( string $tool_name, array $args, int $request_id ): array {
-		try {
-			// Try to get the system tool instance
-			$system_tool = $this->mcp->get_component_registry()->get_system_tool_instance( $tool_name );
-
-			if ( $system_tool ) {
-				// Execute the system tool
-				return $system_tool->execute( $args, $this->mcp );
-			}
-		} catch ( \Throwable $e ) {
-			$this->mcp->error_handler->log(
-				'System tool execution failed',
-				array(
-					'tool'      => $tool_name,
-					'exception' => $e->getMessage(),
-				)
-			);
-
-			// Track system tool execution error event
-			$this->mcp->observability_handler::record_event(
-				'mcp.system_tool.execution_failed',
-				array(
-					'tool_name'      => $tool_name,
-					'error_type'     => get_class( $e ),
-					'error_category' => $this->categorize_error( $e ),
-					'server_id'      => $this->mcp->get_server_id(),
-				)
-			);
-
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing system tool ' . $tool_name )['error'] );
-		}
-		return array( 'error' => McpErrorFactory::tool_not_found( $request_id, $tool_name )['error'] );
-	}
 
 	/**
 	 * Categorize an exception into a general error category.
