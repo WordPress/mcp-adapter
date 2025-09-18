@@ -7,24 +7,20 @@
 
 declare( strict_types=1 );
 
-namespace WP\MCP\Servers\DefaultServer;
+namespace WP\MCP\Servers;
 
 use WP\MCP\Core\McpAdapter;
-use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
-use WP\MCP\Servers\DefaultServer\Tools\DiscoverAbilitiesTool;
-use WP\MCP\Servers\DefaultServer\Tools\ExecuteAbilityTool;
-use WP\MCP\Servers\DefaultServer\Tools\GetAbilityInfoTool;
 use WP\MCP\Transport\HttpTransport;
 
 /**
  * Factory for creating the default WordPress MCP server.
  *
- * This server provides the standard WordPress MCP implementation with:
- * - System tools for discovery, planning, and execution
- * - Ability-based tools from registered WordPress abilities
- * - Clean separation between system and business logic
+ * This server provides a layered MCP implementation that exposes three core abilities:
+ * - discover-abilities: Lists all available WordPress abilities
+ * - get-ability-info: Gets detailed information about specific abilities
+ * - execute-ability: Executes WordPress abilities with provided parameters
  */
 class DefaultServerFactory {
 
@@ -46,15 +42,15 @@ class DefaultServerFactory {
 			'server_route_namespace' => 'mcp-adapter',
 			'server_route'           => 'mcp',
 			'server_name'            => 'MCP Adapter Default Server',
-			'server_description'     => 'Default MCP server with system tools for WordPress abilities discovery and execution',
+			'server_description'     => 'Default MCP server for WordPress abilities discovery and execution',
 			'server_version'         => 'v1.0.0',
 			'mcp_transports'         => array( HttpTransport::class ),
 			'error_handler'          => ErrorLogMcpErrorHandler::class,
 			'observability_handler'  => NullMcpObservabilityHandler::class,
 			'tools'                  => array(
-				DiscoverAbilitiesTool::class,
-				GetAbilityInfoTool::class,
-				ExecuteAbilityTool::class,
+				'mcp-adapter/discover-abilities',
+				'mcp-adapter/get-ability-info',
+				'mcp-adapter/execute-ability',
 			),
 			'resources'              => array(),
 			'prompts'                => array(),
