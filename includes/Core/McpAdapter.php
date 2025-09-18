@@ -9,12 +9,15 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
+use WP\MCP\Abilities\DiscoverAbilitiesAbility;
+use WP\MCP\Abilities\ExecuteAbilityAbility;
+use WP\MCP\Abilities\GetAbilityInfoAbility;
 use WP\MCP\Cli\McpCommand;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
-use WP\MCP\Servers\DefaultServer\DefaultServerFactory;
+use WP\MCP\Servers\DefaultServerFactory;
 
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
@@ -252,7 +255,21 @@ final class McpAdapter {
 			return;
 		}
 
+		add_action( 'abilities_api_init', array( $this, 'register_default_abilities' ) );
+
 		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+	}
+
+	/**
+	 * Register the default MCP abilities.
+	 *
+	 * @return void
+	 */
+	public function register_default_abilities(): void {
+		// Register the three core MCP abilities
+		DiscoverAbilitiesAbility::register();
+		GetAbilityInfoAbility::register();
+		ExecuteAbilityAbility::register();
 	}
 
 	/**
