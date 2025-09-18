@@ -328,11 +328,7 @@ final class McpAdapter {
 			return;
 		}
 
-		call_user_func(
-			array(
-				'WP_CLI',
-				'add_command',
-			),
+		\WP_CLI::add_command(
 			'mcp-adapter',
 			McpCommand::class,
 			array(
