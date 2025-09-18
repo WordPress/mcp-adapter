@@ -9,6 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests;
 
+use WP\MCP\Abilities\DiscoverAbilitiesAbility;
+use WP\MCP\Abilities\ExecuteAbilityAbility;
+use WP\MCP\Abilities\GetAbilityInfoAbility;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
@@ -16,6 +19,30 @@ use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use Yoast\PHPUnitPolyfills\TestCases\TestCase as PolyfillsTestCase;
 
 abstract class TestCase extends PolyfillsTestCase {
+
+	/**
+	 * Set up before each test class to ensure abilities are registered.
+	 */
+	public static function set_up_before_class(): void {
+		parent::set_up_before_class();
+		
+		// Ensure abilities API is initialized so MCP abilities can be registered
+		if ( ! did_action( 'abilities_api_init' ) ) {
+			do_action( 'abilities_api_init' );
+		}
+		
+		// Register the default MCP abilities directly for tests
+		// Only register if they don't already exist to prevent duplicates
+		if ( ! wp_get_ability( 'mcp-adapter/discover-abilities' ) ) {
+			DiscoverAbilitiesAbility::register();
+		}
+		if ( ! wp_get_ability( 'mcp-adapter/get-ability-info' ) ) {
+			GetAbilityInfoAbility::register();
+		}
+		if ( ! wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
+			ExecuteAbilityAbility::register();
+		}
+	}
 
 	/**
 	 * Clean up abilities after each test class finishes.
