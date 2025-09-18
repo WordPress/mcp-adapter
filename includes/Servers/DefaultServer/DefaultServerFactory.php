@@ -35,10 +35,10 @@ class DefaultServerFactory {
 	 * WordPress filters for customization, making it perfect for use within
 	 * the McpAdapter.
 	 *
-	 * @return \WP\MCP\Core\McpServer The configured MCP server instance.
+	 * @return void
 	 * @throws \Exception
 	 */
-	public static function create(): McpServer {
+	public static function create(): void {
 
 		// WordPress-specific defaults
 		$wordpress_defaults = array(
@@ -85,8 +85,5 @@ class DefaultServerFactory {
 			$config['resources'],
 			$config['prompts']
 		);
-
-		// Return the created server
-		return $adapter->get_server( $config['server_id'] );
 	}
 }
