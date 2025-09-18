@@ -32,6 +32,9 @@ final class McpAdapterConfigTest extends TestCase {
 		remove_all_filters( 'mcp_adapter_default_server_config' );
 		remove_all_filters( 'mcp_adapter_create_default_server' );
 
+		// Clean up any actions that might have been added
+		remove_all_actions( 'mcp_adapter_init' );
+
 		// Clean up any registered servers
 		$reflection = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
@@ -47,9 +50,9 @@ final class McpAdapterConfigTest extends TestCase {
 	public function test_default_server_config_filter_allows_customization(): void {
 		// Mock the mcp_adapter_init action
 		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['name'] = 'Custom Server Name';
-			$defaults['description'] = 'Custom Description';
-			$defaults['version'] = 'v2.0.0';
+			$defaults['server_name'] = 'Custom Server Name';
+			$defaults['server_description'] = 'Custom Description';
+			$defaults['server_version'] = 'v2.0.0';
 			return $defaults;
 		} );
 
@@ -99,8 +102,8 @@ final class McpAdapterConfigTest extends TestCase {
 	public function test_default_server_config_partial_override(): void {
 		// Mock the filter to only change some values
 		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['namespace'] = 'custom-namespace';
-			$defaults['route'] = '/custom-route';
+			$defaults['server_route_namespace'] = 'custom-namespace';
+			$defaults['server_route'] = '/custom-route';
 			// Leave other values as default
 			return $defaults;
 		} );
@@ -180,13 +183,13 @@ final class McpAdapterConfigTest extends TestCase {
 		array_pop( $wp_current_filter );
 
 		$this->assertNotNull( $received_config );
-		$this->assertArrayHasKey( 'id', $received_config );
-		$this->assertArrayHasKey( 'namespace', $received_config );
-		$this->assertArrayHasKey( 'route', $received_config );
-		$this->assertArrayHasKey( 'name', $received_config );
-		$this->assertArrayHasKey( 'description', $received_config );
-		$this->assertArrayHasKey( 'version', $received_config );
-		$this->assertArrayHasKey( 'transports', $received_config );
+		$this->assertArrayHasKey( 'server_id', $received_config );
+		$this->assertArrayHasKey( 'server_route_namespace', $received_config );
+		$this->assertArrayHasKey( 'server_route', $received_config );
+		$this->assertArrayHasKey( 'server_name', $received_config );
+		$this->assertArrayHasKey( 'server_description', $received_config );
+		$this->assertArrayHasKey( 'server_version', $received_config );
+		$this->assertArrayHasKey( 'mcp_transports', $received_config );
 		$this->assertArrayHasKey( 'error_handler', $received_config );
 		$this->assertArrayHasKey( 'observability_handler', $received_config );
 		$this->assertArrayHasKey( 'resources', $received_config );
@@ -211,12 +214,12 @@ final class McpAdapterConfigTest extends TestCase {
 		// Clean up the filter mock
 		array_pop( $wp_current_filter );
 
-		$this->assertSame( 'mcp-adapter-default-server', $received_config['id'] );
-		$this->assertSame( 'mcp-adapter', $received_config['namespace'] );
-		$this->assertSame( 'mcp', $received_config['route'] );
-		$this->assertSame( 'MCP Adapter Default Server', $received_config['name'] );
-		$this->assertSame( 'v1.0.0', $received_config['version'] );
-		$this->assertSame( array( HttpTransport::class ), $received_config['transports'] );
+		$this->assertSame( 'mcp-adapter-default-server', $received_config['server_id'] );
+		$this->assertSame( 'mcp-adapter', $received_config['server_route_namespace'] );
+		$this->assertSame( 'mcp', $received_config['server_route'] );
+		$this->assertSame( 'MCP Adapter Default Server', $received_config['server_name'] );
+		$this->assertSame( 'v1.0.0', $received_config['server_version'] );
+		$this->assertSame( array( HttpTransport::class ), $received_config['mcp_transports'] );
 		$this->assertSame( ErrorLogMcpErrorHandler::class, $received_config['error_handler'] );
 		$this->assertSame( NullMcpObservabilityHandler::class, $received_config['observability_handler'] );
 		$this->assertSame( array(), $received_config['resources'] );
@@ -226,14 +229,14 @@ final class McpAdapterConfigTest extends TestCase {
 	public function test_multiple_config_modifications(): void {
 		// First filter
 		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['name'] = 'First Modified Name';
+			$defaults['server_name'] = 'First Modified Name';
 			return $defaults;
 		}, 10 );
 
 		// Second filter with higher priority
 		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['name'] = 'Second Modified Name';
-			$defaults['version'] = 'v3.0.0';
+			$defaults['server_name'] = 'Second Modified Name';
+			$defaults['server_version'] = 'v3.0.0';
 			return $defaults;
 		}, 20 );
 

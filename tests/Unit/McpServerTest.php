@@ -66,7 +66,7 @@ final class McpServerTest extends TestCase {
 		$this->assertInstanceOf( NullMcpErrorHandler::class, $server->error_handler );
 	}
 
-	public function test_constructor_without_tools_registers_system_tools(): void {
+	public function test_constructor_without_tools_does_not_register_system_tools(): void {
 		$server = new McpServer(
 			'test-server',
 			'mcp/v1',
@@ -81,19 +81,7 @@ final class McpServerTest extends TestCase {
 		);
 
 		$server_tools = $server->get_tools();
-		$this->assertNotEmpty( $server_tools );
-
-		// Should have system tools
-		$tool_names = array_map(
-			static function ( $tool ) {
-					return $tool->get_name();
-			},
-			$server_tools
-		);
-
-		$this->assertContains( 'discover_abilities', $tool_names );
-		$this->assertContains( 'get_ability_info', $tool_names );
-		$this->assertContains( 'execute_ability', $tool_names );
+		$this->assertEmpty( $server_tools );
 	}
 
 	public function test_validation_flag_is_configurable(): void {
