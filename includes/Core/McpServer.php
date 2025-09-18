@@ -220,20 +220,9 @@ class McpServer {
 	 * @param array $prompts Prompts to register.
 	 */
 	private function register_mcp_components( array $tools, array $resources, array $prompts ): void {
-		// Register tools or add layered tools as default
+		// Register tools if provided
 		if ( ! empty( $tools ) ) {
 			$this->component_registry->register_tools( $tools );
-		} else {
-			// Auto-register layered tools when no specific tools are provided
-			$this->component_registry->add_tool(
-				LayeredToolsFactory::create_discovery_tool( $this )
-			);
-			$this->component_registry->add_tool(
-				LayeredToolsFactory::create_planning_tool( $this )
-			);
-			$this->component_registry->add_tool(
-				LayeredToolsFactory::create_execution_tool( $this )
-			);
 		}
 
 		// Register resources if provided
@@ -401,5 +390,14 @@ class McpServer {
 	 */
 	public function is_mcp_validation_enabled(): bool {
 		return $this->mcp_validation_enabled;
+	}
+
+	/**
+	 * Get the component registry instance.
+	 *
+	 * @return \WP\MCP\Core\McpComponentRegistry
+	 */
+	public function get_component_registry(): McpComponentRegistry {
+		return $this->component_registry;
 	}
 }
