@@ -42,6 +42,7 @@ final class ErrorResponseConsistencyTest extends TestCase {
 	public function test_all_handlers_use_consistent_error_structure(): void {
 		$tools_handler = new ToolsHandler( $this->server );
 		$prompts_handler = new PromptsHandler( $this->server );
+
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test missing parameter errors from all handlers

@@ -477,6 +477,231 @@ final class HttpTransportTest extends TestCase {
 		$this->assertFalse( $permission_result );
 	}
 
+	public function test_permission_callback_returning_true(): void {
+		// Test with custom permission callback that grants access
+		$context_with_permission = new McpTransportContext(
+			array(
+				'mcp_server'                    => $this->context->mcp_server,
+				'initialize_handler'            => $this->context->initialize_handler,
+				'tools_handler'                 => $this->context->tools_handler,
+				'resources_handler'             => $this->context->resources_handler,
+				'prompts_handler'               => $this->context->prompts_handler,
+				'system_handler'                => $this->context->system_handler,
+				'observability_handler'         => $this->context->observability_handler,
+				'request_router'                => $this->context->request_router,
+				'transport_permission_callback' => function () {
+					return true; // Grant access
+				}
+			)
+		);
+
+		$transport_with_permission = new HttpTransport( $context_with_permission );
+
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		$permission_result = $transport_with_permission->check_permission( $request );
+		$this->assertTrue( $permission_result );
+	}
+
+	public function test_permission_callback_returning_wp_error(): void {
+		// Test with custom permission callback that returns WP_Error
+		$context_with_permission = new McpTransportContext(
+			array(
+				'mcp_server'                    => $this->context->mcp_server,
+				'initialize_handler'            => $this->context->initialize_handler,
+				'tools_handler'                 => $this->context->tools_handler,
+				'resources_handler'             => $this->context->resources_handler,
+				'prompts_handler'               => $this->context->prompts_handler,
+				'system_handler'                => $this->context->system_handler,
+				'observability_handler'         => $this->context->observability_handler,
+				'request_router'                => $this->context->request_router,
+				'error_handler'                 => new DummyErrorHandler(), // Add error_handler
+				'transport_permission_callback' => function () {
+					return new \WP_Error( 'permission_denied', 'Custom permission error' );
+				}
+			)
+		);
+
+		$transport_with_permission = new HttpTransport( $context_with_permission );
+
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Should fall back to default permission check when WP_Error is returned
+		$permission_result = $transport_with_permission->check_permission( $request );
+
+		// Since we're user ID 1 (admin), default permission check should pass
+		$this->assertTrue( $permission_result );
+	}
+
+	public function test_permission_with_different_user_capabilities(): void {
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Test with admin user (ID 1)
+		wp_set_current_user( 1 );
+		$admin_permission = $this->transport->check_permission( $request );
+		$this->assertTrue( $admin_permission, 'Admin should have permission' );
+
+		// Test with subscriber user
+		$subscriber_id = wp_insert_user( array(
+			'user_login' => 'test_subscriber',
+			'user_pass'  => 'password123',
+			'role'       => 'subscriber'
+		) );
+		wp_set_current_user( $subscriber_id );
+		$subscriber_permission = $this->transport->check_permission( $request );
+		$this->assertTrue( $subscriber_permission, 'Subscriber should have read permission by default' );
+
+		// Test with non-logged in user
+		wp_set_current_user( 0 );
+		$guest_permission = $this->transport->check_permission( $request );
+		$this->assertFalse( $guest_permission, 'Guest should not have permission' );
+
+		// Cleanup
+		wp_delete_user( $subscriber_id );
+		wp_set_current_user( 1 );
+	}
+
+	public function test_permission_filter_modification(): void {
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Test changing required capability via filter
+		add_filter( 'mcp_adapter_default_transport_permission', function( $capability ) {
+			return 'manage_options'; // Require admin capability
+		} );
+
+		// Test with subscriber user
+		$subscriber_id = wp_insert_user( array(
+			'user_login' => 'test_subscriber_filter',
+			'user_pass'  => 'password123',
+			'role'       => 'subscriber'
+		) );
+		wp_set_current_user( $subscriber_id );
+
+		$subscriber_permission = $this->transport->check_permission( $request );
+		$this->assertFalse( $subscriber_permission, 'Subscriber should not have manage_options capability' );
+
+		// Test with admin user
+		wp_set_current_user( 1 );
+		$admin_permission = $this->transport->check_permission( $request );
+		$this->assertTrue( $admin_permission, 'Admin should have manage_options capability' );
+
+		// Clean up
+		remove_all_filters( 'mcp_adapter_default_transport_permission' );
+		wp_delete_user( $subscriber_id );
+	}
+
+	public function test_permission_callback_receives_request_context(): void {
+		$captured_request = null;
+
+		// Create transport with callback that captures the request
+		$context_with_permission = new McpTransportContext(
+			array(
+				'mcp_server'                    => $this->context->mcp_server,
+				'initialize_handler'            => $this->context->initialize_handler,
+				'tools_handler'                 => $this->context->tools_handler,
+				'resources_handler'             => $this->context->resources_handler,
+				'prompts_handler'               => $this->context->prompts_handler,
+				'system_handler'                => $this->context->system_handler,
+				'observability_handler'         => $this->context->observability_handler,
+				'request_router'                => $this->context->request_router,
+				'transport_permission_callback' => function ( $request ) use ( &$captured_request ) {
+					$captured_request = $request;
+					return true;
+				}
+			)
+		);
+
+		$transport_with_permission = new HttpTransport( $context_with_permission );
+
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 123,
+			'method'  => 'test/method',
+			'params'  => array( 'test' => 'value' )
+		) );
+		$request->set_header( 'X-Test-Header', 'test-value' );
+
+		$transport_with_permission->check_permission( $request );
+
+		// Verify the callback received the WP_REST_Request object
+		$this->assertInstanceOf( \WP_REST_Request::class, $captured_request );
+		$this->assertEquals( 'POST', $captured_request->get_method() );
+		$this->assertEquals( 'test-value', $captured_request->get_header( 'X-Test-Header' ) );
+
+		// Verify request body was passed correctly
+		$body = json_decode( $captured_request->get_body(), true );
+		$this->assertEquals( 123, $body['id'] );
+		$this->assertEquals( 'test/method', $body['method'] );
+	}
+
+	public function test_permission_callback_throwing_exception(): void {
+		$logged_messages = array();
+
+		// Create a mock error handler that captures log messages
+		$mock_error_handler = $this->getMockBuilder( DummyErrorHandler::class )
+			->onlyMethods( array( 'log' ) )
+			->getMock();
+
+		$mock_error_handler->expects( $this->once() )
+			->method( 'log' )
+			->with(
+				$this->stringContains( 'Error in transport permission callback: Test exception' ),
+				$this->equalTo( array( 'HttpTransport::check_permission' ) )
+			);
+
+		// Create transport with callback that throws exception
+		$context_with_permission = new McpTransportContext(
+			array(
+				'mcp_server'                    => $this->context->mcp_server,
+				'initialize_handler'            => $this->context->initialize_handler,
+				'tools_handler'                 => $this->context->tools_handler,
+				'resources_handler'             => $this->context->resources_handler,
+				'prompts_handler'               => $this->context->prompts_handler,
+				'system_handler'                => $this->context->system_handler,
+				'observability_handler'         => $this->context->observability_handler,
+				'request_router'                => $this->context->request_router,
+				'error_handler'                 => $mock_error_handler,
+				'transport_permission_callback' => function () {
+					throw new \Exception( 'Test exception' );
+				}
+			)
+		);
+
+		$transport_with_permission = new HttpTransport( $context_with_permission );
+
+		$request = $this->createPostRequest( array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'initialize',
+			'params'  => array()
+		) );
+
+		// Should fall back to default permission check when exception is thrown
+		wp_set_current_user( 1 );
+		$permission_result = $transport_with_permission->check_permission( $request );
+		$this->assertTrue( $permission_result, 'Should fall back to default permission check' );
+	}
+
 	// ========== Protocol Version Tests ==========
 
 	public function test_mcp_protocol_version_header(): void {
