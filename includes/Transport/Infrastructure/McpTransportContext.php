@@ -15,6 +15,7 @@ use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
+use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 
 /**
  * Transport context object for dependency injection.
@@ -81,8 +82,17 @@ class McpTransportContext {
 
 	/**
 	 * The observability handler class name.
+	 *
+	 * @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
 	 */
 	public string $observability_handler;
+
+	/**
+	 * The error handler instance.
+	 *
+	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
+	 */
+	public McpErrorHandlerInterface $error_handler;
 
 	/**
 	 * The request router service.
