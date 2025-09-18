@@ -75,7 +75,7 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 			}
 		} else {
 			// Use the first available server
-			$server    = reset( $servers );
+			$server    = array_values( $servers )[0];
 			$server_id = $server->get_server_id();
 			\WP_CLI::line( sprintf( 'Using server: %s', $server_id ) );
 		}
