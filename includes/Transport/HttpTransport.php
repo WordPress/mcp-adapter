@@ -13,7 +13,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport;
 
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
-use WP\MCP\Transport\Infrastructure\AuthenticationValidator;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\HttpRequestHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
@@ -79,10 +78,31 @@ class HttpTransport implements McpRestTransportInterface {
 
 		// Check permission using callback or default
 		$transport_context = $this->request_handler->transport_context;
-		return AuthenticationValidator::check_permission(
-			$context,
-			$transport_context->transport_permission_callback
-		);
+
+		if ( null !== $transport_context->transport_permission_callback ) {
+			try {
+				$result = call_user_func( $transport_context->transport_permission_callback, $context->request );
+
+				// Handle WP_Error returns
+				if ( is_wp_error( $result ) ) {
+					// Log the error and fall back to default permission
+					$this->request_handler->transport_context->error_handler->log(
+						'Permission callback returned WP_Error: ' . $result->get_error_message(),
+						array( 'HttpTransport::check_permission' )
+					);
+					// Fall through to default permission check
+				} else {
+					// Return boolean result directly
+					return $result;
+				}
+			} catch ( \Throwable $e ) {
+				// Log the error using the error handler, and fall back to default permission
+				$this->request_handler->transport_context->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
+			}
+		}
+		$user_capability = apply_filters( 'mcp_adapter_default_transport_permission', 'read', $context );
+
+		return current_user_can( $user_capability );
 	}
 
 	/**
@@ -94,6 +114,7 @@ class HttpTransport implements McpRestTransportInterface {
 	 */
 	public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
 		$context = new HttpRequestContext( $request );
+
 		return $this->request_handler->handle_request( $context );
 	}
 }
