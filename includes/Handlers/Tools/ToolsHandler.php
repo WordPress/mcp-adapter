@@ -193,7 +193,7 @@ class ToolsHandler {
 	/**
 	 * Handle tool call request.
 	 *
-	 * @param array $message    The message.
+	 * @param array $params     The request parameters.
 	 * @param int   $request_id The request ID for JSON-RPC.
 	 *
 	 * @return array
