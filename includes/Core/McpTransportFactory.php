@@ -55,7 +55,7 @@ class McpTransportFactory {
 						esc_html__( 'Transport class "%s" does not exist. Make sure the class is properly autoloaded or included.', 'mcp-adapter' ),
 						esc_html( $mcp_transport )
 					),
-					'1.0.0'
+					'0.1.0'
 				);
 				continue;
 			}
@@ -69,7 +69,7 @@ class McpTransportFactory {
 						esc_html__( 'Transport class "%s" must implement McpTransportInterface. Check your transport implementation.', 'mcp-adapter' ),
 						esc_html( $mcp_transport )
 					),
-					'1.0.0'
+					'0.1.0'
 				);
 				throw new \Exception(
 					sprintf(

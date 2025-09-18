@@ -165,7 +165,7 @@ final class McpAdapter {
 			_doing_it_wrong(
 				__FUNCTION__,
 				esc_html__( 'MCP Servers must be created during the "mcp_adapter_init" action. Hook into "mcp_adapter_init" to register your server.', 'mcp-adapter' ),
-				'1.0.0'
+				'0.1.0'
 			);
 			throw new \Exception(
 				esc_html__( 'MCP Server creation must be done during mcp_adapter_init action.', 'mcp-adapter' )
@@ -180,7 +180,7 @@ final class McpAdapter {
 					esc_html__( 'Server with ID "%s" already exists. Each server must have a unique ID.', 'mcp-adapter' ),
 					esc_html( $server_id )
 				),
-				'1.0.0'
+				'0.1.0'
 			);
 			throw new \Exception(
 			// translators: %s: server ID.
