@@ -132,15 +132,13 @@ class ExecuteAbilityTool implements McpSystemToolInterface {
 				);
 			}
 		} catch ( \Throwable $e ) {
-			if ( $server->error_handler ) {
-				$server->error_handler->log(
-					'Error running ability permission callback',
-					array(
-						'ability'   => $ability_name,
-						'exception' => $e->getMessage(),
-					)
-				);
-			}
+			$server->error_handler->log(
+				'Error running ability permission callback',
+				array(
+					'ability'   => $ability_name,
+					'exception' => $e->getMessage(),
+				)
+			);
 
 			// Track permission check error event
 			$server->observability_handler::record_event(
@@ -184,18 +182,16 @@ class ExecuteAbilityTool implements McpSystemToolInterface {
 			);
 		} catch ( \Throwable $e ) {
 			// Log detailed error server-side for debugging
-			if ( $server->error_handler ) {
-				$server->error_handler->log(
-					'Ability execution failed',
-					array(
-						'ability_name' => $ability_name,
-						'parameters'   => $parameters,
-						'error'        => $e->getMessage(),
-						'file'         => $e->getFile(),
-						'line'         => $e->getLine(),
-					)
-				);
-			}
+			$server->error_handler->log(
+				'Ability execution failed',
+				array(
+					'ability_name' => $ability_name,
+					'parameters'   => $parameters,
+					'error'        => $e->getMessage(),
+					'file'         => $e->getFile(),
+					'line'         => $e->getLine(),
+				)
+			);
 
 			// Track ability execution error event
 			$server->observability_handler::record_event(
