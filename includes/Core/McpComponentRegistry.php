@@ -76,7 +76,7 @@ class McpComponentRegistry {
 	 *
 	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler Error handler instance.
-	 * @param string                                                                     $observability_handler Observability handler class name.
+	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler Observability handler class name.
 	 * @param bool                                                                       $mcp_validation_enabled Whether MCP validation is enabled.
 	 */
 	public function __construct(
@@ -85,8 +85,9 @@ class McpComponentRegistry {
 		string $observability_handler,
 		bool $mcp_validation_enabled
 	) {
-		$this->mcp_server             = $mcp_server;
-		$this->error_handler          = $error_handler;
+		$this->mcp_server    = $mcp_server;
+		$this->error_handler = $error_handler;
+		/** @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler */
 		$this->observability_handler  = $observability_handler;
 		$this->mcp_validation_enabled = $mcp_validation_enabled;
 	}

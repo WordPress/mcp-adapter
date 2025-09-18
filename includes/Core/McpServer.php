@@ -176,6 +176,7 @@ class McpServer {
 
 		// Instantiate observability handler
 		if ( $observability_handler && class_exists( $observability_handler ) ) {
+			/** @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler */
 			$this->observability_handler = $observability_handler;
 		} else {
 			$this->observability_handler = NullMcpObservabilityHandler::class;
@@ -314,7 +315,7 @@ class McpServer {
 	/**
 	 * Get the observability handler class name.
 	 *
-	 * @return string
+	 * @return class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
 	 */
 	public function get_observability_handler(): string {
 		return $this->observability_handler;

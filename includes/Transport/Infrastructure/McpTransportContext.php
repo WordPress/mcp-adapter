@@ -116,14 +116,15 @@ class McpTransportContext {
 	 *   resources_handler: \WP\MCP\Handlers\Resources\ResourcesHandler,
 	 *   prompts_handler: \WP\MCP\Handlers\Prompts\PromptsHandler,
 	 *   system_handler: \WP\MCP\Handlers\System\SystemHandler,
-	 *   observability_handler: string,
+	 *   observability_handler: class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>,
 	 *   request_router?: \WP\MCP\Transport\Infrastructure\RequestRouter,
-	 *   transport_permission_callback?: callable|null
+	 *   transport_permission_callback?: callable|null,
+	 *   error_handler?: \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 * } $properties Properties to set on the context.
 	 */
 	public function __construct( array $properties ) {
 		foreach ( $properties as $name => $value ) {
-				$this->$name = $value;
+			$this->$name = $value;
 		}
 
 		// If request_router is provided, we're done
