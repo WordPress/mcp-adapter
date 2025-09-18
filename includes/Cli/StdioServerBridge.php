@@ -201,7 +201,7 @@ class StdioServerBridge {
 			$result = $this->request_router->route_request(
 				$method,
 				$params,
-				is_int( $id ) ? $id : 0,
+				$id,
 				'stdio'
 			);
 
