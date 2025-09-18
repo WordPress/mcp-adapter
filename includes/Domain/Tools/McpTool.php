@@ -114,6 +114,9 @@ class McpTool {
 	 * @return \WP_Ability|null
 	 */
 	public function get_ability(): ?WP_Ability {
+		if ( ! $this->ability ) {
+			return null;
+		}
 		return wp_get_ability( $this->ability );
 	}
 
