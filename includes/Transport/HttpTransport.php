@@ -100,7 +100,7 @@ class HttpTransport implements McpRestTransportInterface {
 				$this->request_handler->transport_context->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
 			}
 		}
-		$user_capability = apply_filters( 'mcp_adapter_default_transport_permission', 'read', $context );
+		$user_capability = apply_filters( 'mcp_adapter_default_transport_permission_user_capability', 'read', $context );
 
 		return current_user_can( $user_capability );
 	}
