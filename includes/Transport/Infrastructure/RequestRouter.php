@@ -61,19 +61,19 @@ class RequestRouter {
 		$this->context->observability_handler::record_event( 'mcp.request.count', $common_tags );
 
 		$handlers = array(
-			'initialize'               => fn() => $this->context->initialize_handler->handle( $request_id ),
-			'init'                     => fn() => $this->context->initialize_handler->handle( $request_id ),
-			'ping'                     => fn() => $this->context->system_handler->ping( $request_id ),
-			'tools/list'               => fn() => $this->context->tools_handler->list_tools( $request_id ),
-			'tools/list/all'           => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
-			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
-			'resources/list'           => fn() => $this->add_cursor_compatibility( $this->context->resources_handler->list_resources( $request_id ) ),
-			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
-			'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
-			'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
-			'logging/setLevel'         => fn() => $this->context->system_handler->set_logging_level( $params, $request_id ),
-			'completion/complete'      => fn() => $this->context->system_handler->complete( $request_id ),
-			'roots/list'               => fn() => $this->context->system_handler->list_roots( $request_id ),
+			'initialize'          => fn() => $this->context->initialize_handler->handle( $request_id ),
+			'init'                => fn() => $this->context->initialize_handler->handle( $request_id ),
+			'ping'                => fn() => $this->context->system_handler->ping( $request_id ),
+			'tools/list'          => fn() => $this->context->tools_handler->list_tools( $request_id ),
+			'tools/list/all'      => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
+			'tools/call'          => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
+			'resources/list'      => fn() => $this->add_cursor_compatibility( $this->context->resources_handler->list_resources( $request_id ) ),
+			'resources/read'      => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
+			'prompts/list'        => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
+			'prompts/get'         => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
+			'logging/setLevel'    => fn() => $this->context->system_handler->set_logging_level( $params, $request_id ),
+			'completion/complete' => fn() => $this->context->system_handler->complete( $request_id ),
+			'roots/list'          => fn() => $this->context->system_handler->list_roots( $request_id ),
 		);
 
 		try {
