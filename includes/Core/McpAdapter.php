@@ -116,7 +116,7 @@ final class McpAdapter {
 		if ( ! class_exists( $error_handler ) ) {
 			throw new \Exception(
 				sprintf(
-					/* translators: %s: error handler class name */
+				/* translators: %s: error handler class name */
 					esc_html__( 'Error handler class "%s" does not exist.', 'mcp-adapter' ),
 					esc_html( $error_handler )
 				)
@@ -126,7 +126,7 @@ final class McpAdapter {
 		if ( ! in_array( McpErrorHandlerInterface::class, class_implements( $error_handler ) ?: array(), true ) ) {
 			throw new \Exception(
 				sprintf(
-					/* translators: %s: error handler class name */
+				/* translators: %s: error handler class name */
 					esc_html__( 'Error handler class "%s" must implement the McpErrorHandlerInterface.', 'mcp-adapter' ),
 					esc_html( $error_handler )
 				)
@@ -142,7 +142,7 @@ final class McpAdapter {
 		if ( ! class_exists( $observability_handler ) ) {
 			throw new \Exception(
 				sprintf(
-					/* translators: %s: observability handler class name */
+				/* translators: %s: observability handler class name */
 					esc_html__( 'Observability handler class "%s" does not exist.', 'mcp-adapter' ),
 					esc_html( $observability_handler )
 				)
@@ -152,7 +152,7 @@ final class McpAdapter {
 		if ( ! in_array( McpObservabilityHandlerInterface::class, class_implements( $observability_handler ) ?: array(), true ) ) {
 			throw new \Exception(
 				sprintf(
-					/* translators: %s: observability handler class name */
+				/* translators: %s: observability handler class name */
 					esc_html__( 'Observability handler class "%s" must implement the McpObservabilityHandlerInterface interface.', 'mcp-adapter' ),
 					esc_html( $observability_handler )
 				)
