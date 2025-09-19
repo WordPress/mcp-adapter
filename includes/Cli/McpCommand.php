@@ -61,9 +61,6 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 		// Get the MCP adapter instance
 		$adapter = McpAdapter::instance();
 
-		// Ensure adapter is initialized for WP-CLI context
-		$adapter->ensure_initialized();
-
 		// Get all registered servers
 		$servers = $adapter->get_servers();
 
@@ -143,9 +140,6 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 */
 	public function list( array $args, array $assoc_args ): void {
 		$adapter = McpAdapter::instance();
-
-		// Ensure adapter is initialized for WP-CLI context
-		$adapter->ensure_initialized();
 
 		$servers = $adapter->get_servers();
 

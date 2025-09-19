@@ -23,6 +23,9 @@ use WP\MCP\Servers\DefaultServerFactory;
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  */
 final class McpAdapter {
+
+	public const VERSION = '0.1.0';
+
 	/**
 	 * Registry instance
 	 *
@@ -45,6 +48,22 @@ final class McpAdapter {
 	private static bool $initialized = false;
 
 	/**
+	 * Get the registry instance
+	 *
+	 * @return \WP\MCP\Core\McpAdapter
+	 */
+	public static function instance(): self {
+		if ( ! isset( self::$instance ) ) {
+			self::$instance = new self();
+
+			// Initialize for REST API requests with reasonable priority
+			add_action( 'rest_api_init', array( self::$instance, 'init' ), 15 );
+		}
+
+		return self::$instance;
+	}
+
+		/**
 	 * Initialize the registry
 	 *
 	 * @internal For use by instance initialization only.
@@ -59,34 +78,6 @@ final class McpAdapter {
 		do_action( 'mcp_adapter_init', $this );
 		$this->register_wp_cli_commands();
 		self::$initialized = true;
-	}
-
-	/**
-	 * Ensure adapter is initialized (can be called multiple times safely)
-	 *
-	 * This method is safe to call from both REST API and WP-CLI contexts.
-	 * It will only initialize once regardless of how many times it's called.
-	 *
-	 * @return void
-	 */
-	public function ensure_initialized(): void {
-		$this->init();
-	}
-
-	/**
-	 * Get the registry instance
-	 *
-	 * @return \WP\MCP\Core\McpAdapter
-	 */
-	public static function instance(): self {
-		if ( ! isset( self::$instance ) ) {
-			self::$instance = new self();
-
-			// Initialize for REST API requests with reasonable priority
-			add_action( 'rest_api_init', array( self::$instance, 'init' ), 15 );
-		}
-
-		return self::$instance;
 	}
 
 	/**
