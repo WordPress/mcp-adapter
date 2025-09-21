@@ -69,10 +69,12 @@ Fixtures:
 ### Handlers and Routing
 - Initialize: protocolVersion, serverInfo, capabilities, and instructions
 - Tools: list, list-all (available=true), call (permission errors, exceptions, image/text responses)
-- Resources: list, templates, read, subscribe/unsubscribe
+- Resources: list, read
 - Prompts: list, get
-- System: ping, setLoggingLevel, complete, listRoots
+- System: ping, setLoggingLevel
 - Transport: routing, unknown method, cursor compatibility, metric tags
+- Error handling: consistent error response formats and logging
+- Session management: state handling and cleanup
 
 ### MCP Transport Compliance (HttpTransport)
 - **MCP 2025-06-18 Streamable HTTP specification compliance**
@@ -85,8 +87,10 @@ Fixtures:
 - Error response format compliance
 - Protocol version header handling
 - Batch request processing
+- Session state management and cleanup
+- HTTP request context validation
 
-**Test Location**: `tests/Integration/HttpTransportTest.php` (19 comprehensive tests)
+**Test Location**: `tests/Integration/HttpTransportTest.php` (comprehensive test coverage)
 
 ## Writing New Tests
 
