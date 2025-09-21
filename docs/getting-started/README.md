@@ -1,43 +1,39 @@
 # Getting Started with MCP Adapter
 
-Welcome to the MCP Adapter! This guide will help you quickly set up and start using the WordPress MCP Adapter to expose
-your WordPress abilities as MCP (Model Context Protocol) tools, resources, and prompts.
+This guide will help you quickly set up the WordPress MCP Adapter to expose your WordPress abilities as MCP (Model Context Protocol) tools, resources, and prompts.
 
 ## Quick Overview
 
-The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, allowing AI agents to interact with your
-WordPress functionality through standardized protocols. In just a few steps, you'll have a working MCP server that can
-expose your WordPress capabilities to AI systems.
+The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, allowing AI agents to interact with your WordPress functionality through standardized protocols.
 
 ## Prerequisites
 
-Before you begin, ensure you have:
-
 - **PHP 7.4 or higher**
-- **WordPress with Abilities API** loaded
-- **Basic understanding of WordPress plugins/themes**
-- **Optional**: Composer (for enhanced dependency management)
+- **WordPress 6.8 or higher**
+- **WordPress Abilities API**
+- **Composer** (recommended)
 
-## 5-Minute Quick Start
+## Quick Start
 
-### Step 1: Load the MCP Adapter
+### Step 1: Install MCP Adapter
 
-Add this to your plugin or theme's main file:
+**Recommended: Composer Package**
+```bash
+composer require wordpress/abilities-api wordpress/mcp-adapter
+```
 
-```php
-<?php
-// Check if the class isn't already loaded by another plugin
-if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
-    // Load the Jetpack autoloader
-    if ( is_file( ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php' ) ) {
-        require_once ABSPATH . 'wp-content/lib/mcp-adapter/vendor/autoload_packages.php';
-    }
-}
+**Alternative: WordPress Plugin**
+```bash
+# Clone to plugins directory
+git clone https://github.com/WordPress/mcp-adapter.git wp-content/plugins/mcp-adapter
+cd wp-content/plugins/mcp-adapter
+composer install
+wp plugin activate mcp-adapter
 ```
 
 ### Step 2: Register a Simple Ability
 
-First, let's create a simple WordPress ability that we'll expose via MCP:
+Create a WordPress ability that will be exposed via MCP:
 
 ```php
 // Register a simple ability to get site information
@@ -52,21 +48,6 @@ add_action( 'abilities_api_init', function() {
                     'type' => 'boolean',
                     'description' => 'Whether to include post/page statistics',
                     'default' => false
-                ]
-            ]
-        ],
-        'output_schema' => [
-            'type' => 'object',
-            'properties' => [
-                'site_name' => ['type' => 'string'],
-                'site_url' => ['type' => 'string'],
-                'description' => ['type' => 'string'],
-                'stats' => [
-                    'type' => 'object',
-                    'properties' => [
-                        'post_count' => ['type' => 'integer'],
-                        'page_count' => ['type' => 'integer']
-                    ]
                 ]
             ]
         ],
@@ -87,21 +68,46 @@ add_action( 'abilities_api_init', function() {
             return $result;
         },
         'permission_callback' => function() {
-            // Allow any authenticated user
-            return is_user_logged_in();
+            return current_user_can( 'read' );
         }
     ]);
 });
 ```
 
-### Step 3: Create Your MCP Server
+### Step 3: Initialize MCP Adapter
 
-Now let's create an MCP server that exposes this ability:
-
+**If using Composer with Jetpack Autoloader (Recommended):**
 ```php
+<?php
+// Load Jetpack autoloader (handles version conflicts)
+require_once __DIR__ . '/vendor/autoload_packages.php';
+
 use WP\MCP\Core\McpAdapter;
 
-// Hook into the MCP adapter initialization
+// Initialize the adapter
+McpAdapter::instance();
+```
+
+**If using standard Composer autoloader:**
+```php
+<?php
+// Load standard Composer autoloader
+require_once __DIR__ . '/vendor/autoload.php';
+
+use WP\MCP\Core\McpAdapter;
+
+// Initialize the adapter
+McpAdapter::instance();
+```
+
+**If using WordPress Plugin:**
+The adapter initializes automatically when the plugin is activated.
+
+### Step 4: Create Your MCP Server (Optional)
+
+The adapter creates a default server automatically, but you can create custom servers:
+
+```php
 add_action( 'mcp_adapter_init', function( $adapter ) {
     $adapter->create_server(
         'my-first-server',                          // Unique server ID
@@ -110,94 +116,71 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'My First MCP Server',                      // Human-readable name
         'A simple MCP server for demonstration',    // Description
         '1.0.0',                                    // Version
-        [                                           // Transport methods
-            \WP\MCP\Transport\HttpTransport::class,
-        ],
+        [ \WP\MCP\Transport\HttpTransport::class ], // Transport methods
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
-        [                                           // Abilities to expose as tools
-            'my-plugin/get-site-info'
-        ]
+        [ 'my-plugin/get-site-info' ]              // Abilities to expose as tools
     );
 });
 ```
 
-### Step 4: Test Your Setup
+### Step 5: Test Your Setup
 
-That's it! Your MCP server is now running. You can test it by making a REST API request:
+Test your MCP server:
 
+**Using WP-CLI (STDIO transport):**
 ```bash
 # List available tools
-curl -X POST "https://yoursite.com/wp-json/my-plugin/mcp" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "method": "tools/list"
-  }'
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
 
 # Execute the site info tool
-curl -X POST "https://yoursite.com/wp-json/my-plugin/mcp" \
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-get-site-info","arguments":{"include_stats":true}}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+```
+
+**Using HTTP REST API:**
+```bash
+# Test basic connectivity
+curl "https://yoursite.com/wp-json/"
+
+# Test MCP endpoint (requires authentication)
+curl -X POST "https://yoursite.com/wp-json/mcp-adapter/v1/mcp" \
   -H "Content-Type: application/json" \
-  -d '{
-    "method": "tools/call",
-    "params": {
-      "name": "my-plugin--get-site-info",
-      "arguments": {
-        "include_stats": true
-      }
-    }
-  }'
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
 ## What Just Happened?
 
-1. **Ability Registration**: You created a WordPress ability that can retrieve site information
-2. **MCP Server Creation**: You set up an MCP server that exposes this ability as a tool
-3. **REST API Integration**: The adapter automatically created REST endpoints for your MCP server
-4. **Tool Availability**: AI agents can now discover and use your `get-site-info` functionality
+1. **Ability Registration**: You created a WordPress ability that retrieves site information
+2. **Automatic Exposure**: The MCP Adapter automatically exposes your ability as an MCP tool
+3. **REST API Integration**: The adapter created REST endpoints for MCP communication
+4. **AI Agent Access**: AI agents can now discover and use your functionality
 
 ## Next Steps
 
-Now that you have a working setup, explore these areas:
+### Learn More
+- **[Creating Abilities](../guides/creating-abilities.md)** - Build tools, resources, and prompts
+- **[Installation Guide](installation.md)** - Detailed installation options
+- **[Architecture Overview](../architecture/overview.md)** - Understand system design
 
-### **Expand Your Tools**
+### Advanced Topics
+- **[Error Handling](../guides/error-handling.md)** - Custom logging and monitoring
+- **[Transport Permissions](../guides/transport-permissions.md)** - Authentication and authorization
+- **[CLI Usage](../guides/cli-usage.md)** - Command-line MCP server management
 
-- [Creating More Abilities](../guides/creating-abilities.md) - Learn to build complex abilities
-- [Working with Resources](../guides/creating-abilities.md#resources) - Expose data as MCP resources
-- [Building Prompts](../guides/creating-abilities.md#prompts) - Create AI guidance systems
+## Troubleshooting
 
-### **Customize Your Setup**
+**MCP Adapter not found?**
+- Verify installation method (Composer vs Plugin)
+- Check autoloader is loaded correctly
+- Ensure WordPress Abilities API is available
 
-- [Custom Transport Layers](../guides/custom-transports.md) - Build specialized communication protocols
-- [Error Handling](../guides/error-handling.md) - Implement custom logging and monitoring
-- [Multi-Server Configurations](../guides/multi-server-setup.md) - Manage multiple MCP endpoints
-
-### **Real-World Examples**
-
-- [Creating Abilities](../guides/creating-abilities.md) - Complete implementation guide
-- [Architecture Overview](../architecture/overview.md) - Understand the system design
-
-## Common Issues
-
-**Server not responding?**
-
-- Verify the autoloader is loaded correctly
-- Check that WordPress Abilities API is available
-- Ensure your REST API is working (`/wp-json/`)
-
-**Permission errors?**
-
-- Review your ability's `permission_callback`
+**REST API not responding?**
+- Test basic REST API: `curl "https://yoursite.com/wp-json/"`
+- Verify permalink structure is not "Plain"
 - Check WordPress user authentication
-- Verify REST API permissions
 
 **Tool not appearing?**
+- Confirm ability is registered during `abilities_api_init`
+- Verify ability name matches exactly in server configuration
+- Check permission callback allows current user
 
-- Confirm ability is registered before `mcp_adapter_init`
-- Check server configuration
-- Verify ability name matches exactly
-
-For more troubleshooting help, see our [Troubleshooting Guide](../troubleshooting/common-issues.md).
-
----
-
-**Ready to dive deeper?** Explore the [Creating Abilities guide](../guides/creating-abilities.md) or check
-the [Architecture Overview](../architecture/overview.md).
+For detailed troubleshooting, see the [Installation Guide](installation.md#troubleshooting).
