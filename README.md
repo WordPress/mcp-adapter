@@ -188,15 +188,64 @@ This adapter requires the [WordPress Abilities API](https://github.com/WordPress
 
 ## Installation
 
-### As a plugin
+### With Composer (Primary Installation Method)
 
-The best and easiest way to try and use the MCP Adapter is to install it as a plugin by downloading the latest release from the [GitHub Releases page](https://github.com/WordPress/mcp-adapter/releases/latest).
-
-#### With WP-CLI
+The MCP Adapter is designed to be installed as a Composer package. This is the primary and recommended installation method:
 
 ```bash
-wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip
+composer require wordpress/abilities-api wordpress/mcp-adapter
 ```
+
+This will automatically install both the WordPress Abilities API and MCP Adapter as dependencies in your project.
+
+#### Using Jetpack Autoloader (Highly Recommended)
+
+When multiple plugins use the MCP Adapter, it's highly recommended to use the [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) to prevent version conflicts. The Jetpack Autoloader ensures that only the latest version of shared packages is loaded, eliminating conflicts when different plugins use different versions of the same dependency.
+
+Add the Jetpack Autoloader to your project:
+
+```bash
+composer require automattic/jetpack-autoloader
+```
+
+Then load it in your main plugin file instead of the standard Composer autoloader:
+
+```php
+<?php
+// Load the Jetpack autoloader instead of vendor/autoload.php
+require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload_packages.php';
+```
+
+**Benefits of using Jetpack Autoloader:**
+- **Version Conflict Resolution**: Automatically loads the latest version of shared packages
+- **Plugin Compatibility**: Prevents errors when multiple plugins use different versions of MCP Adapter
+- **WordPress Optimized**: Designed specifically for WordPress plugin development
+- **Automatic Management**: No manual intervention needed when plugins update their dependencies
+
+### As a Plugin (Alternative Method)
+
+Alternatively, you can install the MCP Adapter as a traditional WordPress plugin, though the Composer package method is preferred for most use cases.
+
+#### From GitHub Releases
+
+Download the latest stable release from the [GitHub Releases page](https://github.com/WordPress/mcp-adapter/releases/latest).
+
+#### Development Version (Git Clone)
+
+For the latest development version or to contribute to the project:
+
+```bash
+# Clone the repository
+git clone https://github.com/WordPress/mcp-adapter.git wp-content/plugins/mcp-adapter
+
+# Navigate to the plugin directory
+cd wp-content/plugins/mcp-adapter
+
+# Install dependencies
+composer install
+```
+
+This will give you the latest development version from the `trunk` branch with all dependencies installed.
 
 #### With WP-Env
 
