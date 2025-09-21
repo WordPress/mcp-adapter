@@ -233,18 +233,6 @@ class ToolsHandler {
 		 */
 		$ability = $tool->get_ability();
 
-		// All tools must have WordPress abilities
-		if ( null === $ability ) {
-			$this->mcp->error_handler->log(
-				'Tool without ability found',
-				array(
-					'tool' => $tool_name,
-				)
-			);
-
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Tool is not properly configured' )['error'] );
-		}
-
 		// Run ability Permission Callback.
 		try {
 			$has_permission = $ability->has_permission( $args );
@@ -287,6 +275,38 @@ class ToolsHandler {
 		// Execute the tool callback.
 		try {
 			$result = $ability->execute( $args );
+
+			// Handle WP_Error objects that weren't converted by the ability.
+			if ( is_wp_error( $result ) ) {
+				$this->mcp->error_handler->log(
+					'Ability returned WP_Error object',
+					array(
+						'ability'       => $ability->get_name(),
+						'error_code'    => $result->get_error_code(),
+						'error_message' => $result->get_error_message(),
+					)
+				);
+
+				// Track ability WP_Error event.
+				$this->mcp->observability_handler::record_event(
+					'mcp.tool.ability_wp_error',
+					array(
+						'tool_name'    => $tool_name,
+						'ability_name' => $ability->get_name(),
+						'error_code'   => $result->get_error_code(),
+						'server_id'    => $this->mcp->get_server_id(),
+					)
+				);
+
+				// Convert WP_Error to standard error array format.
+				return array(
+					'error' => array(
+						'code'    => $result->get_error_code(),
+						'message' => $result->get_error_message(),
+						'data'    => $result->get_error_data(),
+					),
+				);
+			}
 
 			// Track successful tool execution.
 			$this->mcp->observability_handler::record_event(
