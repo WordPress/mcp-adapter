@@ -1,91 +1,51 @@
 # Error Handling
 
-This guide covers the error handling system in the MCP Adapter. The system uses an interface-based approach that separates error logging from error response creation, making it easy to integrate with existing monitoring systems.
-
-## Table of Contents
-
-1. [System Overview](#system-overview)
-2. [Error Handler Interface](#error-handler-interface)
-3. [Error Factory for Response Creation](#error-factory-for-response-creation)
-4. [Built-in Error Handlers](#built-in-error-handlers)
-5. [Creating Custom Error Handlers](#creating-custom-error-handlers)
-6. [Advanced Integration Examples](#advanced-integration-examples)
+The MCP Adapter uses a two-part error handling system that separates error logging from error response creation.
 
 ## System Overview
 
-The MCP Adapter uses an interface-based error handling system that separates concerns:
+The error handling system has two main components:
 
-- **Error Logging**: Handled by implementations of `McpErrorHandlerInterface`
-- **Error Response Creation**: Handled by the static `McpErrorFactory` class
-- **Error Response Formatting**: Handled directly by transport classes
-
-### Key Benefits
-
-✅ **Flexible Architecture**: Interface allows multiple implementations  
-✅ **Clean Separation**: Error creation vs. error logging separated  
-✅ **Easy Testing**: Can mock interfaces easily  
-✅ **Dependency Injection**: Can inject different handlers based on environment  
-✅ **SOLID Principles**: Follows Interface Segregation and Dependency Inversion  
-
-### Architecture Overview
+- **Error Logging**: `McpErrorHandlerInterface` implementations log errors for monitoring
+- **Error Response Creation**: `McpErrorFactory` creates standardized JSON-RPC error responses
 
 ```php
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
-// Error logging (for monitoring/debugging)
+// Error logging
 interface McpErrorHandlerInterface {
     public function log(string $message, array $context = [], string $type = 'error'): void;
 }
 
-// Error response creation (for clients)
+// Error response creation
 class McpErrorFactory {
-    public static function missing_parameter(int $id, string $parameter): array;
     public static function tool_not_found(int $id, string $tool): array;
+    public static function missing_parameter(int $id, string $parameter): array;
     // ... other error types
 }
 ```
 
 ## Error Handler Interface
 
-All error handlers implement the simple `McpErrorHandlerInterface`:
+Error handlers implement `McpErrorHandlerInterface`:
 
 ```php
-use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-
 interface McpErrorHandlerInterface {
-    /**
-     * Log an error message with optional context and type.
-     *
-     * @param string $message The log message.
-     * @param array  $context Additional context data.
-     * @param string $type The log type (e.g., 'error', 'info', 'debug').
-     */
     public function log(string $message, array $context = [], string $type = 'error'): void;
 }
 ```
 
-### Context Information
+The `log()` method receives:
+- `$message`: Error description
+- `$context`: Additional data (tool name, user ID, etc.)
+- `$type`: Log level ('error', 'info', 'debug')
 
-Error handlers receive rich context information:
+## Error Factory
 
-```php
-$context = [
-    'tool_name' => 'my-plugin/create-post',
-    'user_id' => 123,
-    'request_id' => 'req_12345',
-    'ability_name' => 'my-plugin/create-post',
-    'exception' => 'Exception message...',
-    'timestamp' => '2024-01-15T10:30:00Z',
-    'server_id' => 'content-server'
-];
-```
+`McpErrorFactory` creates standardized JSON-RPC error responses:
 
-## Error Factory for Response Creation
-
-The `McpErrorFactory` class provides static methods to create standardized JSON-RPC error responses:
-
-### Available Error Types
+### Common Error Methods
 
 ```php
 // Standard JSON-RPC errors
@@ -98,16 +58,18 @@ McpErrorFactory::internal_error(int $id, string $details = ''): array
 // MCP-specific errors
 McpErrorFactory::missing_parameter(int $id, string $parameter): array
 McpErrorFactory::tool_not_found(int $id, string $tool): array
-McpErrorFactory::resource_not_found(int $id, string $resource): array
+McpErrorFactory::ability_not_found(int $id, string $ability): array
+McpErrorFactory::resource_not_found(int $id, string $resource_uri): array
 McpErrorFactory::prompt_not_found(int $id, string $prompt): array
 McpErrorFactory::permission_denied(int $id, string $details = ''): array
 McpErrorFactory::unauthorized(int $id, string $details = ''): array
 McpErrorFactory::mcp_disabled(int $id): array
+McpErrorFactory::validation_error(int $id, string $details): array
 ```
 
 ### Error Response Format
 
-All factory methods return standardized JSON-RPC 2.0 error responses:
+All methods return JSON-RPC 2.0 error responses:
 
 ```php
 $error = McpErrorFactory::tool_not_found(123, 'missing-tool');
@@ -124,10 +86,10 @@ $error = McpErrorFactory::tool_not_found(123, 'missing-tool');
 
 ### Error Codes
 
-The system uses standard JSON-RPC error codes:
+Standard JSON-RPC and MCP-specific error codes:
 
 ```php
-// Standard JSON-RPC codes (-32768 to -32000)
+// Standard JSON-RPC codes
 const PARSE_ERROR      = -32700;
 const INVALID_REQUEST  = -32600;
 const METHOD_NOT_FOUND = -32601;
@@ -135,88 +97,59 @@ const INVALID_PARAMS   = -32602;
 const INTERNAL_ERROR   = -32603;
 
 // MCP-specific codes (-32000 to -32099)
-const MCP_DISABLED       = -32000;
-const MISSING_PARAMETER  = -32001;
-const RESOURCE_NOT_FOUND = -32002;
-const TOOL_NOT_FOUND     = -32003;
-const PROMPT_NOT_FOUND   = -32004;
-const PERMISSION_DENIED  = -32008;
-const UNAUTHORIZED       = -32010;
+const SERVER_ERROR       = -32000; // Generic server error (includes MCP disabled)
+const TIMEOUT_ERROR      = -32001; // Request timeout
+const RESOURCE_NOT_FOUND = -32002; // Resource not found
+const TOOL_NOT_FOUND     = -32003; // Tool not found
+const PROMPT_NOT_FOUND   = -32004; // Prompt not found
+const PERMISSION_DENIED  = -32008; // Access denied
+const UNAUTHORIZED       = -32010; // Authentication required
+```
+
+### HTTP Status Mapping
+
+The factory includes methods to map JSON-RPC error codes to HTTP status codes:
+
+```php
+// Get HTTP status for error response
+$http_status = McpErrorFactory::get_http_status_for_error($error_response);
+
+// Direct mapping
+$http_status = McpErrorFactory::mcp_error_to_http_status(-32003); // Returns 404
 ```
 
 ## Built-in Error Handlers
 
 ### ErrorLogMcpErrorHandler
 
-Logs errors to PHP's error log with structured context:
+Logs errors to PHP error log with structured context and user information:
 
 ```php
-use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
-
-class ErrorLogMcpErrorHandler implements McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void {
-        $user_id = function_exists('get_current_user_id') ? get_current_user_id() : 0;
-        $log_message = sprintf(
-            '[%s] %s | Context: %s | User ID: %d',
-            strtoupper($type),
-            $message,
-            wp_json_encode($context),
-            $user_id
-        );
-        error_log($log_message);
-    }
-}
+$handler = new ErrorLogMcpErrorHandler();
+$handler->log('Tool execution failed', ['tool_name' => 'my-tool'], 'error');
+// Logs: [ERROR] Tool execution failed | Context: {"tool_name":"my-tool"} | User ID: 123
 ```
 
 ### NullMcpErrorHandler
 
-No-op handler for environments where logging is not desired:
+No-op handler that ignores all errors (useful for testing or when logging is disabled):
 
 ```php
-use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
-
-class NullMcpErrorHandler implements McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void {
-        // Do nothing
-    }
-}
-```
-
-### Using Built-in Handlers
-
-```php
-add_action('mcp_adapter_init', function($adapter) {
-    $adapter->create_server(
-        'my-server',
-        'my-plugin',
-        'mcp',
-        'My MCP Server',
-        'Description',
-        '1.0.0',
-        [\WP\MCP\Transport\HttpTransport::class],
-        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
-        [\WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class],
-        ['my-plugin/my-tool']
-    );
-});
+$handler = new NullMcpErrorHandler();
+$handler->log('This will not be logged', [], 'error'); // Does nothing
 ```
 
 ## Creating Custom Error Handlers
 
-### Simple Custom Handler
+Implement the `McpErrorHandlerInterface` to create custom error handlers:
 
-Create a custom handler by implementing the interface:
+### File-based Handler
 
 ```php
-<?php
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 
-class MyCustomErrorHandler implements McpErrorHandlerInterface {
-    
+class FileErrorHandler implements McpErrorHandlerInterface {
     public function log(string $message, array $context = [], string $type = 'error'): void {
-        // Log to custom file
         $log_entry = sprintf(
             '[%s] %s | Context: %s',
             strtoupper($type),
@@ -229,141 +162,79 @@ class MyCustomErrorHandler implements McpErrorHandlerInterface {
             $log_entry . "\n",
             FILE_APPEND | LOCK_EX
         );
-        
-        // Also send to external service (optional)
-        if ( function_exists( 'my_monitoring_service' ) ) {
-            my_monitoring_service( $message, $context, $type );
-        }
     }
 }
 ```
 
-### External Service Integration
-
-Simple integration with external monitoring:
+### External Service Handler
 
 ```php
-<?php
-use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-
 class ExternalServiceErrorHandler implements McpErrorHandlerInterface {
-    
     public function log(string $message, array $context = [], string $type = 'error'): void {
-        // Send to external service
-        $this->send_to_service($message, $context, $type);
+        wp_remote_post('https://your-monitoring-service.com/api/errors', [
+            'body' => wp_json_encode([
+                'message' => $message,
+                'context' => $context,
+                'level' => $type,
+                'site' => get_site_url()
+            ]),
+            'headers' => ['Content-Type' => 'application/json'],
+            'timeout' => 5
+        ]);
         
         // Fallback to local logging
         error_log("[MCP {$type}] {$message}");
     }
-    
-    private function send_to_service(string $message, array $context, string $type): void {
-        $data = [
-            'message' => $message,
-            'context' => $context,
-            'level' => $type,
-            'timestamp' => time(),
-            'site' => get_site_url()
-        ];
-        
-        wp_remote_post('https://your-monitoring-service.com/api/errors', [
-            'body' => wp_json_encode($data),
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . get_option('monitoring_api_key')
-            ],
-            'timeout' => 5
-        ]);
-    }
 }
 ```
 
-## Advanced Integration Examples
+## Usage in Practice
 
-### Multi-Handler Setup
+### Handler Helper Trait
 
-Route different error types to different handlers:
+Most handlers use the `HandlerHelperTrait` which provides convenience methods:
 
 ```php
-class MultiErrorHandler implements McpErrorHandlerInterface {
+use WP\MCP\Handlers\HandlerHelperTrait;
+
+class MyHandler {
+    use HandlerHelperTrait;
     
-    public function log(string $message, array $context = [], string $type = 'error'): void {
-        // Always log to file
-        error_log("[MCP {$type}] {$message}");
-        
-        // Send critical errors to external service
-        if ($type === 'critical') {
-            $this->send_to_external_service($message, $context);
+    public function handle_request($request) {
+        // Create error responses easily
+        if (!$this->validate_params($request)) {
+            return $this->missing_parameter_error('required_param', $request['id']);
         }
         
-        // Send errors to email for important tools
-        if (isset($context['tool_name']) && $this->is_important_tool($context['tool_name'])) {
-            $this->send_email_alert($message, $context);
+        // Handle other errors
+        if (!$this->check_permissions()) {
+            return $this->permission_denied_error('resource_access', $request['id']);
         }
     }
-    
-    private function send_to_external_service(string $message, array $context): void {
-        wp_remote_post('https://monitoring.example.com/api/alerts', [
-            'body' => wp_json_encode(['message' => $message, 'context' => $context]),
-            'headers' => ['Content-Type' => 'application/json']
-        ]);
-    }
-    
-    private function send_email_alert(string $message, array $context): void {
-        wp_mail(
-            get_option('admin_email'),
-            'MCP Error Alert',
-            "Error: {$message}\nContext: " . wp_json_encode($context)
-        );
-    }
-    
-    private function is_important_tool(string $tool_name): bool {
-        $important_tools = ['payment-processor', 'user-manager', 'security-scanner'];
-        return in_array($tool_name, $important_tools);
-    }
 }
 ```
 
+### HTTP Transport Integration
 
-
-## Testing Your Error Handlers
-
-### Simple Testing
-
-Test your error handler with basic verification:
+The HTTP transport automatically maps error codes to HTTP status codes:
 
 ```php
-// Test that your handler logs correctly
-$handler = new MyCustomErrorHandler();
-$handler->log('Test error message', ['tool_name' => 'test-tool'], 'error');
+// In transport handlers
+$error_response = McpErrorFactory::tool_not_found(123, 'missing-tool');
+$http_status = McpErrorFactory::get_http_status_for_error($error_response); // Returns 404
 
-// Check that the log file was created
-$log_file = WP_CONTENT_DIR . '/mcp-errors.log';
-if (file_exists($log_file)) {
-    echo "Error handler working correctly";
+return new WP_REST_Response($error_response, $http_status);
+```
+
+### JSON-RPC Message Validation
+
+The factory includes message validation for proper JSON-RPC structure:
+
+```php
+$validation_result = McpErrorFactory::validate_jsonrpc_message($request);
+if (is_array($validation_result)) {
+    // Validation failed, $validation_result contains error response
+    return new WP_REST_Response($validation_result, 400);
 }
+// Validation passed
 ```
-
-### Error Factory Testing
-
-Verify error responses have the correct format:
-
-```php
-// Test error factory output
-$error = McpErrorFactory::tool_not_found(123, 'missing-tool');
-
-// Should return proper JSON-RPC error format
-assert($error['jsonrpc'] === '2.0');
-assert($error['id'] === 123);
-assert($error['error']['code'] === -32003);
-assert(strpos($error['error']['message'], 'missing-tool') !== false);
-```
-
-This error handling system provides a clean, flexible foundation for building robust MCP integrations.
-
-## Next Steps
-
-- **Configure [Transport Permissions](transport-permissions.md)** for custom authentication with robust error handling
-- **Review [Architecture Overview](../architecture/overview.md)** to understand how error handling fits into the overall system
-- **Explore [Testing Guide](testing.md)** for comprehensive testing strategies
-- **Check [Troubleshooting Guide](../troubleshooting/common-issues.md)** for debugging help
-- **See [Creating Abilities](creating-abilities.md)** for complete implementations
