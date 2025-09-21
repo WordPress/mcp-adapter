@@ -60,8 +60,21 @@ For detailed information about MCP components, see the [Model Context Protocol s
 ./includes/
 │   # Core system components
 ├── Core/
-│   ├── McpAdapter.php # Main registry and server management
-│   └── McpServer.php  # Individual server configuration
+│   ├── McpAdapter.php         # Main registry and server management
+│   ├── McpServer.php          # Individual server configuration
+│   ├── McpComponentRegistry.php # Component registration and management
+│   └── McpTransportFactory.php # Transport instantiation factory
+│
+│   # Built-in abilities for MCP functionality
+├── Abilities/
+│   ├── DiscoverAbilitiesAbility.php # Ability discovery
+│   ├── ExecuteAbilityAbility.php    # Ability execution
+│   └── GetAbilityInfoAbility.php    # Ability introspection
+│
+│   # CLI and STDIO transport support
+├── Cli/
+│   ├── McpCommand.php         # WP-CLI commands
+│   └── StdioServerBridge.php  # STDIO transport bridge
 │
 │   # Business logic and MCP components
 ├── Domain/
@@ -86,11 +99,12 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │
 │   # Request processing handlers
 ├── Handlers/
-│   ├── Initialize/  # Initialization handlers
-│   ├── Tools/       # Tool request handlers
-│   ├── Resources/   # Resource request handlers
-│   ├── Prompts/     # Prompt request handlers
-│   └── System/      # System request handlers
+│   ├── HandlerHelperTrait.php  # Shared handler utilities
+│   ├── Initialize/              # Initialization handlers
+│   ├── Tools/                   # Tool request handlers
+│   ├── Resources/               # Resource request handlers
+│   ├── Prompts/                 # Prompt request handlers
+│   └── System/                  # System request handlers
 │
 │   # Infrastructure concerns
 ├── Infrastructure/
@@ -112,21 +126,26 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │   # Transport layer implementations
 ├─── Transport/
 │   ├── Contracts/
-│   │   └── McpTransportInterface.php  # Transport interface
-│   │   # HTTP-based transports
-│   │   # Transport interfaces
+│   │   ├── McpTransportInterface.php     # Base transport interface
+│   │   └── McpRestTransportInterface.php # REST transport interface
+│   ├── HttpTransport.php                 # Unified HTTP transport (MCP 2025-06-18)
+│   │   # Legacy HTTP transports (deprecated)
 │   ├── Http/
-│   │   ├── RestTransport.php        # REST API transport
-│   │   └── StreamableTransport.php  # Streaming transport
+│   │   ├── RestTransport.php            # Legacy REST API transport
+│   │   └── StreamableTransport.php      # Legacy streaming transport
 │   │   # Transport infrastructure
 │   └── Infrastructure/
-│       ├── McpRequestRouter.php         # Request routing
+│       ├── HttpRequestContext.php       # HTTP request context
+│       ├── HttpRequestHandler.php       # HTTP request processing
+│       ├── HttpSessionValidator.php     # Session validation
+│       ├── JsonRpcResponseBuilder.php   # JSON-RPC response building
 │       ├── McpTransportContext.php      # Transport context
-│       └── McpTransportHelperTrait.php  # Helper trait
+│       ├── RequestRouter.php            # Request routing
+│       └── SessionManager.php           # Session management
 │
-│   # Plugin Wrapper - these won't be needed if/when merged into core.
-├── Autoloader.php  # PSR-4 autoloader.
-└── Plugin.php      # Plugin entrypoint.
+│   # Server factories
+├── Servers/
+    └── DefaultServerFactory.php  # Default server creation
 ```
 
 ### Key Classes
