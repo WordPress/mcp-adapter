@@ -58,6 +58,13 @@ class McpPrompt {
 	private array $arguments;
 
 	/**
+	 * Optional properties describing prompt metadata.
+	 *
+	 * @var array
+	 */
+	private array $annotations;
+
+	/**
 	 * The MCP server instance this prompt belongs to.
 	 *
 	 * @var \WP\MCP\Core\McpServer
@@ -72,19 +79,22 @@ class McpPrompt {
 	 * @param string|null $title Optional human-readable name for display.
 	 * @param string|null $description Optional human-readable description.
 	 * @param array       $arguments Optional list of arguments for customization.
+	 * @param array       $annotations Optional properties describing prompt metadata.
 	 */
 	public function __construct(
 		string $ability,
 		string $name,
 		?string $title = null,
 		?string $description = null,
-		array $arguments = array()
+		array $arguments = array(),
+		array $annotations = array()
 	) {
 		$this->ability     = $ability;
 		$this->name        = $name;
 		$this->title       = $title;
 		$this->description = $description;
 		$this->arguments   = $arguments;
+		$this->annotations = $annotations;
 	}
 
 	/**
@@ -121,6 +131,15 @@ class McpPrompt {
 	 */
 	public function get_arguments(): array {
 		return $this->arguments;
+	}
+
+	/**
+	 * Get the annotations.
+	 *
+	 * @return array
+	 */
+	public function get_annotations(): array {
+		return $this->annotations;
 	}
 
 	/**
@@ -163,6 +182,17 @@ class McpPrompt {
 	 */
 	public function set_arguments( array $arguments ): void {
 		$this->arguments = $arguments;
+	}
+
+	/**
+	 * Set the annotations.
+	 *
+	 * @param array $annotations The annotations to set.
+	 *
+	 * @return void
+	 */
+	public function set_annotations( array $annotations ): void {
+		$this->annotations = $annotations;
 	}
 
 	/**
@@ -223,6 +253,29 @@ class McpPrompt {
 	}
 
 	/**
+	 * Add an annotation.
+	 *
+	 * @param string $key The annotation key.
+	 * @param mixed  $value The annotation value.
+	 *
+	 * @return void
+	 */
+	public function add_annotation( string $key, $value ): void {
+		$this->annotations[ $key ] = $value;
+	}
+
+	/**
+	 * Remove an annotation.
+	 *
+	 * @param string $key The annotation key to remove.
+	 *
+	 * @return void
+	 */
+	public function remove_annotation( string $key ): void {
+		unset( $this->annotations[ $key ] );
+	}
+
+	/**
 	 * Convert the prompt to an array representation according to MCP specification.
 	 *
 	 * @return array
@@ -243,6 +296,10 @@ class McpPrompt {
 
 		if ( ! empty( $this->arguments ) ) {
 			$prompt_data['arguments'] = $this->arguments;
+		}
+
+		if ( ! empty( $this->annotations ) ) {
+			$prompt_data['annotations'] = $this->annotations;
 		}
 
 		return $prompt_data;
@@ -273,7 +330,8 @@ class McpPrompt {
 			$data['name'] ?? '',
 			$data['title'] ?? null,
 			$data['description'] ?? null,
-			$data['arguments'] ?? array()
+			$data['arguments'] ?? array(),
+			$data['annotations'] ?? array()
 		);
 
 		$prompt->set_mcp_server( $mcp_server );

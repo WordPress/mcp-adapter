@@ -95,6 +95,11 @@ class RegisterAbilityAsMcpPrompt {
 			$prompt_data['arguments'] = $ability_meta['arguments'];
 		}
 
+		// Get annotations from ability meta
+		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
+			$prompt_data['annotations'] = $ability_meta['annotations'];
+		}
+
 		return $prompt_data;
 	}
 

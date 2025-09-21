@@ -49,6 +49,13 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	protected array $arguments = array();
 
 	/**
+	 * The prompt annotations.
+	 *
+	 * @var array
+	 */
+	protected array $annotations = array();
+
+	/**
 	 * Build and return the MCP prompt instance.
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt The built prompt.
@@ -72,6 +79,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			$this->title,
 			$this->description,
 			$this->arguments,
+			$this->annotations,
 			$builder
 		) extends McpPrompt {
 			private McpPromptBuilderInterface $builder;
@@ -82,9 +90,10 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 				?string $title,
 				?string $description,
 				array $arguments,
+				array $annotations,
 				McpPromptBuilderInterface $builder
 			) {
-				parent::__construct( $ability, $name, $title, $description, $arguments );
+				parent::__construct( $ability, $name, $title, $description, $arguments, $annotations );
 				$this->builder = $builder;
 			}
 
@@ -163,6 +172,19 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		}
 
 		return $this->arguments;
+	}
+
+	/**
+	 * Get the prompt annotations.
+	 *
+	 * @return array The prompt annotations.
+	 */
+	public function get_annotations(): array {
+		if ( empty( $this->name ) ) {
+			$this->configure();
+		}
+
+		return $this->annotations;
 	}
 
 	/**
