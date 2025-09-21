@@ -1,21 +1,12 @@
 # MCP Adapter
 
-[*Part of the **AI Building Blocks for WordPress** initiative*](https://make.wordpress.org/ai/2025/07/17/ai-building-blocks)
+Part of the [**AI Building Blocks for WordPress** initiative](https://make.wordpress.org/ai/2025/07/17/ai-building-blocks)
 
-A canonical plugin for WordPress that provides the adapter for the WordPress Abilities API, enabling WordPress abilities to be exposed as
-MCP (Model Context Protocol) tools, resources, and prompts. This adapter serves as the foundation for integrating
-WordPress abilities with AI agents through the MCP specification.
+The official WordPress package for MCP integration that exposes WordPress abilities as [Model Context Protocol (MCP)](https://modelcontextprotocol.io) tools, resources, and prompts for AI agents.
 
 ## Overview
 
-The MCP Adapter bridges the gap between WordPress's Abilities API and the Model Context Protocol (MCP), allowing
-WordPress applications to expose their functionality to AI agents in a standardized, secure, and extensible way. It
-provides a clean abstraction layer that converts WordPress abilities into MCP-compatible interfaces.
-
-**Built for Extensibility**: The adapter ships with production-ready REST API and streaming transport protocols, plus a
-default error handling system. However, it's designed to be easily extended - create custom transport protocols for
-specialized communication needs or implement custom error handlers for advanced logging, monitoring, and notification
-systems.
+This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
 
 ## Features
 
@@ -24,9 +15,11 @@ systems.
 - **Ability-to-MCP Conversion**: Automatically converts WordPress abilities into MCP tools, resources, and prompts
 - **Multi-Server Management**: Create and manage multiple MCP servers with unique configurations
 - **Extensible Transport Layer**:
-    - **Built-in Transports**: REST API (`RestTransport`) and Streaming (`StreamableTransport`) protocols included
-    - **Custom Transport Support**: Implement `McpTransportInterface` to create custom communication protocols
-    - **Multiple Transport per Server**: Configure servers with multiple transport methods simultaneously
+    - **HTTP Transport**: Unified transport implementing [MCP 2025-06-18 specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports.md) for HTTP-based communication
+    - **STDIO Transport**: Process-based communication via standard input/output for local development and CLI integration
+    - **Legacy Transports**: Deprecated REST API and streaming implementations (use HTTP transport instead)
+    - **Custom Transport Support**: Implement `McpTransportInterface` to create specialized communication protocols
+    - **Multi-Transport Configuration**: Configure servers with multiple transport methods simultaneously
 - **Flexible Error Handling**:
     - **Built-in Error Handler**: Default WordPress-compatible error logging included
     - **Custom Error Handlers**: Implement `McpErrorHandlerInterface` for custom logging, monitoring, or notification
@@ -41,82 +34,23 @@ systems.
 
 ### MCP Component Support
 
-- **Tools**: Convert abilities into executable MCP tools
-- **Resources**: Expose abilities as MCP resources for data access
-- **Prompts**: Transform abilities into structured MCP prompts
-- **Server Discovery**: Automatic registration and discovery of MCP servers
+- **[Tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools.md)**: Convert WordPress abilities into executable MCP tools for AI agent interactions
+- **[Resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources.md)**: Expose WordPress data as MCP resources for contextual information access
+- **[Prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts.md)**: Transform abilities into structured MCP prompts for AI guidance and templates
+- **Server Discovery**: Automatic registration and discovery of MCP servers following MCP protocol standards
+- **Built-in Abilities**: Core WordPress abilities for system introspection and ability management
+- **CLI Integration**: WP-CLI commands supporting STDIO transport as defined in MCP specification
 
 ## Understanding Abilities as MCP Components
 
-The MCP Adapter's core strength lies in its ability to transform WordPress abilities into different MCP component types,
-each serving distinct interaction patterns with AI agents.
+The MCP Adapter transforms WordPress abilities into MCP components:
 
-### Abilities as Tools
+- **Tools**: WordPress abilities become executable MCP tools for AI agent interactions
+- **Resources**: WordPress abilities expose data as MCP resources for contextual information
+- **Prompts**: WordPress abilities provide structured MCP prompts for AI guidance
 
-**Purpose**: Interactive, action-oriented functionality that AI agents can execute with specific parameters.
+For detailed information about MCP components, see the [Model Context Protocol specification](https://modelcontextprotocol.io/specification/2025-06-18/).
 
-**When to Use**:
-
-- Operations that modify data or state (creating posts, updating settings)
-- Search and query operations that require dynamic parameters
-- Actions that return computed results based on input parameters
-- Functions that perform business logic or data processing
-
-**Characteristics**:
-
-- Accept input parameters defined by the ability's input schema
-- Execute the ability's callback function with provided arguments
-- Return structured results based on the ability's output schema
-- Respect permission callbacks for access control
-- Can have side effects (create, update, delete operations)
-
-### Abilities as Resources
-
-**Purpose**: Static or semi-static data access that provides information without requiring complex input parameters.
-
-**When to Use**:
-
-- Providing current user information or site metadata
-- Exposing configuration data or system status
-- Offering read-only access to data collections
-- Sharing contextual information that doesn't change frequently
-
-**Characteristics**:
-
-- Primarily data retrieval operations with minimal or no input parameters
-- Focus on providing information rather than performing actions
-- Results are typically cacheable and may not change frequently
-- Often used for context gathering by AI agents
-- Generally read-only operations without side effects
-
-### Abilities as Prompts
-
-**Purpose**: Structured templates that guide AI agents in generating contextually appropriate responses or suggestions.
-
-**When to Use**:
-
-- Providing advisory content (SEO recommendations, content strategy)
-- Generating analysis reports (performance assessments, security audits)
-- Offering structured prompts for content generation or optimization
-
-**Characteristics**:
-
-- Focus on generating human-readable guidance and recommendations
-- May incorporate data from other abilities or WordPress APIs
-- Designed to provide actionable insights and suggestions
-- Often combine multiple data sources to create comprehensive advice
-- Results are typically formatted for direct presentation to users
-
-### Component Selection Strategy
-
-The choice between tools, resources, and prompts depends on the intended interaction pattern:
-
-- **Choose Tools** for operations requiring user input and dynamic execution
-- **Choose Resources** for providing contextual data and system information
-- **Choose Prompts** for generating guidance, analysis, and recommendations
-
-The same WordPress ability can potentially be exposed through multiple component types, allowing different interaction
-patterns for various use cases.
 
 ## Architecture
 
