@@ -74,7 +74,7 @@ final class McpSessionManagerTest extends TestCase {
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertCount( 1, $sessions );
 		$this->assertArrayHasKey( $session_id, $sessions );
-		$this->assertSame( $client_info, $sessions[ $session_id ]['client_info'] );
+		$this->assertSame( $client_info, $sessions[ $session_id ]['client_params'] );
 	}
 
 	/**
@@ -135,8 +135,8 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertIsArray( $session_data );
 		$this->assertArrayHasKey( 'created_at', $session_data );
 		$this->assertArrayHasKey( 'last_activity', $session_data );
-		$this->assertArrayHasKey( 'client_info', $session_data );
-		$this->assertSame( $client_info, $session_data['client_info'] );
+		$this->assertArrayHasKey( 'client_params', $session_data );
+		$this->assertSame( $client_info, $session_data['client_params'] );
 	}
 
 	/**
