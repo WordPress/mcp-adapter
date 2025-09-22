@@ -48,13 +48,24 @@ final class McpAdapterConfigTest extends TestCase {
 	}
 
 	public function test_default_server_config_filter_allows_customization(): void {
-		// Mock the mcp_adapter_init action
+		// Add the filter for customization
 		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
 			$defaults['server_name'] = 'Custom Server Name';
 			$defaults['server_description'] = 'Custom Description';
 			$defaults['server_version'] = 'v2.0.0';
 			return $defaults;
 		} );
+
+		// Ensure abilities API is initialized first
+		if ( ! did_action( 'abilities_api_init' ) ) {
+			do_action( 'abilities_api_init' );
+		}
+
+		// Reset the initialized flag to allow re-initialization
+		$reflection = new \ReflectionClass( $this->adapter );
+		$initialized_property = $reflection->getProperty( 'initialized' );
+		$initialized_property->setAccessible( true );
+		$initialized_property->setValue( null, false );
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;
