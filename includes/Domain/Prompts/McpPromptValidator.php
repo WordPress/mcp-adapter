@@ -431,14 +431,16 @@ class McpPromptValidator {
 			} else {
 				$valid_audiences = array( 'user', 'assistant' );
 				foreach ( $annotations['audience'] as $audience ) {
-					if ( ! in_array( $audience, $valid_audiences, true ) ) {
-						$errors[] = sprintf(
-						/* translators: %1$d: message index, %2$s: audience value */
-							__( 'Message %1$d content annotation audience \'%2$s\' must be \'user\' or \'assistant\'', 'mcp-adapter' ),
-							$message_index,
-							$audience
-						);
+					if ( in_array( $audience, $valid_audiences, true ) ) {
+						continue;
 					}
+
+					$errors[] = sprintf(
+					/* translators: %1$d: message index, %2$s: audience value */
+						__( 'Message %1$d content annotation audience \'%2$s\' must be \'user\' or \'assistant\'', 'mcp-adapter' ),
+						$message_index,
+						$audience
+					);
 				}
 			}
 		}
