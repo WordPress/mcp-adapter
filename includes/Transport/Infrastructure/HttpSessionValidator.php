@@ -73,17 +73,17 @@ class HttpSessionValidator {
 	 * Validates user authentication and creates session, providing better error
 	 * context than direct SessionManager calls.
 	 *
-	 * @param array $client_info The client information from initialize request.
+	 * @param array $params The client parameters from initialize request.
 	 *
 	 * @return string|array Session ID on success, error array on failure.
 	 */
-	public static function create_session( array $client_info = array() ) {
+	public static function create_session( array $params = array() ) {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			return McpErrorFactory::unauthorized( 0, 'User authentication required for session creation' );
 		}
 
-		$session_id = SessionManager::create_session( $user_id, $client_info );
+		$session_id = SessionManager::create_session( $user_id, $params );
 
 		if ( ! $session_id ) {
 			return McpErrorFactory::internal_error( 0, 'Failed to create session' );

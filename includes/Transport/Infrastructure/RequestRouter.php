@@ -44,10 +44,11 @@ class RequestRouter {
 	 * @param array  $params The request parameters.
 	 * @param mixed  $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
 	 *
 	 * @return array
 	 */
-	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown' ): array {
+	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null ): array {
 		// Track request start time.
 		$start_time = microtime( true );
 
@@ -55,14 +56,14 @@ class RequestRouter {
 		$common_tags = array(
 			'method'    => $method,
 			'transport' => $transport_name,
+			'params'    => $params, // Add params for debugging
 		);
 
 		// Record request event.
 		$this->context->observability_handler::record_event( 'mcp.request.count', $common_tags );
 
 		$handlers = array(
-			'initialize'          => fn() => $this->context->initialize_handler->handle( $request_id ),
-			'init'                => fn() => $this->context->initialize_handler->handle( $request_id ),
+			'initialize'          => fn() => $this->handle_initialize_with_session( $params, $request_id, $http_context ),
 			'ping'                => fn() => $this->context->system_handler->ping( $request_id ),
 			'tools/list'          => fn() => $this->context->tools_handler->list_tools( $request_id ),
 			'tools/list/all'      => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
@@ -122,6 +123,34 @@ class RequestRouter {
 	public function add_cursor_compatibility( array $result ): array {
 		if ( ! isset( $result['nextCursor'] ) ) {
 			$result['nextCursor'] = '';
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Handle initialize requests with session management.
+	 *
+	 * @param array $params The request parameters.
+	 * @param mixed $request_id The request ID.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @return array
+	 */
+	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context ): array {
+		// Get the initialize response from the handler
+		$result = $this->context->initialize_handler->handle( $request_id );
+
+		// Handle session creation if HTTP context is provided and initialize was successful
+		if ( $http_context && ! isset( $result['error'] ) && ! $http_context->session_id ) {
+			$session_result = HttpSessionValidator::create_session( $params );
+
+			if ( is_array( $session_result ) ) {
+				// Session creation failed, return error
+				return array( 'error' => $session_result );
+			}
+
+			// Store session ID in result for HttpRequestHandler to add as header
+			$result['_session_id'] = $session_result;
 		}
 
 		return $result;

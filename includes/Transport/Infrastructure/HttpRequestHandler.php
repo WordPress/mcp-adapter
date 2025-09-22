@@ -171,15 +171,12 @@ class HttpRequestHandler {
 		$method     = $message['method'];
 		$params     = $message['params'] ?? array();
 
-		// Handle initialize request (no session validation required)
-		if ( 'initialize' === $method ) {
-			return $this->handle_initialize_request( $message, $context );
-		}
-
-		// Validate session for all other requests
-		$session_validation = HttpSessionValidator::validate_session( $context );
-		if ( true !== $session_validation ) {
-			return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
+		// Validate session for all requests except initialize (router will handle initialize session creation)
+		if ( 'initialize' !== $method ) {
+			$session_validation = HttpSessionValidator::validate_session( $context );
+			if ( true !== $session_validation ) {
+				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
+			}
 		}
 
 		// Route the request through the transport context
@@ -187,8 +184,15 @@ class HttpRequestHandler {
 			$method,
 			$params,
 			$request_id,
-			$this->get_transport_name()
+			$this->get_transport_name(),
+			$context
 		);
+
+		// Handle session header if provided by router
+		if ( isset( $result['_session_id'] ) ) {
+			$this->add_session_header_to_response( $result['_session_id'] );
+			unset( $result['_session_id'] ); // Remove from actual response data
+		}
 
 		// Format response based on result
 		if ( isset( $result['error'] ) ) {
@@ -198,45 +202,6 @@ class HttpRequestHandler {
 		return JsonRpcResponseBuilder::create_success_response( $request_id, $result );
 	}
 
-	/**
-	 * Handle initialize requests with session creation.
-	 *
-	 * @param array              $message The initialize message.
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return array JSON-RPC response.
-	 */
-	private function handle_initialize_request( array $message, HttpRequestContext $context ): array {
-		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
-		$params     = $message['params'] ?? array();
-
-		// Route the initialize request
-		$result = $this->transport_context->request_router->route_request(
-			'initialize',
-			$params,
-			$request_id,
-			$this->get_transport_name()
-		);
-
-		// Create session if initialize was successful and no existing session
-		if ( ! isset( $result['error'] ) && ! $context->session_id ) {
-			$session_result = HttpSessionValidator::create_session( $params['clientInfo'] ?? array() );
-
-			if ( is_array( $session_result ) ) {
-				// Session creation failed, return error
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_result );
-			}
-
-			$this->add_session_header_to_response( $session_result );
-		}
-
-		// Format response
-		if ( isset( $result['error'] ) ) {
-			return JsonRpcResponseBuilder::create_error_response( $request_id, $result['error'] );
-		}
-
-		return JsonRpcResponseBuilder::create_success_response( $request_id, $result );
-	}
 
 	/**
 	 * Handle GET requests (SSE streaming).

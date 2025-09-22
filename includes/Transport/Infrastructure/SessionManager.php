@@ -74,13 +74,25 @@ class SessionManager {
 	 * Create a new session for a user
 	 *
 	 * @param int $user_id The user ID.
-	 * @param array $client_info Client information from initialize request.
+	 * @param array $params Client parameters from initialize request.
 	 *
 	 * @return string|false The session ID on success, false on failure.
 	 */
-	public static function create_session( int $user_id, array $client_info = array() ) {
+	public static function create_session( int $user_id, array $params = array() ) {
 		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
 			return false;
+		}
+
+		// Debug: Log what params we're receiving
+		if ( function_exists( 'ray' ) ) {
+			ray()->orange()->label( 'SessionManager::create_session' )->send(
+				array(
+					'user_id'         => $user_id,
+					'params_received' => $params,
+					'params_count'    => count( $params ),
+					'params_keys'     => array_keys( $params ),
+				)
+			);
 		}
 
 		// Cleanup inactive sessions first
@@ -118,7 +130,7 @@ class SessionManager {
 		$sessions[ $session_id ] = array(
 			'created_at'    => $now,
 			'last_activity' => $now,
-			'client_info'   => $client_info,
+			'client_params' => $params,
 		);
 
 		// Save sessions
