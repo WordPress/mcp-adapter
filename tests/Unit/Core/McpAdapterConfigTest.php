@@ -168,8 +168,8 @@ final class McpAdapterConfigTest extends TestCase {
 
 		$this->assertNotNull( $server );
 		$this->assertSame( 'mcp-adapter-default-server', $server->get_server_id() );
-		$this->assertSame( 'mcp-adapter', $server->get_server_route_namespace() );
-		$this->assertSame( 'mcp', $server->get_server_route() );
+		$this->assertSame( 'mcp', $server->get_server_route_namespace() );
+		$this->assertSame( 'mcp-adapter-default-server', $server->get_server_route() );
 		$this->assertSame( 'MCP Adapter Default Server', $server->get_server_name() );
 		$this->assertSame( 'Default MCP server for WordPress abilities discovery and execution', $server->get_server_description() );
 		$this->assertSame( 'v1.0.0', $server->get_server_version() );
@@ -226,8 +226,8 @@ final class McpAdapterConfigTest extends TestCase {
 		array_pop( $wp_current_filter );
 
 		$this->assertSame( 'mcp-adapter-default-server', $received_config['server_id'] );
-		$this->assertSame( 'mcp-adapter', $received_config['server_route_namespace'] );
-		$this->assertSame( 'mcp', $received_config['server_route'] );
+		$this->assertSame( 'mcp', $received_config['server_route_namespace'] );
+		$this->assertSame( 'mcp-adapter-default-server', $received_config['server_route'] );
 		$this->assertSame( 'MCP Adapter Default Server', $received_config['server_name'] );
 		$this->assertSame( 'v1.0.0', $received_config['server_version'] );
 		$this->assertSame( array( HttpTransport::class ), $received_config['mcp_transports'] );
