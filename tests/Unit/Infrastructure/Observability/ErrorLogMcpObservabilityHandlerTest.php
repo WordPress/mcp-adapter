@@ -30,7 +30,7 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 
 		// Capture original error log setting
 		$this->original_error_log = ini_get( 'error_log' );
-		
+	
 		// Set up a temporary error log file for testing
 		$temp_log = tempnam( sys_get_temp_dir(), 'mcp_test_error_log' );
 		if ( $temp_log ) {

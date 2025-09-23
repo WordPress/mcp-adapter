@@ -150,7 +150,7 @@ class McpServer {
 		$this->transport_permission_callback = $transport_permission_callback;
 
 		// Setup validation flag. Validation is disabled by default for performance.
-		//Abilities API is also validating all abilities.
+		// Abilities API is also validating all abilities.
 		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 
 		// Setup handlers and components
