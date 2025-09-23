@@ -40,11 +40,7 @@ class HttpTransport implements McpRestTransportInterface {
 	 */
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->request_handler = new HttpRequestHandler( $transport_context );
-
-		// Register routes directly since we're already in the correct context
-		// For REST API: constructor runs during mcp_adapter_init which runs during rest_api_init
-		// For WP-CLI: routes not needed (uses STDIO), registration may fail silently
-		$this->register_routes();
+		add_action( 'rest_api_init', array( $this, 'register_routes' ), 16 );
 	}
 
 	/**

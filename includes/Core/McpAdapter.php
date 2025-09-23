@@ -56,8 +56,13 @@ final class McpAdapter {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
 
-			// Initialize for REST API requests with reasonable priority
-			add_action( 'rest_api_init', array( self::$instance, 'init' ), 15 );
+			// In WP-CLI context, initialize immediately so commands have access to servers
+			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
+				self::$instance->init();
+			} else {
+				// Initialize for REST API requests with reasonable priority
+				add_action( 'rest_api_init', array( self::$instance, 'init' ), 15 );
+			}
 		}
 
 		return self::$instance;

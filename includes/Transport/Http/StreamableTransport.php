@@ -51,9 +51,7 @@ class StreamableTransport implements McpRestTransportInterface {
 
 		$this->context = $context;
 
-		// Register routes directly since we're already in the correct context
-		// For REST API: constructor runs during mcp_adapter_init which runs during rest_api_init
-		// For WP-CLI: routes not needed (uses STDIO), registration may fail silently
+		add_action( 'rest_api_init', array( $this, 'register_routes' ), 16 );
 		$this->register_routes();
 	}
 
