@@ -45,6 +45,11 @@ tests_add_filter(
 // Start up the WP testing environment.
 require $_test_root . '/includes/bootstrap.php';
 
+// Load WP-CLI stubs for testing WP-CLI commands
+// This includes essential classes and functions extracted from php-stubs/wp-cli-stubs
+require_once __DIR__ . '/Stubs/WpCliStubs.php';
+\WP\MCP\Tests\Stubs\WpCliStubs::init();
+
 // Mock WordPress functions that may not be available in test environment.
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	/**
