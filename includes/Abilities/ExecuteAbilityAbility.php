@@ -68,11 +68,9 @@ final class ExecuteAbilityAbility {
 				'execute_callback'    => array( self::class, 'execute' ),
 				'meta'                => array(
 					'annotations' => array(
-						'priority'        => 1.0,
-						'readOnlyHint'    => false,
-						'destructiveHint' => false, // Depends on the executed ability
-						'idempotentHint'  => false, // Depends on the executed ability
-						'openWorldHint'   => true,  // Can execute any registered ability
+						'priority'      => 1.0,
+						'readOnlyHint'  => false,
+						'openWorldHint' => true,
 					),
 				),
 			)
