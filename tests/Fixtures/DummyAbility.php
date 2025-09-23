@@ -28,6 +28,7 @@ final class DummyAbility {
 				},
 				'meta'                => array(
 					'annotations' => array( 'group' => 'tests' ),
+					'public_mcp'  => true, // Expose via MCP for testing
 				),
 			)
 		);
@@ -45,6 +46,9 @@ final class DummyAbility {
 				'permission_callback' => static function ( array $input ) {
 					return false;
 				},
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 
@@ -61,6 +65,9 @@ final class DummyAbility {
 				'permission_callback' => static function ( array $input ) {
 					throw new \RuntimeException( 'nope' );
 				},
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 
@@ -77,6 +84,9 @@ final class DummyAbility {
 				'permission_callback' => static function ( array $input ) {
 					return true;
 				},
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 
@@ -97,6 +107,9 @@ final class DummyAbility {
 				'permission_callback' => static function ( array $input ) {
 					return true;
 				},
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 
@@ -116,6 +129,7 @@ final class DummyAbility {
 				'meta'                => array(
 					'uri'         => 'WordPress://local/resource-1',
 					'annotations' => array( 'group' => 'tests' ),
+					'public_mcp'  => true, // Expose via MCP for testing
 				),
 			)
 		);
@@ -151,6 +165,7 @@ final class DummyAbility {
 							'required'    => true,
 						),
 					),
+					'public_mcp' => true, // Expose via MCP for testing
 				),
 			)
 		);

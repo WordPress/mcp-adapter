@@ -18,10 +18,45 @@ use WP\MCP\Tests\TestCase;
  */
 final class ExecuteAbilityAbilityTest extends TestCase {
 
+	/**
+	 * User ID for authenticated tests.
+	 *
+	 * @var int
+	 */
+	private static $user_id;
+
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
 		do_action( 'abilities_api_init' );
 		DummyAbility::register_all();
+		
+		// Create a test user for authentication tests
+		self::$user_id = wp_insert_user( array(
+			'user_login' => 'testuser',
+			'user_pass'  => 'testpass',
+			'user_email' => 'test@example.com',
+			'role'       => 'administrator',
+		) );
+	}
+
+	public static function tear_down_after_class(): void {
+		// Clean up test user
+		if ( self::$user_id ) {
+			wp_delete_user( self::$user_id );
+		}
+		parent::tear_down_after_class();
+	}
+
+	public function set_up(): void {
+		parent::set_up();
+		// Set current user for each test
+		wp_set_current_user( self::$user_id );
+	}
+
+	public function tear_down(): void {
+		// Reset current user after each test
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_register_creates_ability(): void {
@@ -57,7 +92,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			'parameters' => array()
 		) );
 
-		$this->assertFalse( $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 
 	public function test_check_permission_with_empty_ability_name(): void {
@@ -66,7 +102,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			'parameters'   => array()
 		) );
 
-		$this->assertFalse( $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 
 	public function test_check_permission_with_nonexistent_ability(): void {
@@ -75,7 +112,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			'parameters'   => array()
 		) );
 
-		$this->assertFalse( $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
 	}
 
 	public function test_check_permission_with_wp_error_result(): void {
@@ -90,6 +128,9 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'permission_callback' => function() { 
 					return new \WP_Error( 'permission_denied', 'Custom permission error' ); 
 				},
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 
@@ -105,6 +146,93 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 		// Clean up
 		wp_unregister_ability( 'test/wp-error-permission' );
+	}
+
+	public function test_check_permission_requires_authentication(): void {
+		// Test with no authenticated user
+		wp_set_current_user( 0 );
+
+		$result = ExecuteAbilityAbility::check_permission( array(
+			'ability_name' => 'test/always-allowed',
+			'parameters'   => array()
+		) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'authentication_required', $result->get_error_code() );
+
+		// Restore authenticated user for other tests
+		wp_set_current_user( self::$user_id );
+	}
+
+	public function test_check_permission_requires_capability(): void {
+		// Create a user with no role (no capabilities)
+		$limited_user_id = wp_insert_user( array(
+			'user_login' => 'limiteduser',
+			'user_pass'  => 'testpass',
+			'user_email' => 'limited@example.com',
+		) );
+
+		// Explicitly remove all capabilities
+		$user = new \WP_User( $limited_user_id );
+		$user->set_role( '' ); // Remove all roles
+		$user->remove_all_caps();
+
+		wp_set_current_user( $limited_user_id );
+
+		$result = ExecuteAbilityAbility::check_permission( array(
+			'ability_name' => 'test/always-allowed',
+			'parameters'   => array()
+		) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
+
+		// Clean up
+		wp_delete_user( $limited_user_id );
+		wp_set_current_user( self::$user_id );
+	}
+
+	public function test_check_permission_with_public_mcp_metadata(): void {
+		// Test ability with public_mcp=true (should be allowed)
+		$result = ExecuteAbilityAbility::check_permission( array(
+			'ability_name' => 'test/always-allowed',
+			'parameters'   => array()
+		) );
+		$this->assertTrue( $result );
+
+		// Create a test ability without public_mcp metadata (should be blocked)
+		wp_register_ability(
+			'test/not-public-mcp',
+			array(
+				'label'               => 'Not Public MCP Test',
+				'description'         => 'Ability without public_mcp metadata',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => function() { return array( 'test' => 'result' ); },
+				'permission_callback' => function() { return true; },
+				// No public_mcp metadata - should default to false
+			)
+		);
+
+		$result = ExecuteAbilityAbility::check_permission( array(
+			'ability_name' => 'test/not-public-mcp',
+			'parameters'   => array()
+		) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'ability_not_public_mcp', $result->get_error_code() );
+
+		// Clean up
+		wp_unregister_ability( 'test/not-public-mcp' );
+	}
+
+	public function test_check_permission_with_nonexistent_ability_for_mcp_check(): void {
+		// Test with an ability that doesn't exist (should fail at MCP exposure check)
+		$result = ExecuteAbilityAbility::check_permission( array(
+			'ability_name' => 'nonexistent/test-ability',
+			'parameters'   => array()
+		) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
 	}
 
 	public function test_execute_with_valid_ability(): void {
@@ -176,6 +304,9 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 					return new \WP_Error( 'execution_failed', 'Custom execution error' ); 
 				},
 				'permission_callback' => function() { return true; },
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 
@@ -206,6 +337,9 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 					throw new \RuntimeException( 'Test execution exception' ); 
 				},
 				'permission_callback' => function() { return true; },
+				'meta'                => array(
+					'public_mcp' => true, // Expose via MCP for testing
+				),
 			)
 		);
 

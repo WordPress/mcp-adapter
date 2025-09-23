@@ -18,10 +18,45 @@ use WP\MCP\Tests\TestCase;
  */
 final class DiscoverAbilitiesAbilityTest extends TestCase {
 
+	/**
+	 * User ID for authenticated tests.
+	 *
+	 * @var int
+	 */
+	private static $user_id;
+
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
 		do_action( 'abilities_api_init' );
 		DummyAbility::register_all();
+		
+		// Create a test user for authentication tests
+		self::$user_id = wp_insert_user( array(
+			'user_login' => 'testuser',
+			'user_pass'  => 'testpass',
+			'user_email' => 'test@example.com',
+			'role'       => 'administrator',
+		) );
+	}
+
+	public static function tear_down_after_class(): void {
+		// Clean up test user
+		if ( self::$user_id ) {
+			wp_delete_user( self::$user_id );
+		}
+		parent::tear_down_after_class();
+	}
+
+	public function set_up(): void {
+		parent::set_up();
+		// Set current user for each test
+		wp_set_current_user( self::$user_id );
+	}
+
+	public function tear_down(): void {
+		// Reset current user after each test
+		wp_set_current_user( 0 );
+		parent::tear_down();
 	}
 
 	public function test_register_creates_ability(): void {
@@ -47,7 +82,68 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 		$result = DiscoverAbilitiesAbility::check_permission( array() );
 
-		$this->assertFalse( $result );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'authentication_required', $result->get_error_code() );
+	}
+
+	public function test_execute_with_public_mcp_filtering(): void {
+		$result = DiscoverAbilitiesAbility::execute( array() );
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'abilities', $result );
+		$this->assertIsArray( $result['abilities'] );
+		
+		// Should only contain abilities with public_mcp=true
+		$ability_names = array_column( $result['abilities'], 'name' );
+		$this->assertContains( 'test/always-allowed', $ability_names );
+		
+		// test/permission-denied has public_mcp=true, so it should be included
+		$this->assertContains( 'test/permission-denied', $ability_names );
+		
+		// Create an ability without public_mcp and verify it's not included
+		wp_register_ability(
+			'test/not-public',
+			array(
+				'label'               => 'Not Public Test',
+				'description'         => 'Should not appear in discovery',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => function() { return array(); },
+				'permission_callback' => function() { return true; },
+				// No public_mcp metadata
+			)
+		);
+		
+		$result2 = DiscoverAbilitiesAbility::execute( array() );
+		$ability_names2 = array_column( $result2['abilities'], 'name' );
+		$this->assertNotContains( 'test/not-public', $ability_names2 );
+		
+		// Clean up
+		wp_unregister_ability( 'test/not-public' );
+	}
+
+	public function test_check_permission_requires_capability(): void {
+		// Create a user with no role (no capabilities)
+		$limited_user_id = wp_insert_user( array(
+			'user_login' => 'limiteduser',
+			'user_pass'  => 'testpass',
+			'user_email' => 'limited@example.com',
+		) );
+
+		// Explicitly remove all capabilities
+		$user = new \WP_User( $limited_user_id );
+		$user->set_role( '' ); // Remove all roles
+		$user->remove_all_caps();
+
+		wp_set_current_user( $limited_user_id );
+
+		$result = DiscoverAbilitiesAbility::check_permission( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
+
+		// Clean up
+		wp_delete_user( $limited_user_id );
+		wp_set_current_user( self::$user_id );
 	}
 
 	public function test_execute_returns_abilities_list(): void {
