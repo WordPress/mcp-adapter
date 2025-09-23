@@ -268,11 +268,11 @@ final class McpSessionManagerTest extends TestCase {
 		$session_id = SessionManager::create_session( $this->test_user_id, array() );
 		$this->assertIsString( $session_id );
 
-		$session_before = SessionManager::get_session( $this->test_user_id, $session_id );
-		$this->assertIsArray( $session_before );
-
-		// Wait a moment
-		sleep( 1 );
+		// Directly update the timestamp to simulate time passing
+		$sessions       = \WP\MCP\Transport\Infrastructure\SessionManager::get_all_user_sessions( $this->test_user_id );
+		$old_timestamp  = time() - 2;
+		$sessions[ $session_id ]['last_activity'] = $old_timestamp;
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
 
 		// Validate session (should update last_activity)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
@@ -281,7 +281,7 @@ final class McpSessionManagerTest extends TestCase {
 		$session_after = SessionManager::get_session( $this->test_user_id, $session_id );
 		$this->assertIsArray( $session_after );
 
-		$this->assertGreaterThan( $session_before['last_activity'], $session_after['last_activity'] );
+		$this->assertGreaterThan( $old_timestamp, $session_after['last_activity'] );
 	}
 
 	/**
@@ -296,9 +296,9 @@ final class McpSessionManagerTest extends TestCase {
 			}
 		);
 
-		$session_1 = SessionManager::create_session( $this->test_user_id, array() );
-		$session_2 = SessionManager::create_session( $this->test_user_id, array() );
-		$session_3 = SessionManager::create_session( $this->test_user_id, array() );
+		SessionManager::create_session( $this->test_user_id, array() );
+		SessionManager::create_session( $this->test_user_id, array() );
+		SessionManager::create_session( $this->test_user_id, array() );
 
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertCount( 2, $sessions ); // Limit enforced
@@ -313,11 +313,11 @@ final class McpSessionManagerTest extends TestCase {
 			}
 		); // 1 second
 
-		$short_session = SessionManager::create_session( $this->test_user_id, array() );
-		$this->assertIsString( $short_session );
-
-		// Wait for expiration
-		sleep( 2 );
+		$short_session  = SessionManager::create_session( $this->test_user_id, array() );
+		// Manually expire the session by backdating its last_activity
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$sessions[ $short_session ]['last_activity'] = time() - 3;
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
 
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $short_session );
 		$this->assertFalse( $is_valid ); // Should be expired
