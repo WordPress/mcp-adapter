@@ -97,7 +97,8 @@ add_action( 'abilities_api_init', function() {
                 'priority' => 2.0,
                 'readOnlyHint' => false,
                 'destructiveHint' => false
-            ]
+            ],
+            'public_mcp' => true  // Expose this ability via MCP
         ]
     ]);
 });
@@ -143,7 +144,8 @@ add_action( 'abilities_api_init', function() {
                 'idempotentHint' => true,
                 'audience' => ['user', 'assistant'],
                 'priority' => 0.8
-            ]
+            ],
+            'public_mcp' => true  // Expose this ability via MCP
         ]
     ]);
 });
@@ -211,7 +213,8 @@ add_action( 'abilities_api_init', function() {
             'annotations' => [
                 'readOnlyHint' => true,
                 'idempotentHint' => true
-            ]
+            ],
+            'public_mcp' => true  // Expose this ability via MCP
         ]
     ]);
 });

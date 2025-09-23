@@ -10,6 +10,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ## Implementation Guides
 
+- **[Default Server](guides/default-server.md)** - Understanding the built-in MCP server and core abilities
 - **[Creating Abilities](guides/creating-abilities.md)** - Build tools, resources, and prompts with annotations
 - **[Transport Permissions](guides/transport-permissions.md)** - Custom authentication and access control
 - **[Custom Transports](guides/custom-transports.md)** - Specialized communication protocols
@@ -29,8 +30,9 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ### New to MCP Adapter
 1. [Quick Start Guide](getting-started/README.md)
-2. [Basic Examples](getting-started/basic-examples.md)
-3. [Architecture Overview](architecture/overview.md)
+2. [Default Server](guides/default-server.md)
+3. [Basic Examples](getting-started/basic-examples.md)
+4. [Architecture Overview](architecture/overview.md)
 
 ### Build Custom Tools
 1. [Creating Abilities](guides/creating-abilities.md)
