@@ -16,7 +16,7 @@ namespace WP\MCP\Transport\Infrastructure;
  * Handles session creation, validation, and cleanup using user meta storage.
  * Sessions are tied to authenticated users to prevent anonymous session flooding.
  */
-class SessionManager {
+final class SessionManager {
 
 	/**
 	 * User meta key for storing sessions
