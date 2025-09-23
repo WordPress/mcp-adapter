@@ -83,18 +83,6 @@ class SessionManager {
 			return false;
 		}
 
-		// Debug: Log what params we're receiving
-		if ( function_exists( 'ray' ) ) {
-			ray()->orange()->label( 'SessionManager::create_session' )->send(
-				array(
-					'user_id'         => $user_id,
-					'params_received' => $params,
-					'params_count'    => count( $params ),
-					'params_keys'     => array_keys( $params ),
-				)
-			);
-		}
-
 		// Cleanup inactive sessions first
 		self::cleanup_expired_sessions( $user_id );
 
