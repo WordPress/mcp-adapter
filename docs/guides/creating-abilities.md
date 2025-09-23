@@ -9,7 +9,18 @@ WordPress abilities can be registered as different MCP components:
 - **Resources**: Provide access to data or content
 - **Prompts**: Generate structured messages for language models
 
-**✅ Full Annotation Support**: All component types support MCP annotations through the ability's `meta.annotations` field to provide behavior hints to MCP clients.
+** Full Annotation Support**: All component types support MCP annotations through the ability's `meta.annotations` field to provide behavior hints to MCP clients.
+
+## MCP Exposure
+
+WordPress abilities are NOT accessible via default MCP server by default. To make an ability available through the default MCP server, you must explicitly add `public_mcp: true` to the ability's metadata.
+
+```php
+'meta' => [
+    'public_mcp' => true,  // Required for MCP access
+    'annotations' => [...] // Optional MCP annotations
+]
+```
 
 ## Basic Ability Structure
 
@@ -25,6 +36,7 @@ wp_register_ability('my-plugin/my-ability', [
         'annotations' => [...],   // MCP annotations
         'uri' => '...',          // For resources
         'arguments' => [...],    // For prompts
+        'public_mcp' => true,    // Expose via MCP (required for MCP access)
     ]
 ]);
 ```
@@ -178,7 +190,8 @@ wp_register_ability('my-plugin/create-post', [
             'priority' => 2.0,
             'readOnlyHint' => false,
             'destructiveHint' => false
-        ]
+        ],
+        'public_mcp' => true  // Expose this ability via MCP
     ]
 ]);
 ```
@@ -211,7 +224,8 @@ wp_register_ability('my-plugin/site-config', [
             'audience' => ['user', 'assistant'],
             'priority' => 0.8,
             'lastModified' => '2024-01-15T10:30:00Z'
-        ]
+        ],
+        'public_mcp' => true  // Expose this ability via MCP
     ]
 ]);
 ```
@@ -262,7 +276,8 @@ wp_register_ability('my-plugin/code-review', [
         'annotations' => [
             'readOnlyHint' => true,      // Template doesn't modify data
             'idempotentHint' => true     // Consistent prompt generation
-        ]
+        ],
+        'public_mcp' => true  // Expose this ability via MCP
     ]
 ]);
 ```
@@ -315,7 +330,8 @@ wp_register_ability('my-plugin/analysis-prompt', [
         'annotations' => [
             'readOnlyHint' => true,
             'openWorldHint' => true              // Can handle any data type
-        ]
+        ],
+        'public_mcp' => true  // Expose this ability via MCP
     ]
 ]);
 ```
