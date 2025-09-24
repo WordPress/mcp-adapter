@@ -116,6 +116,7 @@ class MyHandler implements McpObservabilityHandlerInterface {
         // ... send to your system
     }
 }
+```
 
 ## Creating Custom Handlers
 
@@ -157,6 +158,7 @@ class FileObservabilityHandler implements McpObservabilityHandlerInterface {
             $log_entry . "\n", FILE_APPEND | LOCK_EX);
     }
 }
+```
 
 ### External Service Handler
 
@@ -193,17 +195,49 @@ class ExternalServiceObservabilityHandler implements McpObservabilityHandlerInte
 }
 ```
 
-## Usage in Practice
+## Using Custom Handlers
 
-### Event Emission Pattern
+Once you've created custom observability handlers, you can configure them for use in your MCP Adapter setup.
 
-The system emits events rather than storing counters:
-- `record_event()` emits an event (doesn't store locally)
-- `record_timing()` emits a timing measurement (doesn't store locally)
-- External systems handle aggregation and analysis
+### Replacing the Default Server's Observability Handler
 
-### Benefits
-- Zero memory overhead (no local state)
-- Works with any observability system
-- WordPress-friendly (no database writes)
-- Industry standard (StatsD/OpenTelemetry pattern)
+The default MCP server created by the adapter can have its observability handler replaced using the `mcp_adapter_default_server_config` filter:
+
+```php
+// Replace the default server's observability handler
+add_filter('mcp_adapter_default_server_config', function($config) {
+    $config['observability_handler'] = FileObservabilityHandler::class;
+    return $config;
+});
+
+// Or disable observability entirely
+add_filter('mcp_adapter_default_server_config', function($config) {
+    $config['observability_handler'] = NullMcpObservabilityHandler::class;
+    return $config;
+});
+```
+
+### Configuring Observability for Custom Servers
+
+When creating custom servers, you can specify the observability handler directly:
+
+```php
+// In your plugin's initialization
+add_action('mcp_adapter_init', function($adapter) {
+    $adapter->create_server(
+        'my-custom-server',
+        'my-namespace',
+        'my-route',
+        'My Custom Server',
+        'A custom MCP server with file-based observability',
+        '1.0.0',
+        [MyCustomTransport::class],
+        null, // Use default error handler
+        FileObservabilityHandler::class, // Custom observability handler
+        ['my-tool'], // tools
+        [], // resources
+        [], // prompts
+        null // transport permission callback
+    );
+});
+```
