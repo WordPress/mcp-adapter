@@ -20,8 +20,7 @@ interface McpObservabilityHandlerInterface {
 
 ### Event Emission Pattern
 
-The system emits structured events rather than storing local counters:
-- **MCP Adapter**: Emits events to handlers
+- **MCP Adapter**: Emits individual events as they happen to handlers
 - **Handlers**: Send events to external systems (logs, StatsD, Prometheus, etc.)
 - **External Systems**: Aggregate and analyze events
 
