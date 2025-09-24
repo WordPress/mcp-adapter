@@ -246,10 +246,8 @@ The MCP Adapter automatically creates a default server that exposes all register
 - **Prompts**: Generate messages (like `prompts/get`) - return `messages` array
 
 ### Annotations
-All components support annotations in `meta.annotations`:
-- **Universal**: `priority`, `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`
-- **Resources**: `audience`, `lastModified` (MCP specification)
-- **Prompts**: Support both template-level and message content annotations
+All MCP components may include metadata in `meta.annotations`, which hint at how clients should treat them.
+For full details on annotations, their semantics, and usage guidelines, see the Annotations section of the MCP schema spec: https://modelcontextprotocol.io/specification/2025-06-18/schema#annotations
 
 ### Testing
 Use WP-CLI with the default server:
