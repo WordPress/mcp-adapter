@@ -329,11 +329,12 @@ class McpErrorFactory {
 	 * - Transport-level errors (malformed JSON-RPC) → HTTP 4xx
 	 * - Application-level errors (business logic) → HTTP 200 with JSON-RPC error
 	 *
-	 * @param int $mcp_error_code The MCP/JSON-RPC error code.
+	 * @param int|string $mcp_error_code The MCP/JSON-RPC error code (integer or string).
 	 *
 	 * @return int The appropriate HTTP status code.
 	 */
-	public static function mcp_error_to_http_status( int $mcp_error_code ): int {
+	public static function mcp_error_to_http_status( $mcp_error_code ): int {
+		// Handle integer error codes (existing logic)
 		switch ( $mcp_error_code ) {
 			// Transport-level errors - these indicate malformed requests
 			case self::PARSE_ERROR:      // Invalid JSON - syntactic error
