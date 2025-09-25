@@ -113,11 +113,18 @@ class ToolsHandler {
 			// Implement a tool calling logic here.
 			$result = $this->handle_tool_call( $request_params, $request_id );
 
-			// Check if the result contains an error.
+			// Check if the result contains a protocol error (tool not found, permission denied, etc.).
 			if ( isset( $result['error'] ) ) {
-				return $result; // Return error directly.
+				return $result; // Return protocol error directly as JSON-RPC error.
 			}
 
+			// Check if the result is a tool execution error (business logic failure).
+			if ( isset( $result['isError'] ) && true === $result['isError'] ) {
+				// Tool execution error - return as successful response with isError: true.
+				return $result;
+			}
+
+			// Successful tool execution - format the response.
 			$response = array(
 				'content' => array(
 					array(
@@ -298,12 +305,15 @@ class ToolsHandler {
 					)
 				);
 
-				// Convert WP_Error to standard error array format.
+				// Return tool execution error (not protocol error) according to MCP spec.
+				// This should be handled as a successful response with isError: true.
 				return array(
-					'error' => array(
-						'code'    => $result->get_error_code(),
-						'message' => $result->get_error_message(),
-						'data'    => $result->get_error_data(),
+					'isError' => true,
+					'content' => array(
+						array(
+							'type' => 'text',
+							'text' => $result->get_error_message(),
+						),
 					),
 				);
 			}
@@ -340,7 +350,17 @@ class ToolsHandler {
 				)
 			);
 
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Error executing tool' )['error'] );
+			// Return tool execution error (not protocol error) according to MCP spec.
+			// This should be handled as a successful response with isError: true.
+			return array(
+				'isError' => true,
+				'content' => array(
+					array(
+						'type' => 'text',
+						'text' => $e->getMessage(),
+					),
+				),
+			);
 		}
 	}
 
