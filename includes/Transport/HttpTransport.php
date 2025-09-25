@@ -31,7 +31,7 @@ class HttpTransport implements McpRestTransportInterface {
 	 *
 	 * @var \WP\MCP\Transport\Infrastructure\HttpRequestHandler
 	 */
-	private HttpRequestHandler $request_handler;
+	protected HttpRequestHandler $request_handler;
 
 	/**
 	 * Initialize the class and register routes
