@@ -55,8 +55,16 @@ trait McpObservabilityHelperTrait {
 
 		foreach ( $tags as $key => $value ) {
 			// Convert to string and limit length to prevent log bloat.
-			$key   = substr( (string) $key, 0, 64 );
-			$value = is_scalar( $value ) ? (string) $value : wp_json_encode( $value );
+			$key = substr( (string) $key, 0, 64 );
+
+			// Convert value to string, handling null specially.
+			if ( null === $value ) {
+				$value = '';
+			} elseif ( is_scalar( $value ) ) {
+				$value = (string) $value;
+			} else {
+				$value = wp_json_encode( $value );
+			}
 
 			// Remove potentially sensitive information patterns.
 			$value = preg_replace( '/\b(?:password|token|key|secret|auth)\b/i', '[REDACTED]', $value );

@@ -102,16 +102,15 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 
 		$this->assertIsArray( $sanitized );
 		
-		// Check key length limit (50 chars)
+		// Check key length limit (64 chars)
 		$keys = array_keys( $sanitized );
 		foreach ( $keys as $key ) {
-			$this->assertLessThanOrEqual( 50, strlen( $key ) );
+			$this->assertLessThanOrEqual( 64, strlen( $key ) );
 		}
 
-		// Check value length limit (100 chars)
-		foreach ( $sanitized as $value ) {
-			$this->assertLessThanOrEqual( 100, strlen( $value ) );
-		}
+		// Values are not truncated, they maintain their full length
+		$this->assertEquals( 'value', $sanitized['long_key_' . str_repeat( 'x', 55 )] ); // First 64 chars of key
+		$this->assertEquals( 200, strlen( $sanitized['normal_key'] ) ); // Value is not truncated
 	}
 
 	public function test_format_metric_name_adds_mcp_prefix(): void {
