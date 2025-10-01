@@ -146,6 +146,11 @@ class DiscoverAbilitiesAbility {
 				continue;
 			}
 
+			// Only discover abilities with type='tool' (default type)
+			if ( self::get_ability_mcp_type( $ability_name ) !== 'tool' ) {
+				continue;
+			}
+
 			$ability_list[] = array(
 				'name'        => $ability_name,
 				'label'       => $ability->get_label(),

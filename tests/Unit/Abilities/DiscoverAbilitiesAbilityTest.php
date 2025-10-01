@@ -185,11 +185,13 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'abilities', $result );
 
-		// Check that test abilities are included
+		// Check that test tool abilities are included
 		$ability_names = array_column( $result['abilities'], 'name' );
 		$this->assertContains( 'test/always-allowed', $ability_names );
-		$this->assertContains( 'test/resource', $ability_names );
-		$this->assertContains( 'test/prompt', $ability_names );
+		
+		// Resources and prompts should NOT be included (only tools are discovered)
+		$this->assertNotContains( 'test/resource', $ability_names );
+		$this->assertNotContains( 'test/prompt', $ability_names );
 	}
 
 	public function test_execute_with_empty_input(): void {

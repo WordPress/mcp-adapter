@@ -36,6 +36,10 @@ class DefaultServerFactory {
 	 */
 	public static function create(): void {
 
+		// Auto-discover resources and prompts from abilities
+		$auto_discovered_resources = self::discover_abilities_by_type( 'resource' );
+		$auto_discovered_prompts   = self::discover_abilities_by_type( 'prompt' );
+
 		// WordPress-specific defaults
 		$wordpress_defaults = array(
 			'server_id'              => 'mcp-adapter-default-server',
@@ -52,8 +56,8 @@ class DefaultServerFactory {
 				'mcp-adapter/get-ability-info',
 				'mcp-adapter/execute-ability',
 			),
-			'resources'              => array(),
-			'prompts'                => array(),
+			'resources'              => $auto_discovered_resources,
+			'prompts'                => $auto_discovered_prompts,
 		);
 
 		// Apply WordPress filter for customization
@@ -81,5 +85,47 @@ class DefaultServerFactory {
 			$config['resources'],
 			$config['prompts']
 		);
+	}
+
+	/**
+	 * Discover abilities by MCP type.
+	 *
+	 * Scans all registered abilities and returns those with the specified type
+	 * and public MCP exposure.
+	 *
+	 * @param string $type The MCP type to filter by ('tool', 'resource', or 'prompt').
+	 *
+	 * @return array Array of ability names matching the specified type.
+	 */
+	private static function discover_abilities_by_type( string $type ): array {
+		$abilities = wp_get_abilities();
+		$filtered  = array();
+
+		foreach ( $abilities as $ability ) {
+			$ability_name = $ability->get_name();
+			$meta         = $ability->get_meta();
+
+			// Skip if not publicly exposed
+			if ( ! ( $meta['mcp']['public'] ?? false ) ) {
+				continue;
+			}
+
+			// Skip mcp-adapter internal abilities
+			if ( str_starts_with( $ability_name, 'mcp-adapter/' ) ) {
+				continue;
+			}
+
+			// Get the type (defaults to 'tool' if not specified)
+			$ability_type = $meta['mcp']['type'] ?? 'tool';
+
+			// Add to filtered list if type matches
+			if ( $ability_type !== $type ) {
+				continue;
+			}
+
+			$filtered[] = $ability_name;
+		}
+
+		return $filtered;
 	}
 }
