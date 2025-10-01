@@ -45,7 +45,7 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test missing parameter errors from all handlers
+		// Test parameter validation errors (INVALID_PARAMS) from all handlers
 		$tools_error = $tools_handler->call_tool( array( 'params' => array() ) ); // Missing 'name'
 		$prompts_error = $prompts_handler->get_prompt( array( 'params' => array() ) ); // Missing 'name'
 		$resources_error = $resources_handler->read_resource( array( 'params' => array() ) ); // Missing 'uri'
@@ -67,8 +67,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		// Use reflection to access the protected helper methods
 		$reflection = new \ReflectionClass( $tools_handler );
 
-		$missing_param_method = $reflection->getMethod( 'missing_parameter_error' );
-		$missing_param_method->setAccessible( true );
+		$invalid_param_method = $reflection->getMethod( 'missing_parameter_error' );
+		$invalid_param_method->setAccessible( true );
 
 		$permission_denied_method = $reflection->getMethod( 'permission_denied_error' );
 		$permission_denied_method->setAccessible( true );
@@ -76,12 +76,12 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$internal_error_method = $reflection->getMethod( 'internal_error' );
 		$internal_error_method->setAccessible( true );
 
-		// Test all helper methods
-		$missing_param_error = $missing_param_method->invoke( $tools_handler, 'test_param', 123 );
+		// Test all helper methods - missing_parameter_error uses INVALID_PARAMS error code
+		$invalid_param_error = $invalid_param_method->invoke( $tools_handler, 'test_param', 123 );
 		$permission_error = $permission_denied_method->invoke( $tools_handler, 'test_resource', 456 );
 		$internal_error = $internal_error_method->invoke( $tools_handler, 'test_message', 789 );
 
-		$errors = array( $missing_param_error, $permission_error, $internal_error );
+		$errors = array( $invalid_param_error, $permission_error, $internal_error );
 
 		foreach ( $errors as $error ) {
 			$this->assertArrayHasKey( 'error', $error );
@@ -98,19 +98,21 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		// Use reflection to access helper method
 		$reflection = new \ReflectionClass( $tools_handler );
-		$missing_param_method = $reflection->getMethod( 'missing_parameter_error' );
-		$missing_param_method->setAccessible( true );
+		$invalid_param_method = $reflection->getMethod( 'missing_parameter_error' );
+		$invalid_param_method->setAccessible( true );
 
-		// Test same error from factory and helper
+		// Test parameter validation error from both factory and helper
+		// Note: missing_parameter() is a convenience wrapper that returns INVALID_PARAMS error code
 		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' );
-		$helper_error = $missing_param_method->invoke( $tools_handler, 'test_param', 100 );
+		$helper_error = $invalid_param_method->invoke( $tools_handler, 'test_param', 100 );
 
 		// Both should have the same structure
 		$this->assertArrayHasKey( 'error', $factory_error );
 		$this->assertArrayHasKey( 'error', $helper_error );
 
-		// Error codes should match
+		// Error codes should match (both use INVALID_PARAMS)
 		$this->assertSame( $factory_error['error']['code'], $helper_error['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $factory_error['error']['code'] );
 
 		// Both should contain the parameter name
 		$this->assertStringContainsString( 'test_param', $factory_error['error']['message'] );
@@ -241,7 +243,7 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$prompts_handler = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test various error scenarios
+		// Test parameter validation error messages (INVALID_PARAMS error code)
 		$errors = array(
 			$tools_handler->call_tool( array( 'params' => array() ) ), // Missing name
 			$prompts_handler->get_prompt( array( 'params' => array() ) ), // Missing name
@@ -256,7 +258,7 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertGreaterThan( 10, strlen( $message ) ); // Not too short
 			$this->assertLessThan( 200, strlen( $message ) ); // Not too long
 
-			// Should mention what's missing
+			// Should mention what's missing or invalid
 			$this->assertTrue(
 				strpos( $message, 'missing' ) !== false ||
 				strpos( $message, 'required' ) !== false ||
