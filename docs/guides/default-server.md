@@ -37,6 +37,32 @@ $wordpress_defaults = array(
 
 The default server includes three core abilities that provide MCP functionality:
 
+### Layered Tooling Architecture
+
+The MCP Adapter uses a **layered tooling approach** where a small set of meta-abilities provides access to all WordPress abilities, solving the "too many tools problem" that affects MCP servers.
+
+**The Problem**: In traditional MCP implementations, each capability would be exposed as a separate tool. When an AI agent connects, it requests `tools/list` and receives every tool's complete schema (name, description, input parameters, etc.). With dozens or hundreds of tools, this creates several issues:
+
+1. **Context Window Bloat**: Tool schemas consume significant portions of the AI's context window before any actual work begins
+2. **Decision Paralysis**: AI agents struggle to choose the right tool from an overwhelming list of options
+3. **Scalability Limits**: The system becomes unwieldy as the number of tools grows
+
+**The Solution**: Rather than exposing each WordPress ability as a separate MCP tool, the default server exposes just **three strategic meta-abilities** that act as a gateway:
+
+1. **Discover** (`mcp-adapter/discover-abilities`) - Lists all available WordPress abilities
+2. **Get Info** (`mcp-adapter/get-ability-info`) - Retrieves detailed schema for any specific ability
+3. **Execute** (`mcp-adapter/execute-ability`) - Executes any ability with provided parameters
+
+This layered approach provides several key benefits:
+
+- **Minimal Context Consumption**: Only 3 tool schemas are sent to the AI agent, regardless of how many WordPress abilities exist
+- **Dynamic Capability Discovery**: WordPress plugins can register unlimited abilities without MCP server reconfiguration
+- **Progressive Information Loading**: The AI only fetches detailed schemas for abilities it actually needs
+- **Cleaner Decision-Making**: The AI navigates a simple, structured interface rather than choosing from hundreds of tools
+- **Future-Proof Scalability**: New abilities are automatically discoverable through the existing gateway tools
+
+The AI agent uses these three tools in combination to systematically explore and interact with the WordPress abilities ecosystem: first discovering what's available, then getting detailed information about relevant abilities, and finally executing the chosen actions.
+
 ### 1. Discover Abilities (`mcp-adapter/discover-abilities`)
 
 **Purpose**: Lists all WordPress abilities that are publicly available via MCP.
