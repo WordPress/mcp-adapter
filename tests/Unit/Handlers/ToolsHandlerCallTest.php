@@ -70,8 +70,14 @@ final class ToolsHandlerCallTest extends TestCase {
 				'params' => array( 'name' => 'test-execute-exception' ),
 			)
 		);
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( 'code', $res['error'] );
+		// Execute exceptions are returned as tool execution errors (isError: true)
+		// not as protocol errors, per MCP spec
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
+		$this->assertArrayHasKey( 'content', $res );
+		$this->assertIsArray( $res['content'] );
+		$this->assertArrayHasKey( 'type', $res['content'][0] );
+		$this->assertEquals( 'text', $res['content'][0]['type'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
