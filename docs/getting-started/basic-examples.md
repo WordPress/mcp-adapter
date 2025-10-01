@@ -98,7 +98,9 @@ add_action( 'abilities_api_init', function() {
                 'readOnlyHint' => false,
                 'destructiveHint' => false
             ],
-            'public_mcp' => true  // Expose this ability via MCP
+            'mcp' => [
+                'public' => true  // Expose this ability via MCP
+            ]
         ]
     ]);
 });
@@ -145,7 +147,10 @@ add_action( 'abilities_api_init', function() {
                 'audience' => ['user', 'assistant'],
                 'priority' => 0.8
             ],
-            'public_mcp' => true  // Expose this ability via MCP
+            'mcp' => [
+                'public' => true,      // Expose this ability via MCP
+                'type'   => 'resource' // Mark as resource for auto-discovery
+            ]
         ]
     ]);
 });
@@ -214,7 +219,10 @@ add_action( 'abilities_api_init', function() {
                 'readOnlyHint' => true,
                 'idempotentHint' => true
             ],
-            'public_mcp' => true  // Expose this ability via MCP
+            'mcp' => [
+                'public' => true,   // Expose this ability via MCP
+                'type'   => 'prompt' // Mark as prompt for auto-discovery
+            ]
         ]
     ]);
 });

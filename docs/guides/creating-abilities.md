@@ -13,14 +13,26 @@ WordPress abilities can be registered as different MCP components:
 
 ## MCP Exposure
 
-WordPress abilities are NOT accessible via default MCP server by default. To make an ability available through the default MCP server, you must explicitly add `public_mcp: true` to the ability's metadata.
+WordPress abilities are NOT accessible via default MCP server by default. To make an ability available through the default MCP server, you must explicitly add `mcp.public: true` to the ability's metadata.
 
 ```php
 'meta' => [
-    'public_mcp' => true,  // Required for MCP access
+    'mcp' => [
+        'public' => true,  // Required for MCP access
+        'type'   => 'tool' // Optional: 'tool' (default), 'resource', or 'prompt'
+    ],
     'annotations' => [...] // Optional MCP annotations
 ]
 ```
+
+### MCP Type
+
+The `type` parameter specifies how the ability should be exposed in the MCP server:
+- **`tool`** (default): Exposed as a callable tool via the default server's discovery
+- **`resource`**: Exposed as a resource (requires `uri` in meta)
+- **`prompt`**: Exposed as a prompt (requires `arguments` in meta)
+
+If not specified, abilities default to `type: 'tool'`.
 
 ## Basic Ability Structure
 
@@ -36,7 +48,10 @@ wp_register_ability('my-plugin/my-ability', [
         'annotations' => [...],   // MCP annotations
         'uri' => '...',          // For resources
         'arguments' => [...],    // For prompts
-        'public_mcp' => true,    // Expose via MCP (required for MCP access)
+        'mcp' => [
+            'public' => true,    // Expose via MCP (required for MCP access)
+            'type'   => 'tool',  // 'tool', 'resource', or 'prompt'
+        ]
     ]
 ]);
 ```
@@ -191,14 +206,16 @@ wp_register_ability('my-plugin/create-post', [
             'readOnlyHint' => false,
             'destructiveHint' => false
         ],
-        'public_mcp' => true  // Expose this ability via MCP
+        'mcp' => [
+            'public' => true  // Expose this ability via MCP
+        ]
     ]
 ]);
 ```
 
 ## Creating Resources
 
-Resources provide access to data or content. They require a `uri` in the meta field:
+Resources provide access to data or content. They require a `uri` in the meta field and should set `type: 'resource'` in the MCP configuration:
 
 ```php
 wp_register_ability('my-plugin/site-config', [
@@ -225,14 +242,17 @@ wp_register_ability('my-plugin/site-config', [
             'priority' => 0.8,
             'lastModified' => '2024-01-15T10:30:00Z'
         ],
-        'public_mcp' => true  // Expose this ability via MCP
+        'mcp' => [
+            'public' => true,      // Expose this ability via MCP
+            'type'   => 'resource' // Mark as resource for auto-discovery
+        ]
     ]
 ]);
 ```
 
 ## Creating Prompts
 
-Prompts generate structured messages for language models and support two types of annotations:
+Prompts generate structured messages for language models and support two types of annotations. They should set `type: 'prompt'` in the MCP configuration:
 
 ### 1. Template-Level Annotations
 Describe the prompt template's behavior characteristics:
@@ -277,7 +297,10 @@ wp_register_ability('my-plugin/code-review', [
             'readOnlyHint' => true,      // Template doesn't modify data
             'idempotentHint' => true     // Consistent prompt generation
         ],
-        'public_mcp' => true  // Expose this ability via MCP
+        'mcp' => [
+            'public' => true,   // Expose this ability via MCP
+            'type'   => 'prompt' // Mark as prompt for auto-discovery
+        ]
     ]
 ]);
 ```
@@ -331,7 +354,10 @@ wp_register_ability('my-plugin/analysis-prompt', [
             'readOnlyHint' => true,
             'openWorldHint' => true              // Can handle any data type
         ],
-        'public_mcp' => true  // Expose this ability via MCP
+        'mcp' => [
+            'public' => true,   // Expose this ability via MCP
+            'type'   => 'prompt' // Mark as prompt for auto-discovery
+        ]
     ]
 ]);
 ```

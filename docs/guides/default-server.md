@@ -46,12 +46,12 @@ The default server includes three core abilities that provide MCP functionality:
 **Security**: 
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_discover_abilities_capability` filter)
-- Only returns abilities with `public_mcp=true` metadata
+- Only returns abilities with `mcp.public=true` metadata
 
 **Behavior**:
 - Scans all registered WordPress abilities
 - Excludes abilities starting with `mcp-adapter/` (prevents self-referencing)
-- Filters to only include abilities with `public_mcp=true` in their metadata
+- Filters to only include abilities with `mcp.public=true` in their metadata
 - Returns ability name, label, and description for each public ability
 
 **Output Format**:
@@ -85,7 +85,7 @@ The default server includes three core abilities that provide MCP functionality:
 **Security**:
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_get_ability_info_capability` filter)
-- Only works with abilities that have `public_mcp=true` metadata
+- Only works with abilities that have `mcp.public=true` metadata
 - Returns `ability_not_public_mcp` error for non-public abilities
 
 **Output Format**:
@@ -122,13 +122,13 @@ The default server includes three core abilities that provide MCP functionality:
 **Security**:
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_execute_ability_capability` filter)
-- Only executes abilities with `public_mcp=true` metadata
+- Only executes abilities with `mcp.public=true` metadata
 - Performs additional permission check on the target ability itself
 - Double-checks permissions before execution as additional security layer
 
 **Execution Flow**:
 1. Validates user authentication and capabilities
-2. Checks if target ability has `public_mcp=true` metadata
+2. Checks if target ability has `mcp.public=true` metadata
 3. Verifies target ability exists
 4. Calls the target ability's permission callback
 5. Executes the target ability with provided parameters
@@ -163,7 +163,7 @@ The default server includes three core abilities that provide MCP functionality:
 The default server implements a metadata-driven security model:
 
 - **Default Secure**: Abilities are NOT accessible via MCP by default
-- **Explicit Opt-in**: Abilities must include `public_mcp=true` in their metadata to be accessible
+- **Explicit Opt-in**: Abilities must include `mcp.public=true` in their metadata to be accessible
 - **Granular Control**: Each ability individually decides if it should be MCP-accessible
 
 **Example of Public MCP Ability**:
@@ -176,7 +176,9 @@ wp_register_ability('my-plugin/safe-tool', [
         return current_user_can('read');
     },
     'meta' => [
-        'public_mcp' => true, // This makes it accessible via MCP
+        'mcp' => [
+            'public' => true, // This makes it accessible via MCP
+        ]
     ]
 ]);
 ```
@@ -186,7 +188,7 @@ wp_register_ability('my-plugin/safe-tool', [
 All core abilities require:
 1. **WordPress Authentication**: User must be logged in (`is_user_logged_in()`)
 2. **Capability Check**: User must have required capability (default: `read`)
-3. **MCP Exposure Check**: Target ability must have `public_mcp=true` metadata
+3. **MCP Exposure Check**: Target ability must have `mcp.public=true` metadata
 
 ### Capability Filters
 
@@ -288,7 +290,7 @@ The default server uses structured error handling:
 - `authentication_required`: User not logged in
 - `insufficient_capability`: User lacks required WordPress capability
 - `ability_not_found`: Requested ability doesn't exist
-- `ability_not_public_mcp`: Ability not exposed via MCP (missing `public_mcp=true`)
+- `ability_not_public_mcp`: Ability not exposed via MCP (missing `mcp.public=true`)
 - `missing_ability_name`: Required ability name parameter missing
 
 ### Error Response Format
@@ -307,7 +309,7 @@ The default server uses structured error handling:
 
 ### For Plugin Developers
 
-1. **Secure by Default**: Only add `public_mcp=true` to abilities that should be accessible via MCP
+1. **Secure by Default**: Only add `mcp.public=true` to abilities that should be accessible via MCP
 2. **Proper Permissions**: Implement appropriate permission callbacks for your abilities
 3. **Clear Documentation**: Provide good labels and descriptions for your abilities
 4. **Input Validation**: Use proper input schemas to validate parameters
@@ -322,14 +324,14 @@ The default server uses structured error handling:
 ## Troubleshooting
 
 ### No Abilities Returned
-- Check that abilities have `public_mcp=true` in their metadata
+- Check that abilities have `mcp.public=true` in their metadata
 - Verify user is authenticated and has required capabilities
 - Ensure abilities are properly registered during `abilities_api_init`
 
 ### Permission Denied Errors
 - Verify user authentication (logged in)
 - Check user has required capability (default: `read`)
-- Confirm ability has `public_mcp=true` metadata
+- Confirm ability has `mcp.public=true` metadata
 
 ### Ability Not Found
 - Ensure ability is registered before MCP server initialization
