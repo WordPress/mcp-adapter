@@ -64,6 +64,10 @@ trait McpObservabilityHelperTrait {
 				$value = (string) $value;
 			} else {
 				$value = wp_json_encode( $value );
+				// wp_json_encode can return false on failure, ensure we have a string.
+				if ( false === $value ) {
+					$value = '';
+				}
 			}
 
 			// Remove potentially sensitive information patterns.
