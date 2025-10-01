@@ -119,8 +119,6 @@ interface McpRestTransportInterface extends McpTransportInterface {
 
 - **HttpTransport**: Recommended (MCP 2025-06-18 compliant)
 - **STDIO Transport**: Via WP-CLI commands
-- **RestTransport**: Deprecated
-- **StreamableTransport**: Deprecated
 
 ### Dependency Injection
 

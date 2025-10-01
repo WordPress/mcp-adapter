@@ -6,8 +6,6 @@ This guide covers how to implement custom transport layers for the MCP Adapter w
 
 - ✅ **`HttpTransport`** - Recommended (implements MCP 2025-06-18 specification)
 - ✅ **`STDIO Transport`** - Available via WP-CLI commands
-- ❌ **`RestTransport`** - Deprecated, use `HttpTransport`
-- ❌ **`StreamableTransport`** - Deprecated, use `HttpTransport`
 
 ## When to Create Custom Transports
 

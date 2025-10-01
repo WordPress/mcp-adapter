@@ -17,7 +17,6 @@ This adapter bridges WordPress's Abilities API with the [MCP specification](http
 - **Extensible Transport Layer**:
     - **HTTP Transport**: Unified transport implementing [MCP 2025-06-18 specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports.md) for HTTP-based communication
     - **STDIO Transport**: Process-based communication via standard input/output for local development and CLI integration
-    - **Legacy Transports**: Deprecated REST API and streaming implementations (use HTTP transport instead)
     - **Custom Transport Support**: Implement `McpTransportInterface` to create specialized communication protocols
     - **Multi-Transport Configuration**: Configure servers with multiple transport methods simultaneously
 - **Flexible Error Handling**:
@@ -129,10 +128,6 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │   │   ├── McpTransportInterface.php     # Base transport interface
 │   │   └── McpRestTransportInterface.php # REST transport interface
 │   ├── HttpTransport.php                 # Unified HTTP transport (MCP 2025-06-18)
-│   │   # Legacy HTTP transports (deprecated)
-│   ├── Http/
-│   │   ├── RestTransport.php            # Legacy REST API transport
-│   │   └── StreamableTransport.php      # Legacy streaming transport
 │   │   # Transport infrastructure
 │   └── Infrastructure/
 │       ├── HttpRequestContext.php       # HTTP request context
