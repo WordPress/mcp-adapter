@@ -18,6 +18,10 @@ final class ErrorEnvelopeTest extends TestCase {
 		$this->assertArrayHasKey( 'message', $err['error'] );
 	}
 
+	/**
+	 * Test missing_parameter() convenience wrapper.
+	 * Note: This uses the standard INVALID_PARAMS error code.
+	 */
 	public function test_missing_parameter_error(): void {
 		$err = McpErrorFactory::missing_parameter( 123, 'test_param' );
 
@@ -98,6 +102,10 @@ final class ErrorEnvelopeTest extends TestCase {
 		$this->assertStringContainsString( 'Missing field', $err['error']['message'] );
 	}
 
+	/**
+	 * Test invalid_params() method.
+	 * Note: missing_parameter() is a convenience wrapper that also uses this error code.
+	 */
 	public function test_invalid_params_error(): void {
 		$err = McpErrorFactory::invalid_params( 108, 'Wrong type' );
 
@@ -106,6 +114,10 @@ final class ErrorEnvelopeTest extends TestCase {
 		$this->assertStringContainsString( 'Wrong type', $err['error']['message'] );
 	}
 
+	/**
+	 * Test mcp_disabled() convenience wrapper.
+	 * Note: This uses the standard SERVER_ERROR error code.
+	 */
 	public function test_mcp_disabled_error(): void {
 		$err = McpErrorFactory::mcp_disabled( 109 );
 
