@@ -22,6 +22,10 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
  *
  * Contains all dependencies needed by transport implementations,
  * promoting loose coupling and easier testing.
+ *
+ * Note: The request_router parameter is optional. If not provided,
+ * a RequestRouter instance will be automatically created with this
+ * context as its dependency.
  */
 class McpTransportContext {
 
@@ -121,6 +125,7 @@ class McpTransportContext {
 	 *   transport_permission_callback?: callable|null,
 	 *   error_handler?: \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 * } $properties Properties to set on the context.
+	 * Note: request_router is optional and will be auto-created if not provided.
 	 */
 	public function __construct( array $properties ) {
 		foreach ( $properties as $name => $value ) {

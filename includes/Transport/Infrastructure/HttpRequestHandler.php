@@ -248,11 +248,22 @@ class HttpRequestHandler {
 	/**
 	 * Add session header to the REST response.
 	 *
+	 * Uses a static flag to prevent multiple filters from being added
+	 * if this method is called multiple times during a single request
+	 * (e.g., during batch JSON-RPC processing).
+	 *
 	 * @param string $session_id The session ID to add to the response header.
 	 *
 	 * @return void
 	 */
 	private function add_session_header_to_response( string $session_id ): void {
+		static $current_session_id = null;
+
+		// Only add filter once per request, or if session ID changes
+		if ( null !== $current_session_id && $current_session_id === $session_id ) {
+			return;
+		}
+
 		add_filter(
 			'rest_post_dispatch',
 			static function ( $response ) use ( $session_id ) {
@@ -263,5 +274,7 @@ class HttpRequestHandler {
 				return $response;
 			}
 		);
+
+		$current_session_id = $session_id;
 	}
 }
