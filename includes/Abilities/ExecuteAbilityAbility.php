@@ -17,14 +17,14 @@ namespace WP\MCP\Abilities;
  *
  * SECURITY CONSIDERATIONS:
  * - This ability has openWorldHint=true, allowing execution of any registered ability
- * - Only abilities with public_mcp=true metadata can be executed via MCP
+ * - Only abilities with mcp.public=true metadata can be executed via default MCP server.
  * - Requires proper WordPress capability checks for secure operation
  * - Caller identity verification is enforced through WordPress authentication
  *
  * @see https://github.com/your-repo/mcp-adapter/docs/security.md for detailed security configuration
  */
 final class ExecuteAbilityAbility {
-	use AbilitySecurityTrait;
+	use McpAbilityHelperTrait;
 
 	/**
 	 * Register the ability.

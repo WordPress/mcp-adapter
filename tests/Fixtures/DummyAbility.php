@@ -28,7 +28,9 @@ final class DummyAbility {
 				},
 				'meta'                => array(
 					'annotations' => array( 'group' => 'tests' ),
-					'public_mcp'  => true, // Expose via MCP for testing
+					'mcp'         => array(
+						'public' => true, // Expose via MCP for testing
+					),
 				),
 			)
 		);
@@ -47,7 +49,9 @@ final class DummyAbility {
 					return false;
 				},
 				'meta'                => array(
-					'public_mcp' => true, // Expose via MCP for testing
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
 				),
 			)
 		);
@@ -66,7 +70,9 @@ final class DummyAbility {
 					throw new \RuntimeException( 'nope' );
 				},
 				'meta'                => array(
-					'public_mcp' => true, // Expose via MCP for testing
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
 				),
 			)
 		);
@@ -85,7 +91,9 @@ final class DummyAbility {
 					return true;
 				},
 				'meta'                => array(
-					'public_mcp' => true, // Expose via MCP for testing
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
 				),
 			)
 		);
@@ -108,7 +116,9 @@ final class DummyAbility {
 					return true;
 				},
 				'meta'                => array(
-					'public_mcp' => true, // Expose via MCP for testing
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
 				),
 			)
 		);
@@ -129,7 +139,10 @@ final class DummyAbility {
 				'meta'                => array(
 					'uri'         => 'WordPress://local/resource-1',
 					'annotations' => array( 'group' => 'tests' ),
-					'public_mcp'  => true, // Expose via MCP for testing
+					'mcp'         => array(
+						'public' => true, // Expose via MCP for testing
+						'type'   => 'resource', // Explicitly mark as resource
+					),
 				),
 			)
 		);
@@ -165,7 +178,10 @@ final class DummyAbility {
 							'required'    => true,
 						),
 					),
-					'public_mcp' => true, // Expose via MCP for testing
+					'mcp'       => array(
+						'public' => true, // Expose via MCP for testing
+						'type'   => 'prompt', // Explicitly mark as prompt
+					),
 				),
 			)
 		);

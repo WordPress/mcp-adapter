@@ -87,22 +87,22 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_check_permission_with_public_mcp_metadata(): void {
-		// Test ability with public_mcp=true (should be allowed)
+		// Test ability with mcp.public=true (should be allowed)
 		$result = GetAbilityInfoAbility::check_permission( array(
 			'ability_name' => 'test/always-allowed'
 		) );
 		$this->assertTrue( $result );
 
-		// Create a test ability without public_mcp metadata (should be blocked)
+		// Create a test ability without mcp.public metadata (should be blocked)
 		wp_register_ability(
 			'test/not-public-info',
 			array(
 				'label'               => 'Not Public Info Test',
-				'description'         => 'Ability without public_mcp metadata',
+				'description'         => 'Ability without mcp.public metadata',
 				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => function() { return array( 'test' => 'result' ); },
 				'permission_callback' => function() { return true; },
-				// No public_mcp metadata - should default to false
+				// No mcp.public metadata - should default to false
 			)
 		);
 

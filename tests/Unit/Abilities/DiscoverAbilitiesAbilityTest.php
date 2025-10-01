@@ -93,14 +93,14 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'abilities', $result );
 		$this->assertIsArray( $result['abilities'] );
 		
-		// Should only contain abilities with public_mcp=true
+		// Should only contain abilities with mcp.public=true
 		$ability_names = array_column( $result['abilities'], 'name' );
 		$this->assertContains( 'test/always-allowed', $ability_names );
 		
-		// test/permission-denied has public_mcp=true, so it should be included
+		// test/permission-denied has mcp.public=true, so it should be included
 		$this->assertContains( 'test/permission-denied', $ability_names );
 		
-		// Create an ability without public_mcp and verify it's not included
+		// Create an ability without mcp.public and verify it's not included
 		wp_register_ability(
 			'test/not-public',
 			array(
@@ -109,7 +109,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => function() { return array(); },
 				'permission_callback' => function() { return true; },
-				// No public_mcp metadata
+				// No mcp.public metadata
 			)
 		);
 		

@@ -17,7 +17,7 @@ use WP\MCP\Transport\HttpTransport;
 /**
  * Factory for creating the default WordPress MCP server.
  *
- * This server automatically discovers and exposes abilities with public_mcp=true metadata:
+ * This server automatically discovers and exposes abilities with mcp.public=true metadata:
  * - discover-abilities: Lists all publicly available WordPress abilities
  * - get-ability-info: Gets detailed information about specific abilities
  * - execute-ability: Executes WordPress abilities with provided parameters

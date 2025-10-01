@@ -17,13 +17,13 @@ namespace WP\MCP\Abilities;
  *
  * SECURITY CONSIDERATIONS:
  * - This ability exposes information about all registered abilities in the system
- * - Only abilities with public_mcp=true metadata will be returned
+ * - Only abilities with mcp.public=true metadata will be returned
  * - Requires proper WordPress capability checks for secure operation
  *
  * @see https://github.com/your-repo/mcp-adapter/docs/security.md for detailed security configuration
  */
 class DiscoverAbilitiesAbility {
-	use AbilitySecurityTrait;
+	use McpAbilityHelperTrait;
 
 	/**
 	 * Register the ability.
@@ -113,7 +113,7 @@ class DiscoverAbilitiesAbility {
 	/**
 	 * Execute the discover abilities functionality.
 	 *
-	 * Enforces security checks and public_mcp filtering.
+	 * Enforces security checks and mcp.public filtering.
 	 *
 	 * @param array $input Input parameters (unused for this ability).
 	 *
@@ -128,7 +128,7 @@ class DiscoverAbilitiesAbility {
 			);
 		}
 
-		//@todo: Get only publicly exposed abilities (public_mcp=true)
+		//@todo: Get only publicly exposed abilities (mcp.public=true)
 		$abilities = wp_get_abilities();
 
 		$ability_list = array();
