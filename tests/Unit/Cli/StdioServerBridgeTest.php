@@ -396,6 +396,19 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertTrue( isset( $response['result'] ) || isset( $response['error'] ) );
 	}
 
+	public function test_serve_method_checks_stdio_transport_filter(): void {
+		// Test that serve() checks the filter and throws RuntimeException when disabled
+		add_filter( 'mcp_adapter_enable_stdio_transport', '__return_false' );
+
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionMessage( 'The STDIO transport is disabled. Enable it by setting the "mcp_adapter_enable_stdio_transport" filter to true.' );
+
+		$this->bridge->serve();
+
+		// Clean up filter
+		remove_filter( 'mcp_adapter_enable_stdio_transport', '__return_false' );
+	}
+
 	public function test_bridge_handles_request_ids(): void {
 		// Use reflection to access private method
 		$reflection = new \ReflectionClass( $this->bridge );

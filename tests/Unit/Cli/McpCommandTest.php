@@ -120,25 +120,49 @@ final class McpCommandTest extends TestCase {
 		$this->assertFalse( $result );
 	}
 
-	public function test_serve_command_validates_stdio_transport_filter(): void {
-		// Test when STDIO transport is disabled
+	public function test_serve_command_handles_runtime_exception_from_bridge(): void {
+		// Test when STDIO transport is disabled (should be caught from StdioServerBridge)
 		add_filter( 'mcp_adapter_enable_stdio_transport', '__return_false' );
 
-		// Mock WP_CLI::error to capture the call
-		$error_called = false;
-		$error_message = '';
+		// Create a test server for the command to use
+		global $wp_current_filter;
+		$wp_current_filter[] = 'mcp_adapter_init';
 
+		$this->adapter->create_server(
+			'test-stdio-server',
+			'mcp/v1',
+			'/mcp',
+			'Test STDIO Server',
+			'Test Description',
+			'1.0.0',
+			array( HttpTransport::class ),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class
+		);
+
+		array_pop( $wp_current_filter );
+
+		// Mock WP_CLI::error to capture the call
 		if ( ! class_exists( 'WP_CLI' ) ) {
 			// Create a mock WP_CLI class for testing
 			eval( '
 				class WP_CLI {
 					public static $error_called = false;
 					public static $error_message = "";
+					public static $debug_called = false;
 					
 					public static function error( $message ) {
 						self::$error_called = true;
 						self::$error_message = $message;
 						throw new Exception( "WP_CLI::error called: " . $message );
+					}
+					
+					public static function debug( $message ) {
+						self::$debug_called = true;
+					}
+					
+					public static function line( $message ) {
+						// Mock implementation
 					}
 				}
 			' );
@@ -146,7 +170,7 @@ final class McpCommandTest extends TestCase {
 
 		try {
 			$command = new McpCommand();
-		$command->serve( array(), array() );
+			$command->serve( array(), array() );
 			$this->fail( 'Expected WP_CLI::error to be called' );
 		} catch ( \Exception $e ) {
 			$this->assertStringContainsString( 'STDIO transport is disabled', $e->getMessage() );

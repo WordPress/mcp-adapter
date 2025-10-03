@@ -62,8 +62,19 @@ class StdioServerBridge {
 	 *
 	 * This method reads JSON-RPC messages from stdin and writes responses to stdout.
 	 * It runs in a loop until terminated or until it receives a shutdown signal.
+	 *
+	 * @throws \RuntimeException If STDIO transport is disabled.
 	 */
 	public function serve(): void {
+		// Check if STDIO transport is enabled
+		$enable_serve = apply_filters( 'mcp_adapter_enable_stdio_transport', true );
+
+		if ( ! $enable_serve ) {
+			throw new \RuntimeException(
+				'The STDIO transport is disabled. Enable it by setting the  "mcp_adapter_enable_stdio_transport" filter to true.'
+			);
+		}
+
 		$this->is_running = true;
 
 		// Log to stderr to keep stdout clean for MCP messages
