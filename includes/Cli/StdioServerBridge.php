@@ -71,7 +71,7 @@ class StdioServerBridge {
 
 		if ( ! $enable_serve ) {
 			throw new \RuntimeException(
-				'The STDIO transport is disabled. Enable it by setting the  "mcp_adapter_enable_stdio_transport" filter to true.'
+				'The STDIO transport is disabled. Enable it by setting the "mcp_adapter_enable_stdio_transport" filter to true.'
 			);
 		}
 
