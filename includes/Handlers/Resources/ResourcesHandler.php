@@ -52,6 +52,10 @@ class ResourcesHandler {
 
 		return array(
 			'resources' => $resources,
+			'_metadata' => array(
+				'component_type'  => 'resources',
+				'resources_count' => count( $resources ),
+			),
 		);
 	}
 
@@ -68,7 +72,13 @@ class ResourcesHandler {
 		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['uri'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'uri' )['error'] );
+			return array(
+				'error'     => McpErrorFactory::missing_parameter( $request_id, 'uri' )['error'],
+				'_metadata' => array(
+					'component_type' => 'resource',
+					'failure_reason' => 'missing_parameter',
+				),
+			);
 		}
 
 		// Implement resource reading logic here.
@@ -76,7 +86,14 @@ class ResourcesHandler {
 		$resource = $this->mcp->get_resource( $uri );
 
 		if ( ! $resource ) {
-			return array( 'error' => McpErrorFactory::resource_not_found( $request_id, $uri )['error'] );
+			return array(
+				'error'     => McpErrorFactory::resource_not_found( $request_id, $uri )['error'],
+				'_metadata' => array(
+					'component_type' => 'resource',
+					'resource_uri'   => $uri,
+					'failure_reason' => 'not_found',
+				),
+			);
 		}
 
 		/**
@@ -90,13 +107,37 @@ class ResourcesHandler {
 		try {
 			$has_permission = $ability->has_permission( $request_params );
 			if ( true !== $has_permission ) {
-				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for resource: ' . $resource->get_name() )['error'] );
+				// Extract detailed error message and code if WP_Error was returned
+				$error_message  = 'Access denied for resource: ' . $resource->get_name();
+				$failure_reason = 'permission_denied';
+
+				if ( is_wp_error( $has_permission ) ) {
+					$error_message  = $has_permission->get_error_message();
+					$failure_reason = $has_permission->get_error_code(); // Use WP_Error code as failure_reason
+				}
+
+				return array(
+					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )['error'],
+					'_metadata' => array(
+						'component_type' => 'resource',
+						'resource_uri'   => $uri,
+						'resource_name'  => $resource->get_name(),
+						'ability_name'   => $ability->get_name(),
+						'failure_reason' => $failure_reason,
+					),
+				);
 			}
 
 			$contents = $ability->execute( $request_params );
 
 			return array(
-				'contents' => $contents,
+				'contents'  => $contents,
+				'_metadata' => array(
+					'component_type' => 'resource',
+					'resource_uri'   => $uri,
+					'resource_name'  => $resource->get_name(),
+					'ability_name'   => $ability->get_name(),
+				),
 			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->error_handler->log(
@@ -107,7 +148,15 @@ class ResourcesHandler {
 				)
 			);
 
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Failed to read resource' )['error'] );
+			return array(
+				'error'     => McpErrorFactory::internal_error( $request_id, 'Failed to read resource' )['error'],
+				'_metadata' => array(
+					'component_type' => 'resource',
+					'resource_uri'   => $uri,
+					'failure_reason' => 'execution_failed',
+					'error_type'     => get_class( $exception ),
+				),
+			);
 		}
 	}
 }

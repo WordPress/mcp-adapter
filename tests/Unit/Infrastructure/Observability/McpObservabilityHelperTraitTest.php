@@ -49,11 +49,6 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 			public static function test_categorize_error( \Throwable $exception ): string {
 				return self::categorize_error( $exception );
 			}
-
-			public static function test_record_error_event( string $base_event, \Throwable $exception, array $additional_tags = array() ): void {
-				// Mock the static::record_event call for testing
-				// In real usage, this would call the implementing class's record_event method
-			}
 		};
 	}
 
@@ -215,15 +210,4 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 		$this->assertEquals( '', $sanitized['null_value'] );
 	}
 
-	public function test_record_error_event_method_exists(): void {
-		// Verify the method exists and is callable
-		$this->assertTrue( method_exists( $this->trait_user, 'test_record_error_event' ) );
-		
-		// Test that it can be called without throwing errors
-		$exception = new \RuntimeException( 'Test error' );
-		$this->trait_user::test_record_error_event( 'test.operation', $exception, array( 'context' => 'test' ) );
-		
-		// If we get here, the method executed without error
-		$this->assertTrue( true );
-	}
 }

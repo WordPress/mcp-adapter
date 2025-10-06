@@ -17,6 +17,7 @@ use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
+use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 
 /**
  * Registry for managing MCP server components (tools, resources, prompts).
@@ -58,11 +59,11 @@ class McpComponentRegistry {
 	private McpErrorHandlerInterface $error_handler;
 
 	/**
-	 * Observability handler class name.
+	 * Observability handler instance.
 	 *
-	 * @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
+	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
 	 */
-	private string $observability_handler;
+	private McpObservabilityHandlerInterface $observability_handler;
 
 	/**
 	 * Whether MCP validation is enabled.
@@ -72,24 +73,34 @@ class McpComponentRegistry {
 	private bool $mcp_validation_enabled;
 
 	/**
+	 * Whether to record component registration.
+	 *
+	 * @var bool
+	 */
+	private bool $should_record_component_registration;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler Error handler instance.
-	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler Observability handler class name.
+	 * @param \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface $observability_handler Observability handler instance.
 	 * @param bool                                                                       $mcp_validation_enabled Whether MCP validation is enabled.
 	 */
 	public function __construct(
 		McpServer $mcp_server,
 		McpErrorHandlerInterface $error_handler,
-		string $observability_handler,
+		McpObservabilityHandlerInterface $observability_handler,
 		bool $mcp_validation_enabled
 	) {
-		$this->mcp_server    = $mcp_server;
-		$this->error_handler = $error_handler;
-		/** @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler */
+		$this->mcp_server             = $mcp_server;
+		$this->error_handler          = $error_handler;
 		$this->observability_handler  = $observability_handler;
 		$this->mcp_validation_enabled = $mcp_validation_enabled;
+
+		// Allow filtering whether component registration events should be recorded.
+		// Default is false to avoid polluting observability logs during startup.
+		$this->should_record_component_registration = apply_filters( 'mcp_observability_should_record_component_registration', false );
 	}
 
 	/**
@@ -118,27 +129,33 @@ class McpComponentRegistry {
 				$this->tools[ $tool->get_name() ] = $tool;
 
 				// Track successful ability tool registration.
-				$this->observability_handler::record_event(
-					'mcp.component.registered',
-					array(
-						'component_type' => 'ability_tool',
-						'component_name' => $tool_item,
-						'server_id'      => $this->mcp_server->get_server_id(),
-					)
-				);
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'success',
+							'component_type' => 'ability_tool',
+							'component_name' => $tool_item,
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
 			} catch ( \InvalidArgumentException $e ) {
 				$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
 
 				// Track ability tool registration failure.
-				$this->observability_handler::record_event(
-					'mcp.component.registration_failed',
-					array(
-						'component_type' => 'ability_tool',
-						'component_name' => $tool_item,
-						'error_type'     => get_class( $e ),
-						'server_id'      => $this->mcp_server->get_server_id(),
-					)
-				);
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'failed',
+							'component_type' => 'ability_tool',
+							'component_name' => $tool_item,
+							'error_type'     => get_class( $e ),
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
 			}
 		}
 	}
@@ -164,27 +181,33 @@ class McpComponentRegistry {
 			$this->tools[ $tool->get_name() ] = $tool;
 
 			// Track successful tool registration
-			$this->observability_handler::record_event(
-				'mcp.component.registered',
-				array(
-					'component_type' => 'tool',
-					'component_name' => $tool->get_name(),
-					'server_id'      => $this->mcp_server->get_server_id(),
-				)
-			);
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'success',
+						'component_type' => 'tool',
+						'component_name' => $tool->get_name(),
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
 		} catch ( \InvalidArgumentException $e ) {
 			$this->error_handler->log( $e->getMessage(), array( "McpComponentRegistry::add_tool::{$tool->get_name()}" ) );
 
 			// Track tool registration failure
-			$this->observability_handler::record_event(
-				'mcp.component.registration_failed',
-				array(
-					'component_type' => 'tool',
-					'component_name' => $tool->get_name(),
-					'error_type'     => get_class( $e ),
-					'server_id'      => $this->mcp_server->get_server_id(),
-				)
-			);
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'tool',
+						'component_name' => $tool->get_name(),
+						'error_type'     => get_class( $e ),
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
 		}
 	}
 
@@ -213,27 +236,33 @@ class McpComponentRegistry {
 				$this->resources[ $resource->get_uri() ] = $resource;
 
 				// Track successful resource registration.
-				$this->observability_handler::record_event(
-					'mcp.component.registered',
-					array(
-						'component_type' => 'resource',
-						'component_name' => $ability_name,
-						'server_id'      => $this->mcp_server->get_server_id(),
-					)
-				);
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'success',
+							'component_type' => 'resource',
+							'component_name' => $ability_name,
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
 			} catch ( \InvalidArgumentException $e ) {
 				$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
 
 				// Track resource registration failure.
-				$this->observability_handler::record_event(
-					'mcp.component.registration_failed',
-					array(
-						'component_type' => 'resource',
-						'component_name' => $ability_name,
-						'error_type'     => get_class( $e ),
-						'server_id'      => $this->mcp_server->get_server_id(),
-					)
-				);
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'failed',
+							'component_type' => 'resource',
+							'component_name' => $ability_name,
+							'error_type'     => get_class( $e ),
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
 			}
 		}
 	}
@@ -271,27 +300,33 @@ class McpComponentRegistry {
 					$this->prompts[ $prompt->get_name() ] = $prompt;
 
 					// Track successful prompt registration
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'success',
+								'component_type' => 'prompt',
+								'component_name' => $prompt_item,
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
 				} catch ( \InvalidArgumentException $e ) {
 					$this->error_handler->log( $e->getMessage(), array( "McpPromptBuilder::{$prompt_item}" ) );
 
 					// Track prompt registration failure
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'failed',
+								'component_type' => 'prompt',
+								'component_name' => $prompt_item,
+								'error_type'     => get_class( $e ),
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
 				}
 			} else {
 				// Treat as ability name (legacy behavior)
@@ -309,27 +344,33 @@ class McpComponentRegistry {
 					$this->prompts[ $prompt->get_name() ] = $prompt;
 
 					// Track successful prompt registration.
-					$this->observability_handler::record_event(
-						'mcp.component.registered',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'success',
+								'component_type' => 'prompt',
+								'component_name' => $prompt_item,
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
 				} catch ( \InvalidArgumentException $e ) {
 					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
 
 					// Track prompt registration failure.
-					$this->observability_handler::record_event(
-						'mcp.component.registration_failed',
-						array(
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'error_type'     => get_class( $e ),
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'failed',
+								'component_type' => 'prompt',
+								'component_name' => $prompt_item,
+								'error_type'     => get_class( $e ),
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
 				}
 			}
 		}

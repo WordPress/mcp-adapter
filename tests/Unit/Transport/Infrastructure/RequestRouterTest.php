@@ -96,16 +96,19 @@ final class RequestRouterTest extends TestCase {
 		$this->assertEquals( '2025-06-18', $result['protocolVersion'] );
 		$this->assertArrayHasKey( 'serverInfo', $result );
 
-		// Verify observability events
+		// Verify observability events (unified event name with status tag)
 		$this->assertNotEmpty( DummyObservabilityHandler::$events );
 		$events = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request.count', $events );
-		$this->assertContains( 'mcp.request.success', $events );
+		$this->assertContains( 'mcp.request', $events );
 
-		// Verify timing metrics
-		$this->assertNotEmpty( DummyObservabilityHandler::$timings );
-		$timings = array_column( DummyObservabilityHandler::$timings, 'metric' );
-		$this->assertContains( 'mcp.request.duration', $timings );
+		// Verify timing and status tag are included in the event
+		$request_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
+			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $request_event );
+		$first_request = reset( $request_event );
+		$this->assertNotNull( $first_request['duration_ms'] );
+		$this->assertGreaterThan( 0, $first_request['duration_ms'] );
 	}
 
 	public function test_route_request_initialize_with_session(): void {
@@ -188,9 +191,15 @@ final class RequestRouterTest extends TestCase {
 		$this->assertEquals( McpErrorFactory::METHOD_NOT_FOUND, $result['error']['code'] );
 		$this->assertStringContainsString( 'unknown/method', $result['error']['message'] );
 
-		// Verify error event was recorded
+		// Verify error event was recorded with status tag
 		$events = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request.error', $events );
+		$this->assertContains( 'mcp.request', $events );
+		
+		// Check for error status tag
+		$error_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
+			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'error';
+		} );
+		$this->assertNotEmpty( $error_event );
 	}
 
 	public function test_route_request_handles_handler_exceptions(): void {
@@ -207,9 +216,15 @@ final class RequestRouterTest extends TestCase {
 		// Should either have error from handler or from exception handling
 		$this->assertTrue( isset( $result['error'] ) );
 
-		// Verify observability events were recorded
+		// Verify observability events were recorded (error event with duration)
 		$events = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request.count', $events );
+		$this->assertContains( 'mcp.request', $events );
+		
+		// Check for error status tag
+		$error_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
+			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'error';
+		} );
+		$this->assertNotEmpty( $error_event );
 	}
 
 	public function test_add_cursor_compatibility(): void {
@@ -246,28 +261,30 @@ final class RequestRouterTest extends TestCase {
 		// Make a request
 		$this->router->route_request( 'tools/list', array(), 1, 'test-transport' );
 
-		// Verify events were recorded
+		// Verify events were recorded (unified event name with status tag)
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.request.count', $event_names );
-		$this->assertContains( 'mcp.request.success', $event_names );
+		$this->assertContains( 'mcp.request', $event_names );
 
-		// Verify timing was recorded
-		$timings = DummyObservabilityHandler::$timings;
-		$this->assertNotEmpty( $timings );
-
-		$timing_metrics = array_column( $timings, 'metric' );
-		$this->assertContains( 'mcp.request.duration', $timing_metrics );
+		// Verify timing and status tag are included in the event
+		$success_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
+		$first_success = reset( $success_event );
+		$this->assertNotNull( $first_success['duration_ms'] );
+		$this->assertGreaterThan( 0, $first_success['duration_ms'] );
 
 		// Verify tags are included
-		$first_event = $events[0];
-		$this->assertArrayHasKey( 'tags', $first_event );
-		$this->assertArrayHasKey( 'method', $first_event['tags'] );
-		$this->assertArrayHasKey( 'transport', $first_event['tags'] );
-		$this->assertEquals( 'tools/list', $first_event['tags']['method'] );
-		$this->assertEquals( 'test-transport', $first_event['tags']['transport'] );
+		$this->assertArrayHasKey( 'tags', $first_success );
+		$this->assertArrayHasKey( 'status', $first_success['tags'] );
+		$this->assertArrayHasKey( 'method', $first_success['tags'] );
+		$this->assertArrayHasKey( 'transport', $first_success['tags'] );
+		$this->assertEquals( 'success', $first_success['tags']['status'] );
+		$this->assertEquals( 'tools/list', $first_success['tags']['method'] );
+		$this->assertEquals( 'test-transport', $first_success['tags']['transport'] );
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {
@@ -287,7 +304,7 @@ final class RequestRouterTest extends TestCase {
 				'resources_handler'     => $resources_handler,
 				'prompts_handler'       => $prompts_handler,
 				'system_handler'        => $system_handler,
-				'observability_handler' => DummyObservabilityHandler::class,
+				'observability_handler' => new DummyObservabilityHandler(),
 				'error_handler'         => new DummyErrorHandler(),
 			)
 		);

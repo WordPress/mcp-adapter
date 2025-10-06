@@ -54,13 +54,13 @@ class RequestRouter {
 
 		// Common tags for all metrics.
 		$common_tags = array(
-			'method'    => $method,
-			'transport' => $transport_name,
-			'params'    => $params, // Add params for debugging
+			'method'     => $method,
+			'transport'  => $transport_name,
+			'server_id'  => $this->context->mcp_server->get_server_id(),
+			'params'     => $this->sanitize_params_for_logging( $params ),
+			'request_id' => $request_id,
+			'session_id' => $http_context ? $http_context->session_id : null,
 		);
-
-		// Record request event.
-		$this->context->observability_handler::record_event( 'mcp.request.count', $common_tags );
 
 		$handlers = array(
 			'initialize'          => fn() => $this->handle_initialize_with_session( $params, $request_id, $http_context ),
@@ -80,37 +80,52 @@ class RequestRouter {
 		try {
 			$result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method );
 
-			// Handle error formats.
+			// Calculate request duration.
+			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
+
+			// Extract metadata from handler response (if present).
+			$metadata = $result['_metadata'] ?? array();
+			unset( $result['_metadata'] ); // Don't send to client.
+
+			// Capture newly created session ID from initialize if present.
+			if ( isset( $result['_session_id'] ) ) {
+				$metadata['new_session_id'] = $result['_session_id'];
+			}
+
+			// Merge common tags with handler metadata.
+			$tags = array_merge( $common_tags, $metadata );
+
+			// Determine status and record event.
 			if ( isset( $result['error'] ) ) {
-				// Track failed request.
-				$error_code = $result['error']['code'] ?? -32603;
-				$error_tags = array_merge(
-					$common_tags,
-					array( 'error_code' => $error_code )
-				);
-				$this->context->observability_handler::record_event( 'mcp.request.error', $error_tags );
+				$tags['status']     = 'error';
+				$tags['error_code'] = $result['error']['code'] ?? -32603;
+				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;
 			}
 
-			// Track successful request.
-			$this->context->observability_handler::record_event( 'mcp.request.success', $common_tags );
+			// Successful request.
+			$tags['status'] = 'success';
+			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			return $result;
 		} catch ( \Throwable $exception ) {
-			// Track failed request.
-			$error_tags = array_merge(
+			// Calculate request duration.
+			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
+
+			// Track exception with categorization.
+			$tags = array_merge(
 				$common_tags,
-				array( 'error_type' => get_class( $exception ) )
+				array(
+					'status'         => 'error',
+					'error_type'     => get_class( $exception ),
+					'error_category' => $this->categorize_error( $exception ),
+				)
 			);
-			$this->context->observability_handler::record_event( 'mcp.request.error', $error_tags );
+			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			// Create error response from exception.
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )['error'] );
-		} finally {
-			// Track request duration.
-			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
-			$this->context->observability_handler::record_timing( 'mcp.request.duration', $duration, $common_tags );
 		}
 	}
 
@@ -166,5 +181,65 @@ class RequestRouter {
 		return array(
 			'error' => McpErrorFactory::method_not_found( 0, $method )['error'],
 		);
+	}
+
+	/**
+	 * Categorize an exception into a general error category.
+	 *
+	 * @param \Throwable $exception The exception to categorize.
+	 *
+	 * @return string
+	 */
+	private function categorize_error( \Throwable $exception ): string {
+		$error_categories = array(
+			\ArgumentCountError::class       => 'arguments',
+			\Error::class                    => 'system',
+			\InvalidArgumentException::class => 'validation',
+			\LogicException::class           => 'logic',
+			\RuntimeException::class         => 'execution',
+			\TypeError::class                => 'type',
+		);
+
+		return $error_categories[ get_class( $exception ) ] ?? 'unknown';
+	}
+
+	/**
+	 * Sanitize request params for logging to remove sensitive data and limit size.
+	 *
+	 * @param array $params The request parameters to sanitize.
+	 *
+	 * @return array Sanitized parameters safe for logging.
+	 */
+	private function sanitize_params_for_logging( array $params ): array {
+		// Return early for empty parameters.
+		if ( empty( $params ) ) {
+			return array();
+		}
+
+		$sanitized = array();
+
+		// Extract only safe, useful fields for observability
+		$safe_fields = array( 'name', 'protocolVersion', 'uri' );
+
+		foreach ( $safe_fields as $field ) {
+			if ( ! isset( $params[ $field ] ) || ! is_scalar( $params[ $field ] ) ) {
+				continue;
+			}
+
+			$sanitized[ $field ] = $params[ $field ];
+		}
+
+		// Add clientInfo name if available (useful for debugging)
+		if ( isset( $params['clientInfo']['name'] ) ) {
+			$sanitized['client_name'] = $params['clientInfo']['name'];
+		}
+
+		// Add arguments count for tool calls (but not the actual arguments to avoid logging sensitive data)
+		if ( isset( $params['arguments'] ) && is_array( $params['arguments'] ) ) {
+			$sanitized['arguments_count'] = count( $params['arguments'] );
+			$sanitized['arguments_keys']  = array_keys( $params['arguments'] );
+		}
+
+		return $sanitized;
 	}
 }

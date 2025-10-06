@@ -22,52 +22,37 @@ class ErrorLogMcpObservabilityHandler implements Contracts\McpObservabilityHandl
 	use McpObservabilityHelperTrait;
 
 	/**
-	 * Emit a countable event for tracking.
+	 * Emit a countable event for tracking with optional timing data.
 	 *
-	 * @param string $event The event name to record.
-	 * @param array  $tags Optional tags to attach to the event.
+	 * @param string     $event The event name to record.
+	 * @param array      $tags Optional tags to attach to the event.
+	 * @param float|null $duration_ms Optional duration in milliseconds for timing measurements.
 	 *
 	 * @return void
 	 */
-	public static function record_event( string $event, array $tags = array() ): void {
+	public function record_event( string $event, array $tags = array(), ?float $duration_ms = null ): void {
 		$formatted_event = self::format_metric_name( $event );
 		$merged_tags     = self::merge_tags( $tags );
 		$formatted_tags  = self::format_tags( $merged_tags );
 
-		$log_message = sprintf(
-			'[MCP Observability] EVENT %s %s',
-			$formatted_event,
-			$formatted_tags
-		);
+		// Include timing data if provided
+		if ( null !== $duration_ms ) {
+			$log_message = sprintf(
+				'[MCP Observability] EVENT %s %.2fms %s',
+				$formatted_event,
+				$duration_ms,
+				$formatted_tags
+			);
+		} else {
+			$log_message = sprintf(
+				'[MCP Observability] EVENT %s %s',
+				$formatted_event,
+				$formatted_tags
+			);
+		}
 
 		error_log( $log_message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
 	}
-
-	/**
-	 * Record a timing measurement.
-	 *
-	 * @param string $metric The metric name for timing.
-	 * @param float  $duration_ms The duration in milliseconds.
-	 * @param array  $tags Optional tags to attach to the timing.
-	 *
-	 * @return void
-	 */
-	public static function record_timing( string $metric, float $duration_ms, array $tags = array() ): void {
-		$formatted_metric = self::format_metric_name( $metric );
-		$merged_tags      = self::merge_tags( $tags );
-		$formatted_tags   = self::format_tags( $merged_tags );
-
-		$log_message = sprintf(
-			'[MCP Observability] TIMING %s %.2fms %s',
-			$formatted_metric,
-			$duration_ms,
-			$formatted_tags
-		);
-
-		error_log( $log_message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-	}
-
-
 
 	/**
 	 * Format tags array into a readable string for logging.

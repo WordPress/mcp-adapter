@@ -203,9 +203,10 @@ final class McpAdapter {
 		);
 
 		// Track server creation.
-		$observability_handler::record_event(
+		$server->get_observability_handler()->record_event(
 			'mcp.server.created',
 			array(
+				'status'          => 'success',
 				'server_id'       => $server_id,
 				'transport_count' => count( $mcp_transports ),
 				'tools_count'     => count( $tools ),

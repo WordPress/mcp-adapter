@@ -116,28 +116,6 @@ trait McpObservabilityHelperTrait {
 	}
 
 	/**
-	 * Record an error event with standardized error categorization.
-	 *
-	 * @param string     $base_event The base event name (e.g., 'mcp.tool.execution').
-	 * @param \Throwable $exception The exception that occurred.
-	 * @param array      $additional_tags Additional context tags.
-	 *
-	 * @return void
-	 */
-	public static function record_error_event( string $base_event, \Throwable $exception, array $additional_tags = array() ): void {
-		$error_tags = array_merge(
-			array(
-				'error_type'         => get_class( $exception ),
-				'error_category'     => self::categorize_error( $exception ),
-				'error_message_hash' => substr( md5( $exception->getMessage() ), 0, 8 ), // For grouping similar errors.
-			),
-			$additional_tags
-		);
-
-		static::record_event( $base_event . '_failed', $error_tags );
-	}
-
-	/**
 	 * Categorize an exception into a general error category.
 	 *
 	 * @param \Throwable $exception The exception to categorize.

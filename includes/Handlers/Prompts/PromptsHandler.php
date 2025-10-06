@@ -51,7 +51,11 @@ class PromptsHandler {
 		}
 
 		return array(
-			'prompts' => $prompts,
+			'prompts'   => $prompts,
+			'_metadata' => array(
+				'component_type' => 'prompts',
+				'prompts_count'  => count( $prompts ),
+			),
 		);
 	}
 
@@ -68,7 +72,13 @@ class PromptsHandler {
 		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['name'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'] );
+			return array(
+				'error'     => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'],
+				'_metadata' => array(
+					'component_type' => 'prompt',
+					'failure_reason' => 'missing_parameter',
+				),
+			);
 		}
 
 		// Get the prompt by name.
@@ -76,7 +86,14 @@ class PromptsHandler {
 		$prompt      = $this->mcp->get_prompt( $prompt_name );
 
 		if ( ! $prompt ) {
-			return array( 'error' => McpErrorFactory::prompt_not_found( $request_id, $prompt_name )['error'] );
+			return array(
+				'error'     => McpErrorFactory::prompt_not_found( $request_id, $prompt_name )['error'],
+				'_metadata' => array(
+					'component_type' => 'prompt',
+					'prompt_name'    => $prompt_name,
+					'failure_reason' => 'not_found',
+				),
+			);
 		}
 
 		// Get the arguments for the prompt.
@@ -86,12 +103,28 @@ class PromptsHandler {
 			// Check if this is a builder-based prompt that can execute directly
 			if ( $prompt->is_builder_based() ) {
 				// Direct execution through the builder (bypasses abilities completely)
+				// Note: Builder permission checks return bool only, not WP_Error
 				$has_permission = $prompt->check_permission_direct( $arguments );
 				if ( ! $has_permission ) {
-					return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
+					return array(
+						'error'     => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'],
+						'_metadata' => array(
+							'component_type' => 'prompt',
+							'prompt_name'    => $prompt_name,
+							'failure_reason' => 'permission_denied',
+							'is_builder'     => true,
+						),
+					);
 				}
 
-				return $prompt->execute_direct( $arguments );
+				$result              = $prompt->execute_direct( $arguments );
+				$result['_metadata'] = array(
+					'component_type' => 'prompt',
+					'prompt_name'    => $prompt_name,
+					'is_builder'     => true,
+				);
+
+				return $result;
 			}
 
 			/**
@@ -105,10 +138,36 @@ class PromptsHandler {
 			$ability        = $prompt->get_ability();
 			$has_permission = $ability->has_permission( $arguments );
 			if ( true !== $has_permission ) {
-				return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'] );
+				// Extract detailed error message and code if WP_Error was returned
+				$error_message  = 'Access denied for prompt: ' . $prompt_name;
+				$failure_reason = 'permission_denied';
+
+				if ( is_wp_error( $has_permission ) ) {
+					$error_message  = $has_permission->get_error_message();
+					$failure_reason = $has_permission->get_error_code(); // Use WP_Error code as failure_reason
+				}
+
+				return array(
+					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )['error'],
+					'_metadata' => array(
+						'component_type' => 'prompt',
+						'prompt_name'    => $prompt_name,
+						'ability_name'   => $ability->get_name(),
+						'failure_reason' => $failure_reason,
+						'is_builder'     => false,
+					),
+				);
 			}
 
-			return $ability->execute( $arguments );
+			$result              = $ability->execute( $arguments );
+			$result['_metadata'] = array(
+				'component_type' => 'prompt',
+				'prompt_name'    => $prompt_name,
+				'ability_name'   => $ability->get_name(),
+				'is_builder'     => false,
+			);
+
+			return $result;
 		} catch ( \Throwable $e ) {
 			$this->mcp->error_handler->log(
 				'Prompt execution failed',
@@ -119,7 +178,15 @@ class PromptsHandler {
 				)
 			);
 
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )['error'] );
+			return array(
+				'error'     => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )['error'],
+				'_metadata' => array(
+					'component_type' => 'prompt',
+					'prompt_name'    => $prompt_name,
+					'failure_reason' => 'execution_failed',
+					'error_type'     => get_class( $e ),
+				),
+			);
 		}
 	}
 }

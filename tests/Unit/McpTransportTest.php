@@ -52,12 +52,18 @@ final class McpTransportTest extends TestCase {
 		$this->assertIsArray( $res );
 		$this->assertArrayHasKey( 'tools', $res );
 
-		// metrics
+		// metrics (unified event name with status tag)
 		$this->assertNotEmpty( DummyObservabilityHandler::$events );
-		$this->assertNotEmpty( DummyObservabilityHandler::$timings );
 		$eventMetrics = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request.count', $eventMetrics );
-		$this->assertContains( 'mcp.request.success', $eventMetrics );
+		$this->assertContains( 'mcp.request', $eventMetrics );
+		
+		// Verify duration and status are included
+		$success_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
+			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
+		$first_success = reset( $success_event );
+		$this->assertNotNull( $first_success['duration_ms'] );
 	}
 
 	public function test_transport_handles_unknown_methods_with_error_metrics(): void {
@@ -69,8 +75,16 @@ final class McpTransportTest extends TestCase {
 		$res = $transport->test_route_request( 'unknown/method', array() );
 		$this->assertArrayHasKey( 'error', $res );
 
+		// Verify error event was recorded with duration and status tag
 		$this->assertNotEmpty( DummyObservabilityHandler::$events );
-		$this->assertNotEmpty( DummyObservabilityHandler::$timings );
+		$eventMetrics = array_column( DummyObservabilityHandler::$events, 'event' );
+		$this->assertContains( 'mcp.request', $eventMetrics );
+		
+		// Verify status is 'error'
+		$error_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
+			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'error';
+		} );
+		$this->assertNotEmpty( $error_event );
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {
@@ -90,7 +104,7 @@ final class McpTransportTest extends TestCase {
 				'resources_handler'     => $resources_handler,
 				'prompts_handler'       => $prompts_handler,
 				'system_handler'        => $system_handler,
-				'observability_handler' => DummyObservabilityHandler::class,
+				'observability_handler' => new DummyObservabilityHandler(),
 			)
 		);
 	}

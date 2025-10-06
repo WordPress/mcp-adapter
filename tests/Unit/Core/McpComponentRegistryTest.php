@@ -71,7 +71,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->registry = new McpComponentRegistry(
 			$this->server,
 			new DummyErrorHandler(),
-			DummyObservabilityHandler::class,
+			new DummyObservabilityHandler(),
 			false // Disable validation for simpler testing
 		);
 	}
@@ -94,7 +94,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registered', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'success'
+		$success_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
 		$this->assertEmpty( DummyErrorHandler::$logs );
@@ -118,7 +124,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registration_failed', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'failed'
+		$failure_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'failed';
+		} );
+		$this->assertNotEmpty( $failure_event );
 	}
 
 	public function test_register_tools_skips_non_strings(): void {
@@ -157,7 +169,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registered', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'success'
+		$success_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
 	}
 
 	public function test_register_resources_with_valid_ability(): void {
@@ -177,7 +195,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registered', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'success'
+		$success_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
 		$this->assertEmpty( DummyErrorHandler::$logs );
@@ -199,7 +223,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registration_failed', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'failed'
+		$failure_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'failed';
+		} );
+		$this->assertNotEmpty( $failure_event );
 	}
 
 	public function test_register_prompts_with_valid_ability(): void {
@@ -219,7 +249,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registered', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'success'
+		$success_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
 		$this->assertEmpty( DummyErrorHandler::$logs );
@@ -243,7 +279,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registered', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'success'
+		$success_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
 		$this->assertEmpty( DummyErrorHandler::$logs );
@@ -265,7 +307,13 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registration_failed', $event_names );
+		$this->assertContains( 'mcp.component.registration', $event_names );
+		
+		// Verify status is 'failed'
+		$failure_event = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'failed';
+		} );
+		$this->assertNotEmpty( $failure_event );
 	}
 
 	public function test_get_tool_by_name(): void {
@@ -321,9 +369,15 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$registered_events = array_filter( $event_names, function( $event ) {
-			return $event === 'mcp.component.registered';
+			return $event === 'mcp.component.registration';
 		} );
 		$this->assertCount( 4, $registered_events ); // 1 tool + 1 resource + 2 prompts
+		
+		// Verify all are successful registrations
+		$success_events = array_filter( $events, function( $event ) {
+			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
+		} );
+		$this->assertCount( 4, $success_events );
 	}
 
 	public function test_registry_with_validation_enabled(): void {
@@ -331,7 +385,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$registry_with_validation = new McpComponentRegistry(
 			$this->server,
 			new DummyErrorHandler(),
-			DummyObservabilityHandler::class,
+			new DummyObservabilityHandler(),
 			true // Enable validation
 		);
 

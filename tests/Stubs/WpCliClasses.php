@@ -41,15 +41,24 @@ if ( ! class_exists( 'WP_CLI' ) ) {
 			// Stub implementation for testing
 		}
 
-		/**
-		 * Display error message prefixed with "Error:" and exit with error code.
-		 *
-		 * @param string $message Message to display to the user.
-		 * @param bool   $exit    Whether to exit or return.
-		 */
-		public static function error( $message, $exit = true ) {
-			// For testing, throw exception instead of exiting
-			throw new \Exception( 'WP_CLI Error: ' . $message );
-		}
+	/**
+	 * Display error message prefixed with "Error:" and exit with error code.
+	 *
+	 * @param string $message Message to display to the user.
+	 * @param bool   $exit    Whether to exit or return.
+	 */
+	public static function error( $message, $exit = true ) {
+		// For testing, throw exception instead of exiting
+		throw new \Exception( 'WP_CLI Error: ' . $message );
 	}
+
+	/**
+	 * Display debug message when in debug mode.
+	 *
+	 * @param string $message Message to display to the user.
+	 */
+	public static function debug( $message ) {
+		// Stub implementation for testing
+	}
+}
 }

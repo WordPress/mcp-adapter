@@ -337,7 +337,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'resources_handler'     => $resources_handler,
 				'prompts_handler'       => $prompts_handler,
 				'system_handler'        => $system_handler,
-				'observability_handler' => DummyObservabilityHandler::class,
+				'observability_handler' => new DummyObservabilityHandler(),
 				'error_handler'         => new DummyErrorHandler(),
 			)
 		);

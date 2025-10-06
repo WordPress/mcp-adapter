@@ -61,7 +61,8 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 			file_put_contents( $log_file, '' );
 		}
 
-		ErrorLogMcpObservabilityHandler::record_event( 'test.event', array( 'key' => 'value' ) );
+		$handler = new ErrorLogMcpObservabilityHandler();
+		$handler->record_event( 'test.event', array( 'key' => 'value' ) );
 
 		// Check that something was logged
 		$log_content = file_get_contents( $log_file );
@@ -70,18 +71,19 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'key=value', $log_content );
 	}
 
-	public function test_record_timing_logs_to_error_log(): void {
+	public function test_record_event_with_duration_logs_to_error_log(): void {
 		// Clear any existing log content
 		$log_file = ini_get( 'error_log' );
 		if ( file_exists( $log_file ) ) {
 			file_put_contents( $log_file, '' );
 		}
 
-		ErrorLogMcpObservabilityHandler::record_timing( 'test.timing', 123.45, array( 'operation' => 'test' ) );
+		$handler = new ErrorLogMcpObservabilityHandler();
+		$handler->record_event( 'test.timing', array( 'operation' => 'test' ), 123.45 );
 
-		// Check that something was logged
+		// Check that something was logged with duration
 		$log_content = file_get_contents( $log_file );
-		$this->assertStringContainsString( '[MCP Observability] TIMING', $log_content );
+		$this->assertStringContainsString( '[MCP Observability] EVENT', $log_content );
 		$this->assertStringContainsString( 'mcp.test.timing', $log_content );
 		$this->assertStringContainsString( '123.45ms', $log_content );
 		$this->assertStringContainsString( 'operation=test', $log_content );
@@ -95,7 +97,8 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 		}
 
 		// Test metric name formatting
-		ErrorLogMcpObservabilityHandler::record_event( 'raw.event.name' );
+		$handler = new ErrorLogMcpObservabilityHandler();
+		$handler->record_event( 'raw.event.name' );
 
 		$log_content = file_get_contents( $log_file );
 		$this->assertStringContainsString( 'mcp.raw.event.name', $log_content );
@@ -108,24 +111,26 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 			file_put_contents( $log_file, '' );
 		}
 
-		ErrorLogMcpObservabilityHandler::record_event( 'test.event' );
+		$handler = new ErrorLogMcpObservabilityHandler();
+		$handler->record_event( 'test.event' );
 
 		$log_content = file_get_contents( $log_file );
 		$this->assertStringContainsString( '[MCP Observability] EVENT', $log_content );
 		$this->assertStringContainsString( 'mcp.test.event', $log_content );
 	}
 
-	public function test_record_timing_with_empty_tags(): void {
+	public function test_record_event_with_duration_and_empty_tags(): void {
 		// Clear any existing log content
 		$log_file = ini_get( 'error_log' );
 		if ( file_exists( $log_file ) ) {
 			file_put_contents( $log_file, '' );
 		}
 
-		ErrorLogMcpObservabilityHandler::record_timing( 'test.timing', 100.0 );
+		$handler = new ErrorLogMcpObservabilityHandler();
+		$handler->record_event( 'test.timing', array(), 100.0 );
 
 		$log_content = file_get_contents( $log_file );
-		$this->assertStringContainsString( '[MCP Observability] TIMING', $log_content );
+		$this->assertStringContainsString( '[MCP Observability] EVENT', $log_content );
 		$this->assertStringContainsString( 'mcp.test.timing', $log_content );
 		$this->assertStringContainsString( '100.00ms', $log_content );
 	}
@@ -145,7 +150,8 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 			'success'    => true,
 		);
 
-		ErrorLogMcpObservabilityHandler::record_event( 'tool.execution', $complex_tags );
+		$handler = new ErrorLogMcpObservabilityHandler();
+		$handler->record_event( 'tool.execution', $complex_tags );
 
 		$log_content = file_get_contents( $log_file );
 		$this->assertStringContainsString( '[MCP Observability] EVENT', $log_content );

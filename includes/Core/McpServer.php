@@ -14,6 +14,7 @@ use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
+use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
@@ -85,11 +86,11 @@ class McpServer {
 	public McpErrorHandlerInterface $error_handler;
 
 	/**
-	 * Observability handler class name (e.g., NullMcpObservabilityHandler::class).
+	 * Observability handler instance.
 	 *
-	 * @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
+	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
 	 */
-	public string $observability_handler;
+	public McpObservabilityHandlerInterface $observability_handler;
 
 	/**
 	 * Whether MCP validation is enabled.
@@ -176,10 +177,11 @@ class McpServer {
 
 		// Instantiate observability handler
 		if ( $observability_handler && class_exists( $observability_handler ) ) {
-			/** @var class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler */
-			$this->observability_handler = $observability_handler;
+			/** @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface $handler */
+			$handler                     = new $observability_handler();
+			$this->observability_handler = $handler;
 		} else {
-			$this->observability_handler = NullMcpObservabilityHandler::class;
+			$this->observability_handler = new NullMcpObservabilityHandler();
 		}
 	}
 
@@ -302,11 +304,11 @@ class McpServer {
 	}
 
 	/**
-	 * Get the observability handler class name.
+	 * Get the observability handler instance.
 	 *
-	 * @return class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>
+	 * @return \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
 	 */
-	public function get_observability_handler(): string {
+	public function get_observability_handler(): McpObservabilityHandlerInterface {
 		return $this->observability_handler;
 	}
 
