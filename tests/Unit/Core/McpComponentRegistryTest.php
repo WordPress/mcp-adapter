@@ -56,6 +56,9 @@ final class McpComponentRegistryTest extends TestCase {
 	public function set_up(): void {
 		parent::set_up();
 
+		// Enable component registration recording for tests
+		add_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
+
 		$this->server = new McpServer(
 			'test-server',
 			'mcp/v1',
@@ -74,6 +77,12 @@ final class McpComponentRegistryTest extends TestCase {
 			new DummyObservabilityHandler(),
 			false // Disable validation for simpler testing
 		);
+	}
+
+	public function tear_down(): void {
+		// Remove the filter to ensure clean state
+		remove_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
+		parent::tear_down();
 	}
 
 	public function test_register_tools_with_valid_ability(): void {

@@ -248,19 +248,19 @@ The `failure_reason` tag provides specific context for errors. When WordPress ab
 
 #### Controlling Component Registration Events
 
-Component registration events are disabled by default but can be enabled using the `mcp_observability_should_record_component_registration` filter:
+Component registration events are disabled by default but can be enabled using the `mcp_adapter_observability_record_component_registration` filter:
 
 ```php
 // Enable component registration events globally
-add_filter('mcp_observability_should_record_component_registration', '__return_true');
+add_filter('mcp_adapter_observability_record_component_registration', '__return_true');
 
 // Enable only when debugging
-add_filter('mcp_observability_should_record_component_registration', function($should_record) {
+add_filter('mcp_adapter_observability_record_component_registration', function($should_record) {
     return defined('WP_DEBUG') && WP_DEBUG;
 });
 
 // Enable only in development environments
-add_filter('mcp_observability_should_record_component_registration', function($should_record) {
+add_filter('mcp_adapter_observability_record_component_registration', function($should_record) {
     return wp_get_environment_type() === 'development';
 });
 ```

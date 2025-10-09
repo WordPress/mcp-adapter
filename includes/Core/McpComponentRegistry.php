@@ -100,7 +100,7 @@ class McpComponentRegistry {
 
 		// Allow filtering whether component registration events should be recorded.
 		// Default is false to avoid polluting observability logs during startup.
-		$this->should_record_component_registration = apply_filters( 'mcp_observability_should_record_component_registration', false );
+		$this->should_record_component_registration = apply_filters( 'mcp_adapter_observability_record_component_registration', false );
 	}
 
 	/**
