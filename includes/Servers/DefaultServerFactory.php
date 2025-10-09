@@ -110,11 +110,6 @@ class DefaultServerFactory {
 				continue;
 			}
 
-			// Skip mcp-adapter internal abilities
-			if ( str_starts_with( $ability_name, 'mcp-adapter/' ) ) {
-				continue;
-			}
-
 			// Get the type (defaults to 'tool' if not specified)
 			$ability_type = $meta['mcp']['type'] ?? 'tool';
 
