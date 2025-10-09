@@ -52,17 +52,11 @@ trait McpAbilityHelperTrait {
 	 * This is a simplified version that returns only boolean values,
 	 * useful for filtering operations where WP_Error handling isn't needed.
 	 *
-	 * @param string $ability_name The ability name to check.
+	 * @param \WP_Ability $ability The ability object to check.
 	 *
 	 * @return bool True if publicly exposed, false otherwise.
 	 */
-	protected static function is_ability_mcp_public( string $ability_name ): bool {
-		$ability = wp_get_ability( $ability_name );
-
-		if ( ! $ability ) {
-			return false;
-		}
-
+	protected static function is_ability_mcp_public( \WP_Ability $ability ): bool {
 		$meta = $ability->get_meta();
 		return (bool) ( $meta['mcp']['public'] ?? false );
 	}
@@ -72,17 +66,11 @@ trait McpAbilityHelperTrait {
 	 *
 	 * Returns the type specified in meta.mcp.type, defaulting to 'tool' if not specified.
 	 *
-	 * @param string $ability_name The ability name to check.
+	 * @param \WP_Ability $ability The ability object to check.
 	 *
 	 * @return string The MCP type ('tool', 'resource', or 'prompt'). Defaults to 'tool'.
 	 */
-	protected static function get_ability_mcp_type( string $ability_name ): string {
-		$ability = wp_get_ability( $ability_name );
-
-		if ( ! $ability ) {
-			return 'tool';
-		}
-
+	protected static function get_ability_mcp_type( \WP_Ability $ability ): string {
 		$meta = $ability->get_meta();
 		$type = $meta['mcp']['type'] ?? 'tool';
 

@@ -22,7 +22,7 @@ namespace WP\MCP\Abilities;
  *
  * @see https://github.com/your-repo/mcp-adapter/docs/security.md for detailed security configuration
  */
-class DiscoverAbilitiesAbility {
+final class DiscoverAbilitiesAbility {
 	use McpAbilityHelperTrait;
 
 	/**
@@ -128,26 +128,20 @@ class DiscoverAbilitiesAbility {
 			);
 		}
 
-		//@todo: Get only publicly exposed abilities (mcp.public=true)
+		// Get all abilities and filter for publicly exposed ones
 		$abilities = wp_get_abilities();
 
 		$ability_list = array();
 		foreach ( $abilities as $ability ) {
 			$ability_name = $ability->get_name();
 
-			// Exclude abilities that start with 'mcp-adapter/' to prevent self-referencing
-			if ( str_starts_with( $ability_name, 'mcp-adapter/' ) ) {
-				continue;
-			}
-
 			// Check if ability is publicly exposed via MCP
-			// @todo: remove this check once we have a way to get only publicly exposed abilities
-			if ( ! self::is_ability_mcp_public( $ability_name ) ) {
+			if ( ! self::is_ability_mcp_public( $ability ) ) {
 				continue;
 			}
 
 			// Only discover abilities with type='tool' (default type)
-			if ( self::get_ability_mcp_type( $ability_name ) !== 'tool' ) {
+			if ( self::get_ability_mcp_type( $ability ) !== 'tool' ) {
 				continue;
 			}
 
