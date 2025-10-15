@@ -125,7 +125,7 @@ abstract class TestCase extends PolyfillsTestCase {
 	 * @param array $resources Optional ability names to register as resources.
 	 * @param array $prompts Optional ability names or builder classes to register as prompts.
 	 *
-	 * @return McpServer The configured MCP server instance.
+	 * @return \WP\MCP\Core\McpServer The configured MCP server instance.
 	 * @throws \Exception
 	 */
 	public function makeServer( array $tools = array(), array $resources = array(), array $prompts = array() ): McpServer {
