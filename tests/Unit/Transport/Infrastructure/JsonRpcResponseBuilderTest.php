@@ -50,13 +50,22 @@ class JsonRpcResponseBuilderTest extends TestCase {
 	public function test_is_batch_request(): void {
 		// Test batch request
 		$batch_body = array(
-			array( 'method' => 'test1', 'id' => 1 ),
-			array( 'method' => 'test2', 'id' => 2 ),
+			array(
+				'method' => 'test1',
+				'id'     => 1,
+			),
+			array(
+				'method' => 'test2',
+				'id'     => 2,
+			),
 		);
 		$this->assertTrue( JsonRpcResponseBuilder::is_batch_request( $batch_body ) );
 
 		// Test single request
-		$single_body = array( 'method' => 'test', 'id' => 1 );
+		$single_body = array(
+			'method' => 'test',
+			'id'     => 1,
+		);
 		$this->assertFalse( JsonRpcResponseBuilder::is_batch_request( $single_body ) );
 
 		// Test non-array
@@ -69,14 +78,23 @@ class JsonRpcResponseBuilderTest extends TestCase {
 	public function test_normalize_messages(): void {
 		// Test batch request normalization
 		$batch_body = array(
-			array( 'method' => 'test1', 'id' => 1 ),
-			array( 'method' => 'test2', 'id' => 2 ),
+			array(
+				'method' => 'test1',
+				'id'     => 1,
+			),
+			array(
+				'method' => 'test2',
+				'id'     => 2,
+			),
 		);
 		$normalized = JsonRpcResponseBuilder::normalize_messages( $batch_body );
 		$this->assertEquals( $batch_body, $normalized );
 
 		// Test single request normalization
-		$single_body = array( 'method' => 'test', 'id' => 1 );
+		$single_body = array(
+			'method' => 'test',
+			'id'     => 1,
+		);
 		$normalized  = JsonRpcResponseBuilder::normalize_messages( $single_body );
 		$this->assertEquals( array( $single_body ), $normalized );
 	}
@@ -86,12 +104,18 @@ class JsonRpcResponseBuilderTest extends TestCase {
 	 */
 	public function test_process_messages(): void {
 		$messages = array(
-			array( 'method' => 'test1', 'id' => 1 ),
-			array( 'method' => 'test2', 'id' => 2 ),
+			array(
+				'method' => 'test1',
+				'id'     => 1,
+			),
+			array(
+				'method' => 'test2',
+				'id'     => 2,
+			),
 		);
 
 		// Mock processor that returns a response for each message
-		$processor = function ( array $message ) {
+		$processor = static function ( array $message ) {
 			return array(
 				'jsonrpc' => '2.0',
 				'id'      => $message['id'],

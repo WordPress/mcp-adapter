@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\ExecuteAbilityAbility;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\TestCase;
 
 /**
@@ -27,16 +26,16 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-		
+
 		// Create a test user for authentication tests
-		self::$user_id = wp_insert_user( array(
-			'user_login' => 'testuser',
-			'user_pass'  => 'testpass',
-			'user_email' => 'test@example.com',
-			'role'       => 'administrator',
-		) );
+		self::$user_id = wp_insert_user(
+			array(
+				'user_login' => 'testuser',
+				'user_pass'  => 'testpass',
+				'user_email' => 'test@example.com',
+				'role'       => 'administrator',
+			)
+		);
 	}
 
 	public static function tear_down_after_class(): void {
@@ -70,47 +69,57 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	public function test_check_permission_with_valid_ability(): void {
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/always-allowed',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/always-allowed',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertTrue( $result );
 	}
 
 	public function test_check_permission_with_permission_denied_ability(): void {
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/permission-denied',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/permission-denied',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertFalse( $result );
 	}
 
 	public function test_check_permission_with_missing_ability_name(): void {
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'parameters' => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'parameters' => array(),
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 
 	public function test_check_permission_with_empty_ability_name(): void {
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => '',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => '',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 
 	public function test_check_permission_with_nonexistent_ability(): void {
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'nonexistent/ability',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'nonexistent/ability',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
@@ -123,10 +132,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			array(
 				'label'               => 'WP Error Permission Test',
 				'description'         => 'Returns WP_Error for permission',
+				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => function() { return array( 'test' => 'result' ); },
-				'permission_callback' => function() { 
-					return new \WP_Error( 'permission_denied', 'Custom permission error' ); 
+				'execute_callback'    => static function () {
+					return array( 'test' => 'result' ); },
+				'permission_callback' => static function () {
+					return new \WP_Error( 'permission_denied', 'Custom permission error' );
 				},
 				'meta'                => array(
 					'mcp' => array(
@@ -136,10 +147,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/wp-error-permission',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/wp-error-permission',
+				'parameters'   => array(),
+			)
+		);
 
 		// WP_Error should be returned as-is
 		$this->assertInstanceOf( \WP_Error::class, $result );
@@ -154,10 +167,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		// Test with no authenticated user
 		wp_set_current_user( 0 );
 
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/always-allowed',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/always-allowed',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'authentication_required', $result->get_error_code() );
@@ -168,11 +183,13 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_check_permission_requires_capability(): void {
 		// Create a user with no role (no capabilities)
-		$limited_user_id = wp_insert_user( array(
-			'user_login' => 'limiteduser',
-			'user_pass'  => 'testpass',
-			'user_email' => 'limited@example.com',
-		) );
+		$limited_user_id = wp_insert_user(
+			array(
+				'user_login' => 'limiteduser',
+				'user_pass'  => 'testpass',
+				'user_email' => 'limited@example.com',
+			)
+		);
 
 		// Explicitly remove all capabilities
 		$user = new \WP_User( $limited_user_id );
@@ -181,10 +198,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 		wp_set_current_user( $limited_user_id );
 
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/always-allowed',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/always-allowed',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
@@ -196,10 +215,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_check_permission_with_public_mcp_metadata(): void {
 		// Test ability with mcp.public=true (should be allowed)
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/always-allowed',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/always-allowed',
+				'parameters'   => array(),
+			)
+		);
 		$this->assertTrue( $result );
 
 		// Create a test ability without mcp.public metadata (should be blocked)
@@ -208,17 +229,22 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			array(
 				'label'               => 'Not Public MCP Test',
 				'description'         => 'Ability without mcp.public metadata',
+				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => function() { return array( 'test' => 'result' ); },
-				'permission_callback' => function() { return true; },
+				'execute_callback'    => static function () {
+					return array( 'test' => 'result' ); },
+				'permission_callback' => static function () {
+					return true; },
 				// No mcp.public metadata - should default to false
 			)
 		);
 
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'test/not-public-mcp',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'test/not-public-mcp',
+				'parameters'   => array(),
+			)
+		);
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_public_mcp', $result->get_error_code() );
 
@@ -228,20 +254,24 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_check_permission_with_nonexistent_ability_for_mcp_check(): void {
 		// Test with an ability that doesn't exist (should fail at MCP exposure check)
-		$result = ExecuteAbilityAbility::check_permission( array(
-			'ability_name' => 'nonexistent/test-ability',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::check_permission(
+			array(
+				'ability_name' => 'nonexistent/test-ability',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
 	}
 
 	public function test_execute_with_valid_ability(): void {
-		$result = ExecuteAbilityAbility::execute( array(
-			'ability_name' => 'test/always-allowed',
-			'parameters'   => array( 'test_param' => 'test_value' )
-		) );
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'ability_name' => 'test/always-allowed',
+				'parameters'   => array( 'test_param' => 'test_value' ),
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'success', $result );
@@ -256,9 +286,11 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_missing_ability_name(): void {
-		$result = ExecuteAbilityAbility::execute( array(
-			'parameters' => array()
-		) );
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'parameters' => array(),
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'success', $result );
@@ -268,10 +300,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_empty_ability_name(): void {
-		$result = ExecuteAbilityAbility::execute( array(
-			'ability_name' => '',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'ability_name' => '',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'success', $result );
@@ -281,10 +315,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_nonexistent_ability(): void {
-		$result = ExecuteAbilityAbility::execute( array(
-			'ability_name' => 'nonexistent/ability',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'ability_name' => 'nonexistent/ability',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'success', $result );
@@ -301,11 +337,13 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			array(
 				'label'               => 'WP Error Execution Test',
 				'description'         => 'Returns WP_Error for execution',
+				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => function() { 
-					return new \WP_Error( 'execution_failed', 'Custom execution error' ); 
+				'execute_callback'    => static function () {
+					return new \WP_Error( 'execution_failed', 'Custom execution error' );
 				},
-				'permission_callback' => function() { return true; },
+				'permission_callback' => static function () {
+					return true; },
 				'meta'                => array(
 					'mcp' => array(
 						'public' => true, // Expose via MCP for testing
@@ -314,10 +352,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$result = ExecuteAbilityAbility::execute( array(
-			'ability_name' => 'test/wp-error-execution',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'ability_name' => 'test/wp-error-execution',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'success', $result );
@@ -336,11 +376,13 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			array(
 				'label'               => 'Exception Execution Test',
 				'description'         => 'Throws exception for execution',
+				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => function() { 
-					throw new \RuntimeException( 'Test execution exception' ); 
+				'execute_callback'    => static function () {
+					throw new \RuntimeException( 'Test execution exception' );
 				},
-				'permission_callback' => function() { return true; },
+				'permission_callback' => static function () {
+					return true; },
 				'meta'                => array(
 					'mcp' => array(
 						'public' => true, // Expose via MCP for testing
@@ -349,10 +391,12 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$result = ExecuteAbilityAbility::execute( array(
-			'ability_name' => 'test/exception-execution',
-			'parameters'   => array()
-		) );
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'ability_name' => 'test/exception-execution',
+				'parameters'   => array(),
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'success', $result );
@@ -385,7 +429,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_ability_has_correct_annotations(): void {
 		$ability = wp_get_ability( 'mcp-adapter/execute-ability' );
-		$meta = $ability->get_meta();
+		$meta    = $ability->get_meta();
 
 		$this->assertIsArray( $meta );
 		$this->assertArrayHasKey( 'annotations', $meta );

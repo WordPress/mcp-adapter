@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Core;
 
 use WP\MCP\Core\McpAdapter;
-use WP\MCP\Core\McpTransportFactory;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpTransportFactory;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Tests\Fixtures\DummyTransport;
@@ -21,7 +21,7 @@ final class DeveloperErrorsTest extends TestCase {
 		$this->adapter = McpAdapter::instance();
 
 		// Clear any existing servers
-		$reflection = new \ReflectionClass( $this->adapter );
+		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
 		$servers_property->setAccessible( true );
 		$servers_property->setValue( $this->adapter, array() );
@@ -40,13 +40,16 @@ final class DeveloperErrorsTest extends TestCase {
 		// Capture _doing_it_wrong calls
 		$captured_calls = array();
 
-		add_action( 'doing_it_wrong_run', function( ...$args ) use ( &$captured_calls ) {
-			$captured_calls[] = array(
-				'function' => $args[0] ?? '',
-				'message' => $args[1] ?? '',
-				'version' => $args[2] ?? '',
-			);
-		} );
+		add_action(
+			'doing_it_wrong_run',
+			static function ( ...$args ) use ( &$captured_calls ) {
+				$captured_calls[] = array(
+					'function' => $args[0] ?? '',
+					'message'  => $args[1] ?? '',
+					'version'  => $args[2] ?? '',
+				);
+			}
+		);
 
 		// Try to create server outside of mcp_adapter_init
 		try {
@@ -61,7 +64,7 @@ final class DeveloperErrorsTest extends TestCase {
 				NullMcpErrorHandler::class,
 				NullMcpObservabilityHandler::class
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			// Expected exception
 		}
 
@@ -75,13 +78,16 @@ final class DeveloperErrorsTest extends TestCase {
 	public function test_duplicate_server_id_triggers_doing_it_wrong(): void {
 		$captured_calls = array();
 
-		add_action( 'doing_it_wrong_run', function( ...$args ) use ( &$captured_calls ) {
-			$captured_calls[] = array(
-				'function' => $args[0] ?? '',
-				'message' => $args[1] ?? '',
-				'version' => $args[2] ?? '',
-			);
-		} );
+		add_action(
+			'doing_it_wrong_run',
+			static function ( ...$args ) use ( &$captured_calls ) {
+				$captured_calls[] = array(
+					'function' => $args[0] ?? '',
+					'message'  => $args[1] ?? '',
+					'version'  => $args[2] ?? '',
+				);
+			}
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;
@@ -113,7 +119,7 @@ final class DeveloperErrorsTest extends TestCase {
 				NullMcpErrorHandler::class,
 				NullMcpObservabilityHandler::class
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			// Expected exception for duplicate ID
 		}
 
@@ -129,13 +135,16 @@ final class DeveloperErrorsTest extends TestCase {
 	public function test_transport_factory_with_nonexistent_class_triggers_doing_it_wrong(): void {
 		$captured_calls = array();
 
-		add_action( 'doing_it_wrong_run', function( ...$args ) use ( &$captured_calls ) {
-			$captured_calls[] = array(
-				'function' => $args[0] ?? '',
-				'message' => $args[1] ?? '',
-				'version' => $args[2] ?? '',
-			);
-		} );
+		add_action(
+			'doing_it_wrong_run',
+			static function ( ...$args ) use ( &$captured_calls ) {
+				$captured_calls[] = array(
+					'function' => $args[0] ?? '',
+					'message'  => $args[1] ?? '',
+					'version'  => $args[2] ?? '',
+				);
+			}
+		);
 
 		$server = new McpServer(
 			'test-server',
@@ -162,13 +171,16 @@ final class DeveloperErrorsTest extends TestCase {
 	public function test_transport_factory_with_invalid_interface_triggers_doing_it_wrong(): void {
 		$captured_calls = array();
 
-		add_action( 'doing_it_wrong_run', function( ...$args ) use ( &$captured_calls ) {
-			$captured_calls[] = array(
-				'function' => $args[0] ?? '',
-				'message' => $args[1] ?? '',
-				'version' => $args[2] ?? '',
-			);
-		} );
+		add_action(
+			'doing_it_wrong_run',
+			static function ( ...$args ) use ( &$captured_calls ) {
+				$captured_calls[] = array(
+					'function' => $args[0] ?? '',
+					'message'  => $args[1] ?? '',
+					'version'  => $args[2] ?? '',
+				);
+			}
+		);
 
 		$server = new McpServer(
 			'test-server',
@@ -187,7 +199,7 @@ final class DeveloperErrorsTest extends TestCase {
 		// Try to initialize with class that doesn't implement McpTransportInterface
 		try {
 			$factory->initialize_transports( array( \stdClass::class ) );
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			// Expected exception
 		}
 
@@ -199,13 +211,16 @@ final class DeveloperErrorsTest extends TestCase {
 	public function test_doing_it_wrong_messages_are_helpful_for_developers(): void {
 		$captured_calls = array();
 
-		add_action( 'doing_it_wrong_run', function( ...$args ) use ( &$captured_calls ) {
-			$captured_calls[] = array(
-				'function' => $args[0] ?? '',
-				'message' => $args[1] ?? '',
-				'version' => $args[2] ?? '',
-			);
-		} );
+		add_action(
+			'doing_it_wrong_run',
+			static function ( ...$args ) use ( &$captured_calls ) {
+				$captured_calls[] = array(
+					'function' => $args[0] ?? '',
+					'message'  => $args[1] ?? '',
+					'version'  => $args[2] ?? '',
+				);
+			}
+		);
 
 		// Test various error scenarios
 
@@ -221,7 +236,7 @@ final class DeveloperErrorsTest extends TestCase {
 				array( DummyTransport::class ),
 				NullMcpErrorHandler::class
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			// Expected
 		}
 
@@ -241,7 +256,7 @@ final class DeveloperErrorsTest extends TestCase {
 		$factory = new McpTransportFactory( $server );
 		try {
 			$factory->initialize_transports( array( \stdClass::class ) );
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			// Expected
 		}
 
@@ -249,9 +264,12 @@ final class DeveloperErrorsTest extends TestCase {
 		$this->assertNotEmpty( $captured_calls );
 
 		// Should have multiple calls from different error scenarios
-		$function_names = array_map( function( $call ) {
-			return $call['function'];
-		}, $captured_calls );
+		$function_names = array_map(
+			static function ( $call ) {
+					return $call['function'];
+			},
+			$captured_calls
+		);
 
 		$this->assertContains( 'create_server', $function_names );
 		$this->assertContains( 'initialize_transports', $function_names );
@@ -260,13 +278,16 @@ final class DeveloperErrorsTest extends TestCase {
 	public function test_no_doing_it_wrong_when_everything_is_correct(): void {
 		$captured_calls = array();
 
-		add_action( 'doing_it_wrong_run', function( ...$args ) use ( &$captured_calls ) {
-			$captured_calls[] = array(
-				'function' => $args[0] ?? '',
-				'message' => $args[1] ?? '',
-				'version' => $args[2] ?? '',
-			);
-		} );
+		add_action(
+			'doing_it_wrong_run',
+			static function ( ...$args ) use ( &$captured_calls ) {
+				$captured_calls[] = array(
+					'function' => $args[0] ?? '',
+					'message'  => $args[1] ?? '',
+					'version'  => $args[2] ?? '',
+				);
+			}
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;

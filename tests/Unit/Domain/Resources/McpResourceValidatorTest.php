@@ -173,7 +173,7 @@ final class McpResourceValidatorTest extends TestCase {
 
 	public function test_validate_resource_instance_with_valid_resource(): void {
 		$server = $this->makeServer();
-		
+
 		$resource_data = array(
 			'ability'     => 'test/valid-resource',
 			'uri'         => 'WordPress://local/valid-resource',
@@ -193,7 +193,7 @@ final class McpResourceValidatorTest extends TestCase {
 	public function test_validate_resource_uniqueness_method_exists(): void {
 		// Test that the uniqueness validation method exists and is callable
 		$server = $this->makeServer();
-		
+
 		$resource_data = array(
 			'ability'     => 'test/test-resource',
 			'uri'         => 'WordPress://local/test-resource',
@@ -201,11 +201,11 @@ final class McpResourceValidatorTest extends TestCase {
 			'description' => 'Test resource',
 			'text'        => 'Test content',
 		);
-		$resource = McpResource::from_array( $resource_data, $server );
+		$resource      = McpResource::from_array( $resource_data, $server );
 
 		// The method should exist and be callable
 		$this->assertTrue( method_exists( McpResourceValidator::class, 'validate_resource_uniqueness' ) );
-		
+
 		// Should not throw exception for unique resource
 		McpResourceValidator::validate_resource_uniqueness( $resource, 'test-context' );
 		$this->assertTrue( true );

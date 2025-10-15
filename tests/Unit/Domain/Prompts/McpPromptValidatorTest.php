@@ -403,7 +403,7 @@ final class McpPromptValidatorTest extends TestCase {
 
 	public function test_validate_prompt_instance_with_valid_prompt(): void {
 		$server = $this->makeServer();
-		
+
 		$prompt = new McpPrompt(
 			'test/valid-prompt',
 			'valid-prompt',
@@ -420,18 +420,18 @@ final class McpPromptValidatorTest extends TestCase {
 	public function test_validate_prompt_uniqueness_method_exists(): void {
 		// Test that the uniqueness validation method exists and is callable
 		$server = $this->makeServer();
-		
+
 		$prompt_data = array(
 			'ability'     => 'test/test-prompt',
 			'name'        => 'test-prompt',
 			'title'       => 'Test Prompt',
 			'description' => 'Test prompt',
 		);
-		$prompt = McpPrompt::from_array( $prompt_data, $server );
+		$prompt      = McpPrompt::from_array( $prompt_data, $server );
 
 		// The method should exist and be callable
 		$this->assertTrue( method_exists( McpPromptValidator::class, 'validate_prompt_uniqueness' ) );
-		
+
 		// Should not throw exception for unique prompt
 		McpPromptValidator::validate_prompt_uniqueness( $prompt, 'test-context' );
 		$this->assertTrue( true );

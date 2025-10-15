@@ -13,7 +13,6 @@ use WP\MCP\Core\McpComponentRegistry;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Domain\Tools\McpTool;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -31,7 +30,10 @@ class TestRegistryPrompt extends McpPromptBuilder {
 	}
 
 	public function handle( array $arguments ): array {
-		return array( 'result' => 'success', 'input' => $arguments['input'] ?? 'none' );
+		return array(
+			'result' => 'success',
+			'input'  => $arguments['input'] ?? 'none',
+		);
 	}
 
 	public function has_permission( array $arguments ): bool {
@@ -42,16 +44,11 @@ class TestRegistryPrompt extends McpPromptBuilder {
 /**
  * Test McpComponentRegistry functionality.
  */
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 final class McpComponentRegistryTest extends TestCase {
 
 	private McpComponentRegistry $registry;
 	private McpServer $server;
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function set_up(): void {
 		parent::set_up();
@@ -86,9 +83,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_tools_with_valid_ability(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_tools( array( 'test/always-allowed' ) );
 
 		$tools = $this->registry->get_tools();
@@ -104,11 +98,14 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'success'
-		$success_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
@@ -116,9 +113,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_tools_with_invalid_ability(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_tools( array( 'nonexistent/ability' ) );
 
 		$tools = $this->registry->get_tools();
@@ -134,17 +128,18 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'failed'
-		$failure_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'failed';
-		} );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'failed' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $failure_event );
 	}
 
 	public function test_register_tools_skips_non_strings(): void {
-		DummyObservabilityHandler::reset();
-
 		$this->registry->register_tools( array( 123, null, array(), 'test/always-allowed' ) );
 
 		$tools = $this->registry->get_tools();
@@ -153,8 +148,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_add_tool_direct(): void {
-		DummyObservabilityHandler::reset();
-
 		// Create a tool directly
 		$tool = new McpTool(
 			'test/direct-tool',
@@ -179,18 +172,18 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'success'
-		$success_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $success_event );
 	}
 
 	public function test_register_resources_with_valid_ability(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_resources( array( 'test/resource' ) );
 
 		$resources = $this->registry->get_resources();
@@ -205,11 +198,14 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'success'
-		$success_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
@@ -217,9 +213,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_resources_with_invalid_ability(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_resources( array( 'nonexistent/resource' ) );
 
 		$resources = $this->registry->get_resources();
@@ -233,18 +226,18 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'failed'
-		$failure_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'failed';
-		} );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'failed' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $failure_event );
 	}
 
 	public function test_register_prompts_with_valid_ability(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_prompts( array( 'test/prompt' ) );
 
 		$prompts = $this->registry->get_prompts();
@@ -259,11 +252,14 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'success'
-		$success_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
@@ -271,9 +267,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_prompts_with_builder_class(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_prompts( array( TestRegistryPrompt::class ) );
 
 		$prompts = $this->registry->get_prompts();
@@ -289,11 +282,14 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'success'
-		$success_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $success_event );
 
 		// Verify no errors were logged
@@ -301,9 +297,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_prompts_with_invalid_ability(): void {
-		DummyObservabilityHandler::reset();
-		DummyErrorHandler::reset();
-
 		$this->registry->register_prompts( array( 'nonexistent/prompt' ) );
 
 		$prompts = $this->registry->get_prompts();
@@ -317,11 +310,14 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $events );
 		$event_names = array_column( $events, 'event' );
 		$this->assertContains( 'mcp.component.registration', $event_names );
-		
+
 		// Verify status is 'failed'
-		$failure_event = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'failed';
-		} );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'failed' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $failure_event );
 	}
 
@@ -343,7 +339,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $resources );
 
 		$resource_uri = array_keys( $resources )[0];
-		$resource = $this->registry->get_resource( $resource_uri );
+		$resource     = $this->registry->get_resource( $resource_uri );
 		$this->assertInstanceOf( \WP\MCP\Domain\Resources\McpResource::class, $resource );
 
 		$nonexistent = $this->registry->get_resource( 'nonexistent://resource' );
@@ -361,8 +357,6 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_registry_handles_mixed_component_types(): void {
-		DummyObservabilityHandler::reset();
-
 		// Register multiple component types
 		$this->registry->register_tools( array( 'test/always-allowed' ) );
 		$this->registry->register_resources( array( 'test/resource' ) );
@@ -376,16 +370,22 @@ final class McpComponentRegistryTest extends TestCase {
 		// Verify multiple observability events were recorded
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
-		$event_names = array_column( $events, 'event' );
-		$registered_events = array_filter( $event_names, function( $event ) {
-			return $event === 'mcp.component.registration';
-		} );
+		$event_names       = array_column( $events, 'event' );
+		$registered_events = array_filter(
+			$event_names,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event;
+			}
+		);
 		$this->assertCount( 4, $registered_events ); // 1 tool + 1 resource + 2 prompts
-		
+
 		// Verify all are successful registrations
-		$success_events = array_filter( $events, function( $event ) {
-			return $event['event'] === 'mcp.component.registration' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertCount( 4, $success_events );
 	}
 
@@ -397,8 +397,6 @@ final class McpComponentRegistryTest extends TestCase {
 			new DummyObservabilityHandler(),
 			true // Enable validation
 		);
-
-		DummyObservabilityHandler::reset();
 
 		// This should still work with valid abilities
 		$registry_with_validation->register_tools( array( 'test/always-allowed' ) );

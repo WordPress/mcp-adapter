@@ -5,16 +5,9 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Prompts\PromptsHandler;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\TestCase;
 
 final class PromptsHandlerTest extends TestCase {
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function test_list_prompts_returns_registered_prompts(): void {
 		wp_set_current_user( 1 );

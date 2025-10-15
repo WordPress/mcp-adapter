@@ -9,7 +9,6 @@ use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -17,12 +16,6 @@ use WP\MCP\Tests\TestCase;
 final class ErrorResponseConsistencyTest extends TestCase {
 
 	private McpServer $server;
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function setUp(): void {
 		parent::setUp();
@@ -40,14 +33,14 @@ final class ErrorResponseConsistencyTest extends TestCase {
 	}
 
 	public function test_all_handlers_use_consistent_error_structure(): void {
-		$tools_handler = new ToolsHandler( $this->server );
+		$tools_handler   = new ToolsHandler( $this->server );
 		$prompts_handler = new PromptsHandler( $this->server );
 
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test parameter validation errors (INVALID_PARAMS) from all handlers
-		$tools_error = $tools_handler->call_tool( array( 'params' => array() ) ); // Missing 'name'
-		$prompts_error = $prompts_handler->get_prompt( array( 'params' => array() ) ); // Missing 'name'
+		$tools_error     = $tools_handler->call_tool( array( 'params' => array() ) ); // Missing 'name'
+		$prompts_error   = $prompts_handler->get_prompt( array( 'params' => array() ) ); // Missing 'name'
 		$resources_error = $resources_handler->read_resource( array( 'params' => array() ) ); // Missing 'uri'
 
 		$errors = array( $tools_error, $prompts_error, $resources_error );
@@ -78,8 +71,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		// Test all helper methods - missing_parameter_error uses INVALID_PARAMS error code
 		$invalid_param_error = $invalid_param_method->invoke( $tools_handler, 'test_param', 123 );
-		$permission_error = $permission_denied_method->invoke( $tools_handler, 'test_resource', 456 );
-		$internal_error = $internal_error_method->invoke( $tools_handler, 'test_message', 789 );
+		$permission_error    = $permission_denied_method->invoke( $tools_handler, 'test_resource', 456 );
+		$internal_error      = $internal_error_method->invoke( $tools_handler, 'test_message', 789 );
 
 		$errors = array( $invalid_param_error, $permission_error, $internal_error );
 
@@ -97,14 +90,14 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$tools_handler = new ToolsHandler( $this->server );
 
 		// Use reflection to access helper method
-		$reflection = new \ReflectionClass( $tools_handler );
+		$reflection           = new \ReflectionClass( $tools_handler );
 		$invalid_param_method = $reflection->getMethod( 'missing_parameter_error' );
 		$invalid_param_method->setAccessible( true );
 
 		// Test parameter validation error from both factory and helper
 		// Note: missing_parameter() is a convenience wrapper that returns INVALID_PARAMS error code
 		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' );
-		$helper_error = $invalid_param_method->invoke( $tools_handler, 'test_param', 100 );
+		$helper_error  = $invalid_param_method->invoke( $tools_handler, 'test_param', 100 );
 
 		// Both should have the same structure
 		$this->assertArrayHasKey( 'error', $factory_error );
@@ -123,33 +116,36 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$tools_handler = new ToolsHandler( $this->server );
 
 		// Use reflection to access helper method
-		$reflection = new \ReflectionClass( $tools_handler );
+		$reflection           = new \ReflectionClass( $tools_handler );
 		$extract_error_method = $reflection->getMethod( 'extract_error' );
 		$extract_error_method->setAccessible( true );
 
 		// Test with McpErrorFactory response
 		$factory_response = McpErrorFactory::tool_not_found( 200, 'test_tool' );
-		$extracted_error = $extract_error_method->invoke( $tools_handler, $factory_response );
+		$extracted_error  = $extract_error_method->invoke( $tools_handler, $factory_response );
 
 		$this->assertArrayHasKey( 'code', $extracted_error );
 		$this->assertArrayHasKey( 'message', $extracted_error );
 		$this->assertSame( $factory_response['error'], $extracted_error );
 
 		// Test with plain error array
-		$plain_error = array( 'code' => 300, 'message' => 'Plain error' );
+		$plain_error     = array(
+			'code'    => 300,
+			'message' => 'Plain error',
+		);
 		$extracted_plain = $extract_error_method->invoke( $tools_handler, $plain_error );
 
 		$this->assertSame( $plain_error, $extracted_plain );
 	}
 
 	public function test_all_handlers_return_errors_in_same_format_for_not_found(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-		$prompts_handler = new PromptsHandler( $this->server );
+		$tools_handler     = new ToolsHandler( $this->server );
+		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test "not found" errors from all handlers
-		$tool_not_found = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) );
-		$prompt_not_found = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) );
+		$tool_not_found     = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) );
+		$prompt_not_found   = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) );
 		$resource_not_found = $resources_handler->read_resource( array( 'params' => array( 'uri' => 'nonexistent://resource' ) ) );
 
 		$errors = array( $tool_not_found, $prompt_not_found, $resource_not_found );
@@ -170,17 +166,20 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$tools_handler = new ToolsHandler( $this->server );
 
 		// Use reflection to access helper method
-		$reflection = new \ReflectionClass( $tools_handler );
+		$reflection     = new \ReflectionClass( $tools_handler );
 		$success_method = $reflection->getMethod( 'create_success_response' );
 		$success_method->setAccessible( true );
 
 		// Test success response formats
-		$array_data = array( 'result' => 'success', 'data' => array( 'id' => 123 ) );
-		$string_data = 'simple success message';
+		$array_data   = array(
+			'result' => 'success',
+			'data'   => array( 'id' => 123 ),
+		);
+		$string_data  = 'simple success message';
 		$numeric_data = 42;
 
-		$array_response = $success_method->invoke( $tools_handler, $array_data );
-		$string_response = $success_method->invoke( $tools_handler, $string_data );
+		$array_response   = $success_method->invoke( $tools_handler, $array_data );
+		$string_response  = $success_method->invoke( $tools_handler, $string_data );
 		$numeric_response = $success_method->invoke( $tools_handler, $numeric_data );
 
 		$responses = array( $array_response, $string_response, $numeric_response );
@@ -195,13 +194,13 @@ final class ErrorResponseConsistencyTest extends TestCase {
 	}
 
 	public function test_parameter_extraction_consistency_across_handlers(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-		$prompts_handler = new PromptsHandler( $this->server );
+		$tools_handler     = new ToolsHandler( $this->server );
+		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Use reflection to access extract_params methods
-		$tools_reflection = new \ReflectionClass( $tools_handler );
-		$prompts_reflection = new \ReflectionClass( $prompts_handler );
+		$tools_reflection     = new \ReflectionClass( $tools_handler );
+		$prompts_reflection   = new \ReflectionClass( $prompts_handler );
 		$resources_reflection = new \ReflectionClass( $resources_handler );
 
 		$tools_extract = $tools_reflection->getMethod( 'extract_params' );
@@ -214,20 +213,31 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$resources_extract->setAccessible( true );
 
 		// Test both nested and direct parameter formats
-		$nested_params = array( 'params' => array( 'name' => 'test', 'value' => 123 ) );
-		$direct_params = array( 'name' => 'test', 'value' => 123 );
+		$nested_params = array(
+			'params' => array(
+				'name'  => 'test',
+				'value' => 123,
+			),
+		);
+		$direct_params = array(
+			'name'  => 'test',
+			'value' => 123,
+		);
 
 		// All handlers should extract parameters the same way
-		$tools_nested = $tools_extract->invoke( $tools_handler, $nested_params );
-		$prompts_nested = $prompts_extract->invoke( $prompts_handler, $nested_params );
+		$tools_nested     = $tools_extract->invoke( $tools_handler, $nested_params );
+		$prompts_nested   = $prompts_extract->invoke( $prompts_handler, $nested_params );
 		$resources_nested = $resources_extract->invoke( $resources_handler, $nested_params );
 
-		$tools_direct = $tools_extract->invoke( $tools_handler, $direct_params );
-		$prompts_direct = $prompts_extract->invoke( $prompts_handler, $direct_params );
+		$tools_direct     = $tools_extract->invoke( $tools_handler, $direct_params );
+		$prompts_direct   = $prompts_extract->invoke( $prompts_handler, $direct_params );
 		$resources_direct = $resources_extract->invoke( $resources_handler, $direct_params );
 
 		// All should extract to the same result
-		$expected = array( 'name' => 'test', 'value' => 123 );
+		$expected = array(
+			'name'  => 'test',
+			'value' => 123,
+		);
 
 		$this->assertSame( $expected, $tools_nested );
 		$this->assertSame( $expected, $prompts_nested );
@@ -239,8 +249,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 	}
 
 	public function test_error_message_quality_across_handlers(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-		$prompts_handler = new PromptsHandler( $this->server );
+		$tools_handler     = new ToolsHandler( $this->server );
+		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test parameter validation error messages (INVALID_PARAMS error code)

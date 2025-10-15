@@ -5,17 +5,10 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 
 final class ToolsHandlerCallTest extends TestCase {
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function test_missing_name_returns_missing_parameter_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
@@ -27,7 +20,6 @@ final class ToolsHandlerCallTest extends TestCase {
 
 	public function test_unknown_tool_logs_and_returns_error(): void {
 		$server = $this->makeServer( array( 'test/always-allowed' ) );
-		DummyErrorHandler::reset();
 		$handler = new ToolsHandler( $server );
 		$res     = $handler->call_tool( array( 'params' => array( 'name' => 'nope' ) ) );
 		$this->assertArrayHasKey( 'error', $res );
@@ -50,7 +42,6 @@ final class ToolsHandlerCallTest extends TestCase {
 
 	public function test_permission_exception_logs_and_returns_error(): void {
 		$server = $this->makeServer( array( 'test/permission-exception' ) );
-		DummyErrorHandler::reset();
 		$handler = new ToolsHandler( $server );
 		$res     = $handler->call_tool(
 			array(
@@ -63,7 +54,6 @@ final class ToolsHandlerCallTest extends TestCase {
 
 	public function test_execute_exception_logs_and_returns_internal_error_envelope(): void {
 		$server = $this->makeServer( array( 'test/execute-exception' ) );
-		DummyErrorHandler::reset();
 		$handler = new ToolsHandler( $server );
 		$res     = $handler->call_tool(
 			array(

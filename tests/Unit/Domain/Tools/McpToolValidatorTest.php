@@ -163,7 +163,7 @@ final class McpToolValidatorTest extends TestCase {
 
 	public function test_validate_tool_instance_with_valid_tool(): void {
 		$server = $this->makeServer();
-		
+
 		$tool = new McpTool(
 			'test/valid-tool',
 			'valid-tool',
@@ -181,7 +181,7 @@ final class McpToolValidatorTest extends TestCase {
 	public function test_validate_tool_uniqueness_method_exists(): void {
 		// Test that the uniqueness validation method exists and is callable
 		$server = $this->makeServer();
-		$tool = new McpTool(
+		$tool   = new McpTool(
 			'test/test-tool',
 			'test-tool',
 			'Test tool',
@@ -191,7 +191,7 @@ final class McpToolValidatorTest extends TestCase {
 
 		// The method should exist and be callable
 		$this->assertTrue( method_exists( McpToolValidator::class, 'validate_tool_uniqueness' ) );
-		
+
 		// Should not throw exception for unique tool
 		McpToolValidator::validate_tool_uniqueness( $tool, 'test-context' );
 		$this->assertTrue( true );

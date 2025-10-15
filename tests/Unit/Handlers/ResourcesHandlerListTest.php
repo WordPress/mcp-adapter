@@ -6,18 +6,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
 final class ResourcesHandlerListTest extends TestCase {
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function test_list_resources_returns_registered_resources(): void {
 		// Simulate logged-in for permission check.

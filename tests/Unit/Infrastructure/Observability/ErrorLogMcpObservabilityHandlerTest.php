@@ -30,12 +30,14 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 
 		// Capture original error log setting
 		$this->original_error_log = ini_get( 'error_log' );
-	
+
 		// Set up a temporary error log file for testing
 		$temp_log = tempnam( sys_get_temp_dir(), 'mcp_test_error_log' );
-		if ( $temp_log ) {
-			ini_set( 'error_log', $temp_log );
+		if ( ! $temp_log ) {
+			return;
 		}
+
+		ini_set( 'error_log', $temp_log );
 	}
 
 	public function tear_down(): void {
@@ -48,9 +50,9 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 	}
 
 	public function test_implements_observability_interface(): void {
-		$this->assertContains( 
-			McpObservabilityHandlerInterface::class, 
-			class_implements( ErrorLogMcpObservabilityHandler::class ) 
+		$this->assertContains(
+			McpObservabilityHandlerInterface::class,
+			class_implements( ErrorLogMcpObservabilityHandler::class )
 		);
 	}
 
@@ -143,11 +145,11 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 		}
 
 		$complex_tags = array(
-			'server_id'  => 'test-server',
-			'user_id'    => 123,
-			'method'     => 'tools/call',
-			'tool_name'  => 'test-tool',
-			'success'    => true,
+			'server_id' => 'test-server',
+			'user_id'   => 123,
+			'method'    => 'tools/call',
+			'tool_name' => 'test-tool',
+			'success'   => true,
 		);
 
 		$handler = new ErrorLogMcpObservabilityHandler();
@@ -163,7 +165,7 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 
 	public function test_format_tags_method(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( ErrorLogMcpObservabilityHandler::class );
+		$reflection         = new \ReflectionClass( ErrorLogMcpObservabilityHandler::class );
 		$format_tags_method = $reflection->getMethod( 'format_tags' );
 		$format_tags_method->setAccessible( true );
 
@@ -183,7 +185,7 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 
 	public function test_format_tags_with_empty_array(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( ErrorLogMcpObservabilityHandler::class );
+		$reflection         = new \ReflectionClass( ErrorLogMcpObservabilityHandler::class );
 		$format_tags_method = $reflection->getMethod( 'format_tags' );
 		$format_tags_method->setAccessible( true );
 

@@ -92,7 +92,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_invalid_interface(): void {
 		// This should trigger _doing_it_wrong and throw exception
-		$this->expectException( \Exception::class );
+		$this->expectException( \Throwable::class );
 		$this->expectExceptionMessage( 'must implement the McpTransportInterface' );
 
 		$this->factory->initialize_transports( array( \stdClass::class ) );
@@ -100,10 +100,12 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_multiple_transports(): void {
 		// Test with multiple valid transports
-		$this->factory->initialize_transports( array( 
-			DummyTransport::class,
-			DummyTransport::class // Same transport twice should work
-		) );
+		$this->factory->initialize_transports(
+			array(
+				DummyTransport::class,
+				DummyTransport::class, // Same transport twice should work
+			)
+		);
 
 		// If we get here, both transports were successfully initialized
 		$this->assertTrue( true );
@@ -111,10 +113,12 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_mixed_validity(): void {
 		// Mix valid and invalid transports
-		$this->factory->initialize_transports( array( 
-			'NonExistentClass',
-			DummyTransport::class, // This should still work
-		) );
+		$this->factory->initialize_transports(
+			array(
+				'NonExistentClass',
+				DummyTransport::class, // This should still work
+			)
+		);
 
 		// If we get here, the method handled mixed validity gracefully
 		$this->assertTrue( true );
@@ -162,7 +166,8 @@ final class McpTransportFactoryTest extends TestCase {
 			array(),
 			array(),
 			array(),
-			function() { return true; } // Custom permission callback
+			static function () {
+				return true; } // Custom permission callback
 		);
 
 		$factory = new McpTransportFactory( $server_with_callback );

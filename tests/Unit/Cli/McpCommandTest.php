@@ -11,7 +11,6 @@ namespace WP\MCP\Tests\Unit\Cli;
 
 use WP\MCP\Cli\McpCommand;
 use WP\MCP\Core\McpAdapter;
-use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -19,7 +18,7 @@ use WP\MCP\Transport\HttpTransport;
 
 /**
  * Test McpCommand functionality.
- * 
+ *
  * Note: These tests mock WP-CLI since it's not available in the test environment.
  */
 final class McpCommandTest extends TestCase {
@@ -37,7 +36,7 @@ final class McpCommandTest extends TestCase {
 		$this->adapter = McpAdapter::instance();
 
 		// Clear any existing servers for clean testing
-		$reflection = new \ReflectionClass( $this->adapter );
+		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
 		$servers_property->setAccessible( true );
 		$servers_property->setValue( $this->adapter, array() );
@@ -51,7 +50,7 @@ final class McpCommandTest extends TestCase {
 		$command = new McpCommand();
 
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $command );
+		$reflection      = new \ReflectionClass( $command );
 		$get_user_method = $reflection->getMethod( 'get_user' );
 		$get_user_method->setAccessible( true );
 
@@ -72,7 +71,7 @@ final class McpCommandTest extends TestCase {
 		$command = new McpCommand();
 
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $command );
+		$reflection      = new \ReflectionClass( $command );
 		$get_user_method = $reflection->getMethod( 'get_user' );
 		$get_user_method->setAccessible( true );
 
@@ -93,7 +92,7 @@ final class McpCommandTest extends TestCase {
 		$command = new McpCommand();
 
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $command );
+		$reflection      = new \ReflectionClass( $command );
 		$get_user_method = $reflection->getMethod( 'get_user' );
 		$get_user_method->setAccessible( true );
 
@@ -111,7 +110,7 @@ final class McpCommandTest extends TestCase {
 		$command = new McpCommand();
 
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $command );
+		$reflection      = new \ReflectionClass( $command );
 		$get_user_method = $reflection->getMethod( 'get_user' );
 		$get_user_method->setAccessible( true );
 
@@ -145,7 +144,8 @@ final class McpCommandTest extends TestCase {
 		// Mock WP_CLI::error to capture the call
 		if ( ! class_exists( 'WP_CLI' ) ) {
 			// Create a mock WP_CLI class for testing
-			eval( '
+			eval(
+				'
 				class WP_CLI {
 					public static $error_called = false;
 					public static $error_message = "";
@@ -165,14 +165,15 @@ final class McpCommandTest extends TestCase {
 						// Mock implementation
 					}
 				}
-			' );
+			'
+			);
 		}
 
 		try {
 			$command = new McpCommand();
 			$command->serve( array(), array() );
 			$this->fail( 'Expected WP_CLI::error to be called' );
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			$this->assertStringContainsString( 'STDIO transport is disabled', $e->getMessage() );
 		}
 
@@ -187,7 +188,8 @@ final class McpCommandTest extends TestCase {
 
 		// Mock WP_CLI::line to capture output
 		if ( ! class_exists( 'WP_CLI' ) ) {
-			eval( '
+			eval(
+				'
 				class WP_CLI {
 					public static $line_called = false;
 					public static $line_message = "";
@@ -197,7 +199,8 @@ final class McpCommandTest extends TestCase {
 						self::$line_message = $message;
 					}
 				}
-			' );
+			'
+			);
 		}
 
 		$command = new McpCommand();

@@ -10,22 +10,12 @@ use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Tests\Fixtures\DummyAbility;
-use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\Fixtures\DummyTransport;
 use WP\MCP\Tests\TestCase;
-use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 final class McpTransportTest extends TestCase {
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		// Make sure abilities API is initialized
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function test_transport_helper_trait_normalizes_class_name(): void {
 		$server    = $this->makeServer();
@@ -46,21 +36,22 @@ final class McpTransportTest extends TestCase {
 		$context   = $this->createTransportContext( $server );
 		$transport = new DummyTransport( $context );
 
-		DummyObservabilityHandler::reset();
-
 		$res = $transport->test_route_request( 'tools/list', array() );
 		$this->assertIsArray( $res );
 		$this->assertArrayHasKey( 'tools', $res );
 
 		// metrics (unified event name with status tag)
 		$this->assertNotEmpty( DummyObservabilityHandler::$events );
-		$eventMetrics = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request', $eventMetrics );
-		
+		$event_metrics = array_column( DummyObservabilityHandler::$events, 'event' );
+		$this->assertContains( 'mcp.request', $event_metrics );
+
 		// Verify duration and status are included
-		$success_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
-			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'success';
-		} );
+		$success_event = array_filter(
+			DummyObservabilityHandler::$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $success_event );
 		$first_success = reset( $success_event );
 		$this->assertNotNull( $first_success['duration_ms'] );
@@ -70,20 +61,22 @@ final class McpTransportTest extends TestCase {
 		$server    = $this->makeServer();
 		$context   = $this->createTransportContext( $server );
 		$transport = new DummyTransport( $context );
-		DummyObservabilityHandler::reset();
 
 		$res = $transport->test_route_request( 'unknown/method', array() );
 		$this->assertArrayHasKey( 'error', $res );
 
 		// Verify error event was recorded with duration and status tag
 		$this->assertNotEmpty( DummyObservabilityHandler::$events );
-		$eventMetrics = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request', $eventMetrics );
-		
+		$event_metrics = array_column( DummyObservabilityHandler::$events, 'event' );
+		$this->assertContains( 'mcp.request', $event_metrics );
+
 		// Verify status is 'error'
-		$error_event = array_filter( DummyObservabilityHandler::$events, function( $event ) {
-			return $event['event'] === 'mcp.request' && isset( $event['tags']['status'] ) && $event['tags']['status'] === 'error';
-		} );
+		$error_event = array_filter(
+			DummyObservabilityHandler::$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'] && isset( $event['tags']['status'] ) && 'error' === $event['tags']['status'];
+			}
+		);
 		$this->assertNotEmpty( $error_event );
 	}
 

@@ -19,7 +19,7 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->adapter = McpAdapter::instance();
 
 		// Clear any existing servers to ensure clean state
-		$reflection = new \ReflectionClass( $this->adapter );
+		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
 		$servers_property->setAccessible( true );
 		$servers_property->setValue( $this->adapter, array() );
@@ -36,7 +36,7 @@ final class McpAdapterConfigTest extends TestCase {
 		remove_all_actions( 'mcp_adapter_init' );
 
 		// Clean up any registered servers
-		$reflection = new \ReflectionClass( $this->adapter );
+		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
 		$servers_property->setAccessible( true );
 		$servers_property->setValue( $this->adapter, array() );
@@ -49,20 +49,22 @@ final class McpAdapterConfigTest extends TestCase {
 
 	public function test_default_server_config_filter_allows_customization(): void {
 		// Add the filter for customization
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['server_name'] = 'Custom Server Name';
-			$defaults['server_description'] = 'Custom Description';
-			$defaults['server_version'] = 'v2.0.0';
-			return $defaults;
-		} );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) {
+				$defaults['server_name']        = 'Custom Server Name';
+				$defaults['server_description'] = 'Custom Description';
+				$defaults['server_version']     = 'v2.0.0';
+				return $defaults;
+			}
+		);
 
 		// Ensure abilities API is initialized first
 		if ( ! did_action( 'abilities_api_init' ) ) {
-			do_action( 'abilities_api_init' );
 		}
 
 		// Reset the initialized flag to allow re-initialization
-		$reflection = new \ReflectionClass( $this->adapter );
+		$reflection           = new \ReflectionClass( $this->adapter );
 		$initialized_property = $reflection->getProperty( 'initialized' );
 		$initialized_property->setAccessible( true );
 		$initialized_property->setValue( null, false );
@@ -88,9 +90,12 @@ final class McpAdapterConfigTest extends TestCase {
 
 	public function test_default_server_config_with_invalid_config_uses_defaults(): void {
 		// Mock the filter to return invalid config
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			return 'invalid-config'; // Not an array
-		} );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) {
+				return 'invalid-config'; // Not an array
+			}
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;
@@ -112,12 +117,15 @@ final class McpAdapterConfigTest extends TestCase {
 
 	public function test_default_server_config_partial_override(): void {
 		// Mock the filter to only change some values
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['server_route_namespace'] = 'custom-namespace';
-			$defaults['server_route'] = '/custom-route';
-			// Leave other values as default
-			return $defaults;
-		} );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) {
+				$defaults['server_route_namespace'] = 'custom-namespace';
+				$defaults['server_route']           = '/custom-route';
+				// Leave other values as default
+				return $defaults;
+			}
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;
@@ -178,10 +186,13 @@ final class McpAdapterConfigTest extends TestCase {
 	public function test_config_filter_receives_all_expected_keys(): void {
 		$received_config = null;
 
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) use ( &$received_config ) {
-			$received_config = $defaults;
-			return $defaults;
-		} );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) use ( &$received_config ) {
+				$received_config = $defaults;
+				return $defaults;
+			}
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;
@@ -210,10 +221,13 @@ final class McpAdapterConfigTest extends TestCase {
 	public function test_config_has_expected_default_values(): void {
 		$received_config = null;
 
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) use ( &$received_config ) {
-			$received_config = $defaults;
-			return $defaults;
-		} );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) use ( &$received_config ) {
+				$received_config = $defaults;
+				return $defaults;
+			}
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;
@@ -233,23 +247,33 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertSame( array( HttpTransport::class ), $received_config['mcp_transports'] );
 		$this->assertSame( ErrorLogMcpErrorHandler::class, $received_config['error_handler'] );
 		$this->assertSame( NullMcpObservabilityHandler::class, $received_config['observability_handler'] );
-		$this->assertSame( array(), $received_config['resources'] );
-		$this->assertSame( array(), $received_config['prompts'] );
+		// Auto-discovered resources from test fixtures (test/resource has mcp.public=true and mcp.type='resource')
+		$this->assertSame( array( 'test/resource' ), $received_config['resources'] );
+		// Auto-discovered prompts from test fixtures (test/prompt has mcp.public=true and mcp.type='prompt')
+		$this->assertSame( array( 'test/prompt' ), $received_config['prompts'] );
 	}
 
 	public function test_multiple_config_modifications(): void {
 		// First filter
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['server_name'] = 'First Modified Name';
-			return $defaults;
-		}, 10 );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) {
+				$defaults['server_name'] = 'First Modified Name';
+				return $defaults;
+			},
+			10
+		);
 
 		// Second filter with higher priority
-		add_filter( 'mcp_adapter_default_server_config', function( $defaults ) {
-			$defaults['server_name'] = 'Second Modified Name';
-			$defaults['server_version'] = 'v3.0.0';
-			return $defaults;
-		}, 20 );
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) {
+				$defaults['server_name']    = 'Second Modified Name';
+				$defaults['server_version'] = 'v3.0.0';
+				return $defaults;
+			},
+			20
+		);
 
 		// Mock being inside mcp_adapter_init
 		global $wp_current_filter;

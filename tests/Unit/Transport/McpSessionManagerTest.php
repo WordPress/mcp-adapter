@@ -269,8 +269,8 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertIsString( $session_id );
 
 		// Directly update the timestamp to simulate time passing
-		$sessions       = \WP\MCP\Transport\Infrastructure\SessionManager::get_all_user_sessions( $this->test_user_id );
-		$old_timestamp  = time() - 2;
+		$sessions                                 = \WP\MCP\Transport\Infrastructure\SessionManager::get_all_user_sessions( $this->test_user_id );
+		$old_timestamp                            = time() - 2;
 		$sessions[ $session_id ]['last_activity'] = $old_timestamp;
 		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
 
@@ -313,9 +313,9 @@ final class McpSessionManagerTest extends TestCase {
 			}
 		); // 1 second
 
-		$short_session  = SessionManager::create_session( $this->test_user_id, array() );
+		$short_session = SessionManager::create_session( $this->test_user_id, array() );
 		// Manually expire the session by backdating its last_activity
-		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$sessions                                    = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $short_session ]['last_activity'] = time() - 3;
 		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
 

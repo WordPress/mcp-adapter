@@ -6,18 +6,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
 final class ToolsHandlerListTest extends TestCase {
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function test_list_and_list_all_only_include_json_safe_fields(): void {
 		$server = new McpServer(
@@ -48,7 +41,7 @@ final class ToolsHandlerListTest extends TestCase {
 		$this->assertArrayNotHasKey( 'callback', $tool );
 		$this->assertArrayNotHasKey( 'permission_callback', $tool );
 
-		$toolAll = $all['tools'][0];
-		$this->assertTrue( $toolAll['available'] );
+		$tool_all = $all['tools'][0];
+		$this->assertTrue( $tool_all['available'] );
 	}
 }

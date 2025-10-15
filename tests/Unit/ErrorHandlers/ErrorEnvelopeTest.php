@@ -127,35 +127,35 @@ final class ErrorEnvelopeTest extends TestCase {
 	}
 
 	public function test_jsonrpc_message_validation_valid(): void {
-		$validMessage = array(
+		$valid_message = array(
 			'jsonrpc' => '2.0',
 			'method'  => 'test',
 			'id'      => 1,
 		);
 
-		$result = McpErrorFactory::validate_jsonrpc_message( $validMessage );
+		$result = McpErrorFactory::validate_jsonrpc_message( $valid_message );
 		$this->assertTrue( $result );
 	}
 
 	public function test_jsonrpc_message_validation_invalid_version(): void {
-		$invalidMessage = array(
+		$invalid_message = array(
 			'jsonrpc' => '1.0',
 			'method'  => 'test',
 			'id'      => 1,
 		);
 
-		$result = McpErrorFactory::validate_jsonrpc_message( $invalidMessage );
+		$result = McpErrorFactory::validate_jsonrpc_message( $invalid_message );
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
 	}
 
 	public function test_jsonrpc_message_validation_missing_method(): void {
-		$invalidMessage = array(
+		$invalid_message = array(
 			'jsonrpc' => '2.0',
 			'id'      => 1,
 		);
 
-		$result = McpErrorFactory::validate_jsonrpc_message( $invalidMessage );
+		$result = McpErrorFactory::validate_jsonrpc_message( $invalid_message );
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
 	}

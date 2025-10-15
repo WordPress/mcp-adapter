@@ -16,7 +16,6 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -33,12 +32,6 @@ final class HttpRequestHandlerTest extends TestCase {
 
 	private HttpRequestHandler $handler;
 	private McpTransportContext $context;
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function set_up(): void {
 		parent::set_up();
@@ -99,18 +92,20 @@ final class HttpRequestHandlerTest extends TestCase {
 	}
 
 	public function test_handle_request_post_initialize(): void {
-		$request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'method'  => 'initialize',
-			'params'  => array(
-				'protocolVersion' => '2025-06-18',
-				'clientInfo'      => array(
-					'name'    => 'test-client',
-					'version' => '1.0.0'
-				)
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-06-18',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
 			)
-		) );
+		);
 
 		$context = new HttpRequestContext( $request );
 
@@ -126,12 +121,14 @@ final class HttpRequestHandlerTest extends TestCase {
 	}
 
 	public function test_handle_request_post_invalid_session(): void {
-		$request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'method'  => 'tools/list',
-			'params'  => array()
-		) );
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
 		$request->set_header( 'Mcp-Session-Id', 'invalid-session' );
 
 		$context = new HttpRequestContext( $request );
@@ -148,29 +145,36 @@ final class HttpRequestHandlerTest extends TestCase {
 
 	public function test_handle_request_post_valid_session(): void {
 		// First create a session
-		$init_request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'method'  => 'initialize',
-			'params'  => array(
-				'protocolVersion' => '2025-06-18',
-				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
+		$init_request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-06-18',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
 			)
-		) );
-		$init_context = new HttpRequestContext( $init_request );
+		);
+		$init_context  = new HttpRequestContext( $init_request );
 		$init_response = $this->handler->handle_request( $init_context );
 
 		// Extract session ID from headers (if available)
-		$headers = $init_response->get_headers();
+		$headers    = $init_response->get_headers();
 		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test subsequent request with session
-		$request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id'      => 2,
-			'method'  => 'tools/list',
-			'params'  => array()
-		) );
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
 		$request->set_header( 'Mcp-Session-Id', $session_id );
 
 		$context = new HttpRequestContext( $request );
@@ -187,19 +191,24 @@ final class HttpRequestHandlerTest extends TestCase {
 
 	public function test_handle_request_post_batch(): void {
 		// First initialize to create session
-		$init_request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'method'  => 'initialize',
-			'params'  => array(
-				'protocolVersion' => '2025-06-18',
-				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
+		$init_request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-06-18',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
 			)
-		) );
-		$init_context = new HttpRequestContext( $init_request );
+		);
+		$init_context  = new HttpRequestContext( $init_request );
 		$init_response = $this->handler->handle_request( $init_context );
-		$headers = $init_response->get_headers();
-		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
+		$headers       = $init_response->get_headers();
+		$session_id    = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test batch request
 		$batch = array(
@@ -207,14 +216,14 @@ final class HttpRequestHandlerTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 2,
 				'method'  => 'tools/list',
-				'params'  => array()
+				'params'  => array(),
 			),
 			array(
 				'jsonrpc' => '2.0',
 				'id'      => 3,
 				'method'  => 'resources/list',
-				'params'  => array()
-			)
+				'params'  => array(),
+			),
 		);
 
 		$request = $this->createPostRequest( $batch );
@@ -234,11 +243,13 @@ final class HttpRequestHandlerTest extends TestCase {
 
 	public function test_handle_request_post_notification(): void {
 		// Test notification (no id field)
-		$request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'method'  => 'notifications/cancelled',
-			'params'  => array( 'requestId' => 123 )
-		) );
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'method'  => 'notifications/cancelled',
+				'params'  => array( 'requestId' => 123 ),
+			)
+		);
 
 		$context = new HttpRequestContext( $request );
 
@@ -267,19 +278,24 @@ final class HttpRequestHandlerTest extends TestCase {
 
 	public function test_handle_request_delete_session(): void {
 		// First create a session
-		$init_request = $this->createPostRequest( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'method'  => 'initialize',
-			'params'  => array(
-				'protocolVersion' => '2025-06-18',
-				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
+		$init_request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-06-18',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
 			)
-		) );
-		$init_context = new HttpRequestContext( $init_request );
+		);
+		$init_context  = new HttpRequestContext( $init_request );
 		$init_response = $this->handler->handle_request( $init_context );
-		$headers = $init_response->get_headers();
-		$session_id = $headers['Mcp-Session-Id'] ?? 'test-session-id';
+		$headers       = $init_response->get_headers();
+		$session_id    = $headers['Mcp-Session-Id'] ?? 'test-session-id';
 
 		// Test session termination
 		$request = new WP_REST_Request( 'DELETE', '/test-mcp' );

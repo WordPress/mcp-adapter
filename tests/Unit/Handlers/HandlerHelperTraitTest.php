@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\HandlerHelperTrait;
-use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
 
 final class HandlerHelperTraitTest extends TestCase {
@@ -19,7 +18,7 @@ final class HandlerHelperTraitTest extends TestCase {
 		parent::setUp();
 
 		// Create an anonymous class that uses the trait
-		$this->trait_user = new class {
+		$this->trait_user = new class() {
 			use HandlerHelperTrait;
 
 			// Make protected methods public for testing
@@ -56,22 +55,25 @@ final class HandlerHelperTraitTest extends TestCase {
 	public function test_extract_params_with_nested_params(): void {
 		$input = array(
 			'params' => array(
-				'name' => 'test-tool',
+				'name'      => 'test-tool',
 				'arguments' => array( 'key' => 'value' ),
 			),
 		);
 
 		$result = $this->trait_user->test_extract_params( $input );
 
-		$this->assertSame( array(
-			'name' => 'test-tool',
-			'arguments' => array( 'key' => 'value' ),
-		), $result );
+		$this->assertSame(
+			array(
+				'name'      => 'test-tool',
+				'arguments' => array( 'key' => 'value' ),
+			),
+			$result
+		);
 	}
 
 	public function test_extract_params_with_direct_params(): void {
 		$input = array(
-			'name' => 'test-tool',
+			'name'      => 'test-tool',
 			'arguments' => array( 'key' => 'value' ),
 		);
 
@@ -83,7 +85,7 @@ final class HandlerHelperTraitTest extends TestCase {
 	public function test_extract_params_with_empty_nested_params(): void {
 		$input = array(
 			'params' => array(),
-			'name' => 'fallback-tool',
+			'name'   => 'fallback-tool',
 		);
 
 		$result = $this->trait_user->test_extract_params( $input );
@@ -102,22 +104,25 @@ final class HandlerHelperTraitTest extends TestCase {
 	public function test_extract_error_from_factory_response(): void {
 		$factory_response = array(
 			'error' => array(
-				'code' => 100,
+				'code'    => 100,
 				'message' => 'Factory error',
 			),
 		);
 
 		$result = $this->trait_user->test_extract_error( $factory_response );
 
-		$this->assertSame( array(
-			'code' => 100,
-			'message' => 'Factory error',
-		), $result );
+		$this->assertSame(
+			array(
+				'code'    => 100,
+				'message' => 'Factory error',
+			),
+			$result
+		);
 	}
 
 	public function test_extract_error_from_plain_response(): void {
 		$plain_response = array(
-			'code' => 200,
+			'code'    => 200,
 			'message' => 'Plain error',
 		);
 
@@ -154,7 +159,10 @@ final class HandlerHelperTraitTest extends TestCase {
 	}
 
 	public function test_create_success_response(): void {
-		$data = array( 'status' => 'success', 'data' => array( 'id' => 123 ) );
+		$data   = array(
+			'status' => 'success',
+			'data'   => array( 'id' => 123 ),
+		);
 		$result = $this->trait_user->test_create_success_response( $data );
 
 		$this->assertArrayHasKey( 'result', $result );
@@ -162,7 +170,7 @@ final class HandlerHelperTraitTest extends TestCase {
 	}
 
 	public function test_create_success_response_with_string(): void {
-		$data = 'success message';
+		$data   = 'success message';
 		$result = $this->trait_user->test_create_success_response( $data );
 
 		$this->assertArrayHasKey( 'result', $result );

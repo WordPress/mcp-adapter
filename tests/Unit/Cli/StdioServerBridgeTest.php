@@ -11,7 +11,6 @@ namespace WP\MCP\Tests\Unit\Cli;
 
 use WP\MCP\Cli\StdioServerBridge;
 use WP\MCP\Core\McpServer;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -19,19 +18,13 @@ use WP\MCP\Transport\HttpTransport;
 
 /**
  * Test StdioServerBridge functionality.
- * 
+ *
  * Note: These tests focus on the bridge logic rather than actual STDIO communication.
  */
 final class StdioServerBridgeTest extends TestCase {
 
 	private StdioServerBridge $bridge;
 	private McpServer $server;
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function set_up(): void {
 		parent::set_up();
@@ -73,19 +66,24 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_valid_json_rpc(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'method'  => 'initialize',
-			'params'  => array(
-				'protocolVersion' => '2025-06-18',
-				'clientInfo'      => array( 'name' => 'test-client', 'version' => '1.0.0' )
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-06-18',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
 			)
-		) );
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -103,16 +101,18 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_notification(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'method'  => 'notifications/cancelled',
-			'params'  => array( 'requestId' => 123 )
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'method'  => 'notifications/cancelled',
+				'params'  => array( 'requestId' => 123 ),
 			// No 'id' field - this is a notification
-		) );
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -121,7 +121,7 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_invalid_json(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
@@ -139,16 +139,18 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_invalid_jsonrpc_version(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		$json_input = json_encode( array(
-			'jsonrpc' => '1.0', // Invalid version
-			'id'      => 1,
-			'method'  => 'initialize',
-			'params'  => array()
-		) );
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '1.0', // Invalid version
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(),
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -160,16 +162,18 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_missing_method(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 1,
-			'params'  => array()
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'params'  => array(),
 			// Missing 'method' field
-		) );
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -181,13 +185,16 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_format_response_with_success_result(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection             = new \ReflectionClass( $this->bridge );
 		$format_response_method = $reflection->getMethod( 'format_response' );
 		$format_response_method->setAccessible( true );
 
 		$result = array(
 			'protocolVersion' => '2025-06-18',
-			'serverInfo'      => array( 'name' => 'Test Server', 'version' => '1.0.0' )
+			'serverInfo'      => array(
+				'name'    => 'Test Server',
+				'version' => '1.0.0',
+			),
 		);
 
 		$response = $format_response_method->invoke( $this->bridge, $result, 123 );
@@ -204,7 +211,7 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_format_response_with_error_result(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection             = new \ReflectionClass( $this->bridge );
 		$format_response_method = $reflection->getMethod( 'format_response' );
 		$format_response_method->setAccessible( true );
 
@@ -212,8 +219,8 @@ final class StdioServerBridgeTest extends TestCase {
 			'error' => array(
 				'code'    => -32602,
 				'message' => 'Invalid params',
-				'data'    => array( 'details' => 'Missing parameter' )
-			)
+				'data'    => array( 'details' => 'Missing parameter' ),
+			),
 		);
 
 		$response = $format_response_method->invoke( $this->bridge, $result, 456 );
@@ -225,7 +232,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'id', $response_data );
 		$this->assertEquals( 456, $response_data['id'] );
 		$this->assertArrayHasKey( 'error', $response_data );
-		
+
 		$error = $response_data['error'];
 		$this->assertEquals( -32602, $error['code'] );
 		$this->assertEquals( 'Invalid params', $error['message'] );
@@ -234,15 +241,15 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_create_error_response(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection          = new \ReflectionClass( $this->bridge );
 		$create_error_method = $reflection->getMethod( 'create_error_response' );
 		$create_error_method->setAccessible( true );
 
-		$response = $create_error_method->invoke( 
-			$this->bridge, 
-			789, 
-			-32603, 
-			'Internal error', 
+		$response = $create_error_method->invoke(
+			$this->bridge,
+			789,
+			-32603,
+			'Internal error',
 			'Additional error data'
 		);
 
@@ -253,7 +260,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'id', $response_data );
 		$this->assertEquals( 789, $response_data['id'] );
 		$this->assertArrayHasKey( 'error', $response_data );
-		
+
 		$error = $response_data['error'];
 		$this->assertEquals( -32603, $error['code'] );
 		$this->assertEquals( 'Internal error', $error['message'] );
@@ -262,21 +269,21 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_create_error_response_without_data(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection          = new \ReflectionClass( $this->bridge );
 		$create_error_method = $reflection->getMethod( 'create_error_response' );
 		$create_error_method->setAccessible( true );
 
-		$response = $create_error_method->invoke( 
-			$this->bridge, 
-			999, 
-			-32600, 
+		$response = $create_error_method->invoke(
+			$this->bridge,
+			999,
+			-32600,
 			'Invalid Request'
 		);
 
 		$this->assertIsString( $response );
 		$response_data = json_decode( $response, true );
 		$this->assertArrayHasKey( 'error', $response_data );
-		
+
 		$error = $response_data['error'];
 		$this->assertEquals( -32600, $error['code'] );
 		$this->assertEquals( 'Invalid Request', $error['message'] );
@@ -285,7 +292,7 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_bridge_creates_request_router(): void {
 		// Use reflection to access private property
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection      = new \ReflectionClass( $this->bridge );
 		$router_property = $reflection->getProperty( 'request_router' );
 		$router_property->setAccessible( true );
 
@@ -296,7 +303,7 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_stop_method(): void {
 		// Use reflection to access private property
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection          = new \ReflectionClass( $this->bridge );
 		$is_running_property = $reflection->getProperty( 'is_running' );
 		$is_running_property->setAccessible( true );
 
@@ -312,16 +319,18 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_tools_list(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 2,
-			'method'  => 'tools/list',
-			'params'  => array()
-		) );
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -333,17 +342,19 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_object_params(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
 		// Test with object params (should be converted to array)
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 3,
-			'method'  => 'tools/list',
-			'params'  => (object) array( 'filter' => 'test' )
-		) );
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 3,
+				'method'  => 'tools/list',
+				'params'  => (object) array( 'filter' => 'test' ),
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -354,17 +365,19 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_non_array_params(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
 		// Test with string params (should be converted to empty array)
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 4,
-			'method'  => 'ping',
-			'params'  => 'invalid-params'
-		) );
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 4,
+				'method'  => 'ping',
+				'params'  => 'invalid-params',
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -376,17 +389,19 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_handle_request_with_exception_in_routing(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
 		// Test with a method that might cause issues
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 5,
-			'method'  => 'tools/call',
-			'params'  => array( 'name' => 'nonexistent-tool' )
-		) );
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 5,
+				'method'  => 'tools/call',
+				'params'  => array( 'name' => 'nonexistent-tool' ),
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 
@@ -411,27 +426,29 @@ final class StdioServerBridgeTest extends TestCase {
 
 	public function test_bridge_handles_request_ids(): void {
 		// Use reflection to access private method
-		$reflection = new \ReflectionClass( $this->bridge );
+		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
 		// Test with numeric ID
-		$json_input = json_encode( array(
-			'jsonrpc' => '2.0',
-			'id'      => 42,
-			'method'  => 'ping',
-			'params'  => array()
-		) );
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 42,
+				'method'  => 'ping',
+				'params'  => array(),
+			)
+		);
 
 		$result = $handle_request_method->invoke( $this->bridge, $json_input );
 		$this->assertIsString( $result );
 		$this->assertNotEmpty( $result );
-		
+
 		$response = json_decode( $result, true );
 		$this->assertIsArray( $response );
 		$this->assertArrayHasKey( 'jsonrpc', $response );
 		$this->assertEquals( '2.0', $response['jsonrpc'] );
-		
+
 		// The response should have either result or error
 		$this->assertTrue( isset( $response['result'] ) || isset( $response['error'] ) );
 	}

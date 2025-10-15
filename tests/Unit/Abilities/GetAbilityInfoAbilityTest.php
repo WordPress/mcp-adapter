@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\GetAbilityInfoAbility;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\TestCase;
 
 /**
@@ -27,16 +26,16 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-		
+
 		// Create a test user for authentication tests
-		self::$user_id = wp_insert_user( array(
-			'user_login' => 'testuser',
-			'user_pass'  => 'testpass',
-			'user_email' => 'test@example.com',
-			'role'       => 'administrator',
-		) );
+		self::$user_id = wp_insert_user(
+			array(
+				'user_login' => 'testuser',
+				'user_pass'  => 'testpass',
+				'user_email' => 'test@example.com',
+				'role'       => 'administrator',
+			)
+		);
 	}
 
 	public static function tear_down_after_class(): void {
@@ -88,9 +87,11 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 	public function test_check_permission_with_public_mcp_metadata(): void {
 		// Test ability with mcp.public=true (should be allowed)
-		$result = GetAbilityInfoAbility::check_permission( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result = GetAbilityInfoAbility::check_permission(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 		$this->assertTrue( $result );
 
 		// Create a test ability without mcp.public metadata (should be blocked)
@@ -99,16 +100,21 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 			array(
 				'label'               => 'Not Public Info Test',
 				'description'         => 'Ability without mcp.public metadata',
+				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => function() { return array( 'test' => 'result' ); },
-				'permission_callback' => function() { return true; },
+				'execute_callback'    => static function () {
+					return array( 'test' => 'result' ); },
+				'permission_callback' => static function () {
+					return true; },
 				// No mcp.public metadata - should default to false
 			)
 		);
 
-		$result = GetAbilityInfoAbility::check_permission( array(
-			'ability_name' => 'test/not-public-info'
-		) );
+		$result = GetAbilityInfoAbility::check_permission(
+			array(
+				'ability_name' => 'test/not-public-info',
+			)
+		);
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_public_mcp', $result->get_error_code() );
 
@@ -118,11 +124,13 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 	public function test_check_permission_requires_capability(): void {
 		// Create a user with no role (no capabilities)
-		$limited_user_id = wp_insert_user( array(
-			'user_login' => 'limiteduser',
-			'user_pass'  => 'testpass',
-			'user_email' => 'limited@example.com',
-		) );
+		$limited_user_id = wp_insert_user(
+			array(
+				'user_login' => 'limiteduser',
+				'user_pass'  => 'testpass',
+				'user_email' => 'limited@example.com',
+			)
+		);
 
 		// Explicitly remove all capabilities
 		$user = new \WP_User( $limited_user_id );
@@ -131,9 +139,11 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 		wp_set_current_user( $limited_user_id );
 
-		$result = GetAbilityInfoAbility::check_permission( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result = GetAbilityInfoAbility::check_permission(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
@@ -151,9 +161,11 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_valid_ability(): void {
-		$result = GetAbilityInfoAbility::execute( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'name', $result );
@@ -169,38 +181,46 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 	public function test_execute_with_ability_having_output_schema(): void {
 		// Test with an ability that has output schema
-		$result = GetAbilityInfoAbility::execute( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 
 		$this->assertIsArray( $result );
-		
+
 		// Check if output schema is included when available
-		$ability = wp_get_ability( 'test/always-allowed' );
+		$ability       = wp_get_ability( 'test/always-allowed' );
 		$output_schema = $ability->get_output_schema();
-		
-		if ( ! empty( $output_schema ) ) {
-			$this->assertArrayHasKey( 'output_schema', $result );
-			$this->assertEquals( $output_schema, $result['output_schema'] );
+
+		if ( empty( $output_schema ) ) {
+			return;
 		}
+
+		$this->assertArrayHasKey( 'output_schema', $result );
+		$this->assertEquals( $output_schema, $result['output_schema'] );
 	}
 
 	public function test_execute_with_ability_having_meta(): void {
 		// Test with an ability that has meta information
-		$result = GetAbilityInfoAbility::execute( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 
 		$this->assertIsArray( $result );
-		
+
 		// Check if meta is included when available
 		$ability = wp_get_ability( 'test/always-allowed' );
-		$meta = $ability->get_meta();
-		
-		if ( ! empty( $meta ) ) {
-			$this->assertArrayHasKey( 'meta', $result );
-			$this->assertEquals( $meta, $result['meta'] );
+		$meta    = $ability->get_meta();
+
+		if ( empty( $meta ) ) {
+			return;
 		}
+
+		$this->assertArrayHasKey( 'meta', $result );
+		$this->assertEquals( $meta, $result['meta'] );
 	}
 
 	public function test_execute_with_missing_ability_name(): void {
@@ -212,9 +232,11 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_empty_ability_name(): void {
-		$result = GetAbilityInfoAbility::execute( array(
-			'ability_name' => ''
-		) );
+		$result = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => '',
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
@@ -222,9 +244,11 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_nonexistent_ability(): void {
-		$result = GetAbilityInfoAbility::execute( array(
-			'ability_name' => 'nonexistent/ability'
-		) );
+		$result = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'nonexistent/ability',
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
@@ -233,7 +257,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_ability_has_correct_input_schema(): void {
-		$ability = wp_get_ability( 'mcp-adapter/get-ability-info' );
+		$ability      = wp_get_ability( 'mcp-adapter/get-ability-info' );
 		$input_schema = $ability->get_input_schema();
 
 		$this->assertIsArray( $input_schema );
@@ -245,13 +269,13 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_ability_has_correct_output_schema(): void {
-		$ability = wp_get_ability( 'mcp-adapter/get-ability-info' );
+		$ability       = wp_get_ability( 'mcp-adapter/get-ability-info' );
 		$output_schema = $ability->get_output_schema();
 
 		$this->assertIsArray( $output_schema );
 		$this->assertEquals( 'object', $output_schema['type'] );
 		$this->assertArrayHasKey( 'properties', $output_schema );
-		
+
 		$properties = $output_schema['properties'];
 		$this->assertArrayHasKey( 'name', $properties );
 		$this->assertArrayHasKey( 'label', $properties );
@@ -265,7 +289,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 	public function test_ability_has_correct_annotations(): void {
 		$ability = wp_get_ability( 'mcp-adapter/get-ability-info' );
-		$meta = $ability->get_meta();
+		$meta    = $ability->get_meta();
 
 		$this->assertIsArray( $meta );
 		$this->assertArrayHasKey( 'annotations', $meta );
@@ -280,14 +304,18 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 	public function test_execute_handles_various_input_formats(): void {
 		// Test with nested params structure
-		$result1 = GetAbilityInfoAbility::execute( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result1 = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 
 		// Test with direct ability_name
-		$result2 = GetAbilityInfoAbility::execute( array(
-			'ability_name' => 'test/always-allowed'
-		) );
+		$result2 = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'test/always-allowed',
+			)
+		);
 
 		$this->assertEquals( $result1, $result2 );
 		$this->assertArrayHasKey( 'name', $result1 );

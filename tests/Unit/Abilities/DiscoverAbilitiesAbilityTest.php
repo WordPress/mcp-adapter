@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\DiscoverAbilitiesAbility;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\TestCase;
 
 /**
@@ -27,16 +26,16 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-		
+
 		// Create a test user for authentication tests
-		self::$user_id = wp_insert_user( array(
-			'user_login' => 'testuser',
-			'user_pass'  => 'testpass',
-			'user_email' => 'test@example.com',
-			'role'       => 'administrator',
-		) );
+		self::$user_id = wp_insert_user(
+			array(
+				'user_login' => 'testuser',
+				'user_pass'  => 'testpass',
+				'user_email' => 'test@example.com',
+				'role'       => 'administrator',
+			)
+		);
 	}
 
 	public static function tear_down_after_class(): void {
@@ -92,42 +91,47 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'abilities', $result );
 		$this->assertIsArray( $result['abilities'] );
-		
+
 		// Should only contain abilities with mcp.public=true
-		$ability_names = array_column( $result['abilities'], 'name' );
-		$this->assertContains( 'test/always-allowed', $ability_names );
-		
+		$result = array_column( $result['abilities'], 'name' );
+		$this->assertContains( 'test/always-allowed', $result );
+
 		// test/permission-denied has mcp.public=true, so it should be included
-		$this->assertContains( 'test/permission-denied', $ability_names );
-		
+		$this->assertContains( 'test/permission-denied', $result );
+
 		// Create an ability without mcp.public and verify it's not included
 		wp_register_ability(
 			'test/not-public',
 			array(
 				'label'               => 'Not Public Test',
 				'description'         => 'Should not appear in discovery',
+				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => function() { return array(); },
-				'permission_callback' => function() { return true; },
+				'execute_callback'    => static function () {
+					return array(); },
+				'permission_callback' => static function () {
+					return true; },
 				// No mcp.public metadata
 			)
 		);
-		
-		$result2 = DiscoverAbilitiesAbility::execute( array() );
+
+		$result2        = DiscoverAbilitiesAbility::execute( array() );
 		$ability_names2 = array_column( $result2['abilities'], 'name' );
 		$this->assertNotContains( 'test/not-public', $ability_names2 );
-		
+
 		// Clean up
 		wp_unregister_ability( 'test/not-public' );
 	}
 
 	public function test_check_permission_requires_capability(): void {
 		// Create a user with no role (no capabilities)
-		$limited_user_id = wp_insert_user( array(
-			'user_login' => 'limiteduser',
-			'user_pass'  => 'testpass',
-			'user_email' => 'limited@example.com',
-		) );
+		$limited_user_id = wp_insert_user(
+			array(
+				'user_login' => 'limiteduser',
+				'user_pass'  => 'testpass',
+				'user_email' => 'limited@example.com',
+			)
+		);
 
 		// Explicitly remove all capabilities
 		$user = new \WP_User( $limited_user_id );
@@ -171,10 +175,13 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'abilities', $result );
 
 		// Check that no abilities starting with 'mcp-adapter/' are included
-		$ability_names = array_column( $result['abilities'], 'name' );
-		$mcp_adapter_abilities = array_filter( $ability_names, function( $name ) {
-			return str_starts_with( $name, 'mcp-adapter/' );
-		} );
+		$ability_names         = array_column( $result['abilities'], 'name' );
+		$mcp_adapter_abilities = array_filter(
+			$ability_names,
+			static function ( $name ) {
+				return str_starts_with( $name, 'mcp-adapter/' );
+			}
+		);
 
 		$this->assertEmpty( $mcp_adapter_abilities, 'Should not include self-referencing mcp-adapter abilities' );
 	}
@@ -188,7 +195,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		// Check that test tool abilities are included
 		$ability_names = array_column( $result['abilities'], 'name' );
 		$this->assertContains( 'test/always-allowed', $ability_names );
-		
+
 		// Resources and prompts should NOT be included (only tools are discovered)
 		$this->assertNotContains( 'test/resource', $ability_names );
 		$this->assertNotContains( 'test/prompt', $ability_names );
@@ -204,11 +211,13 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 	public function test_execute_ignores_input_parameters(): void {
 		// Should ignore any input parameters since it discovers all abilities
-		$result = DiscoverAbilitiesAbility::execute( array(
-			'filter' => 'some-filter',
-			'limit'  => 10,
-			'unused' => 'parameter'
-		) );
+		$result = DiscoverAbilitiesAbility::execute(
+			array(
+				'filter' => 'some-filter',
+				'limit'  => 10,
+				'unused' => 'parameter',
+			)
+		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'abilities', $result );
@@ -233,7 +242,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 	public function test_ability_has_correct_annotations(): void {
 		$ability = wp_get_ability( 'mcp-adapter/discover-abilities' );
-		$meta = $ability->get_meta();
+		$meta    = $ability->get_meta();
 
 		$this->assertIsArray( $meta );
 		$this->assertArrayHasKey( 'annotations', $meta );
