@@ -15,6 +15,7 @@ if ( ! class_exists( 'WP_CLI_Command' ) ) {
 	 *
 	 * @package wp-cli
 	 */
+	// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound
 	abstract class WP_CLI_Command {
 		public function __construct() {
 		}
@@ -25,11 +26,12 @@ if ( ! class_exists( 'WP_CLI' ) ) {
 	/**
 	 * Various utilities for WP-CLI commands.
 	 */
+	// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound, Generic.Files.OneObjectStructurePerFile.MultipleFound
 	class WP_CLI {
 		private static $logger;
-		private static $hooks = array();
-		private static $hooks_passed = array();
-		private static $capture_exit = false;
+		private static $hooks              = array();
+		private static $hooks_passed       = array();
+		private static $capture_exit       = false;
 		private static $deferred_additions = array();
 
 		/**
@@ -41,24 +43,26 @@ if ( ! class_exists( 'WP_CLI' ) ) {
 			// Stub implementation for testing
 		}
 
-	/**
-	 * Display error message prefixed with "Error:" and exit with error code.
-	 *
-	 * @param string $message Message to display to the user.
-	 * @param bool   $exit    Whether to exit or return.
-	 */
-	public static function error( $message, $exit = true ) {
-		// For testing, throw exception instead of exiting
-		throw new \Exception( 'WP_CLI Error: ' . $message );
-	}
+		/**
+		 * Display error message prefixed with "Error:" and exit with error code.
+		 *
+		 * @param string $message Message to display to the user.
+		 * @param bool   $exit    Whether to exit or return.
+		 */
+		// phpcs:ignore Universal.NamingConventions.NoReservedKeywordParameterNames.exitFound
+		public static function error( $message, $exit = true ) {
+			// For testing, throw exception instead of exiting
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+			throw new \Exception( 'WP_CLI Error: ' . $message );
+		}
 
-	/**
-	 * Display debug message when in debug mode.
-	 *
-	 * @param string $message Message to display to the user.
-	 */
-	public static function debug( $message ) {
-		// Stub implementation for testing
+		/**
+		 * Display debug message when in debug mode.
+		 *
+		 * @param string $message Message to display to the user.
+		 */
+		public static function debug( $message ) {
+			// Stub implementation for testing
+		}
 	}
-}
 }
