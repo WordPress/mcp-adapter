@@ -10,6 +10,9 @@
 
 define( 'TESTS_REPO_ROOT_DIR', dirname( __DIR__ ) );
 
+// Set custom debug log location for tests.
+define( 'WP_DEBUG_LOG_FILE', TESTS_REPO_ROOT_DIR . '/tests/_output/debug.log' );
+
 // Load Composer dependencies if applicable.
 if ( file_exists( TESTS_REPO_ROOT_DIR . '/vendor/autoload.php' ) ) {
 	require_once TESTS_REPO_ROOT_DIR . '/vendor/autoload.php';
