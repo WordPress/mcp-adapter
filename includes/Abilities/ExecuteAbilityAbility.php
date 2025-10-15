@@ -35,6 +35,7 @@ final class ExecuteAbilityAbility {
 			array(
 				'label'               => 'Execute Ability',
 				'description'         => 'Execute a WordPress ability with the provided parameters. This is the primary execution layer that can run any registered ability.',
+				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
@@ -68,7 +69,7 @@ final class ExecuteAbilityAbility {
 				'execute_callback'    => array( self::class, 'execute' ),
 				'meta'                => array(
 					'annotations' => array(
-						'priority'      => 1.0,
+						'priority'      => '1.0',
 						'readOnlyHint'  => false,
 						'openWorldHint' => true,
 					),
@@ -114,7 +115,7 @@ final class ExecuteAbilityAbility {
 
 		// Check if the user has permission to execute the target ability
 		$parameters        = $input['parameters'] ?? array();
-		$permission_result = $ability->has_permission( $parameters );
+		$permission_result = $ability->check_permissions( $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
 		if ( is_wp_error( $permission_result ) ) {

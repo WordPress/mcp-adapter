@@ -34,6 +34,7 @@ final class GetAbilityInfoAbility {
 			array(
 				'label'               => 'Get Ability Info',
 				'description'         => 'Get detailed information about a specific WordPress ability including its input/output schema, description, and usage examples.',
+				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'properties'           => array(
@@ -70,7 +71,7 @@ final class GetAbilityInfoAbility {
 				'execute_callback'    => array( self::class, 'execute' ),
 				'meta'                => array(
 					'annotations' => array(
-						'priority'        => 1.0,
+						'priority'        => '1.0',
 						'readOnlyHint'    => true,
 						'destructiveHint' => false,
 						'idempotentHint'  => true,

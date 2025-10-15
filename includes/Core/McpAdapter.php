@@ -252,9 +252,26 @@ final class McpAdapter {
 			return;
 		}
 
+		// Register category before abilities
+		add_action( 'abilities_api_categories_init', array( $this, 'register_default_category' ) );
 		add_action( 'abilities_api_init', array( $this, 'register_default_abilities' ) );
 
 		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+	}
+
+	/**
+	 * Register the default MCP category.
+	 *
+	 * @return void
+	 */
+	public function register_default_category(): void {
+		wp_register_ability_category(
+			'mcp-adapter',
+			array(
+				'label'       => 'MCP Adapter',
+				'description' => 'Abilities for the MCP Adapter',
+			)
+		);
 	}
 
 	/**

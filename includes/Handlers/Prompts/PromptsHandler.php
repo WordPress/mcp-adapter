@@ -136,7 +136,7 @@ class PromptsHandler {
 			 * @var \WP_Ability $ability
 			 */
 			$ability        = $prompt->get_ability();
-			$has_permission = $ability->has_permission( $arguments );
+			$has_permission = $ability->check_permissions( $arguments );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message and code if WP_Error was returned
 				$error_message  = 'Access denied for prompt: ' . $prompt_name;

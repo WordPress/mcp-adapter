@@ -254,7 +254,7 @@ class ToolsHandler {
 
 		// Run ability Permission Callback.
 		try {
-			$has_permission = $ability->has_permission( $args );
+			$has_permission = $ability->check_permissions( $args );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message and code if WP_Error was returned
 				$error_message  = 'Access denied for tool: ' . $tool_name;

@@ -34,6 +34,7 @@ final class DiscoverAbilitiesAbility {
 			array(
 				'label'               => 'Discover Abilities',
 				'description'         => 'Discover all available WordPress abilities in the system. Returns a list of all registered abilities with their basic information.',
+				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
 					'type'                 => 'object',
 					'additionalProperties' => false,
@@ -60,7 +61,7 @@ final class DiscoverAbilitiesAbility {
 				'execute_callback'    => array( self::class, 'execute' ),
 				'meta'                => array(
 					'annotations' => array(
-						'priority'        => 1.0,
+						'priority'        => '1.0',
 						'readOnlyHint'    => true,
 						'destructiveHint' => false,
 						'idempotentHint'  => true,
