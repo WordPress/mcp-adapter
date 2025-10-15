@@ -35,6 +35,7 @@ class AdminOnlyPrompt extends McpPromptBuilder {
 }
 
 // Test prompt that always allows execution
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 class OpenPrompt extends McpPromptBuilder {
 
 	protected function configure(): void {
@@ -56,6 +57,7 @@ class OpenPrompt extends McpPromptBuilder {
 	}
 }
 
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 final class BuilderPromptExecutionTest extends TestCase {
 
 	public function test_builder_prompt_execution_through_handler(): void {

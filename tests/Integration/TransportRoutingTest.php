@@ -10,21 +10,13 @@ use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\Fixtures\DummyTransport;
 use WP\MCP\Tests\TestCase;
-use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 final class TransportRoutingTest extends TestCase {
-
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-		do_action( 'abilities_api_init' );
-		DummyAbility::register_all();
-	}
 
 	public function test_tools_and_prompts_routed_and_cursor_added(): void {
 		$server = new McpServer(
