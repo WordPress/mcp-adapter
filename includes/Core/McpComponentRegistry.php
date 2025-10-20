@@ -117,31 +117,10 @@ class McpComponentRegistry {
 			}
 
 			// Treat as ability name
-			try {
-				$ability = wp_get_ability( $tool_item );
+			$ability = wp_get_ability( $tool_item );
 
-				if ( ! $ability ) {
-					throw new \InvalidArgumentException( "WordPress ability '{$tool_item}' does not exist." );
-				}
-
-				$tool = RegisterAbilityAsMcpTool::make( $ability, $this->mcp_server );
-				// Add the processed tools to this server.
-				$this->tools[ $tool->get_name() ] = $tool;
-
-				// Track successful ability tool registration.
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'success',
-							'component_type' => 'ability_tool',
-							'component_name' => $tool_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
-			} catch ( \InvalidArgumentException $e ) {
-				$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
+			if ( ! $ability ) {
+				$this->error_handler->log( "WordPress ability '{$tool_item}' does not exist.", array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
 
 				// Track ability tool registration failure.
 				if ( $this->should_record_component_registration ) {
@@ -151,12 +130,53 @@ class McpComponentRegistry {
 							'status'         => 'failed',
 							'component_type' => 'ability_tool',
 							'component_name' => $tool_item,
-							'error_type'     => get_class( $e ),
+							'failure_reason' => 'ability_not_found',
 							'server_id'      => $this->mcp_server->get_server_id(),
 						)
 					);
 				}
+				continue;
 			}
+
+			$tool = RegisterAbilityAsMcpTool::make( $ability, $this->mcp_server );
+
+			// Check if tool creation returned an error
+			if ( is_wp_error( $tool ) ) {
+				$this->error_handler->log( $tool->get_error_message(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
+
+				// Track ability tool registration failure.
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'failed',
+							'component_type' => 'ability_tool',
+							'component_name' => $tool_item,
+							'error_code'     => $tool->get_error_code(),
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
+				continue;
+			}
+
+			// Add the processed tools to this server.
+			$this->tools[ $tool->get_name() ] = $tool;
+
+			// Track successful ability tool registration.
+			if ( ! $this->should_record_component_registration ) {
+				continue;
+			}
+
+			$this->observability_handler->record_event(
+				'mcp.component.registration',
+				array(
+					'status'         => 'success',
+					'component_type' => 'ability_tool',
+					'component_name' => $tool_item,
+					'server_id'      => $this->mcp_server->get_server_id(),
+				)
+			);
 		}
 	}
 
@@ -168,47 +188,51 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	public function add_tool( McpTool $tool ): void {
-		try {
-			// Validate if validation is enabled
-			if ( $this->mcp_validation_enabled ) {
-				$tool->validate( "McpComponentRegistry::add_tool::{$tool->get_name()}" );
-			}
+		// Validate if validation is enabled
+		if ( $this->mcp_validation_enabled ) {
+			$validation_result = $tool->validate( "McpComponentRegistry::add_tool::{$tool->get_name()}" );
 
-			// Set the MCP server
-			$tool->set_mcp_server( $this->mcp_server );
+			// Check if validation returned an error
+			if ( is_wp_error( $validation_result ) ) {
+				$this->error_handler->log( $validation_result->get_error_message(), array( "McpComponentRegistry::add_tool::{$tool->get_name()}" ) );
 
-			// Add the tool to this server
-			$this->tools[ $tool->get_name() ] = $tool;
-
-			// Track successful tool registration
-			if ( $this->should_record_component_registration ) {
-				$this->observability_handler->record_event(
-					'mcp.component.registration',
-					array(
-						'status'         => 'success',
-						'component_type' => 'tool',
-						'component_name' => $tool->get_name(),
-						'server_id'      => $this->mcp_server->get_server_id(),
-					)
-				);
-			}
-		} catch ( \InvalidArgumentException $e ) {
-			$this->error_handler->log( $e->getMessage(), array( "McpComponentRegistry::add_tool::{$tool->get_name()}" ) );
-
-			// Track tool registration failure
-			if ( $this->should_record_component_registration ) {
-				$this->observability_handler->record_event(
-					'mcp.component.registration',
-					array(
-						'status'         => 'failed',
-						'component_type' => 'tool',
-						'component_name' => $tool->get_name(),
-						'error_type'     => get_class( $e ),
-						'server_id'      => $this->mcp_server->get_server_id(),
-					)
-				);
+				// Track tool registration failure
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'failed',
+							'component_type' => 'tool',
+							'component_name' => $tool->get_name(),
+							'error_code'     => $validation_result->get_error_code(),
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
+				return;
 			}
 		}
+
+		// Set the MCP server
+		$tool->set_mcp_server( $this->mcp_server );
+
+		// Add the tool to this server
+		$this->tools[ $tool->get_name() ] = $tool;
+
+		// Track successful tool registration
+		if ( ! $this->should_record_component_registration ) {
+			return;
+		}
+
+		$this->observability_handler->record_event(
+			'mcp.component.registration',
+			array(
+				'status'         => 'success',
+				'component_type' => 'tool',
+				'component_name' => $tool->get_name(),
+				'server_id'      => $this->mcp_server->get_server_id(),
+			)
+		);
 	}
 
 	/**
@@ -224,31 +248,10 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			try {
-				$ability = wp_get_ability( $ability_name );
+			$ability = wp_get_ability( $ability_name );
 
-				if ( ! $ability ) {
-					throw new \InvalidArgumentException( esc_html( "WordPress ability '{$ability_name}' does not exist." ) );
-				}
-
-				$resource = RegisterAbilityAsMcpResource::make( $ability, $this->mcp_server );
-				// Add the processed resources to this server.
-				$this->resources[ $resource->get_uri() ] = $resource;
-
-				// Track successful resource registration.
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'success',
-							'component_type' => 'resource',
-							'component_name' => $ability_name,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
-			} catch ( \InvalidArgumentException $e ) {
-				$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
+			if ( ! $ability ) {
+				$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
 
 				// Track resource registration failure.
 				if ( $this->should_record_component_registration ) {
@@ -258,12 +261,53 @@ class McpComponentRegistry {
 							'status'         => 'failed',
 							'component_type' => 'resource',
 							'component_name' => $ability_name,
-							'error_type'     => get_class( $e ),
+							'failure_reason' => 'ability_not_found',
 							'server_id'      => $this->mcp_server->get_server_id(),
 						)
 					);
 				}
+				continue;
 			}
+
+			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->mcp_server );
+
+			// Check if resource creation returned an error
+			if ( is_wp_error( $resource ) ) {
+				$this->error_handler->log( $resource->get_error_message(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
+
+				// Track resource registration failure.
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'failed',
+							'component_type' => 'resource',
+							'component_name' => $ability_name,
+							'error_code'     => $resource->get_error_code(),
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
+				continue;
+			}
+
+			// Add the processed resources to this server.
+			$this->resources[ $resource->get_uri() ] = $resource;
+
+			// Track successful resource registration.
+			if ( ! $this->should_record_component_registration ) {
+				continue;
+			}
+
+			$this->observability_handler->record_event(
+				'mcp.component.registration',
+				array(
+					'status'         => 'success',
+					'component_type' => 'resource',
+					'component_name' => $ability_name,
+					'server_id'      => $this->mcp_server->get_server_id(),
+				)
+			);
 		}
 	}
 
@@ -282,81 +326,60 @@ class McpComponentRegistry {
 
 			// Check if it's a class that implements McpPromptBuilderInterface
 			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
-				try {
-					// Create instance of the prompt builder class
-					/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
-					$builder = new $prompt_item();
-					$prompt  = $builder->build();
+				// Create instance of the prompt builder class
+				/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
+				$builder = new $prompt_item();
+				$prompt  = $builder->build();
 
-					// Set the MCP server after building
-					$prompt->set_mcp_server( $this->mcp_server );
+				// Set the MCP server after building
+				$prompt->set_mcp_server( $this->mcp_server );
 
-					// Validate if validation is enabled
-					if ( $this->mcp_validation_enabled ) {
-						$prompt->validate( "McpPromptBuilder::{$prompt_item}" );
+				// Validate if validation is enabled
+				if ( $this->mcp_validation_enabled ) {
+					$validation_result = $prompt->validate( "McpPromptBuilder::{$prompt_item}" );
+
+					// Check if validation returned an error
+					if ( is_wp_error( $validation_result ) ) {
+						$this->error_handler->log( $validation_result->get_error_message(), array( "McpPromptBuilder::{$prompt_item}" ) );
+
+						// Track prompt registration failure
+						if ( $this->should_record_component_registration ) {
+							$this->observability_handler->record_event(
+								'mcp.component.registration',
+								array(
+									'status'         => 'failed',
+									'component_type' => 'prompt',
+									'component_name' => $prompt_item,
+									'error_code'     => $validation_result->get_error_code(),
+									'server_id'      => $this->mcp_server->get_server_id(),
+								)
+							);
+						}
+						continue;
 					}
+				}
 
-					// Add the prompt to this server
-					$this->prompts[ $prompt->get_name() ] = $prompt;
+				// Add the prompt to this server
+				$this->prompts[ $prompt->get_name() ] = $prompt;
 
-					// Track successful prompt registration
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'success',
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
-				} catch ( \InvalidArgumentException $e ) {
-					$this->error_handler->log( $e->getMessage(), array( "McpPromptBuilder::{$prompt_item}" ) );
-
-					// Track prompt registration failure
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'failed',
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'error_type'     => get_class( $e ),
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
+				// Track successful prompt registration
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'success',
+							'component_type' => 'prompt',
+							'component_name' => $prompt_item,
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
 				}
 			} else {
 				// Treat as ability name (legacy behavior)
-				try {
-					$ability = wp_get_ability( $prompt_item );
+				$ability = wp_get_ability( $prompt_item );
 
-					if ( ! $ability ) {
-						throw new \InvalidArgumentException( "WordPress ability '{$prompt_item}' does not exist." );
-					}
-
-					// Use RegisterMcpPrompt to handle all validation and processing.
-					$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->mcp_server );
-
-					// Add the processed prompts to this server.
-					$this->prompts[ $prompt->get_name() ] = $prompt;
-
-					// Track successful prompt registration.
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'success',
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
-				} catch ( \InvalidArgumentException $e ) {
-					$this->error_handler->log( $e->getMessage(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
+				if ( ! $ability ) {
+					$this->error_handler->log( "WordPress ability '{$prompt_item}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
 
 					// Track prompt registration failure.
 					if ( $this->should_record_component_registration ) {
@@ -366,11 +389,51 @@ class McpComponentRegistry {
 								'status'         => 'failed',
 								'component_type' => 'prompt',
 								'component_name' => $prompt_item,
-								'error_type'     => get_class( $e ),
+								'failure_reason' => 'ability_not_found',
 								'server_id'      => $this->mcp_server->get_server_id(),
 							)
 						);
 					}
+					continue;
+				}
+
+				// Use RegisterMcpPrompt to handle all validation and processing.
+				$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->mcp_server );
+
+				// Check if prompt creation returned an error
+				if ( is_wp_error( $prompt ) ) {
+					$this->error_handler->log( $prompt->get_error_message(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
+
+					// Track prompt registration failure.
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'failed',
+								'component_type' => 'prompt',
+								'component_name' => $prompt_item,
+								'error_code'     => $prompt->get_error_code(),
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
+					continue;
+				}
+
+				// Add the processed prompts to this server.
+				$this->prompts[ $prompt->get_name() ] = $prompt;
+
+				// Track successful prompt registration.
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'         => 'success',
+							'component_type' => 'prompt',
+							'component_name' => $prompt_item,
+							'server_id'      => $this->mcp_server->get_server_id(),
+						)
+					);
 				}
 			}
 		}

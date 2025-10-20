@@ -41,8 +41,6 @@ class McpTransportFactory {
 	 * Initialize MCP transports for the server.
 	 *
 	 * @param array $mcp_transports Array of MCP transport class names to initialize.
-	 *
-	 * @throws \Exception If any transport class does not implement McpTransportInterface.
 	 */
 	public function initialize_transports( array $mcp_transports ): void {
 		foreach ( $mcp_transports as $mcp_transport ) {
@@ -56,6 +54,11 @@ class McpTransportFactory {
 						esc_html( $mcp_transport )
 					),
 					'0.1.0'
+				);
+				// Log error and continue processing other transports
+				$this->mcp_server->get_error_handler()->log(
+					sprintf( 'Transport class "%s" does not exist.', $mcp_transport ),
+					array( 'McpTransportFactory::initialize_transports' )
 				);
 				continue;
 			}
@@ -71,13 +74,12 @@ class McpTransportFactory {
 					),
 					'0.1.0'
 				);
-				throw new \Exception(
-					sprintf(
-						/* translators: %s: Transport class name */
-						esc_html__( 'MCP transport class "%s" must implement the McpTransportInterface.', 'mcp-adapter' ),
-						esc_html( $mcp_transport )
-					)
+				// Log error and continue processing other transports
+				$this->mcp_server->get_error_handler()->log(
+					sprintf( 'MCP transport class "%s" must implement the McpTransportInterface.', $mcp_transport ),
+					array( 'McpTransportFactory::initialize_transports' )
 				);
+				continue;
 			}
 
 			// Interface-based instantiation with dependency injection

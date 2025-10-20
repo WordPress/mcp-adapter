@@ -102,10 +102,9 @@ final class McpAdapter {
 	 * @param array $prompts Prompts to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
-	 * @return \WP\MCP\Core\McpAdapter
-	 * @throws \Exception If the server already exists or if called outside of the mcp_adapter_init action.
+	 * @return \WP\MCP\Core\McpAdapter|\WP_Error McpAdapter instance on success, WP_Error on failure.
 	 */
-	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ): self {
+	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ) {
 		// Use NullMcpErrorHandler if no error handler is provided.
 		if ( ! $error_handler ) {
 			$error_handler = NullMcpErrorHandler::class;
@@ -113,7 +112,8 @@ final class McpAdapter {
 
 		// Validate error handler class exists and implements McpErrorHandlerInterface.
 		if ( ! class_exists( $error_handler ) ) {
-			throw new \Exception(
+			return new \WP_Error(
+				'invalid_error_handler',
 				sprintf(
 				/* translators: %s: error handler class name */
 					esc_html__( 'Error handler class "%s" does not exist.', 'mcp-adapter' ),
@@ -123,7 +123,8 @@ final class McpAdapter {
 		}
 
 		if ( ! in_array( McpErrorHandlerInterface::class, class_implements( $error_handler ) ?: array(), true ) ) {
-			throw new \Exception(
+			return new \WP_Error(
+				'invalid_error_handler',
 				sprintf(
 				/* translators: %s: error handler class name */
 					esc_html__( 'Error handler class "%s" must implement the McpErrorHandlerInterface.', 'mcp-adapter' ),
@@ -139,7 +140,8 @@ final class McpAdapter {
 
 		// Validate observability handler class exists and implements McpObservabilityHandlerInterface.
 		if ( ! class_exists( $observability_handler ) ) {
-			throw new \Exception(
+			return new \WP_Error(
+				'invalid_observability_handler',
 				sprintf(
 				/* translators: %s: observability handler class name */
 					esc_html__( 'Observability handler class "%s" does not exist.', 'mcp-adapter' ),
@@ -149,7 +151,8 @@ final class McpAdapter {
 		}
 
 		if ( ! in_array( McpObservabilityHandlerInterface::class, class_implements( $observability_handler ) ?: array(), true ) ) {
-			throw new \Exception(
+			return new \WP_Error(
+				'invalid_observability_handler',
 				sprintf(
 				/* translators: %s: observability handler class name */
 					esc_html__( 'Observability handler class "%s" must implement the McpObservabilityHandlerInterface interface.', 'mcp-adapter' ),
@@ -164,7 +167,8 @@ final class McpAdapter {
 				esc_html__( 'MCP Servers must be created during the "mcp_adapter_init" action. Hook into "mcp_adapter_init" to register your server.', 'mcp-adapter' ),
 				'0.1.0'
 			);
-			throw new \Exception(
+			return new \WP_Error(
+				'invalid_timing',
 				esc_html__( 'MCP Server creation must be done during mcp_adapter_init action.', 'mcp-adapter' )
 			);
 		}
@@ -179,8 +183,9 @@ final class McpAdapter {
 				),
 				'0.1.0'
 			);
-			throw new \Exception(
-			// translators: %s: server ID.
+			return new \WP_Error(
+				'duplicate_server_id',
+				// translators: %s: server ID.
 				sprintf( esc_html__( 'Server with ID "%s" already exists.', 'mcp-adapter' ), esc_html( $server_id ) )
 			);
 		}
