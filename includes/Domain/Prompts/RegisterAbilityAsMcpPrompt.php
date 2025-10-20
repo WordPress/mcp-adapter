@@ -45,10 +45,9 @@ class RegisterAbilityAsMcpPrompt {
 	 * @param \WP_Ability            $ability    The ability.
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt Returns prompt instance if valid
-	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|\WP_Error Returns prompt instance or WP_Error if validation fails.
 	 */
-	public static function make( WP_Ability $ability, McpServer $mcp_server ): McpPrompt {
+	public static function make( WP_Ability $ability, McpServer $mcp_server ) {
 		$prompt = new self( $ability, $mcp_server );
 
 		return $prompt->get_prompt();
@@ -69,7 +68,6 @@ class RegisterAbilityAsMcpPrompt {
 	 * Get the MCP prompt data array.
 	 *
 	 * @return array<string,mixed>
-	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	private function get_data(): array {
 		$prompt_data = array(
@@ -106,10 +104,9 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt instance.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt MCP prompt instance.
-	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|\WP_Error MCP prompt instance or WP_Error if validation fails.
 	 */
-	private function get_prompt(): McpPrompt {
+	private function get_prompt() {
 		return McpPrompt::from_array( $this->get_data(), $this->mcp_server );
 	}
 }
