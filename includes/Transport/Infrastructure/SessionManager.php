@@ -30,14 +30,14 @@ final class SessionManager {
 	 *
 	 * @var int
 	 */
-	private const MAX_SESSIONS = 32;
+	private const DEFAULT_MAX_SESSIONS = 32;
 
 	/**
 	 * Session inactivity timeout in seconds (24 hours).
 	 *
 	 * @var int
 	 */
-	private const INACTIVITY_TIMEOUT = DAY_IN_SECONDS;
+	private const DEFAULT_INACTIVITY_TIMEOUT = DAY_IN_SECONDS;
 
 	/**
 	 * Get configuration values.
@@ -46,8 +46,8 @@ final class SessionManager {
 	 */
 	private static function get_config(): array {
 		return array(
-			'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::MAX_SESSIONS ),
-			'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::INACTIVITY_TIMEOUT ),
+			'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS ),
+			'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT ),
 		);
 	}
 
