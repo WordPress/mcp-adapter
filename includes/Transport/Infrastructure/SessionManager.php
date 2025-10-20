@@ -93,22 +93,15 @@ final class SessionManager {
 		$config       = self::get_config();
 		$max_sessions = $config['max_sessions'];
 		if ( count( $sessions ) >= $max_sessions ) {
-			// Remove oldest session (FIFO)
-			$oldest_session_id = null;
-			$oldest_time       = PHP_INT_MAX;
-
-			foreach ( $sessions as $session_id => $session_data ) {
-				if ( $session_data['created_at'] >= $oldest_time ) {
-					continue;
+			// Remove oldest session (FIFO) - sort by created_at and remove first
+			uasort(
+				$sessions,
+				static function ( $a, $b ) {
+					return $a['created_at'] <=> $b['created_at'];
 				}
+			);
 
-				$oldest_time       = $session_data['created_at'];
-				$oldest_session_id = $session_id;
-			}
-
-			if ( $oldest_session_id ) {
-				unset( $sessions[ $oldest_session_id ] );
-			}
+			array_shift( $sessions );
 		}
 
 		// Create a new session
