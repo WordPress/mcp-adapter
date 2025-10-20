@@ -28,6 +28,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ## Contributing
 
+- **[Contributing Guide](../CONTRIBUTING.md)** - Development setup, coding standards, and contribution workflow
 - **[Testing Guide](guides/testing.md)** - Running and writing tests with wp-env
 
 ## Quick Navigation
