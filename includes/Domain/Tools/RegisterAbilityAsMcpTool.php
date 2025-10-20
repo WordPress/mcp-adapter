@@ -67,11 +67,21 @@ class RegisterAbilityAsMcpTool {
 	 * @throws \InvalidArgumentException If WordPress ability doesn't exist or validation fails.
 	 */
 	private function get_data(): array {
+		$input_schema = $this->ability->get_input_schema();
+
+		// If ability has no input schema, use an empty object schema for MCP
+		if ( empty( $input_schema ) ) {
+			$input_schema = array(
+				'type'                 => 'object',
+				'additionalProperties' => false,
+			);
+		}
+
 		$tool_data = array(
 			'ability'     => $this->ability->get_name(),
 			'name'        => str_replace( '/', '-', $this->ability->get_name() ),
 			'description' => $this->ability->get_description(),
-			'inputSchema' => $this->ability->get_input_schema(),
+			'inputSchema' => $input_schema,
 		);
 
 		// Add optional title from ability label.

@@ -252,6 +252,12 @@ class ToolsHandler {
 		 */
 		$ability = $tool->get_ability();
 
+		// If ability has no input schema and args is empty, pass null instead
+		$ability_input_schema = $ability->get_input_schema();
+		if ( empty( $ability_input_schema ) && empty( $args ) ) {
+			$args = null;
+		}
+
 		// Run ability Permission Callback.
 		try {
 			$has_permission = $ability->check_permissions( $args );

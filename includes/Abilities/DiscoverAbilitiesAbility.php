@@ -35,10 +35,6 @@ final class DiscoverAbilitiesAbility {
 				'label'               => 'Discover Abilities',
 				'description'         => 'Discover all available WordPress abilities in the system. Returns a list of all registered abilities with their basic information.',
 				'category'            => 'mcp-adapter',
-				'input_schema'        => array(
-					'type'                 => 'object',
-					'additionalProperties' => false,
-				),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(

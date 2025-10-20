@@ -229,8 +229,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 		$input_schema = $ability->get_input_schema();
 		$this->assertIsArray( $input_schema );
-		$this->assertEquals( 'object', $input_schema['type'] );
-		$this->assertFalse( $input_schema['additionalProperties'] );
+		$this->assertEmpty( $input_schema );
 
 		$output_schema = $ability->get_output_schema();
 		$this->assertIsArray( $output_schema );
