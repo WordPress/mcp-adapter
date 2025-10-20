@@ -194,7 +194,12 @@ npm run wp-env start
 
 ### Test Failures
 
-- **Class not found**: Make sure the environment is running and run `npm run wp-env run tests-cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload`
+- **Class not found**: This typically occurs after adding new classes, pulling changes, or switching branches. Regenerate the Composer autoloader to resolve:
+  ```bash
+  npm run wp-env run tests-cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload
+  ```
+  The `--env-cwd` flag sets the working directory inside the Docker container to ensure Composer operates on the plugin's `composer.json`.
+
 - **Permission errors**: Ensure Docker has the necessary permissions to mount volumes
 - **Port conflicts**: wp-env uses ports 8888 and 8889 by default. If these are in use, stop other services or configure different ports in `.wp-env.json`
 
