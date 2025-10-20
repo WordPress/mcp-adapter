@@ -145,10 +145,21 @@ class McpPrompt {
 	/**
 	 * Get the ability name.
 	 *
-	 * @return \WP_Ability|null
+	 * @return \WP_Ability|\WP_Error WP_Ability instance on success, WP_Error on failure.
 	 */
-	public function get_ability(): ?WP_Ability {
-		return wp_get_ability( $this->ability );
+	public function get_ability() {
+		$ability = wp_get_ability( $this->ability );
+		if ( ! $ability ) {
+			return new \WP_Error(
+				'ability_not_found',
+				sprintf(
+					/* translators: %s: ability name */
+					esc_html__( "WordPress ability '%s' does not exist.", 'mcp-adapter' ),
+					esc_html( $this->ability )
+				)
+			);
+		}
+		return $ability;
 	}
 
 	/**

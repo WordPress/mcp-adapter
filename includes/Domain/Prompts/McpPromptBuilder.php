@@ -112,10 +112,17 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 				return $this->builder->has_permission( $arguments );
 			}
 
-			// Fallback for ability-based execution (should not be used)
-			public function get_ability(): ?WP_Ability {
+			/**
+			 * Fallback for ability-based execution (should not be used).
+			 *
+			 * @return \WP_Error Always returns an error as builder-based prompts don't have abilities.
+			 */
+			public function get_ability() {
 				// This should not be called for builder-based prompts
-				return null;
+				return new \WP_Error(
+					'builder_has_no_ability',
+					esc_html__( 'Builder-based prompts do not have an associated ability.', 'mcp-adapter' )
+				);
 			}
 		};
 
