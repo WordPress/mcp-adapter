@@ -97,12 +97,33 @@ class ResourcesHandler {
 		}
 
 		/**
-		 * Assume resources can only be registered with valid abilities.
-		 * If not, the has_permission() will let us know in the try-catch block.
+		 * Get the ability
 		 *
-		 * @var \WP_Ability $ability
+		 * @var \WP_Ability|\WP_Error $ability
 		 */
 		$ability = $resource->get_ability();
+
+		// Check if getting the ability returned an error
+		if ( is_wp_error( $ability ) ) {
+			$this->mcp->error_handler->log(
+				'Failed to get ability for resource',
+				array(
+					'resource_uri'  => $uri,
+					'error_message' => $ability->get_error_message(),
+				)
+			);
+
+			return array(
+				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )['error'],
+				'_metadata' => array(
+					'component_type' => 'resource',
+					'resource_uri'   => $uri,
+					'resource_name'  => $resource->get_name(),
+					'failure_reason' => 'ability_retrieval_failed',
+					'error_code'     => $ability->get_error_code(),
+				),
+			);
+		}
 
 		try {
 			$has_permission = $ability->check_permissions( $request_params );
