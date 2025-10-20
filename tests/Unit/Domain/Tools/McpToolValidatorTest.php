@@ -34,9 +34,8 @@ final class McpToolValidatorTest extends TestCase {
 			'annotations' => array( 'category' => 'test' ),
 		);
 
-		// Should not throw exception
-		McpToolValidator::validate_tool_data( $valid_tool_data, 'test-context' );
-		$this->assertTrue( true );
+		$result = McpToolValidator::validate_tool_data( $valid_tool_data, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_tool_data_with_missing_name(): void {
@@ -45,11 +44,12 @@ final class McpToolValidatorTest extends TestCase {
 			'inputSchema' => array( 'type' => 'object' ),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Tool validation failed' );
-		$this->expectExceptionMessage( 'Tool name is required' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool validation failed', $result->get_error_message() );
+		$this->assertStringContainsString( 'Tool name is required', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_data_with_invalid_name(): void {
@@ -59,10 +59,11 @@ final class McpToolValidatorTest extends TestCase {
 			'inputSchema' => array( 'type' => 'object' ),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Tool name is required and must only contain letters, numbers, hyphens (-), and underscores (_)' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool name is required and must only contain letters, numbers, hyphens (-), and underscores (_)', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_data_with_missing_description(): void {
@@ -71,10 +72,11 @@ final class McpToolValidatorTest extends TestCase {
 			'inputSchema' => array( 'type' => 'object' ),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Tool description is required' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool description is required', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_data_with_invalid_input_schema(): void {
@@ -84,10 +86,11 @@ final class McpToolValidatorTest extends TestCase {
 			'inputSchema' => 'not-an-object',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Tool inputSchema must be a valid JSON schema object' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool inputSchema must be a valid JSON schema object', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_data_with_invalid_input_schema_type(): void {
@@ -99,10 +102,11 @@ final class McpToolValidatorTest extends TestCase {
 			),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'must use type' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'must use type', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_data_with_invalid_output_schema(): void {
@@ -113,10 +117,11 @@ final class McpToolValidatorTest extends TestCase {
 			'outputSchema' => 'not-an-object',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Tool outputSchema must be a valid JSON schema object' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool outputSchema must be a valid JSON schema object', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_data_with_invalid_annotations(): void {
@@ -127,10 +132,11 @@ final class McpToolValidatorTest extends TestCase {
 			'annotations' => 'not-an-array',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Tool annotations must be an array if provided' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool annotations must be an array if provided', $result->get_error_message() );
 	}
 
 	public function test_validate_tool_name_with_valid_names(): void {
@@ -173,9 +179,8 @@ final class McpToolValidatorTest extends TestCase {
 		);
 		$tool->set_mcp_server( $server );
 
-		// Should not throw exception
-		McpToolValidator::validate_tool_instance( $tool, 'test-context' );
-		$this->assertTrue( true );
+		$result = McpToolValidator::validate_tool_instance( $tool, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_tool_uniqueness_method_exists(): void {
@@ -192,9 +197,9 @@ final class McpToolValidatorTest extends TestCase {
 		// The method should exist and be callable
 		$this->assertTrue( method_exists( McpToolValidator::class, 'validate_tool_uniqueness' ) );
 
-		// Should not throw exception for unique tool
-		McpToolValidator::validate_tool_uniqueness( $tool, 'test-context' );
-		$this->assertTrue( true );
+		// Should return true for unique tool
+		$result = McpToolValidator::validate_tool_uniqueness( $tool, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_get_validation_errors_returns_array(): void {
@@ -261,9 +266,8 @@ final class McpToolValidatorTest extends TestCase {
 			),
 		);
 
-		// Should not throw exception
-		McpToolValidator::validate_tool_data( $complex_tool_data );
-		$this->assertTrue( true );
+		$result = McpToolValidator::validate_tool_data( $complex_tool_data );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_tool_data_with_invalid_required_field_reference(): void {
@@ -279,9 +283,10 @@ final class McpToolValidatorTest extends TestCase {
 			),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'does not exist in properties' );
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
 
-		McpToolValidator::validate_tool_data( $invalid_tool_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'does not exist in properties', $result->get_error_message() );
 	}
 }

@@ -144,4 +144,28 @@ abstract class TestCase extends PolyfillsTestCase {
 			$prompts,
 		);
 	}
+
+	/**
+	 * Asserts that the given value is an instance of WP_Error.
+	 *
+	 * @param mixed  $actual  The value to check.
+	 * @param string $message Optional. Message to display when the assertion fails.
+	 *
+	 * @return void
+	 */
+	public function assertWPError( $actual, string $message = '' ): void {
+		$this->assertInstanceOf( \WP_Error::class, $actual, $message );
+	}
+
+	/**
+	 * Asserts that the given value is not an instance of WP_Error.
+	 *
+	 * @param mixed  $actual  The value to check.
+	 * @param string $message Optional. Message to display when the assertion fails.
+	 *
+	 * @return void
+	 */
+	public function assertNotWPError( $actual, string $message = '' ): void {
+		$this->assertNotInstanceOf( \WP_Error::class, $actual, $message );
+	}
 }

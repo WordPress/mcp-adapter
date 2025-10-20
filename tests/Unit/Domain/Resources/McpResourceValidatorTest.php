@@ -28,9 +28,8 @@ final class McpResourceValidatorTest extends TestCase {
 			'annotations' => array( 'category' => 'test' ),
 		);
 
-		// Should not throw exception
-		McpResourceValidator::validate_resource_data( $valid_resource_data, 'test-context' );
-		$this->assertTrue( true );
+		$result = McpResourceValidator::validate_resource_data( $valid_resource_data, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_resource_data_with_valid_blob_resource(): void {
@@ -42,9 +41,8 @@ final class McpResourceValidatorTest extends TestCase {
 			'mimeType'    => 'application/octet-stream',
 		);
 
-		// Should not throw exception
-		McpResourceValidator::validate_resource_data( $valid_resource_data );
-		$this->assertTrue( true );
+		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_resource_data_with_missing_uri(): void {
@@ -54,11 +52,12 @@ final class McpResourceValidatorTest extends TestCase {
 			'text'        => 'Content',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource validation failed' );
-		$this->expectExceptionMessage( 'Resource URI is required' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource validation failed', $result->get_error_message() );
+		$this->assertStringContainsString( 'Resource URI is required', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_data_with_invalid_uri(): void {
@@ -67,10 +66,11 @@ final class McpResourceValidatorTest extends TestCase {
 			'text' => 'Content',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource URI must be a valid URI format' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource URI must be a valid URI format', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_data_with_no_content(): void {
@@ -80,10 +80,11 @@ final class McpResourceValidatorTest extends TestCase {
 			'description' => 'Missing both text and blob',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource must have either text or blob content' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource must have either text or blob content', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_data_with_both_text_and_blob(): void {
@@ -93,10 +94,11 @@ final class McpResourceValidatorTest extends TestCase {
 			'blob' => 'SGVsbG8=', // Both text and blob (not allowed)
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource cannot have both text and blob content' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource cannot have both text and blob content', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_data_with_invalid_mime_type(): void {
@@ -106,10 +108,11 @@ final class McpResourceValidatorTest extends TestCase {
 			'mimeType' => 'invalid-mime-type',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource mimeType must be a valid MIME type format' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource mimeType must be a valid MIME type format', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_uri_with_valid_uris(): void {
@@ -185,9 +188,8 @@ final class McpResourceValidatorTest extends TestCase {
 
 		$resource = McpResource::from_array( $resource_data, $server );
 
-		// Should not throw exception
-		McpResourceValidator::validate_resource_instance( $resource, 'test-context' );
-		$this->assertTrue( true );
+		$result = McpResourceValidator::validate_resource_instance( $resource, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_resource_uniqueness_method_exists(): void {
@@ -206,9 +208,9 @@ final class McpResourceValidatorTest extends TestCase {
 		// The method should exist and be callable
 		$this->assertTrue( method_exists( McpResourceValidator::class, 'validate_resource_uniqueness' ) );
 
-		// Should not throw exception for unique resource
-		McpResourceValidator::validate_resource_uniqueness( $resource, 'test-context' );
-		$this->assertTrue( true );
+		// Should return true for unique resource
+		$result = McpResourceValidator::validate_resource_uniqueness( $resource, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_get_validation_errors_returns_array(): void {
@@ -231,13 +233,12 @@ final class McpResourceValidatorTest extends TestCase {
 			'uri' => '',
 		);
 
-		try {
-			McpResourceValidator::validate_resource_data( $invalid_resource_data, 'custom-context' );
-			$this->fail( 'Expected exception to be thrown' );
-		} catch ( \InvalidArgumentException $e ) {
-			$this->assertStringContainsString( '[custom-context]', $e->getMessage() );
-			$this->assertStringContainsString( 'Resource validation failed', $e->getMessage() );
-		}
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data, 'custom-context' );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( '[custom-context]', $result->get_error_message() );
+		$this->assertStringContainsString( 'Resource validation failed', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_data_sanitizes_string_inputs(): void {
@@ -249,9 +250,8 @@ final class McpResourceValidatorTest extends TestCase {
 			'text'        => 'Content',
 		);
 
-		// Should not throw exception (whitespace should be trimmed)
-		McpResourceValidator::validate_resource_data( $resource_data_with_whitespace );
-		$this->assertTrue( true );
+		$result = McpResourceValidator::validate_resource_data( $resource_data_with_whitespace );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_resource_data_with_invalid_text_type(): void {
@@ -260,10 +260,11 @@ final class McpResourceValidatorTest extends TestCase {
 			'text' => 123, // Should be string
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource text content must be a string' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource text content must be a string', $result->get_error_message() );
 	}
 
 	public function test_validate_resource_data_with_invalid_blob_type(): void {
@@ -273,9 +274,10 @@ final class McpResourceValidatorTest extends TestCase {
 			'text' => '', // This will trigger the "must have either text or blob" error first
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Resource must have either text or blob content' );
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
 
-		McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Resource must have either text or blob content', $result->get_error_message() );
 	}
 }

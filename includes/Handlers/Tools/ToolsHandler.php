@@ -248,9 +248,30 @@ class ToolsHandler {
 		/**
 		 * Get the ability
 		 *
-		 * @var \WP_Ability $ability
+		 * @var \WP_Ability|\WP_Error $ability
 		 */
 		$ability = $tool->get_ability();
+
+		// Check if getting the ability returned an error
+		if ( is_wp_error( $ability ) ) {
+			$this->mcp->error_handler->log(
+				'Failed to get ability for tool',
+				array(
+					'tool'          => $tool_name,
+					'error_message' => $ability->get_error_message(),
+				)
+			);
+
+			return array(
+				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )['error'],
+				'_metadata' => array(
+					'component_type' => 'tool',
+					'tool_name'      => $tool_name,
+					'failure_reason' => 'ability_retrieval_failed',
+					'error_code'     => $ability->get_error_code(),
+				),
+			);
+		}
 
 		// If ability has no input schema and args is empty, pass null instead
 		$ability_input_schema = $ability->get_input_schema();

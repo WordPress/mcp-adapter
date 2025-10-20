@@ -25,10 +25,9 @@ class McpPromptValidator {
 	 * @param array  $prompt_data The prompt data to validate.
 	 * @param string $context Optional context for error messages.
 	 *
-	 * @return void
-	 * @throws \InvalidArgumentException If validation fails.
+	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
-	public static function validate_prompt_data( array $prompt_data, string $context = '' ): void {
+	public static function validate_prompt_data( array $prompt_data, string $context = '' ) {
 		$validation_errors = self::get_validation_errors( $prompt_data );
 
 		if ( ! empty( $validation_errors ) ) {
@@ -38,8 +37,10 @@ class McpPromptValidator {
 				__( 'Prompt validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			throw new \InvalidArgumentException( esc_html( $error_message ) );
+			return new \WP_Error( 'prompt_validation_failed', esc_html( $error_message ) );
 		}
+
+		return true;
 	}
 
 	/**
@@ -48,12 +49,15 @@ class McpPromptValidator {
 	 * @param \WP\MCP\Domain\Prompts\McpPrompt $prompt The prompt instance to validate.
 	 * @param string    $context Optional context for error messages.
 	 *
-	 * @return void
-	 * @throws \InvalidArgumentException If validation fails.
+	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
-	public static function validate_prompt_instance( McpPrompt $prompt, string $context = '' ): void {
-		self::validate_prompt_uniqueness( $prompt, $context );
-		self::validate_prompt_data( $prompt->to_array(), $context );
+	public static function validate_prompt_instance( McpPrompt $prompt, string $context = '' ) {
+		$uniqueness_result = self::validate_prompt_uniqueness( $prompt, $context );
+		if ( is_wp_error( $uniqueness_result ) ) {
+			return $uniqueness_result;
+		}
+
+		return self::validate_prompt_data( $prompt->to_array(), $context );
 	}
 
 
@@ -63,9 +67,9 @@ class McpPromptValidator {
 	 * @param \WP\MCP\Domain\Prompts\McpPrompt $prompt The resource instance to validate.
 	 * @param string    $context Optional context for error messages.
 	 *
-	 * @throws \InvalidArgumentException If the resource URI is not unique.
+	 * @return bool|\WP_Error True if unique, WP_Error if the prompt name is not unique.
 	 */
-	public static function validate_prompt_uniqueness( McpPrompt $prompt, string $context = '' ): void {
+	public static function validate_prompt_uniqueness( McpPrompt $prompt, string $context = '' ) {
 		$this_prompt_name  = $prompt->get_name();
 		$existing_resource = $prompt->get_mcp_server()->get_prompt( $this_prompt_name );
 		if ( $existing_resource ) {
@@ -75,8 +79,10 @@ class McpPromptValidator {
 				__( "Prompt name '%s' is not unique. It already exists in the MCP server.", 'mcp-adapter' ),
 				$this_prompt_name
 			);
-			throw new \InvalidArgumentException( esc_html( $error_message ) );
+			return new \WP_Error( 'prompt_not_unique', esc_html( $error_message ) );
 		}
+
+		return true;
 	}
 
 	/**

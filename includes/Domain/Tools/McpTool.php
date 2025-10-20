@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Core\McpServer;
-use WP_Ability;
 
 /**
  * Represents an MCP tool according to the Model Context Protocol specification.
@@ -111,12 +110,19 @@ class McpTool {
 	/**
 	 * Get the ability name.
 	 *
-	 * @return \WP_Ability
+	 * @return \WP_Ability|\WP_Error WP_Ability instance on success, WP_Error on failure.
 	 */
-	public function get_ability(): WP_Ability {
+	public function get_ability() {
 		$ability = wp_get_ability( $this->ability );
 		if ( ! $ability ) {
-			throw new \InvalidArgumentException( esc_html( "WordPress ability '{$this->ability}' does not exist." ) );
+			return new \WP_Error(
+				'ability_not_found',
+				sprintf(
+					/* translators: %s: ability name */
+					esc_html__( "WordPress ability '%s' does not exist.", 'mcp-adapter' ),
+					esc_html( $this->ability )
+				)
+			);
 		}
 		return $ability;
 	}
@@ -310,10 +316,9 @@ class McpTool {
 	 * @param array     $data Array containing tool data.
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
-	 * @return self
-	 * @throws \InvalidArgumentException If required fields are missing or validation fails.
+	 * @return self|\WP_Error Returns a new McpTool instance or WP_Error if validation fails.
 	 */
-	public static function from_array( array $data, McpServer $mcp_server ): self {
+	public static function from_array( array $data, McpServer $mcp_server ) {
 		$tool = new self(
 			$data['ability'] ?? '',
 			$data['name'] ?? '',
@@ -334,16 +339,19 @@ class McpTool {
 	 *
 	 * @param string $context Optional context for error messages.
 	 *
-	 * @return self Returns the validated tool instance.
-	 * @throws \InvalidArgumentException If validation fails.
+	 * @return self|\WP_Error Returns the validated tool instance or WP_Error if validation fails.
 	 */
-	public function validate( string $context = '' ): self {
+	public function validate( string $context = '' ) {
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}
 
-		$context_to_use = $context ?: "McpTool::{$this->name}";
-		McpToolValidator::validate_tool_instance( $this, $context_to_use );
+		$context_to_use    = $context ?: "McpTool::{$this->name}";
+		$validation_result = McpToolValidator::validate_tool_instance( $this, $context_to_use );
+
+		if ( is_wp_error( $validation_result ) ) {
+			return $validation_result;
+		}
 
 		return $this;
 	}

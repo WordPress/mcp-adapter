@@ -37,9 +37,8 @@ final class McpPromptValidatorTest extends TestCase {
 			'annotations' => array( 'category' => 'test' ),
 		);
 
-		// Should not throw exception
-		McpPromptValidator::validate_prompt_data( $valid_prompt_data, 'test-context' );
-		$this->assertTrue( true );
+		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_prompt_data_with_missing_name(): void {
@@ -48,11 +47,12 @@ final class McpPromptValidatorTest extends TestCase {
 			'description' => 'A test prompt',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt validation failed' );
-		$this->expectExceptionMessage( 'Prompt name is required' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt validation failed', $result->get_error_message() );
+		$this->assertStringContainsString( 'Prompt name is required', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_name(): void {
@@ -61,10 +61,11 @@ final class McpPromptValidatorTest extends TestCase {
 			'description' => 'A test prompt',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt name is required and must only contain letters, numbers, hyphens (-), and underscores (_)' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt name is required and must only contain letters, numbers, hyphens (-), and underscores (_)', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_title(): void {
@@ -73,10 +74,11 @@ final class McpPromptValidatorTest extends TestCase {
 			'title' => 123, // Should be string
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt title must be a string if provided' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt title must be a string if provided', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_description(): void {
@@ -85,10 +87,11 @@ final class McpPromptValidatorTest extends TestCase {
 			'description' => array(), // Should be string
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt description must be a string if provided' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt description must be a string if provided', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_arguments(): void {
@@ -97,10 +100,11 @@ final class McpPromptValidatorTest extends TestCase {
 			'arguments' => 'not-an-array',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt arguments must be an array if provided' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt arguments must be an array if provided', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_argument_structure(): void {
@@ -111,10 +115,11 @@ final class McpPromptValidatorTest extends TestCase {
 			),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt argument at index 0 must be an object' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt argument at index 0 must be an object', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_missing_argument_name(): void {
@@ -127,10 +132,11 @@ final class McpPromptValidatorTest extends TestCase {
 			),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt argument at index 0 must have a non-empty name string' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt argument at index 0 must have a non-empty name string', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_argument_name(): void {
@@ -144,10 +150,11 @@ final class McpPromptValidatorTest extends TestCase {
 			),
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'name must only contain letters, numbers, hyphens (-), and underscores (_)' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'name must only contain letters, numbers, hyphens (-), and underscores (_)', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_data_with_invalid_annotations(): void {
@@ -156,10 +163,11 @@ final class McpPromptValidatorTest extends TestCase {
 			'annotations' => 'not-an-array',
 		);
 
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'Prompt annotations must be an array if provided' );
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
 
-		McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Prompt annotations must be an array if provided', $result->get_error_message() );
 	}
 
 	public function test_validate_prompt_name_with_valid_names(): void {
@@ -412,9 +420,8 @@ final class McpPromptValidatorTest extends TestCase {
 		);
 		$prompt->set_mcp_server( $server );
 
-		// Should not throw exception
-		McpPromptValidator::validate_prompt_instance( $prompt, 'test-context' );
-		$this->assertTrue( true );
+		$result = McpPromptValidator::validate_prompt_instance( $prompt, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_validate_prompt_uniqueness_method_exists(): void {
@@ -432,9 +439,9 @@ final class McpPromptValidatorTest extends TestCase {
 		// The method should exist and be callable
 		$this->assertTrue( method_exists( McpPromptValidator::class, 'validate_prompt_uniqueness' ) );
 
-		// Should not throw exception for unique prompt
-		McpPromptValidator::validate_prompt_uniqueness( $prompt, 'test-context' );
-		$this->assertTrue( true );
+		// Should return true for unique prompt
+		$result = McpPromptValidator::validate_prompt_uniqueness( $prompt, 'test-context' );
+		$this->assertTrue( $result );
 	}
 
 	public function test_get_validation_errors_returns_array(): void {

@@ -354,10 +354,9 @@ class McpResource {
 	 * @param array     $data Array containing resource data.
 	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
 	 *
-	 * @return self
-	 * @throws \InvalidArgumentException If required fields are missing or validation fails.
+	 * @return self|\WP_Error Returns a new McpResource instance or WP_Error if validation fails.
 	 */
-	public static function from_array( array $data, McpServer $mcp_server ): self {
+	public static function from_array( array $data, McpServer $mcp_server ) {
 		$resource = new self(
 			$data['ability'] ?? '',
 			$data['uri'] ?? '',
@@ -397,17 +396,19 @@ class McpResource {
 	 *
 	 * @param string $context Optional context for error messages.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource
-	 * @throws \InvalidArgumentException If validation fails.
+	 * @return \WP\MCP\Domain\Resources\McpResource|\WP_Error Resource instance on success, WP_Error on failure.
 	 */
-	public function validate( string $context = '' ): self {
+	public function validate( string $context = '' ) {
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}
 
-		$context_to_use = $context ?: "McpResource::{$this->name}";
+		$context_to_use    = $context ?: "McpResource::{$this->name}";
+		$validation_result = McpResourceValidator::validate_resource_instance( $this, $context_to_use );
 
-		McpResourceValidator::validate_resource_instance( $this, $context_to_use );
+		if ( is_wp_error( $validation_result ) ) {
+			return $validation_result;
+		}
 
 		return $this;
 	}
