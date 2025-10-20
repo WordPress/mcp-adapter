@@ -1,15 +1,14 @@
 # Testing the MCP Adapter
 
-This guide explains how to run and write tests for the MCP Adapter. The suite supports two modes:
-
-- Fast unit mode (no WordPress DB needed)
-- Full WordPress integration mode (uses the WP test suite)
+This guide explains how to run and write tests for the MCP Adapter using `wp-env`.
 
 ## Prerequisites
 
-- PHP 7.4+
-- Composer
-- Optional (for full WP tests): a local MySQL/MariaDB server or a WordPress test DB
+- Node.js 20.x (NVM recommended)
+- Docker
+- Git
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#prerequisites) for full setup requirements.
 
 ## Test Layout
 
@@ -19,105 +18,206 @@ This guide explains how to run and write tests for the MCP Adapter. The suite su
 
 ## Running Tests
 
-### 1) Fast Unit Mode (recommended for local dev)
+The MCP Adapter uses `wp-env` to provide a containerized WordPress environment with all dependencies. This eliminates the need for manual database setup or WordPress installation.
 
-No database required. A lightweight bootstrap provides minimal WordPress shims.
+### Starting the Test Environment
 
-```bash
-# from mcp-adapter/
-MCP_ADAPTER_FAST_UNIT=1 composer test
-```
-
-What this does:
-- Loads Composer autoloaders and Abilities API
-- Provides shims for `add_filter()`, `apply_filters()`, `wp_set_current_user()`, `is_user_logged_in()`, i18n, etc.
-- Runs the entire suite from `tests/Unit` and `tests/Integration`
-
-Tip: Run a single file or test via PHPUnit’s filter:
+First, ensure the wp-env environment is running:
 
 ```bash
-MCP_ADAPTER_FAST_UNIT=1 vendor/bin/phpunit -c phpunit.xml.dist tests/Unit/Handlers/ToolsHandlerCallTest.php
-MCP_ADAPTER_FAST_UNIT=1 vendor/bin/phpunit -c phpunit.xml.dist --filter test_image_result_is_converted_to_base64_with_mime_type
+npm run wp-env start
 ```
 
-### 2) Full WordPress Integration Mode
+This starts a WordPress instance at http://localhost:8888 with all required dependencies.
 
-This uses the official WP test suite and requires a DB.
+### Running All Tests
+
+Run the full PHPUnit test suite:
 
 ```bash
-# Install WP test suite
-composer test:install
-
-# Run tests (will load WordPress bootstrap)
-composer test
+npm run test:php
 ```
 
-If you see “Error establishing a database connection”, ensure your DB is running and credentials in `bin/install-wp-tests.sh` (or env variables) are correct.
+This executes both unit and integration tests in the wp-env container.
+
+### Running Specific Tests
+
+You can pass PHPUnit arguments to the test script using `--`:
+
+```bash
+# Run a specific test by name
+npm run test:php -- --filter test_execute_with_public_mcp_filtering
+
+# Run a specific test file
+npm run test:php -- tests/Unit/Handlers/ToolsHandlerCallTest.php
+
+# Run tests matching a pattern
+npm run test:php -- --filter "Tools.*"
+```
+
+### Test Coverage
+
+To generate code coverage reports, restart the environment with Xdebug coverage mode enabled:
+
+```bash
+# Enable coverage mode
+npm run wp-env start -- --xdebug=coverage
+
+# Run tests (coverage will be generated)
+npm run test:php
+```
+
+Coverage reports will be generated:
+- HTML report: `tests/_output/html/index.html` (open in your browser)
+- Clover XML: `tests/_output/php-coverage.xml` (for CI/CD tools)
 
 ## Observability and Error Handling
 
-The suite verifies that:
-- Request counts, successes, errors, and timings are recorded
-- Error envelopes adhere to JSON-RPC shape: `{ jsonrpc, id, error: { code, message, data? } }`
+The test suite includes fixtures for verifying observability and error handling:
 
-Fixtures:
-- `DummyObservabilityHandler` captures `increment()` and `timing()` calls
-- `DummyErrorHandler` collects logs for assertions
+**DummyObservabilityHandler** (`tests/Fixtures/DummyObservabilityHandler.php`)
+- Captures `record_event()` calls with event names, tags, and optional timing data
+- Stores events in `$events` array for test assertions
+- Used to verify that requests, successes, errors, and timings are properly tracked
 
-## Test Coverage
+**DummyErrorHandler** (`tests/Fixtures/DummyErrorHandler.php`)
+- Captures `log()` calls with messages, context, and error types
+- Stores logs in `$logs` array for test assertions
+- Used to verify error handling and logging behavior
 
-### Handlers and Routing
-- Initialize: protocolVersion, serverInfo, capabilities, and instructions
-- Tools: list, list-all (available=true), call (permission errors, exceptions, image/text responses)
-- Resources: list, read
-- Prompts: list, get
-- System: ping, setLoggingLevel
-- Transport: routing, unknown method, cursor compatibility, metric tags
-- Error handling: consistent error response formats and logging
-- Session management: state handling and cleanup
+Tests verify that error responses adhere to JSON-RPC 2.0 format: `{ jsonrpc, id, error: { code, message, data? } }`
 
-### MCP Transport Compliance (HttpTransport)
-- **MCP 2025-06-18 Streamable HTTP specification compliance**
-- HTTP methods: GET, POST, DELETE, OPTIONS
-- JSON-RPC 2.0 message format validation
-- Session management and termination
-- CORS preflight and header handling
-- Notification handling (202 responses)
-- Accept header validation for different request types
-- Error response format compliance
-- Protocol version header handling
-- Batch request processing
-- Session state management and cleanup
-- HTTP request context validation
+## What's Tested
 
-**Test Location**: `tests/Integration/HttpTransportTest.php` (comprehensive test coverage)
+The test suite provides comprehensive coverage across handlers, transport, and infrastructure:
+
+### Handler Tests (`tests/Unit/Handlers/`)
+
+**InitializeHandler** - Server initialization and capabilities
+- Protocol version negotiation (2025-06-18)
+- Server info (name, version)
+- Capabilities reporting
+- Instructions delivery
+
+**ToolsHandler** - Tool listing and execution
+- List: JSON-safe field filtering
+- Call: Permission errors, execution exceptions, image/base64 conversion, missing parameters
+
+**ResourcesHandler** - Resource listing and reading
+- List: Registered resources enumeration
+- Read: Missing URI errors, unknown resource errors, successful content retrieval
+
+**PromptsHandler** - Prompt listing and retrieval
+- List: Registered prompts enumeration
+- Get: Missing/unknown prompt errors, successful prompt execution
+
+**SystemHandler** - System-level operations
+- Ping responses
+- Logging level validation
+- Complete and roots list operations
+
+### Transport and Routing Tests
+
+**RequestRouter** (`tests/Unit/Transport/Infrastructure/RequestRouterTest.php`)
+- Route dispatching for all MCP methods (initialize, tools/*, resources/*, prompts/*, ping)
+- Unknown method handling
+- Handler exception handling
+- Cursor compatibility (nextCursor backward compatibility)
+- Observability metrics recording (event tracking with tags and timing)
+
+**HttpTransport** (`tests/Integration/HttpTransportTest.php`) - MCP 2025-06-18 Compliance
+- HTTP methods: POST (requests/notifications/batch), GET (SSE streams), DELETE (session termination), OPTIONS (CORS preflight)
+- JSON-RPC 2.0: Valid/invalid JSON, protocol version validation
+- Session management: Creation on initialize, validation for subsequent requests, expiration handling
+- Protocol version headers
+- Permission callbacks and capability filtering
+- Unsupported method handling
+
+**HttpRequestHandler** (`tests/Unit/Transport/Infrastructure/HttpRequestHandlerTest.php`)
+- Request processing for all HTTP methods
+- Session validation
+- Batch message processing
+- Notification handling
+- Invalid JSON handling
+
+### Error Handling (`tests/Integration/ErrorHandlingIntegrationTest.php`, `tests/Unit/ErrorHandling/`)
+- Consistent JSON-RPC error response format: `{ jsonrpc, id, error: { code, message, data? } }`
+- Error factory creates properly structured errors
+- Error handlers implement interface correctly
+- Error logging integration
 
 ## Writing New Tests
 
 - Place unit tests under `tests/Unit/.../*Test.php`
-- Favor fast unit mode while developing
-- For behavior depending on WordPress state (e.g., current user), in fast mode use:
-  - `wp_set_current_user(1);`
-  - `add_filter('mcp_validation_enabled', '__return_false');`
+- Place integration tests under `tests/Integration/.../*Test.php`
 - Use fixtures in `tests/Fixtures` or create your own test doubles
+- Follow the Arrange-Act-Assert (AAA) pattern
+- Mock external dependencies using PHPUnit mocks
+- Test files should mirror the source structure with a `Test.php` suffix
 
-## Coverage
+Example test structure:
 
-You can enable coverage locally with Xdebug:
+```php
+<?php
+namespace WP\MCP\Tests\Unit\Handlers;
 
-```bash
-XDEBUG_MODE=coverage MCP_ADAPTER_FAST_UNIT=1 vendor/bin/phpunit -c phpunit.xml.dist --coverage-text
+use PHPUnit\Framework\TestCase;
+
+class MyHandlerTest extends TestCase {
+    public function test_something(): void {
+        // Arrange
+        $handler = new MyHandler();
+
+        // Act
+        $result = $handler->handle($request, $server);
+
+        // Assert
+        $this->assertSame($expected, $result);
+    }
+}
 ```
 
 ## Troubleshooting
 
-- DB connection error: use fast unit mode or start a local DB and rerun `composer test:install`
-- Class not found in tests: run `composer dump-autoload`
-- WP hook callback missing (e.g. `__return_false`): fast unit mode shims these; ensure `MCP_ADAPTER_FAST_UNIT=1` is set
+### Environment Issues
 
-## CI Recommendations
+If wp-env fails to start:
 
-- Default to fast unit mode for speed
-- Optionally add a matrix job that runs the full WP suite on a stable WordPress version
+```bash
+# Stop and clean the environment
+npm run wp-env stop
+npm run wp-env clean
+
+# Restart
+npm run wp-env start
+```
+
+### Test Failures
+
+- **Class not found**: Make sure the environment is running and run `npm run wp-env run tests-cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload`
+- **Permission errors**: Ensure Docker has the necessary permissions to mount volumes
+- **Port conflicts**: wp-env uses ports 8888 and 8889 by default. If these are in use, stop other services or configure different ports in `.wp-env.json`
+
+### Accessing the Test Environment
+
+- WordPress site: http://localhost:8888
+- Admin dashboard: http://localhost:8888/wp-admin/ (admin/password)
+- Run WP-CLI commands: `npm run wp-env run tests-cli YOUR_COMMAND`
+
+## Continuous Integration
+
+The repository has comprehensive CI testing via GitHub Actions (`.github/workflows/test.yml`):
+
+**Test Matrix:**
+- PHP versions: 8.4, 8.3, 8.2, 8.1, 8.0, 7.4
+- WordPress versions: latest, trunk
+- Coverage: Enabled for PHP 8.4 + WordPress latest (uploaded to Codecov)
+
+**Automated Checks:**
+- PHPUnit tests via `npm run test:php`
+- PHPCS coding standards
+- PHPStan static analysis (Level 8)
+
+All tests run automatically on pull requests and pushes to trunk.
 
 

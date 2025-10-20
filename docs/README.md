@@ -26,6 +26,10 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 - **[Common Issues](troubleshooting/common-issues.md)** - Quick fixes and debugging techniques
 
+## Contributing
+
+- **[Testing Guide](guides/testing.md)** - Running and writing tests with wp-env
+
 ## Quick Navigation
 
 ### New to MCP Adapter
