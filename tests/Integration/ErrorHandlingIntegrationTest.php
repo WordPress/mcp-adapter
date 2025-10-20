@@ -99,7 +99,9 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		// This should trigger an error and log it
 		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-permission-exception' ) ) );
 
-		$this->assertArrayHasKey( 'error', $result );
+		// Permission exceptions are tool execution errors (isError: true)
+		$this->assertArrayHasKey( 'isError', $result );
+		$this->assertTrue( $result['isError'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 
 		$log = DummyErrorHandler::$logs[0];
