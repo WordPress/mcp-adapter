@@ -96,7 +96,7 @@ class DefaultServerFactory {
 			sprintf(
 				'MCP Adapter: Failed to create default server. Error: %s (Code: %s)',
 				esc_html( $result->get_error_message() ),
-				esc_html( $result->get_error_code() )
+				esc_html( (string) $result->get_error_code() )
 			),
 			'n.e.x.t'
 		);
