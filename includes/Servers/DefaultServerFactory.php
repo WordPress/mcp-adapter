@@ -91,13 +91,14 @@ class DefaultServerFactory {
 			return;
 		}
 
-		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-		error_log(
+		_doing_it_wrong(
+			__METHOD__,
 			sprintf(
 				'MCP Adapter: Failed to create default server. Error: %s (Code: %s)',
 				$result->get_error_message(),
 				$result->get_error_code()
-			)
+			),
+			'n.e.x.t'
 		);
 	}
 
