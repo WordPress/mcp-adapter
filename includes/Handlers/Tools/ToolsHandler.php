@@ -133,6 +133,15 @@ class ToolsHandler {
 				),
 			);
 
+			// Extract and store metadata before adding result to response content.
+			$response['_metadata'] = $result['_metadata'] ?? array(
+				'component_type' => 'tool',
+				'tool_name'      => $request_params['name'],
+			);
+
+			// Remove metadata from result so it doesn't appear in content or structuredContent.
+			unset( $result['_metadata'] );
+
 			// @todo: add support for EmbeddedResource schema.ts:619.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] ) {
 				$response['content'][0]['type'] = 'image';
@@ -144,12 +153,6 @@ class ToolsHandler {
 				$response['content'][0]['text'] = wp_json_encode( $result );
 				$response['structuredContent']  = $result;
 			}
-
-			// Add metadata from result if present, or create basic metadata.
-			$response['_metadata'] = $result['_metadata'] ?? array(
-				'component_type' => 'tool',
-				'tool_name'      => $request_params['name'],
-			);
 
 			return $response;
 		} catch ( \Throwable $exception ) {
