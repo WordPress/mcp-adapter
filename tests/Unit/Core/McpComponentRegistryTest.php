@@ -408,4 +408,49 @@ final class McpComponentRegistryTest extends TestCase {
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
 	}
+
+	// Note: Validation failure tests require complex setup and are covered in integration tests
+
+	public function test_register_resources_skips_non_strings(): void {
+		$this->registry->register_resources( array( 123, null, array(), 'test/resource' ) );
+
+		$resources = $this->registry->get_resources();
+		$this->assertCount( 1, $resources ); // Only the valid string should be processed
+	}
+
+	public function test_register_prompts_skips_non_strings(): void {
+		$this->registry->register_prompts( array( 123, null, array(), 'test/prompt' ) );
+
+		$prompts = $this->registry->get_prompts();
+		$this->assertCount( 1, $prompts ); // Only the valid string should be processed
+	}
+
+	public function test_registry_with_observability_disabled(): void {
+		// Remove the filter to disable observability recording
+		remove_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
+
+		// Create registry
+		$registry_no_observability = new McpComponentRegistry(
+			$this->server,
+			new DummyErrorHandler(),
+			new DummyObservabilityHandler(),
+			false
+		);
+
+		// Clear events from previous tests
+		DummyObservabilityHandler::$events = array();
+
+		// Register a tool
+		$registry_no_observability->register_tools( array( 'test/always-allowed' ) );
+
+		$tools = $registry_no_observability->get_tools();
+		$this->assertCount( 1, $tools );
+
+		// Verify NO observability events were recorded
+		$events = DummyObservabilityHandler::$events;
+		$this->assertEmpty( $events );
+
+		// Re-enable the filter for subsequent tests
+		add_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
+	}
 }

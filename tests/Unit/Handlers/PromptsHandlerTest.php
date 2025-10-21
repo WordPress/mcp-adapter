@@ -44,5 +44,9 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 		$this->assertIsArray( $res );
+		$this->assertArrayHasKey( '_metadata', $res );
 	}
+
+	// Note: Error path testing for prompts is covered by integration tests
+	// and the existing basic error tests above
 }
