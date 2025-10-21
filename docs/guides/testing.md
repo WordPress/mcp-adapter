@@ -87,65 +87,6 @@ The test suite includes fixtures for verifying observability and error handling:
 
 Tests verify that error responses adhere to JSON-RPC 2.0 format: `{ jsonrpc, id, error: { code, message, data? } }`
 
-## What's Tested
-
-The test suite provides comprehensive coverage across handlers, transport, and infrastructure:
-
-### Handler Tests (`tests/Unit/Handlers/`)
-
-**InitializeHandler** - Server initialization and capabilities
-- Protocol version negotiation (2025-06-18)
-- Server info (name, version)
-- Capabilities reporting
-- Instructions delivery
-
-**ToolsHandler** - Tool listing and execution
-- List: JSON-safe field filtering
-- Call: Permission errors, execution exceptions, image/base64 conversion, missing parameters
-
-**ResourcesHandler** - Resource listing and reading
-- List: Registered resources enumeration
-- Read: Missing URI errors, unknown resource errors, successful content retrieval
-
-**PromptsHandler** - Prompt listing and retrieval
-- List: Registered prompts enumeration
-- Get: Missing/unknown prompt errors, successful prompt execution
-
-**SystemHandler** - System-level operations
-- Ping responses
-- Logging level validation
-- Complete and roots list operations
-
-### Transport and Routing Tests
-
-**RequestRouter** (`tests/Unit/Transport/Infrastructure/RequestRouterTest.php`)
-- Route dispatching for all MCP methods (initialize, tools/*, resources/*, prompts/*, ping)
-- Unknown method handling
-- Handler exception handling
-- Cursor compatibility (nextCursor backward compatibility)
-- Observability metrics recording (event tracking with tags and timing)
-
-**HttpTransport** (`tests/Integration/HttpTransportTest.php`) - MCP 2025-06-18 Compliance
-- HTTP methods: POST (requests/notifications/batch), GET (SSE streams), DELETE (session termination), OPTIONS (CORS preflight)
-- JSON-RPC 2.0: Valid/invalid JSON, protocol version validation
-- Session management: Creation on initialize, validation for subsequent requests, expiration handling
-- Protocol version headers
-- Permission callbacks and capability filtering
-- Unsupported method handling
-
-**HttpRequestHandler** (`tests/Unit/Transport/Infrastructure/HttpRequestHandlerTest.php`)
-- Request processing for all HTTP methods
-- Session validation
-- Batch message processing
-- Notification handling
-- Invalid JSON handling
-
-### Error Handling (`tests/Integration/ErrorHandlingIntegrationTest.php`, `tests/Unit/ErrorHandling/`)
-- Consistent JSON-RPC error response format: `{ jsonrpc, id, error: { code, message, data? } }`
-- Error factory creates properly structured errors
-- Error handlers implement interface correctly
-- Error logging integration
-
 ## Writing New Tests
 
 - Place unit tests under `tests/Unit/.../*Test.php`
@@ -224,5 +165,3 @@ The repository has comprehensive CI testing via GitHub Actions (`.github/workflo
 - PHPStan static analysis (Level 8)
 
 All tests run automatically on pull requests and pushes to trunk.
-
-
