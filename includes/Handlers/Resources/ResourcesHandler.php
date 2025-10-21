@@ -130,6 +130,31 @@ class ResourcesHandler {
 
 			$contents = $ability->execute( $request_params );
 
+			// Handle WP_Error objects that weren't converted by the ability.
+			if ( is_wp_error( $contents ) ) {
+				$this->mcp->error_handler->log(
+					'Ability returned WP_Error object',
+					array(
+						'ability'       => $ability->get_name(),
+						'error_code'    => $contents->get_error_code(),
+						'error_message' => $contents->get_error_message(),
+					)
+				);
+
+				return array(
+					'error'     => McpErrorFactory::internal_error( $request_id, $contents->get_error_message() )['error'],
+					'_metadata' => array(
+						'component_type' => 'resource',
+						'resource_uri'   => $uri,
+						'resource_name'  => $resource->get_name(),
+						'ability_name'   => $ability->get_name(),
+						'failure_reason' => 'wp_error',
+						'error_code'     => $contents->get_error_code(),
+					),
+				);
+			}
+
+			// Successful execution - return contents.
 			return array(
 				'contents'  => $contents,
 				'_metadata' => array(

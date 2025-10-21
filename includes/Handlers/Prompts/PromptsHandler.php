@@ -159,7 +159,33 @@ class PromptsHandler {
 				);
 			}
 
-			$result              = $ability->execute( $arguments );
+			$result = $ability->execute( $arguments );
+
+			// Handle WP_Error objects that weren't converted by the ability.
+			if ( is_wp_error( $result ) ) {
+				$this->mcp->error_handler->log(
+					'Ability returned WP_Error object',
+					array(
+						'ability'       => $ability->get_name(),
+						'error_code'    => $result->get_error_code(),
+						'error_message' => $result->get_error_message(),
+					)
+				);
+
+				return array(
+					'error'     => McpErrorFactory::internal_error( $request_id, $result->get_error_message() )['error'],
+					'_metadata' => array(
+						'component_type' => 'prompt',
+						'prompt_name'    => $prompt_name,
+						'ability_name'   => $ability->get_name(),
+						'failure_reason' => 'wp_error',
+						'error_code'     => $result->get_error_code(),
+						'is_builder'     => false,
+					),
+				);
+			}
+
+			// Successful execution - add metadata.
 			$result['_metadata'] = array(
 				'component_type' => 'prompt',
 				'prompt_name'    => $prompt_name,
