@@ -72,15 +72,14 @@ final class DummyAbility {
 				'label'               => 'Always Allowed',
 				'description'         => 'Returns a simple payload',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
 				'output_schema'       => array(),
-				'execute_callback'    => static function ( array $input ) {
+				'execute_callback'    => static function () {
 					return array(
 						'ok'   => true,
-						'echo' => $input,
+						'echo' => array(),
 					);
 				},
-				'permission_callback' => static function ( array $input ) {
+				'permission_callback' => static function () {
 					return true;
 				},
 				'meta'                => array(
@@ -99,11 +98,10 @@ final class DummyAbility {
 				'label'               => 'Permission Denied',
 				'description'         => 'Permission denied ability',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function ( array $input ) {
+				'execute_callback'    => static function () {
 					return array( 'should' => 'not run' );
 				},
-				'permission_callback' => static function ( array $input ) {
+				'permission_callback' => static function () {
 					return false;
 				},
 				'meta'                => array(
