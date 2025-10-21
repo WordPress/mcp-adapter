@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Core\McpServer;
-use WP_Ability;
 
 /**
  * Represents an MCP resource according to the Model Context Protocol specification.

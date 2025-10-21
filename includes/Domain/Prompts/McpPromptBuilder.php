@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
-use WP_Ability;
 
 /**
  * Abstract base class for building MCP prompts.

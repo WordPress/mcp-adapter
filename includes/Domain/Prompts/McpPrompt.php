@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Core\McpServer;
-use WP_Ability;
 
 /**
  * Represents an MCP prompt according to the Model Context Protocol specification.
