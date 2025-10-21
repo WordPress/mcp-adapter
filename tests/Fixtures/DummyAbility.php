@@ -216,7 +216,16 @@ final class DummyAbility {
 				'label'               => 'Prompt',
 				'description'         => 'A sample prompt',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'code' => array(
+							'type'        => 'string',
+							'description' => 'Code to review',
+						),
+					),
+					'required'   => array( 'code' ),
+				),
 				'execute_callback'    => static function ( array $input ) {
 					return array(
 						'messages' => array(
@@ -234,14 +243,7 @@ final class DummyAbility {
 					return true;
 				},
 				'meta'                => array(
-					'arguments' => array(
-						array(
-							'name'        => 'code',
-							'description' => 'Code to review',
-							'required'    => true,
-						),
-					),
-					'mcp'       => array(
+					'mcp' => array(
 						'public' => true, // Expose via MCP for testing
 						'type'   => 'prompt', // Explicitly mark as prompt
 					),
