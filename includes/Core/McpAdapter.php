@@ -253,8 +253,13 @@ final class McpAdapter {
 		}
 
 		// Register category before abilities
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
 		add_action( 'abilities_api_categories_init', array( $this, 'register_default_category' ) );
 		add_action( 'abilities_api_init', array( $this, 'register_default_abilities' ) );
+
+		// WordPress Core 6.9+ uses wp_ prefixed hooks
+		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
+		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
 
 		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
 	}

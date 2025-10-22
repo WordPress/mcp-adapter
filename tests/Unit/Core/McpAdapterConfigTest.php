@@ -60,7 +60,8 @@ final class McpAdapterConfigTest extends TestCase {
 		);
 
 		// Ensure abilities API is initialized first
-		if ( ! did_action( 'abilities_api_init' ) ) {
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
+		if ( ! did_action( 'abilities_api_init' ) && ! did_action( 'wp_abilities_api_init' ) ) {
 		}
 
 		// Reset the initialized flag to allow re-initialization

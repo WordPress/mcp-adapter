@@ -7,14 +7,14 @@ namespace WP\MCP\Tests\Fixtures;
 final class DummyAbility {
 
 	/**
-	 * Registers the 'test' category for dummy abilities.
+	 * Register the 'test' category for dummy abilities.
 	 *
-	 * MUST be called during the 'abilities_api_categories_init' action.
+	 * MUST be called during the 'wp_abilities_api_categories_init' action.
 	 * Does not check if category already exists - if it does, test isolation has failed.
 	 *
 	 * @return void
 	 */
-	public static function register_category(): void {
+	private static function register_category(): void {
 		wp_register_ability_category(
 			'test',
 			array(
@@ -25,41 +25,37 @@ final class DummyAbility {
 	}
 
 	/**
-	 * Registers all dummy abilities for testing.
+	 * Attach dummy ability registration to WordPress hooks.
 	 *
 	 * Sets up action hooks to register category and abilities at the correct times:
-	 * - Category registration during 'abilities_api_categories_init'
-	 * - Abilities registration during 'abilities_api_init'
+	 * - Category registration during 'wp_abilities_api_categories_init'
+	 * - Abilities registration during 'wp_abilities_api_init'
 	 *
-	 * Then fires the hooks if they haven't been fired yet.
-	 * Does not check if abilities already exist - if they do, test isolation has failed.
+	 * This method only attaches callbacks; it does not fire hooks. Hook firing
+	 * is managed by the test framework (see TestCase::set_up_before_class).
 	 *
 	 * @return void
 	 */
 	public static function register_all(): void {
-		// Hook category registration to the proper action
-		add_action( 'abilities_api_categories_init', array( self::class, 'register_category' ) );
+		// Attach category registration to both old and new hook variants
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
+		\WP\MCP\Tests\Helpers\HookHelper::add_actions(
+			array( 'abilities_api_categories_init', 'wp_abilities_api_categories_init' ),
+			array( self::class, 'register_category' )
+		);
 
-		// Fire categories init hook if not already fired
-		if ( ! did_action( 'abilities_api_categories_init' ) ) {
-			do_action( 'abilities_api_categories_init' );
-		}
-
-		// Hook abilities registration to the proper action
-		add_action( 'abilities_api_init', array( self::class, 'register_abilities' ) );
-
-		// Fire abilities init hook if not already fired
-		if ( did_action( 'abilities_api_init' ) ) {
-			return;
-		}
-
-		do_action( 'abilities_api_init' );
+		// Attach abilities registration to both old and new hook variants
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
+		\WP\MCP\Tests\Helpers\HookHelper::add_actions(
+			array( 'abilities_api_init', 'wp_abilities_api_init' ),
+			array( self::class, 'register_abilities' )
+		);
 	}
 
 	/**
 	 * Registers all the dummy abilities.
 	 *
-	 * This method should be called during the 'abilities_api_init' action.
+	 * This method should be called during the 'wp_abilities_api_init' action.
 	 *
 	 * @return void
 	 */
@@ -260,8 +256,16 @@ final class DummyAbility {
 	 */
 	public static function unregister_all(): void {
 		// Remove action hooks to prevent re-registration
-		remove_action( 'abilities_api_categories_init', array( self::class, 'register_category' ) );
-		remove_action( 'abilities_api_init', array( self::class, 'register_abilities' ) );
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
+		\WP\MCP\Tests\Helpers\HookHelper::remove_actions(
+			array( 'abilities_api_categories_init', 'wp_abilities_api_categories_init' ),
+			array( self::class, 'register_category' )
+		);
+
+		\WP\MCP\Tests\Helpers\HookHelper::remove_actions(
+			array( 'abilities_api_init', 'wp_abilities_api_init' ),
+			array( self::class, 'register_abilities' )
+		);
 
 		// Unregister all abilities
 		$names = array(

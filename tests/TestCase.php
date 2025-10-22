@@ -9,9 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests;
 
-use WP\MCP\Abilities\DiscoverAbilitiesAbility;
-use WP\MCP\Abilities\ExecuteAbilityAbility;
-use WP\MCP\Abilities\GetAbilityInfoAbility;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
@@ -38,53 +35,35 @@ abstract class TestCase extends PolyfillsTestCase {
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
 
-		// Register mcp-adapter category during the proper hook
-		add_action(
-			'abilities_api_categories_init',
-			static function () {
-				if ( \WP_Abilities_Category_Registry::get_instance()->is_registered( 'mcp-adapter' ) ) {
-					return;
-				}
+		// Get MCP adapter instance for reusing production registration methods
+		$adapter = \WP\MCP\Core\McpAdapter::instance();
 
-				wp_register_ability_category(
-					'mcp-adapter',
-					array(
-						'label'       => 'MCP Adapter',
-						'description' => 'Abilities for the MCP Adapter',
-					)
-				);
-			}
+		// Attach mcp-adapter category registration (reuses production method)
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
+		Helpers\HookHelper::add_actions(
+			array( 'abilities_api_categories_init', 'wp_abilities_api_categories_init' ),
+			array( $adapter, 'register_default_category' )
 		);
 
-		// Use DummyAbility to register test category
-		add_action( 'abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
+		// Attach test fixtures category and abilities registration
+		DummyAbility::register_all();
 
 		// Ensure categories API is initialized first
-		if ( ! did_action( 'abilities_api_categories_init' ) ) {
-			do_action( 'abilities_api_categories_init' );
+		if ( ! did_action( 'abilities_api_categories_init' ) && ! did_action( 'wp_abilities_api_categories_init' ) ) {
+			do_action( 'wp_abilities_api_categories_init' );
 		}
 
-		// Use DummyAbility to register test abilities
-		add_action( 'abilities_api_init', array( DummyAbility::class, 'register_abilities' ) );
+		// Attach MCP abilities registration (reuses production method)
+		// @todo Remove old hook names when upstream repository is updated to use wp_ prefix
+		Helpers\HookHelper::add_actions(
+			array( 'abilities_api_init', 'wp_abilities_api_init' ),
+			array( $adapter, 'register_default_abilities' )
+		);
 
 		// Ensure abilities API is initialized so MCP abilities can be registered
-		if ( ! did_action( 'abilities_api_init' ) ) {
-			do_action( 'abilities_api_init' );
+		if ( ! did_action( 'abilities_api_init' ) && ! did_action( 'wp_abilities_api_init' ) ) {
+			do_action( 'wp_abilities_api_init' );
 		}
-
-		// Register the default MCP abilities directly for tests
-		// Only register if they don't already exist to prevent duplicates
-		if ( ! wp_get_ability( 'mcp-adapter/discover-abilities' ) ) {
-			DiscoverAbilitiesAbility::register();
-		}
-		if ( ! wp_get_ability( 'mcp-adapter/get-ability-info' ) ) {
-			GetAbilityInfoAbility::register();
-		}
-		if ( wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
-			return;
-		}
-
-		ExecuteAbilityAbility::register();
 	}
 
 	/**
@@ -93,7 +72,7 @@ abstract class TestCase extends PolyfillsTestCase {
 	 * Note: We intentionally do NOT unregister test abilities here.
 	 * Test fixtures from DummyAbility are designed to persist for the entire
 	 * test suite run. This is necessary because WordPress hooks
-	 * (abilities_api_init, abilities_api_categories_init) can only be fired
+	 * (wp_abilities_api_init, wp_abilities_api_categories_init) can only be fired
 	 * once during the test suite execution. Re-registering between test classes
 	 * would fail since the hooks have already been executed.
 	 *
