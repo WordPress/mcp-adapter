@@ -80,11 +80,9 @@ abstract class TestCase extends PolyfillsTestCase {
 		if ( ! wp_get_ability( 'mcp-adapter/get-ability-info' ) ) {
 			GetAbilityInfoAbility::register();
 		}
-		if ( wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
-			return;
+		if ( ! wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
+			ExecuteAbilityAbility::register();
 		}
-
-		ExecuteAbilityAbility::register();
 	}
 
 	/**
