@@ -140,7 +140,11 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayHasKey( 'error', $res );
+		// Per MCP spec: "Any errors that originate from the tool SHOULD be reported inside
+		// the result object, with isError set to true"
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
+		$this->assertArrayHasKey( 'content', $res );
 		$this->assertArrayHasKey( '_metadata', $res );
 		$this->assertEquals( 'permission_check_failed', $res['_metadata']['failure_reason'] );
 		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
@@ -161,7 +165,11 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayHasKey( 'error', $res );
+		// Per MCP spec: "Any errors that originate from the tool SHOULD be reported inside
+		// the result object, with isError set to true"
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
+		$this->assertArrayHasKey( 'content', $res );
 		$this->assertArrayHasKey( '_metadata', $res );
 		$this->assertEquals( 'permission_denied', $res['_metadata']['failure_reason'] );
 	}
