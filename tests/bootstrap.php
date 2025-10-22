@@ -38,9 +38,8 @@ require_once $_test_root . '/includes/functions.php';
 tests_add_filter(
 	'muplugins_loaded',
 	static function (): void {
-		// Load the abilities API, next to the MCP adapter.
-		require_once dirname( __DIR__, 2 ) . '/abilities-api/abilities-api.php';
 		// Load the MCP adapter.
+		// Note: Abilities API is now part of WordPress core (6.9.0+)
 		require_once dirname( __DIR__ ) . '/mcp-adapter.php';
 	}
 );

@@ -14,7 +14,7 @@ final class DummyAbility {
 	 *
 	 * @return void
 	 */
-	private static function register_category(): void {
+	public static function register_category(): void {
 		wp_register_ability_category(
 			'test',
 			array(
