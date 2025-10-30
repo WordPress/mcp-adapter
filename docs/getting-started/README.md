@@ -142,7 +142,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-
 curl "https://yoursite.com/wp-json/"
 
 # Test MCP endpoint (requires authentication)
-curl -X POST "https://yoursite.com/wp-json/mcp-adapter/v1/mcp" \
+curl -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```

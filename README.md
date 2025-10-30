@@ -417,7 +417,7 @@ Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to co
         "@automattic/mcp-wordpress-remote@latest"
       ],
       "env": {
-        "WP_API_URL": "http://your-site.test/wp-json/mcp-adapter/v1/mcp",
+        "WP_API_URL": "http://your-site.test/wp-json/mcp/mcp-adapter-default-server",
         "LOG_FILE": "/path/to/logs/mcp-adapter.log",
         "WP_API_USERNAME": "your-username",
         "WP_API_PASSWORD": "your-application-password"
@@ -461,10 +461,10 @@ add_action('mcp_adapter_init', function($adapter) {
             \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-06-18 compliant
         ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
+        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class // Observability handler
         ['my-plugin/my-ability'],         // Abilities to expose as tools
         [],                              // Resources (optional)
         [],                              // Prompts (optional)
-        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class // Observability handler
     );
 });
 ```
