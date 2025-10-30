@@ -34,10 +34,13 @@ final class ToolsHandlerCallTest extends TestCase {
 				'params' => array( 'name' => 'test-permission-denied' ),
 			)
 		);
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( 'code', $res['error'] );
-		$this->assertArrayHasKey( 'message', $res['error'] );
-		$this->assertStringContainsString( 'Permission denied', $res['error']['message'] );
+		// Permission denied is now returned as isError: true (tool execution error)
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
+		$this->assertArrayHasKey( 'content', $res );
+		$this->assertIsArray( $res['content'] );
+		$this->assertArrayHasKey( 'text', $res['content'][0] );
+		$this->assertStringContainsString( 'Permission denied', $res['content'][0]['text'] );
 	}
 
 	public function test_permission_exception_logs_and_returns_error(): void {
@@ -48,7 +51,9 @@ final class ToolsHandlerCallTest extends TestCase {
 				'params' => array( 'name' => 'test-permission-exception' ),
 			)
 		);
-		$this->assertArrayHasKey( 'error', $res );
+		// Permission check exception is returned as isError: true (tool execution error)
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 

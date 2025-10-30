@@ -285,7 +285,7 @@ The MCP Adapter automatically creates a default server that exposes all register
 - The default server supports both HTTP and STDIO transports with MCP 2025-06-18 compliance
 - Abilities are exposed as tools, resources, or prompts based on their characteristics
 - Built-in error handling and observability are included
-- Access via HTTP: `/wp-json/mcp-adapter/v1/mcp`
+- Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
 - Access via STDIO: `wp mcp-adapter serve --server=mcp-adapter-default-server`
 
 <details>
@@ -293,7 +293,7 @@ The MCP Adapter automatically creates a default server that exposes all register
 
 ```php
 // Simply register a WordPress ability
-add_action( 'abilities_api_init', function() {
+add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/get-posts', [
         'label' => 'Get Posts',
         'description' => 'Retrieve WordPress posts with optional filtering',
@@ -417,7 +417,7 @@ Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to co
         "@automattic/mcp-wordpress-remote@latest"
       ],
       "env": {
-        "WP_API_URL": "http://your-site.test/wp-json/mcp-adapter/v1/mcp",
+        "WP_API_URL": "http://your-site.test/wp-json/mcp/mcp-adapter-default-server",
         "LOG_FILE": "/path/to/logs/mcp-adapter.log",
         "WP_API_USERNAME": "your-username",
         "WP_API_PASSWORD": "your-application-password"
@@ -461,10 +461,10 @@ add_action('mcp_adapter_init', function($adapter) {
             \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-06-18 compliant
         ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
+        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class, // Observability handler
         ['my-plugin/my-ability'],         // Abilities to expose as tools
         [],                              // Resources (optional)
         [],                              // Prompts (optional)
-        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class // Observability handler
     );
 });
 ```

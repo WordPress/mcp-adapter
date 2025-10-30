@@ -40,7 +40,7 @@ abstract class TestCase extends PolyfillsTestCase {
 
 		// Register mcp-adapter category during the proper hook
 		add_action(
-			'abilities_api_categories_init',
+			'wp_abilities_api_categories_init',
 			static function () {
 				if ( \WP_Abilities_Category_Registry::get_instance()->is_registered( 'mcp-adapter' ) ) {
 					return;
@@ -57,19 +57,19 @@ abstract class TestCase extends PolyfillsTestCase {
 		);
 
 		// Use DummyAbility to register test category
-		add_action( 'abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
+		add_action( 'wp_abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
 
 		// Ensure categories API is initialized first
-		if ( ! did_action( 'abilities_api_categories_init' ) ) {
-			do_action( 'abilities_api_categories_init' );
+		if ( ! did_action( 'wp_abilities_api_categories_init' ) ) {
+			do_action( 'wp_abilities_api_categories_init' );
 		}
 
 		// Use DummyAbility to register test abilities
-		add_action( 'abilities_api_init', array( DummyAbility::class, 'register_abilities' ) );
+		add_action( 'wp_abilities_api_init', array( DummyAbility::class, 'register_abilities' ) );
 
 		// Ensure abilities API is initialized so MCP abilities can be registered
-		if ( ! did_action( 'abilities_api_init' ) ) {
-			do_action( 'abilities_api_init' );
+		if ( ! did_action( 'wp_abilities_api_init' ) ) {
+			do_action( 'wp_abilities_api_init' );
 		}
 
 		// Register the default MCP abilities directly for tests
@@ -93,7 +93,7 @@ abstract class TestCase extends PolyfillsTestCase {
 	 * Note: We intentionally do NOT unregister test abilities here.
 	 * Test fixtures from DummyAbility are designed to persist for the entire
 	 * test suite run. This is necessary because WordPress hooks
-	 * (abilities_api_init, abilities_api_categories_init) can only be fired
+	 * (wp_abilities_api_init, wp_abilities_api_categories_init) can only be fired
 	 * once during the test suite execution. Re-registering between test classes
 	 * would fail since the hooks have already been executed.
 	 *

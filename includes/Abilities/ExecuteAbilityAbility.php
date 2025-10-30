@@ -114,7 +114,7 @@ final class ExecuteAbilityAbility {
 		}
 
 		// Check if the user has permission to execute the target ability
-		$parameters        = $input['parameters'] ?? array();
+		$parameters        = empty( $input['parameters'] ) ? null : $input['parameters'];
 		$permission_result = $ability->check_permissions( $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
@@ -160,7 +160,7 @@ final class ExecuteAbilityAbility {
 	 */
 	public static function execute( $input = array() ): array {
 		$ability_name = $input['ability_name'] ?? '';
-		$parameters   = $input['parameters'] ?? array();
+		$parameters   = empty( $input['parameters'] ) ? null : $input['parameters'];
 
 		if ( empty( $ability_name ) ) {
 			return array(

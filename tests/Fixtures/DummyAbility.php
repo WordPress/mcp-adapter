@@ -9,7 +9,7 @@ final class DummyAbility {
 	/**
 	 * Registers the 'test' category for dummy abilities.
 	 *
-	 * MUST be called during the 'abilities_api_categories_init' action.
+	 * MUST be called during the 'wp_abilities_api_categories_init' action.
 	 * Does not check if category already exists - if it does, test isolation has failed.
 	 *
 	 * @return void
@@ -28,8 +28,8 @@ final class DummyAbility {
 	 * Registers all dummy abilities for testing.
 	 *
 	 * Sets up action hooks to register category and abilities at the correct times:
-	 * - Category registration during 'abilities_api_categories_init'
-	 * - Abilities registration during 'abilities_api_init'
+	 * - Category registration during 'wp_abilities_api_categories_init'
+	 * - Abilities registration during 'wp_abilities_api_init'
 	 *
 	 * Then fires the hooks if they haven't been fired yet.
 	 * Does not check if abilities already exist - if they do, test isolation has failed.
@@ -38,28 +38,28 @@ final class DummyAbility {
 	 */
 	public static function register_all(): void {
 		// Hook category registration to the proper action
-		add_action( 'abilities_api_categories_init', array( self::class, 'register_category' ) );
+		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_category' ) );
 
 		// Fire categories init hook if not already fired
-		if ( ! did_action( 'abilities_api_categories_init' ) ) {
-			do_action( 'abilities_api_categories_init' );
+		if ( ! did_action( 'wp_abilities_api_categories_init' ) ) {
+			do_action( 'wp_abilities_api_categories_init' );
 		}
 
 		// Hook abilities registration to the proper action
-		add_action( 'abilities_api_init', array( self::class, 'register_abilities' ) );
+		add_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
 
 		// Fire abilities init hook if not already fired
-		if ( did_action( 'abilities_api_init' ) ) {
+		if ( did_action( 'wp_abilities_api_init' ) ) {
 			return;
 		}
 
-		do_action( 'abilities_api_init' );
+		do_action( 'wp_abilities_api_init' );
 	}
 
 	/**
 	 * Registers all the dummy abilities.
 	 *
-	 * This method should be called during the 'abilities_api_init' action.
+	 * This method should be called during the 'wp_abilities_api_init' action.
 	 *
 	 * @return void
 	 */
@@ -72,15 +72,14 @@ final class DummyAbility {
 				'label'               => 'Always Allowed',
 				'description'         => 'Returns a simple payload',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
 				'output_schema'       => array(),
-				'execute_callback'    => static function ( array $input ) {
+				'execute_callback'    => static function () {
 					return array(
 						'ok'   => true,
-						'echo' => $input,
+						'echo' => array(),
 					);
 				},
-				'permission_callback' => static function ( array $input ) {
+				'permission_callback' => static function () {
 					return true;
 				},
 				'meta'                => array(
@@ -99,11 +98,10 @@ final class DummyAbility {
 				'label'               => 'Permission Denied',
 				'description'         => 'Permission denied ability',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function ( array $input ) {
+				'execute_callback'    => static function () {
 					return array( 'should' => 'not run' );
 				},
-				'permission_callback' => static function ( array $input ) {
+				'permission_callback' => static function () {
 					return false;
 				},
 				'meta'                => array(
@@ -259,8 +257,8 @@ final class DummyAbility {
 	 */
 	public static function unregister_all(): void {
 		// Remove action hooks to prevent re-registration
-		remove_action( 'abilities_api_categories_init', array( self::class, 'register_category' ) );
-		remove_action( 'abilities_api_init', array( self::class, 'register_abilities' ) );
+		remove_action( 'wp_abilities_api_categories_init', array( self::class, 'register_category' ) );
+		remove_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
 
 		// Unregister all abilities
 		$names = array(

@@ -9,7 +9,7 @@ Tools execute actions and return results. Here's a simple post creation tool:
 ```php
 <?php
 // Register the ability
-add_action( 'abilities_api_init', function() {
+add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/create-post', [
         'label' => 'Create Post',
         'description' => 'Creates a new WordPress post with the specified content',
@@ -106,7 +106,7 @@ add_action( 'abilities_api_init', function() {
 });
 ```
 
-The ability is automatically available via the default MCP server at `/wp-json/mcp-adapter/v1/mcp`.
+The ability is automatically available via the default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
 
 ### Testing the Tool
 
@@ -122,7 +122,7 @@ Resources provide access to data. They require a `uri` in the ability meta:
 ```php
 <?php
 // Register the ability as a resource
-add_action( 'abilities_api_init', function() {
+add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/site-config', [
         'label' => 'Site Configuration',
         'description' => 'WordPress site configuration and settings',
@@ -175,7 +175,7 @@ Prompts generate structured messages for language models:
 ```php
 <?php
 // Register the ability as a prompt
-add_action( 'abilities_api_init', function() {
+add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/code-review', [
         'label' => 'Code Review Prompt',
         'description' => 'Generate a code review prompt with specific focus areas',
@@ -244,7 +244,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}' | wp mcp-ada
 
 ### Default Server
 The MCP Adapter automatically creates a default server that exposes all registered abilities:
-- **Endpoint**: `/wp-json/mcp-adapter/v1/mcp`
+- **Endpoint**: `/wp-json/mcp/mcp-adapter-default-server`
 - **Server ID**: `mcp-adapter-default-server`
 - **Automatic Registration**: All abilities become available immediately
 

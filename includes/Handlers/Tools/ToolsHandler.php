@@ -113,15 +113,41 @@ class ToolsHandler {
 			// Implement a tool calling logic here.
 			$result = $this->handle_tool_call( $request_params, $request_id );
 
-			// Check if the result contains a protocol error (tool not found, permission denied, etc.).
+			// Check if the result contains an error.
+			// Distinguish between protocol errors (JSON-RPC format) and tool execution errors (isError format).
 			if ( isset( $result['error'] ) ) {
-				return $result; // Return protocol error directly (already has _metadata).
-			}
+				$failure_reason = $result['_metadata']['failure_reason'] ?? '';
 
-			// Check if the result is a tool execution error (business logic failure).
-			if ( isset( $result['isError'] ) && true === $result['isError'] ) {
-				// Tool execution error - return as successful response with isError: true.
-				return $result; // Already has _metadata.
+				// Protocol errors (keep JSON-RPC error format):
+				// - not_found (tool doesn't exist)
+				// - ability_retrieval_failed (internal error getting ability)
+				$protocol_errors = array( 'not_found', 'ability_retrieval_failed' );
+
+				if ( in_array( $failure_reason, $protocol_errors, true ) ) {
+					// Return as JSON-RPC error
+					return $result;
+				}
+
+				// Tool execution errors (convert to isError: true format):
+				// - permission_denied, permission_check_failed
+				// - wp_error, execution_failed
+				$error_message = $result['error']['message'] ?? 'An error occurred while executing the tool.';
+				$response      = array(
+					'content' => array(
+						array(
+							'type' => 'text',
+							'text' => $error_message,
+						),
+					),
+					'isError' => true,
+				);
+
+				// Preserve metadata if present.
+				if ( isset( $result['_metadata'] ) ) {
+					$response['_metadata'] = $result['_metadata'];
+				}
+
+				return $response;
 			}
 
 			// Successful tool execution - format the response.
@@ -132,6 +158,15 @@ class ToolsHandler {
 					),
 				),
 			);
+
+			// Extract and store metadata before adding result to response content.
+			$response['_metadata'] = $result['_metadata'] ?? array(
+				'component_type' => 'tool',
+				'tool_name'      => $request_params['name'],
+			);
+
+			// Remove metadata from result so it doesn't appear in content or structuredContent.
+			unset( $result['_metadata'] );
 
 			// @todo: add support for EmbeddedResource schema.ts:619.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] ) {
@@ -144,12 +179,6 @@ class ToolsHandler {
 				$response['content'][0]['text'] = wp_json_encode( $result );
 				$response['structuredContent']  = $result;
 			}
-
-			// Add metadata from result if present, or create basic metadata.
-			$response['_metadata'] = $result['_metadata'] ?? array(
-				'component_type' => 'tool',
-				'tool_name'      => $request_params['name'],
-			);
 
 			return $response;
 		} catch ( \Throwable $exception ) {
@@ -317,15 +346,11 @@ class ToolsHandler {
 					)
 				);
 
-				// Return tool execution error (not protocol error) according to MCP spec.
-				// This should be handled as a successful response with isError: true.
+				// Return error for conversion to isError format by call_tool().
 				return array(
-					'isError'   => true,
-					'content'   => array(
-						array(
-							'type' => 'text',
-							'text' => $result->get_error_message(),
-						),
+					'error'     => array(
+						'message' => $result->get_error_message(),
+						'code'    => $result->get_error_code(),
 					),
 					'_metadata' => array(
 						'component_type' => 'tool',
@@ -354,15 +379,10 @@ class ToolsHandler {
 				)
 			);
 
-			// Return tool execution error (not protocol error) according to MCP spec.
-			// This should be handled as a successful response with isError: true.
+			// Return error for conversion to isError format by call_tool().
 			return array(
-				'isError'   => true,
-				'content'   => array(
-					array(
-						'type' => 'text',
-						'text' => $e->getMessage(),
-					),
+				'error'     => array(
+					'message' => $e->getMessage(),
 				),
 				'_metadata' => array(
 					'component_type' => 'tool',

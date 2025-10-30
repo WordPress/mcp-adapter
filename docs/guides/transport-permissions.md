@@ -16,10 +16,10 @@ $adapter->create_server(
     '1.0.0',
     [\WP\MCP\Transport\HttpTransport::class],
     \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
+    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class
     ['my-plugin/tool'], // tools
     [], // resources
     [], // prompts
-    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class
     // No permission callback = uses is_user_logged_in()
 );
 ```
@@ -39,10 +39,10 @@ $adapter->create_server(
     '1.0.0',
     [\WP\MCP\Transport\HttpTransport::class],
     \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
+    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,
     ['my-plugin/admin-tool'], // tools
     [], // resources
     [], // prompts
-    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,
     function(): bool {  // Permission callback
         return current_user_can('manage_options');
     }
@@ -157,10 +157,10 @@ $adapter->create_server(
     '1.0.0',
     [\WP\MCP\Transport\HttpTransport::class],
     \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
+    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,
     ['my-plugin/edit-post', 'my-plugin/delete-post'],
     [], // resources
     [], // prompts
-    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,
     function(): bool {
         // Transport: Allow editors and admins
         return current_user_can('edit_posts');
