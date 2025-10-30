@@ -189,11 +189,10 @@ final class DummyAbility {
 				'label'               => 'Resource',
 				'description'         => 'A text resource',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function ( array $input ) {
+				'execute_callback'    => static function () {
 					return 'content';
 				},
-				'permission_callback' => static function ( array $input ) {
+				'permission_callback' => static function () {
 					return true;
 				},
 				'meta'                => array(
