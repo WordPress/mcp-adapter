@@ -73,8 +73,9 @@ final class McpPromptBuilderTest extends TestCase {
 		$this->assertTrue( $prompt->is_builder_based() );
 
 		// Verify abilities are bypassed (get_ability returns WP_Error)
-		$this->assertWPError( $prompt->get_ability() );
-		$this->assertEquals( 'builder_has_no_ability', $prompt->get_ability()->get_error_code() );
+		$ability = $prompt->get_ability();
+		$this->assertWPError( $ability );
+		$this->assertEquals( 'builder_has_no_ability', $ability->get_error_code() );
 
 		// Test direct permission checking
 		$this->assertTrue( $prompt->check_permission_direct( array() ) );

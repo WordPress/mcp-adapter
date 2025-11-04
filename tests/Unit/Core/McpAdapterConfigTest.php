@@ -14,8 +14,8 @@ final class McpAdapterConfigTest extends TestCase {
 
 	private McpAdapter $adapter;
 
-	public function setUp(): void {
-		parent::setUp();
+	public function set_up(): void {
+		parent::set_up();
 		$this->adapter = McpAdapter::instance();
 
 		// Clear any existing servers to ensure clean state
@@ -25,8 +25,8 @@ final class McpAdapterConfigTest extends TestCase {
 		$servers_property->setValue( $this->adapter, array() );
 	}
 
-	public function tearDown(): void {
-		parent::tearDown();
+	public function tear_down(): void {
+		parent::tear_down();
 
 		// Clean up filters first
 		remove_all_filters( 'mcp_adapter_default_server_config' );
@@ -291,5 +291,33 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertNotNull( $server );
 		$this->assertSame( 'Second Modified Name', $server->get_server_name() );
 		$this->assertSame( 'v3.0.0', $server->get_server_version() );
+	}
+
+	public function test_default_server_factory_handles_wp_error_from_create_server(): void {
+		// Configure default server with invalid error handler to force WP_Error
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) {
+				$defaults['error_handler'] = 'NonExistentErrorHandlerClass';
+				return $defaults;
+			}
+		);
+
+		// Mock being inside mcp_adapter_init so create_server() allows the call
+		global $wp_current_filter;
+		$wp_current_filter[] = 'mcp_adapter_init';
+
+		// Call DefaultServerFactory::create() directly to test error handling
+		\WP\MCP\Servers\DefaultServerFactory::create();
+
+		// Clean up the filter mock
+		array_pop( $wp_current_filter );
+
+		// Verify _doing_it_wrong was called by DefaultServerFactory
+		$this->assertDoingItWrongTriggered( 'WP\MCP\Servers\DefaultServerFactory::create' );
+
+		// Verify server was not created due to error
+		$server = $this->adapter->get_server( 'mcp-adapter-default-server' );
+		$this->assertNull( $server, 'Server should not be created when create_server returns WP_Error' );
 	}
 }

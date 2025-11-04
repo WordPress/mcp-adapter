@@ -106,12 +106,25 @@ abstract class TestCase extends PolyfillsTestCase {
 	}
 
 	/**
+	 * Set up before each test.
+	 *
+	 * Sets up `_doing_it_wrong` capturing for all tests.
+	 */
+	public function set_up(): void {
+		parent::set_up();
+		$this->doing_it_wrong_log = array();
+		add_action( 'doing_it_wrong_run', array( $this, 'record_doing_it_wrong' ), 10, 3 );
+	}
+
+	/**
 	 * Clean up after each test.
 	 *
 	 * This method resets the state of test handlers to ensure test isolation.
 	 * Automatically resets DummyErrorHandler and DummyObservabilityHandler between tests.
 	 */
 	public function tear_down(): void {
+		remove_action( 'doing_it_wrong_run', array( $this, 'record_doing_it_wrong' ) );
+		$this->doing_it_wrong_log = array();
 		DummyErrorHandler::reset();
 		DummyObservabilityHandler::reset();
 		parent::tear_down();
@@ -166,5 +179,61 @@ abstract class TestCase extends PolyfillsTestCase {
 	 */
 	public function assertNotWPError( $actual, string $message = '' ): void {
 		$this->assertNotInstanceOf( \WP_Error::class, $actual, $message );
+	}
+
+	/**
+	 * Captured `_doing_it_wrong` calls during a test.
+	 *
+	 * @var array<int,array{function:string,message:string,version:string}>
+	 */
+	protected $doing_it_wrong_log = array();
+
+	/**
+	 * Records `_doing_it_wrong` calls for later assertions.
+	 *
+	 * @param string $the_method Function name flagged by `_doing_it_wrong`.
+	 * @param string $message    Message supplied to `_doing_it_wrong`.
+	 * @param string $version    Version string supplied to `_doing_it_wrong`.
+	 *
+	 * @return void
+	 */
+	public function record_doing_it_wrong( string $the_method, string $message, string $version ): void {
+		$this->doing_it_wrong_log[] = array(
+			'function' => $the_method,
+			'message'  => $message,
+			'version'  => $version,
+		);
+	}
+
+	/**
+	 * Asserts that `_doing_it_wrong` was triggered for the expected function.
+	 *
+	 * @param string      $the_method         Function name expected to trigger `_doing_it_wrong`.
+	 * @param string|null $message_contains Optional. String that should be contained in the error message.
+	 *
+	 * @return void
+	 */
+	protected function assertDoingItWrongTriggered( string $the_method, ?string $message_contains = null ): void {
+		foreach ( $this->doing_it_wrong_log as $entry ) {
+			if ( $the_method === $entry['function'] ) {
+				// If message check is specified, verify it contains the expected text.
+				if ( null !== $message_contains && false === strpos( $entry['message'], $message_contains ) ) {
+					continue;
+				}
+				return;
+			}
+		}
+
+		if ( null !== $message_contains ) {
+			$this->fail(
+				sprintf(
+					'Failed asserting that _doing_it_wrong() was triggered for %s with message containing "%s".',
+					$the_method,
+					$message_contains
+				)
+			);
+		} else {
+			$this->fail( sprintf( 'Failed asserting that _doing_it_wrong() was triggered for %s.', $the_method ) );
+		}
 	}
 }
