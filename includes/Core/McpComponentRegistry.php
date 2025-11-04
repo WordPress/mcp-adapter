@@ -328,8 +328,26 @@ class McpComponentRegistry {
 			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
 				// Create instance of the prompt builder class
 				/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
-				$builder = new $prompt_item();
-				$prompt  = $builder->build();
+				try {
+					$builder = new $prompt_item();
+					$prompt  = $builder->build();
+				} catch ( \Exception $e ) {
+					$this->error_handler->log( "Failed to build prompt from class '{$prompt_item}': {$e->getMessage()}", array( "McpPromptBuilder::{$prompt_item}" ) );
+					
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'failed',
+								'component_type' => 'prompt',
+								'component_name' => $prompt_item,
+								'failure_reason' => 'builder_exception',
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
+					continue;
+				}
 
 				// Set the MCP server after building
 				$prompt->set_mcp_server( $this->mcp_server );
