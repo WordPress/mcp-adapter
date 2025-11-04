@@ -116,7 +116,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			 *
 			 * @return \WP_Error Always returns an error as builder-based prompts don't have abilities.
 			 */
-			public function get_ability() {
+			public function get_ability(): \WP_Error {
 				// This should not be called for builder-based prompts
 				return new \WP_Error(
 					'builder_has_no_ability',
