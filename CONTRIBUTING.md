@@ -96,15 +96,7 @@ PHPUnit tests can be run using the following command:
 npm run test:php
 ```
 
-To generate a code coverage report, make sure to start the testing environment with coverage mode enabled:
-
-```bash
-npm run env start -- --xdebug=coverage
-
-npm run test:php
-```
-
-You should see the html coverage report in the `tests/_output/html` directory and the clover XML report in `tests/_output/php-coverage.xml`.
+For detailed testing instructions including running specific tests, generating coverage reports, and troubleshooting, see the **[Testing Guide](docs/guides/testing.md)**.
 
 ### Building the plugin for distribution
 

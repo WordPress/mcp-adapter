@@ -13,16 +13,31 @@ use WP_Ability;
 /**
  * Converts WordPress abilities to MCP prompts according to the specification.
  *
- * This class extracts prompt data and arguments from ability metadata.
- * The ability meta can contain prompt-specific information like arguments.
+ * This class extracts prompt data from ability properties and converts the JSON Schema
+ * input_schema to MCP prompt arguments format.
  *
- * Example ability meta structure:
- * array(
- *     'arguments' => array(
- *         array('name' => 'code', 'description' => 'Code to review', 'required' => true)
- *     ),
- *     'annotations' => array(...)
- * )
+ * The ability must have an input_schema defined using JSON Schema format, which will
+ * be automatically converted to MCP prompt arguments.
+ *
+ * Example ability registration:
+ * wp_register_ability(
+ *     'prompts/code-review',
+ *     array(
+ *         'label' => 'Code Review Prompt',
+ *         'description' => 'Generate code review prompt',
+ *         'input_schema' => array(
+ *             'type' => 'object',
+ *             'properties' => array(
+ *                 'code' => array('type' => 'string', 'description' => 'Code to review'),
+ *             ),
+ *             'required' => array('code'),
+ *         ),
+ *         'meta' => array(
+ *             'mcp' => array('public' => true, 'type' => 'prompt'),
+ *             'annotations' => array(...)
+ *         )
+ *     )
+ * );
  */
 class RegisterAbilityAsMcpPrompt {
 	/**
@@ -87,18 +102,82 @@ class RegisterAbilityAsMcpPrompt {
 			$prompt_data['description'] = $description;
 		}
 
-		// Get arguments from ability meta
-		$ability_meta = $this->ability->get_meta();
-		if ( ! empty( $ability_meta['arguments'] ) && is_array( $ability_meta['arguments'] ) ) {
-			$prompt_data['arguments'] = $ability_meta['arguments'];
+		// Convert input_schema to MCP prompt arguments format
+		// MCP expects: [{"name": "x", "description": "...", "required": true}, ...]
+		// Abilities use JSON Schema: {"type": "object", "properties": {...}, "required": [...]}
+		$input_schema = $this->ability->get_input_schema();
+		if ( ! empty( $input_schema ) ) {
+			$arguments = $this->convert_input_schema_to_arguments( $input_schema );
+			if ( ! empty( $arguments ) ) {
+				$prompt_data['arguments'] = $arguments;
+			}
 		}
 
 		// Get annotations from ability meta
+		$ability_meta = $this->ability->get_meta();
 		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
 			$prompt_data['annotations'] = $ability_meta['annotations'];
 		}
 
 		return $prompt_data;
+	}
+
+	/**
+	 * Convert JSON Schema input_schema to MCP prompt arguments format.
+	 *
+	 * Converts from WordPress Abilities JSON Schema format:
+	 * {
+	 *   "type": "object",
+	 *   "properties": {
+	 *     "topic": {"type": "string", "description": "..."},
+	 *     "tone": {"type": "string", "description": "..."}
+	 *   },
+	 *   "required": ["topic"]
+	 * }
+	 *
+	 * To MCP prompt arguments format:
+	 * [
+	 *   {"name": "topic", "description": "...", "required": true},
+	 *   {"name": "tone", "description": "...", "required": false}
+	 * ]
+	 *
+	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
+	 * @return array<int,array<string,mixed>> MCP-formatted arguments array.
+	 */
+	private function convert_input_schema_to_arguments( array $input_schema ): array {
+		$arguments = array();
+
+		// Ensure we have properties to convert
+		if ( empty( $input_schema['properties'] ) || ! is_array( $input_schema['properties'] ) ) {
+			return $arguments;
+		}
+
+		// Get the list of required properties
+		$required_fields = array();
+		if ( isset( $input_schema['required'] ) && is_array( $input_schema['required'] ) ) {
+			$required_fields = $input_schema['required'];
+		}
+
+		// Convert each property to an MCP argument
+		foreach ( $input_schema['properties'] as $property_name => $property_schema ) {
+			if ( ! is_array( $property_schema ) ) {
+				continue;
+			}
+
+			$argument = array(
+				'name'     => $property_name,
+				'required' => in_array( $property_name, $required_fields, true ),
+			);
+
+			// Add description if available
+			if ( ! empty( $property_schema['description'] ) ) {
+				$argument['description'] = $property_schema['description'];
+			}
+
+			$arguments[] = $argument;
+		}
+
+		return $arguments;
 	}
 
 	/**

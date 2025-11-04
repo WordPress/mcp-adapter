@@ -133,7 +133,6 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'label'               => 'WP Error Permission Test',
 				'description'         => 'Returns WP_Error for permission',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function () {
 					return array( 'test' => 'result' ); },
 				'permission_callback' => static function () {
@@ -269,7 +268,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$result = ExecuteAbilityAbility::execute(
 			array(
 				'ability_name' => 'test/always-allowed',
-				'parameters'   => array( 'test_param' => 'test_value' ),
+				'parameters'   => array(),
 			)
 		);
 
@@ -282,7 +281,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'ok', $data );
 		$this->assertArrayHasKey( 'echo', $data );
 		$this->assertTrue( $data['ok'] );
-		$this->assertEquals( array( 'test_param' => 'test_value' ), $data['echo'] );
+		$this->assertEquals( array(), $data['echo'] );
 	}
 
 	public function test_execute_with_missing_ability_name(): void {
@@ -338,7 +337,6 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'label'               => 'WP Error Execution Test',
 				'description'         => 'Returns WP_Error for execution',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function () {
 					return new \WP_Error( 'execution_failed', 'Custom execution error' );
 				},
@@ -377,7 +375,6 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'label'               => 'Exception Execution Test',
 				'description'         => 'Throws exception for execution',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function () {
 					throw new \RuntimeException( 'Test execution exception' );
 				},

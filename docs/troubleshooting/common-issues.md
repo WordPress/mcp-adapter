@@ -172,7 +172,7 @@ add_action( 'rest_api_init', function() {
 ### 401 Unauthorized
 ```bash
 # Test with authentication
-curl -X POST "https://yoursite.com/wp-json/mcp-adapter/v1/mcp" \
+curl -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
   --user "username:application_password" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

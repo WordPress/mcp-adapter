@@ -37,7 +37,7 @@ Create a WordPress ability that will be exposed via MCP:
 
 ```php
 // Register a simple ability to get site information
-add_action( 'abilities_api_init', function() {
+add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/get-site-info', [
         'label' => 'Get Site Information',
         'description' => 'Retrieves basic information about the current WordPress site',
@@ -142,7 +142,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-
 curl "https://yoursite.com/wp-json/"
 
 # Test MCP endpoint (requires authentication)
-curl -X POST "https://yoursite.com/wp-json/mcp-adapter/v1/mcp" \
+curl -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
@@ -179,7 +179,7 @@ curl -X POST "https://yoursite.com/wp-json/mcp-adapter/v1/mcp" \
 - Check WordPress user authentication
 
 **Tool not appearing?**
-- Confirm ability is registered during `abilities_api_init`
+- Confirm ability is registered during `wp_abilities_api_init`
 - Verify ability name matches exactly in server configuration
 - Check permission callback allows current user
 

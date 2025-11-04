@@ -158,6 +158,12 @@ class PromptsHandler {
 				);
 			}
 
+			// If ability has no input schema and arguments is empty, pass null
+			// This is required by WP_Ability::validate_input() which expects null when no schema
+			$ability_input_schema = $ability->get_input_schema();
+			if ( empty( $ability_input_schema ) && empty( $arguments ) ) {
+				$arguments = null;
+			}
 			$has_permission = $ability->check_permissions( $arguments );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message and code if WP_Error was returned

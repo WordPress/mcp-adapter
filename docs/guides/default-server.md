@@ -352,7 +352,7 @@ The default server uses structured error handling:
 ### No Abilities Returned
 - Check that abilities have `mcp.public=true` in their metadata
 - Verify user is authenticated and has required capabilities
-- Ensure abilities are properly registered during `abilities_api_init`
+- Ensure abilities are properly registered during `wp_abilities_api_init`
 
 ### Permission Denied Errors
 - Verify user authentication (logged in)
@@ -362,7 +362,7 @@ The default server uses structured error handling:
 ### Ability Not Found
 - Ensure ability is registered before MCP server initialization
 - Check ability name spelling and format
-- Verify ability registration happens during `abilities_api_init` action
+- Verify ability registration happens during `wp_abilities_api_init` action
 
 ## Next Steps
 

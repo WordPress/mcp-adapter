@@ -252,19 +252,54 @@ wp_register_ability('my-plugin/site-config', [
 
 ## Creating Prompts
 
-Prompts generate structured messages for language models and support two types of annotations. They should set `type: 'prompt'` in the MCP configuration:
+Prompts generate structured messages for language models. They use `input_schema` to define parameters, which are automatically converted to MCP prompt arguments format. Prompts should set `type: 'prompt'` in the MCP configuration.
 
-### 1. Template-Level Annotations
-Describe the prompt template's behavior characteristics:
+### Input Schema for Prompts
+
+Prompts use standard JSON Schema `input_schema` to define their parameters. The MCP Adapter automatically converts this to the MCP prompt `arguments` format:
+
+```php
+// Your definition (JSON Schema):
+'input_schema' => [
+    'type' => 'object',
+    'properties' => [
+        'code' => ['type' => 'string', 'description' => 'Code to review']
+    ],
+    'required' => ['code']
+]
+
+// Automatically converted to MCP format:
+'arguments' => [
+    ['name' => 'code', 'description' => 'Code to review', 'required' => true]
+]
+```
+
+### Complete Prompt Example
 
 ```php
 wp_register_ability('my-plugin/code-review', [
     'label' => 'Code Review Prompt',
     'description' => 'Generate a code review prompt with specific focus areas',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'code' => [
+                'type' => 'string',
+                'description' => 'Code to review'
+            ],
+            'focus' => [
+                'type' => 'array',
+                'description' => 'Areas to focus on during review',
+                'items' => ['type' => 'string'],
+                'default' => ['security', 'performance']
+            ]
+        ],
+        'required' => ['code']
+    ],
     'execute_callback' => function($input) {
-        $code = $input['code'] ?? '';
+        $code = $input['code'];
         $focus = $input['focus'] ?? ['security', 'performance'];
-        
+
         return [
             'messages' => [
                 [
@@ -281,18 +316,6 @@ wp_register_ability('my-plugin/code-review', [
         return current_user_can('edit_posts');
     },
     'meta' => [
-        'arguments' => [
-            [
-                'name' => 'code',
-                'description' => 'Code to review',
-                'required' => true
-            ],
-            [
-                'name' => 'focus',
-                'description' => 'Areas to focus on during review',
-                'required' => false
-            ]
-        ],
         'annotations' => [
             'readOnlyHint' => true,      // Template doesn't modify data
             'idempotentHint' => true     // Consistent prompt generation
@@ -305,16 +328,27 @@ wp_register_ability('my-plugin/code-review', [
 ]);
 ```
 
-### 2. Message Content Annotations (MCP Specification)
-Annotate the generated message content according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts#promptmessage):
+### Message Content Annotations (MCP Specification)
+
+You can also annotate the generated message content according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts#promptmessage):
 
 ```php
 wp_register_ability('my-plugin/analysis-prompt', [
     'label' => 'Analysis Prompt',
     'description' => 'Generate analysis prompts with content annotations',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'data' => [
+                'type' => 'string',
+                'description' => 'Data to analyze'
+            ]
+        ],
+        'required' => ['data']
+    ],
     'execute_callback' => function($input) {
         $data = $input['data'] ?? '';
-        
+
         return [
             'messages' => [
                 [
@@ -343,13 +377,10 @@ wp_register_ability('my-plugin/analysis-prompt', [
             ]
         ];
     },
-    'permission_callback' => function() {
+    'permission_callback' => function($input) {
         return current_user_can('read');
     },
     'meta' => [
-        'arguments' => [
-            ['name' => 'data', 'description' => 'Data to analyze', 'required' => true]
-        ],
         'annotations' => [
             'readOnlyHint' => true,
             'openWorldHint' => true              // Can handle any data type
@@ -362,12 +393,24 @@ wp_register_ability('my-plugin/analysis-prompt', [
 ]);
 ```
 
-### Content Annotation Types
+### Prompt Annotations Summary
 
-According to the MCP specification, message content supports these annotations:
-- `audience` (array): Intended audience (`["user", "assistant"]`)
-- `priority` (float): Content importance (0.0 to 1.0)
-- `lastModified` (string): ISO 8601 timestamp
+**Template-Level Annotations** (in `meta.annotations`):
+- Apply to the prompt template itself
+- Describe the prompt's behavior characteristics
+- Support all standard MCP annotations (readOnlyHint, idempotentHint, etc.)
+
+**Message Content Annotations** (in message `content.annotations`):
+- Apply to individual messages within the prompt
+- Provide metadata for specific message content
+- Support: `audience`, `priority`, `lastModified`
+
+### Key Points for Prompts
+
+1. **Use `input_schema`** instead of `meta.arguments` - it provides validation and is automatically converted to MCP format
+2. **Callbacks receive validated input** - the Abilities API validates against your schema
+3. **Return MCP message format** - prompts must return `{ messages: [...] }` structure
+4. **Set `type: 'prompt'`** in `meta.mcp` for proper auto-discovery
 
 ## Permission and Security
 
