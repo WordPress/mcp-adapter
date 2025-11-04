@@ -11,6 +11,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 
 	public function test_make_builds_prompt_from_ability(): void {
 		$ability = wp_get_ability( 'test/prompt' );
+		$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
 		$prompt  = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
 		$arr     = $prompt->to_array();
 		$this->assertSame( 'test-prompt', $arr['name'] );

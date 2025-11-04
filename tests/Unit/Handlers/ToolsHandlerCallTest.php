@@ -84,6 +84,10 @@ final class ToolsHandlerCallTest extends TestCase {
 				'params' => array( 'name' => 'test-image' ),
 			)
 		);
+		$this->assertArrayHasKey( 'content', $res, 'Response should have content key' );
+		$this->assertIsArray( $res['content'], 'Content should be an array' );
+		$this->assertNotEmpty( $res['content'], 'Content array should not be empty' );
+		$this->assertArrayHasKey( 0, $res['content'], 'Content should have at least one element' );
 		$this->assertSame( 'image', $res['content'][0]['type'] );
 		$this->assertArrayHasKey( 'data', $res['content'][0] );
 		$this->assertArrayHasKey( 'mimeType', $res['content'][0] );

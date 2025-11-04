@@ -42,7 +42,8 @@ abstract class TestCase extends PolyfillsTestCase {
 		add_action(
 			'wp_abilities_api_categories_init',
 			static function () {
-				if ( \WP_Abilities_Category_Registry::get_instance()->is_registered( 'mcp-adapter' ) ) {
+				$categories_registry = \WP_Ability_Categories_Registry::get_instance();
+				if ( $categories_registry->is_registered( 'mcp-adapter' ) ) {
 					return;
 				}
 
