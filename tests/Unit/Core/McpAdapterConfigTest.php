@@ -59,9 +59,7 @@ final class McpAdapterConfigTest extends TestCase {
 			}
 		);
 
-		// Ensure abilities API is initialized first
-		if ( ! did_action( 'wp_abilities_api_init' ) ) {
-		}
+		// Ensure abilities API is initialized first (already done in TestCase::set_up_before_class)
 
 		// Reset the initialized flag to allow re-initialization
 		$reflection           = new \ReflectionClass( $this->adapter );

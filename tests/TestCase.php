@@ -68,21 +68,26 @@ abstract class TestCase extends PolyfillsTestCase {
 		// Use DummyAbility to register test abilities
 		add_action( 'wp_abilities_api_init', array( DummyAbility::class, 'register_abilities' ) );
 
+		// Register the default MCP abilities inside the hook
+		add_action(
+			'wp_abilities_api_init',
+			static function () {
+				// Only register if they don't already exist to prevent duplicates
+				if ( ! wp_get_ability( 'mcp-adapter/discover-abilities' ) ) {
+					DiscoverAbilitiesAbility::register();
+				}
+				if ( ! wp_get_ability( 'mcp-adapter/get-ability-info' ) ) {
+					GetAbilityInfoAbility::register();
+				}
+				if ( ! wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
+					ExecuteAbilityAbility::register();
+				}
+			}
+		);
+
 		// Ensure abilities API is initialized so MCP abilities can be registered
 		if ( ! did_action( 'wp_abilities_api_init' ) ) {
 			do_action( 'wp_abilities_api_init' );
-		}
-
-		// Register the default MCP abilities directly for tests
-		// Only register if they don't already exist to prevent duplicates
-		if ( ! wp_get_ability( 'mcp-adapter/discover-abilities' ) ) {
-			DiscoverAbilitiesAbility::register();
-		}
-		if ( ! wp_get_ability( 'mcp-adapter/get-ability-info' ) ) {
-			GetAbilityInfoAbility::register();
-		}
-		if ( ! wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
-			ExecuteAbilityAbility::register();
 		}
 	}
 
@@ -203,6 +208,39 @@ abstract class TestCase extends PolyfillsTestCase {
 			'message'  => $message,
 			'version'  => $version,
 		);
+	}
+
+	/**
+	 * Registers an ability inside the wp_abilities_api_init hook.
+	 *
+	 * This helper ensures abilities are registered during the hook execution,
+	 * as required by WordPress abilities API which uses doing_action() checks.
+	 *
+	 * @param string               $name The ability name.
+	 * @param array<string, mixed> $args The ability arguments.
+	 *
+	 * @return void
+	 */
+	protected function register_ability_in_hook( string $name, array $args ): void {
+		// If we're already inside the hook, register directly
+		if ( doing_action( 'wp_abilities_api_init' ) ) {
+			wp_register_ability( $name, $args );
+			return;
+		}
+
+		// Create a callback that registers the ability
+		$callback = function () use ( $name, $args ) {
+			wp_register_ability( $name, $args );
+		};
+
+		// Add the hook
+		add_action( 'wp_abilities_api_init', $callback, 999 );
+
+		// Fire the hook to execute our callback
+		do_action( 'wp_abilities_api_init' );
+
+		// Clean up the hook to prevent duplicate registrations if hook fires again
+		remove_action( 'wp_abilities_api_init', $callback, 999 );
 	}
 
 	/**
