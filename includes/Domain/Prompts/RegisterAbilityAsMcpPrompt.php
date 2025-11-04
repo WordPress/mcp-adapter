@@ -102,9 +102,6 @@ class RegisterAbilityAsMcpPrompt {
 			$prompt_data['description'] = $description;
 		}
 
-		// Convert input_schema to MCP prompt arguments format
-		// MCP expects: [{"name": "x", "description": "...", "required": true}, ...]
-		// Abilities use JSON Schema: {"type": "object", "properties": {...}, "required": [...]}
 		$input_schema = $this->ability->get_input_schema();
 		if ( ! empty( $input_schema ) ) {
 			$arguments = $this->convert_input_schema_to_arguments( $input_schema );
