@@ -327,13 +327,13 @@ class McpComponentRegistry {
 			// Check if it's a class that implements McpPromptBuilderInterface
 			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
 				// Create instance of the prompt builder class
-				/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
 				try {
+					/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
 					$builder = new $prompt_item();
 					$prompt  = $builder->build();
-				} catch ( \Exception $e ) {
+				} catch ( \Throwable $e ) {
 					$this->error_handler->log( "Failed to build prompt from class '{$prompt_item}': {$e->getMessage()}", array( "McpPromptBuilder::{$prompt_item}" ) );
-					
+
 					if ( $this->should_record_component_registration ) {
 						$this->observability_handler->record_event(
 							'mcp.component.registration',
