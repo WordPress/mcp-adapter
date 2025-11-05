@@ -229,17 +229,16 @@ abstract class TestCase extends PolyfillsTestCase {
 		}
 
 		// Create a callback that registers the ability
-		$callback = function () use ( $name, $args ) {
+		$callback = static function () use ( $name, $args ) {
 			wp_register_ability( $name, $args );
 		};
 
-		// Add the hook
+		// Add the callback to the hook
 		add_action( 'wp_abilities_api_init', $callback, 999 );
 
-		// Fire the hook to execute our callback
 		do_action( 'wp_abilities_api_init' );
 
-		// Clean up the hook to prevent duplicate registrations if hook fires again
+		// Clean up the callback to prevent duplicate registrations if hook fires again
 		remove_action( 'wp_abilities_api_init', $callback, 999 );
 	}
 

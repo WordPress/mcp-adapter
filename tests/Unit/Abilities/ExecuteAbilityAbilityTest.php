@@ -127,7 +127,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_check_permission_with_wp_error_result(): void {
 		// Create a mock ability that returns WP_Error for permission check
-		wp_register_ability(
+		$this->register_ability_in_hook(
 			'test/wp-error-permission',
 			array(
 				'label'               => 'WP Error Permission Test',
@@ -223,7 +223,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertTrue( $result );
 
 		// Create a test ability without mcp.public metadata (should be blocked)
-		wp_register_ability(
+		$this->register_ability_in_hook(
 			'test/not-public-mcp',
 			array(
 				'label'               => 'Not Public MCP Test',
@@ -331,7 +331,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_execute_with_ability_returning_wp_error(): void {
 		// Create a mock ability that returns WP_Error
-		wp_register_ability(
+		$this->register_ability_in_hook(
 			'test/wp-error-execution',
 			array(
 				'label'               => 'WP Error Execution Test',
@@ -369,7 +369,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_execute_with_ability_throwing_exception(): void {
 		// Create a mock ability that throws exception
-		wp_register_ability(
+		$this->register_ability_in_hook(
 			'test/exception-execution',
 			array(
 				'label'               => 'Exception Execution Test',

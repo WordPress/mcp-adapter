@@ -95,7 +95,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 		$this->assertTrue( $result );
 
 		// Create a test ability without mcp.public metadata (should be blocked)
-		wp_register_ability(
+		$this->register_ability_in_hook(
 			'test/not-public-info',
 			array(
 				'label'               => 'Not Public Info Test',
