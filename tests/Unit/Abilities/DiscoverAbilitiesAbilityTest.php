@@ -100,7 +100,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertContains( 'test/permission-denied', $result );
 
 		// Create an ability without mcp.public and verify it's not included
-		wp_register_ability(
+		$this->register_ability_in_hook(
 			'test/not-public',
 			array(
 				'label'               => 'Not Public Test',

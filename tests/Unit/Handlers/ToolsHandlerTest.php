@@ -77,8 +77,138 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertEquals( 'not_found', $res['_metadata']['failure_reason'] );
 	}
 
+	public function test_call_tool_with_wp_error_from_get_ability(): void {
+		wp_set_current_user( 1 );
+
+		// Create a tool with a non-existent ability name
+		$server = $this->makeServer( array(), array(), array() );
+		$tool   = new \WP\MCP\Domain\Tools\McpTool(
+			'nonexistent/ability',
+			'test-nonexistent-tool',
+			'Test Tool',
+			array( 'type' => 'object' )
+		);
+		$tool->set_mcp_server( $server );
+		$server->get_component_registry()->add_tool( $tool );
+
+		$handler = new ToolsHandler( $server );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-nonexistent-tool',
+				),
+			)
+		);
+
+		// Should return JSON-RPC error (protocol error)
+		$this->assertArrayHasKey( 'error', $res );
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertEquals( 'ability_retrieval_failed', $res['_metadata']['failure_reason'] );
+		$this->assertArrayHasKey( 'error_code', $res['_metadata'] );
+		$this->assertEquals( 'ability_not_found', $res['_metadata']['error_code'] );
+	}
+
+	public function test_call_tool_with_wp_error_from_execute(): void {
+		wp_set_current_user( 1 );
+
+		// Register an ability that returns WP_Error
+		$this->register_ability_in_hook(
+			'test/wp-error-execute',
+			array(
+				'label'               => 'WP Error Execute',
+				'description'         => 'Returns WP_Error from execute',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return new \WP_Error( 'test_error', 'Test error message' );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array( 'test/wp-error-execute' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-wp-error-execute',
+				),
+			)
+		);
+
+		// Should return isError format (tool execution error)
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
+		$this->assertArrayHasKey( 'content', $res );
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertEquals( 'wp_error', $res['_metadata']['failure_reason'] );
+		$this->assertEquals( 'test_error', $res['_metadata']['error_code'] );
+
+		// Clean up
+		wp_unregister_ability( 'test/wp-error-execute' );
+	}
+
+	public function test_call_tool_with_exception_in_handler(): void {
+		wp_set_current_user( 1 );
+
+		// Register an ability that throws exception during permission check
+		$this->register_ability_in_hook(
+			'test/permission-exception-in-call',
+			array(
+				'label'               => 'Permission Exception',
+				'description'         => 'Throws exception in permission',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'result' => 'success' );
+				},
+				'permission_callback' => static function () {
+					throw new \RuntimeException( 'Permission check exception' );
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array( 'test/permission-exception-in-call' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-permission-exception-in-call',
+				),
+			)
+		);
+
+		// Should return isError format (tool execution error)
+		$this->assertArrayHasKey( 'isError', $res );
+		$this->assertTrue( $res['isError'] );
+		$this->assertArrayHasKey( 'content', $res );
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertEquals( 'permission_check_failed', $res['_metadata']['failure_reason'] );
+		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+
+		// Clean up
+		wp_unregister_ability( 'test/permission-exception-in-call' );
+	}
+
 	// Note: Permission denied, execution errors, and exceptions are tested
 	// using existing test abilities in DummyAbility
+	// Exception handling in call_tool() outer try-catch is covered by exception tests
+	// in handle_tool_call() which propagate properly
 
 	public function test_call_tool_success_returns_content(): void {
 		wp_set_current_user( 1 );

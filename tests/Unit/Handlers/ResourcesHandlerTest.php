@@ -67,6 +67,146 @@ final class ResourcesHandlerTest extends TestCase {
 		$this->assertEquals( 'nonexistent://resource', $res['_metadata']['resource_uri'] );
 	}
 
+	public function test_read_resource_with_wp_error_from_get_ability(): void {
+		wp_set_current_user( 1 );
+
+		// Create a resource with a non-existent ability name
+		$server = $this->makeServer( array(), array(), array() );
+		$resource = new \WP\MCP\Domain\Resources\McpResource(
+			'nonexistent/ability',
+			'WordPress://test/nonexistent-resource',
+			'Test Resource',
+			'Test description'
+		);
+		$resource->set_mcp_server( $server );
+		// Manually add the invalid resource (bypassing normal registration)
+		$registry = $server->get_component_registry();
+		$reflection = new \ReflectionClass( $registry );
+		$resources_property = $reflection->getProperty( 'resources' );
+		$resources_property->setAccessible( true );
+		$resources = $resources_property->getValue( $registry );
+		$resources['WordPress://test/nonexistent-resource'] = $resource;
+		$resources_property->setValue( $registry, $resources );
+
+		$handler = new ResourcesHandler( $server );
+
+		$res = $handler->read_resource(
+			array(
+				'params' => array(
+					'uri' => 'WordPress://test/nonexistent-resource',
+				),
+			)
+		);
+
+		// Should return error
+		$this->assertArrayHasKey( 'error', $res );
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertEquals( 'ability_retrieval_failed', $res['_metadata']['failure_reason'] );
+		$this->assertEquals( 'ability_not_found', $res['_metadata']['error_code'] );
+	}
+
+	public function test_read_resource_with_wp_error_from_execute(): void {
+		wp_set_current_user( 1 );
+
+		// Register an ability that returns WP_Error
+		$this->register_ability_in_hook(
+			'test/wp-error-resource-execute',
+			array(
+				'label'               => 'WP Error Resource Execute',
+				'description'         => 'Returns WP_Error from execute',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return new \WP_Error( 'test_error', 'Test error message' );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => 'WordPress://test/wp-error-resource',
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array(), array( 'test/wp-error-resource-execute' ), array() );
+		$handler = new ResourcesHandler( $server );
+		$resources = $server->get_resources();
+		$this->assertNotEmpty( $resources, 'test/wp-error-resource-execute should be registered' );
+
+		$resource_uri = array_keys( $resources )[0];
+
+		$res = $handler->read_resource(
+			array(
+				'params' => array(
+					'uri' => $resource_uri,
+				),
+			)
+		);
+
+		// Should return error
+		$this->assertArrayHasKey( 'error', $res );
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertEquals( 'wp_error', $res['_metadata']['failure_reason'] );
+		$this->assertEquals( 'test_error', $res['_metadata']['error_code'] );
+
+		// Clean up
+		wp_unregister_ability( 'test/wp-error-resource-execute' );
+	}
+
+	public function test_read_resource_with_exception(): void {
+		wp_set_current_user( 1 );
+
+		// Register an ability that throws exception during execute
+		$this->register_ability_in_hook(
+			'test/resource-execute-exception',
+			array(
+				'label'               => 'Resource Execute Exception',
+				'description'         => 'Throws exception in execute',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					throw new \RuntimeException( 'Execute exception' );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => 'WordPress://test/resource-exception',
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array(), array( 'test/resource-execute-exception' ), array() );
+		$handler = new ResourcesHandler( $server );
+		$resources = $server->get_resources();
+		$this->assertNotEmpty( $resources, 'test/resource-execute-exception should be registered' );
+
+		$resource_uri = array_keys( $resources )[0];
+
+		$res = $handler->read_resource(
+			array(
+				'params' => array(
+					'uri' => $resource_uri,
+				),
+			)
+		);
+
+		// Should return error
+		$this->assertArrayHasKey( 'error', $res );
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertEquals( 'execution_failed', $res['_metadata']['failure_reason'] );
+		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+
+		// Clean up
+		wp_unregister_ability( 'test/resource-execute-exception' );
+	}
+
 	// Note: Testing ability retrieval failure requires complex mocking
 	// that's already covered in integration tests
 

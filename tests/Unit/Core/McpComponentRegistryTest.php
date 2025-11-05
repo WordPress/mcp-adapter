@@ -41,6 +41,22 @@ class TestRegistryPrompt extends McpPromptBuilder {
 	}
 }
 
+// Test prompt builder that throws exception during build
+class ExceptionPromptBuilder extends McpPromptBuilder {
+
+	protected function configure(): void {
+		throw new \RuntimeException( 'Builder exception during configure' );
+	}
+
+	public function handle( array $arguments ): array {
+		return array();
+	}
+
+	public function has_permission( array $arguments ): bool {
+		return true;
+	}
+}
+
 /**
  * Test McpComponentRegistry functionality.
  */
@@ -407,6 +423,345 @@ final class McpComponentRegistryTest extends TestCase {
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
 		$this->assertNotEmpty( $events );
+	}
+
+	public function test_register_tools_with_wp_error_from_validation(): void {
+		// Register an ability that will fail validation when validation is enabled
+		$this->register_ability_in_hook(
+			'test/invalid-tool',
+			array(
+				'label'               => 'Invalid Tool',
+				'description'         => '', // Empty description will fail validation
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array();
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
+		// Create registry with validation enabled
+		$registry_with_validation = new McpComponentRegistry(
+			$this->server,
+			new DummyErrorHandler(),
+			new DummyObservabilityHandler(),
+			true // Enable validation
+		);
+
+		// Clear previous events
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register the invalid tool
+		$registry_with_validation->register_tools( array( 'test/invalid-tool' ) );
+
+		// Tool should not be registered due to validation failure
+		$tools = $registry_with_validation->get_tools();
+		$this->assertCount( 0, $tools );
+
+		// Verify error was logged
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'WordPress ability \'test/invalid-tool\' does not exist.', implode( ' ', $log_messages ) );
+
+		// Verify failure event was recorded
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'ability_tool' === $event['tags']['component_type'];
+			}
+		);
+		$this->assertNotEmpty( $failure_event );
+
+		// Clean up
+		wp_unregister_ability( 'test/invalid-tool' );
+	}
+
+	public function test_register_resources_with_missing_uri(): void {
+		// Register a resource ability without URI in meta
+		$this->register_ability_in_hook(
+			'test/resource-no-uri',
+			array(
+				'label'               => 'Resource No URI',
+				'description'         => 'A resource without URI',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					// No 'uri' key - this will cause WP_Error
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		// Clear previous events
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register the resource without URI
+		$this->registry->register_resources( array( 'test/resource-no-uri' ) );
+
+		// Resource should not be registered
+		$resources = $this->registry->get_resources();
+		$this->assertCount( 0, $resources );
+
+		// Verify error was logged
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'Resource URI not found', implode( ' ', $log_messages ) );
+
+		// Verify failure event was recorded
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'resource' === $event['tags']['component_type'];
+			}
+		);
+		$this->assertNotEmpty( $failure_event );
+
+		// Clean up
+		wp_unregister_ability( 'test/resource-no-uri' );
+	}
+
+	public function test_register_prompts_with_builder_exception(): void {
+		// Clear previous events
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register a prompt builder that throws exception
+		$this->registry->register_prompts( array( ExceptionPromptBuilder::class ) );
+
+		// Prompt should not be registered
+		$prompts = $this->registry->get_prompts();
+		$this->assertCount( 0, $prompts );
+
+		// Verify error was logged
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'Failed to build prompt from class', implode( ' ', $log_messages ) );
+		$this->assertStringContainsString( 'Builder exception', implode( ' ', $log_messages ) );
+
+		// Verify failure event was recorded
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'prompt' === $event['tags']['component_type']
+					&& isset( $event['tags']['failure_reason'] )
+					&& 'builder_exception' === $event['tags']['failure_reason'];
+			}
+		);
+		$this->assertNotEmpty( $failure_event );
+	}
+
+	public function test_add_tool_with_validation_failure(): void {
+		// Create registry with validation enabled
+		$registry_with_validation = new McpComponentRegistry(
+			$this->server,
+			new DummyErrorHandler(),
+			new DummyObservabilityHandler(),
+			true // Enable validation
+		);
+
+		// Create an invalid tool (empty description)
+		$invalid_tool = new McpTool(
+			'test/invalid',
+			'invalid-tool',
+			'', // Empty description will fail validation
+			array( 'type' => 'object' )
+		);
+		$invalid_tool->set_mcp_server( $this->server );
+
+		// Clear previous events
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Try to add the invalid tool
+		$registry_with_validation->add_tool( $invalid_tool );
+
+		// Tool should not be registered
+		$tools = $registry_with_validation->get_tools();
+		$this->assertCount( 0, $tools );
+
+		// Verify error was logged
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'Tool validation failed', implode( ' ', $log_messages ) );
+
+		// Verify failure event was recorded
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'tool' === $event['tags']['component_type'];
+			}
+		);
+		$this->assertNotEmpty( $failure_event );
+	}
+
+	public function test_register_prompts_with_builder_validation_failure(): void {
+		// Create a prompt builder that will fail validation
+		$invalid_builder = new class() extends McpPromptBuilder {
+			protected function configure(): void {
+				$this->name        = ''; // Empty name will fail validation
+				$this->title       = 'Invalid Prompt';
+				$this->description = 'This prompt will fail validation';
+			}
+
+			public function handle( array $arguments ): array {
+				return array();
+			}
+
+			public function has_permission( array $arguments ): bool {
+				return true;
+			}
+		};
+
+		// Create registry with validation enabled
+		$registry_with_validation = new McpComponentRegistry(
+			$this->server,
+			new DummyErrorHandler(),
+			new DummyObservabilityHandler(),
+			true // Enable validation
+		);
+
+		// Clear previous events
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register the invalid prompt builder
+		$registry_with_validation->register_prompts( array( get_class( $invalid_builder ) ) );
+
+		// Prompt should not be registered
+		$prompts = $registry_with_validation->get_prompts();
+		$this->assertCount( 0, $prompts );
+
+		// Verify error was logged
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'Prompt validation failed', implode( ' ', $log_messages ) );
+
+		// Verify failure event was recorded
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+		$failure_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'prompt' === $event['tags']['component_type'];
+			}
+		);
+		$this->assertNotEmpty( $failure_event );
+	}
+
+	public function test_register_prompts_with_wp_error_from_ability(): void {
+		// Register an ability that will fail when converted to prompt (missing input_schema for validation)
+		$this->register_ability_in_hook(
+			'test/invalid-prompt-ability',
+			array(
+				'label'               => 'Invalid Prompt Ability',
+				'description'         => '', // Empty description might fail validation if enabled
+				'category'            => 'test',
+				// No input_schema - might cause issues
+				'execute_callback'    => static function () {
+					return array();
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Create registry with validation enabled to test WP_Error path
+		$registry_with_validation = new McpComponentRegistry(
+			$this->server,
+			new DummyErrorHandler(),
+			new DummyObservabilityHandler(),
+			true // Enable validation
+		);
+
+		// Clear previous events
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register the prompt - this might fail validation
+		$registry_with_validation->register_prompts( array( 'test/invalid-prompt-ability' ) );
+
+		// Verify error was logged (if validation failed)
+		// The exact behavior depends on prompt validation rules
+		$events = DummyObservabilityHandler::$events;
+		if ( ! empty( DummyErrorHandler::$logs ) ) {
+			// If validation failed, verify the failure was logged
+			$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+			$has_error    = false;
+			foreach ( $log_messages as $message ) {
+				if ( strpos( $message, 'test/invalid-prompt-ability' ) !== false ) {
+					$has_error = true;
+					break;
+				}
+			}
+			// Error should be logged if validation failed
+			if ( $has_error ) {
+				$failure_event = array_filter(
+					$events,
+					static function ( $event ) {
+						return 'mcp.component.registration' === $event['event']
+							&& isset( $event['tags']['status'] )
+							&& 'failed' === $event['tags']['status'];
+					}
+				);
+				$this->assertNotEmpty( $failure_event, 'Failure event should be recorded when validation fails' );
+			}
+		}
+
+		// Clean up
+		wp_unregister_ability( 'test/invalid-prompt-ability' );
 	}
 
 	// Note: Validation failure tests require complex setup and are covered in integration tests

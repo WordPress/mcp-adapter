@@ -59,4 +59,3 @@ final class NullMcpErrorHandlerTest extends TestCase {
 		$this->assertTrue( true, 'log() method executed with complex context without throwing exception' );
 	}
 }
-
