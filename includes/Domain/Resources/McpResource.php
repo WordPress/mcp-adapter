@@ -311,6 +311,17 @@ class McpResource {
 	}
 
 	/**
+	 * Set the MCP server instance this resource belongs to.
+	 *
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
+	 *
+	 * @return void
+	 */
+	public function set_mcp_server( McpServer $mcp_server ): void {
+		$this->mcp_server = $mcp_server;
+	}
+
+	/**
 	 * Convert the resource to an array representation according to MCP specification.
 	 *
 	 * @return array

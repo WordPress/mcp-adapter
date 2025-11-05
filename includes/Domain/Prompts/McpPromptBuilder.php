@@ -63,12 +63,9 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	public function build(): McpPrompt {
 		$this->configure();
 
-		if ( empty( $this->name ) ) {
-			throw new \InvalidArgumentException( 'Prompt name is required' );
-		}
-
 		// Create a synthetic ability name for the prompt
-		$synthetic_ability = 'synthetic/' . $this->name;
+		// Use empty string if name is empty (validation will catch it)
+		$synthetic_ability = empty( $this->name ) ? 'synthetic/' : 'synthetic/' . $this->name;
 
 		// Create a builder-based prompt that completely bypasses abilities
 		$builder = $this;

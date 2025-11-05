@@ -160,6 +160,32 @@ class McpComponentRegistry {
 				continue;
 			}
 
+			// If registry has validation enabled, validate the tool (bypassing server's validation flag)
+			if ( $this->mcp_validation_enabled ) {
+				$context_to_use    = "McpComponentRegistry::register_tools::{$tool_item}";
+				$validation_result = \WP\MCP\Domain\Tools\McpToolValidator::validate_tool_instance( $tool, $context_to_use );
+
+				// Check if validation returned an error
+				if ( is_wp_error( $validation_result ) ) {
+					$this->error_handler->log( $validation_result->get_error_message(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
+
+					// Track ability tool registration failure.
+					if ( $this->should_record_component_registration ) {
+						$this->observability_handler->record_event(
+							'mcp.component.registration',
+							array(
+								'status'         => 'failed',
+								'component_type' => 'ability_tool',
+								'component_name' => $tool_item,
+								'error_code'     => $validation_result->get_error_code(),
+								'server_id'      => $this->mcp_server->get_server_id(),
+							)
+						);
+					}
+					continue;
+				}
+			}
+
 			// Add the processed tools to this server.
 			$this->tools[ $tool->get_name() ] = $tool;
 
@@ -188,9 +214,13 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	public function add_tool( McpTool $tool ): void {
-		// Validate if validation is enabled
+		// Set the MCP server before validation (validation needs it to check if validation is enabled)
+		$tool->set_mcp_server( $this->mcp_server );
+
+		// Validate if validation is enabled (call validator directly to respect registry's validation flag)
 		if ( $this->mcp_validation_enabled ) {
-			$validation_result = $tool->validate( "McpComponentRegistry::add_tool::{$tool->get_name()}" );
+			$context_to_use    = "McpComponentRegistry::add_tool::{$tool->get_name()}";
+			$validation_result = \WP\MCP\Domain\Tools\McpToolValidator::validate_tool_instance( $tool, $context_to_use );
 
 			// Check if validation returned an error
 			if ( is_wp_error( $validation_result ) ) {
@@ -212,9 +242,6 @@ class McpComponentRegistry {
 				return;
 			}
 		}
-
-		// Set the MCP server
-		$tool->set_mcp_server( $this->mcp_server );
 
 		// Add the tool to this server
 		$this->tools[ $tool->get_name() ] = $tool;
@@ -352,9 +379,10 @@ class McpComponentRegistry {
 				// Set the MCP server after building
 				$prompt->set_mcp_server( $this->mcp_server );
 
-				// Validate if validation is enabled
+				// Validate if validation is enabled (call validator directly to respect registry's validation flag)
 				if ( $this->mcp_validation_enabled ) {
-					$validation_result = $prompt->validate( "McpPromptBuilder::{$prompt_item}" );
+					$context_to_use    = "McpPromptBuilder::{$prompt_item}";
+					$validation_result = \WP\MCP\Domain\Prompts\McpPromptValidator::validate_prompt_instance( $prompt, $context_to_use );
 
 					// Check if validation returned an error
 					if ( is_wp_error( $validation_result ) ) {
