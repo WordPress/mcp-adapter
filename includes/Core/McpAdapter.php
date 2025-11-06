@@ -58,13 +58,7 @@ final class McpAdapter {
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
-				// Ensure init action has fired before initializing
-				if ( did_action( 'init' ) ) {
-					self::$instance->init();
-				} else {
-					// If init hasn't fired yet, hook into it
-					add_action( 'init', array( self::$instance, 'init' ), 20 );
-				}
+				add_action( 'init', array( self::$instance, 'init' ), 20 );
 			} else {
 				// Initialize for REST API requests with reasonable priority
 				add_action( 'rest_api_init', array( self::$instance, 'init' ), 15 );
