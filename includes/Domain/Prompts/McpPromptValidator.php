@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
+use WP\MCP\Domain\Utils\McpValidator;
+
 /**
  * Validates MCP prompts against the Model Context Protocol specification.
  *
@@ -204,7 +206,7 @@ class McpPromptValidator {
 					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
 					continue;
 				}
-				if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
+				if ( ! McpValidator::validate_iso8601_timestamp( trim( $value ) ) ) {
 					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
 				}
 				continue;
@@ -565,7 +567,7 @@ class McpPromptValidator {
 					__( 'Message %d content annotation \'lastModified\' must be a string', 'mcp-adapter' ),
 					$message_index
 				);
-			} elseif ( ! self::validate_iso8601_timestamp( $annotations['lastModified'] ) ) {
+			} elseif ( ! McpValidator::validate_iso8601_timestamp( $annotations['lastModified'] ) ) {
 				$errors[] = sprintf(
 				/* translators: %d: message index */
 					__( 'Message %d content annotation \'lastModified\' must be a valid ISO 8601 timestamp', 'mcp-adapter' ),
@@ -699,27 +701,6 @@ class McpPromptValidator {
 	 * @return bool True if valid ISO 8601 timestamp, false otherwise.
 	 */
 	public static function validate_iso8601_timestamp( string $timestamp ): bool {
-		// Try to parse as DateTime with ISO 8601 format
-		$datetime = \DateTime::createFromFormat( \DateTime::ATOM, $timestamp );
-		if ( $datetime && $datetime->format( \DateTime::ATOM ) === $timestamp ) {
-			return true;
-		}
-
-		// Try alternative ISO 8601 formats
-		$formats = array(
-			'Y-m-d\TH:i:s\Z',           // UTC format
-			'Y-m-d\TH:i:sP',            // With timezone offset
-			'Y-m-d\TH:i:s.u\Z',         // With microseconds UTC
-			'Y-m-d\TH:i:s.uP',          // With microseconds and timezone
-		);
-
-		foreach ( $formats as $format ) {
-			$datetime = \DateTime::createFromFormat( $format, $timestamp );
-			if ( $datetime && $datetime->format( $format ) === $timestamp ) {
-				return true;
-			}
-		}
-
-		return false;
+		return McpValidator::validate_iso8601_timestamp( $timestamp );
 	}
 }

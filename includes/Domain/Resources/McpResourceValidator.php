@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
+use WP\MCP\Domain\Utils\McpValidator;
+
 /**
  * Validates MCP resources against the Model Context Protocol specification.
  *
@@ -228,8 +230,8 @@ class McpResourceValidator {
 					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
 					continue;
 				}
-				// Validate ISO 8601 format using the prompt validator's method (reuse logic).
-				if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
+				// Validate ISO 8601 format using shared utility.
+				if ( ! McpValidator::validate_iso8601_timestamp( trim( $value ) ) ) {
 					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
 				}
 				continue;
@@ -249,38 +251,6 @@ class McpResourceValidator {
 		}
 
 		return $errors;
-	}
-
-	/**
-	 * Validate ISO 8601 timestamp format.
-	 *
-	 * @param string $timestamp The timestamp to validate.
-	 *
-	 * @return bool True if valid ISO 8601 timestamp, false otherwise.
-	 */
-	private static function validate_iso8601_timestamp( string $timestamp ): bool {
-		// Try to parse as DateTime with ISO 8601 format.
-		$datetime = \DateTime::createFromFormat( \DateTime::ATOM, $timestamp );
-		if ( $datetime && $datetime->format( \DateTime::ATOM ) === $timestamp ) {
-			return true;
-		}
-
-		// Try alternative ISO 8601 formats.
-		$formats = array(
-			'Y-m-d\TH:i:s\Z',           // UTC format
-			'Y-m-d\TH:i:sP',            // With timezone offset
-			'Y-m-d\TH:i:s.u\Z',         // With microseconds UTC
-			'Y-m-d\TH:i:s.uP',          // With microseconds and timezone
-		);
-
-		foreach ( $formats as $format ) {
-			$datetime = \DateTime::createFromFormat( $format, $timestamp );
-			if ( $datetime && $datetime->format( $format ) === $timestamp ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 
 	/**
