@@ -16,7 +16,7 @@ $adapter->create_server(
     '1.0.0',
     [\WP\MCP\Transport\HttpTransport::class],
     \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
-    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class
+    \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,
     ['my-plugin/tool'], // tools
     [], // resources
     [], // prompts
