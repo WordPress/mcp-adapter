@@ -131,7 +131,11 @@ class ToolsHandler {
 				// Tool execution errors (convert to isError: true format):
 				// - permission_denied, permission_check_failed
 				// - wp_error, execution_failed
-				$error_message = $result['error']['message'] ?? 'An error occurred while executing the tool.';
+				if ( is_string( $result['error'] ) ) {
+					$error_message = $result['error'];
+				} else {
+					$error_message = $result['error']['message'] ?? 'An error occurred while executing the tool.';
+				}
 				$response      = array(
 					'content' => array(
 						array(
