@@ -289,4 +289,127 @@ final class McpToolValidatorTest extends TestCase {
 		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'does not exist in properties', $result->get_error_message() );
 	}
+
+	public function test_validate_tool_data_with_valid_mcp_annotations(): void {
+		$valid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool with MCP annotations',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'readOnlyHint'    => true,
+				'destructiveHint' => false,
+				'idempotentHint'  => true,
+				'openWorldHint'   => false,
+				'title'           => 'Test Annotation',
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $valid_tool_data );
+		$this->assertTrue( $result );
+	}
+
+	public function test_validate_tool_data_with_invalid_annotation_field_name(): void {
+		$invalid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'readonly' => true, // Old WordPress format, should be rejected
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Unknown annotation field: readonly', $result->get_error_message() );
+	}
+
+	public function test_validate_tool_data_with_invalid_annotation_boolean_type(): void {
+		$invalid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'readOnlyHint' => 'yes', // Should be boolean, not string
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Annotation field readOnlyHint must be a boolean', $result->get_error_message() );
+	}
+
+	public function test_validate_tool_data_with_invalid_annotation_string_type(): void {
+		$invalid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'title' => 123, // Should be string, not number
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Annotation field title must be a string', $result->get_error_message() );
+	}
+
+	public function test_validate_tool_data_with_empty_annotation_title(): void {
+		$invalid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'title' => '   ', // Empty/whitespace-only string
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Annotation field title must be a non-empty string', $result->get_error_message() );
+	}
+
+	public function test_validate_tool_data_with_multiple_annotation_errors(): void {
+		$invalid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'readonly'      => true,    // Invalid field name
+				'readOnlyHint'  => 'yes',   // Invalid type
+				'invalidField'  => true,    // Unknown field
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $invalid_tool_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'tool_validation_failed', $result->get_error_code() );
+
+		$error_message = $result->get_error_message();
+		$this->assertStringContainsString( 'Unknown annotation field: readonly', $error_message );
+		$this->assertStringContainsString( 'Unknown annotation field: invalidField', $error_message );
+	}
+
+	public function test_validate_tool_data_with_partial_mcp_annotations(): void {
+		// Should be valid - not all annotation fields are required
+		$valid_tool_data = array(
+			'name'        => 'test-tool',
+			'description' => 'A test tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'annotations' => array(
+				'readOnlyHint' => true,
+			),
+		);
+
+		$result = McpToolValidator::validate_tool_data( $valid_tool_data );
+		$this->assertTrue( $result );
+	}
 }
