@@ -210,17 +210,14 @@ class McpPromptValidator {
 				continue;
 			}
 
-			// Validate priority field.
-			if ( 'priority' === $field ) {
-				if ( ! is_numeric( $value ) ) {
-					$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
-					continue;
-				}
-				$priority = (float) $value;
-				if ( $priority < 0.0 || $priority > 1.0 ) {
-					$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
-				}
+			// Validate priority field (only remaining valid field after audience and lastModified checks).
+			if ( ! is_numeric( $value ) ) {
+				$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
 				continue;
+			}
+			$priority = (float) $value;
+			if ( $priority < 0.0 || $priority > 1.0 ) {
+				$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
 			}
 		}
 

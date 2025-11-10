@@ -119,7 +119,8 @@ class RegisterAbilityAsMcpTool {
 			}
 
 			// Handle string fields: only include if not empty.
-			if ( 'string' !== $field_type || empty( $value ) ) {
+			// This is the only remaining type after boolean check.
+			if ( empty( $value ) ) {
 				continue;
 			}
 			$filtered_annotations[ $field ] = (string) $value;

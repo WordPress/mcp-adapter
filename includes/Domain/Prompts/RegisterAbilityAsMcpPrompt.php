@@ -145,16 +145,14 @@ class RegisterAbilityAsMcpPrompt {
 			}
 
 			// Validate and normalize priority field (number between 0 and 1).
-			if ( 'priority' === $field ) {
-				if ( ! is_numeric( $value ) ) {
-					continue;
-				}
-				$priority = (float) $value;
-				// Clamp priority between 0 and 1 per MCP spec.
-				$priority                  = max( 0.0, min( 1.0, $priority ) );
-				$mcp_annotations[ $field ] = $priority;
+			// This is the only remaining valid field after audience and lastModified checks.
+			if ( ! is_numeric( $value ) ) {
 				continue;
 			}
+			$priority = (float) $value;
+			// Clamp priority between 0 and 1 per MCP spec.
+			$priority                  = max( 0.0, min( 1.0, $priority ) );
+			$mcp_annotations[ $field ] = $priority;
 		}
 
 		return $mcp_annotations;
