@@ -245,7 +245,7 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertSame( array( HttpTransport::class ), $received_config['mcp_transports'] );
 		$this->assertSame( ErrorLogMcpErrorHandler::class, $received_config['error_handler'] );
 		$this->assertSame( NullMcpObservabilityHandler::class, $received_config['observability_handler'] );
-		// Auto-discovered resources from test fixtures (test/resource has mcp.public=true and mcp.type='resource')
+		// Auto-discovered resources from test fixtures (test/resource* abilities have mcp.public=true and mcp.type='resource', resulting in 4 discovered resources)
 		$this->assertSame(
 			array(
 				'test/resource',
