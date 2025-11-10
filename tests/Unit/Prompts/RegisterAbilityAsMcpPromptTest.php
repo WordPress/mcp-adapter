@@ -67,21 +67,23 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 
 		$arr = $prompt->to_array();
 
-		// Verify invalid annotations are filtered out.
-		if ( isset( $arr['annotations'] ) ) {
-			// Invalid role should be filtered
-			if ( isset( $arr['annotations']['audience'] ) ) {
-				$this->assertNotContains( 'invalid-role', $arr['annotations']['audience'] );
-			}
-			// Invalid date should be filtered
-			$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
-			// Priority should be clamped to 0.0 (was -1.0)
-			if ( isset( $arr['annotations']['priority'] ) ) {
-				$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
-			}
-			// Unknown field should be filtered
-			$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
-		}
+		// Verify annotations are present
+		$this->assertArrayHasKey( 'annotations', $arr );
+
+		// Invalid role should be filtered from audience
+		$this->assertArrayHasKey( 'audience', $arr['annotations'] );
+		$this->assertNotContains( 'invalid-role', $arr['annotations']['audience'] );
+		$this->assertContains( 'user', $arr['annotations']['audience'] );
+
+		// Invalid date should be filtered
+		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
+
+		// Priority should be clamped to 0.0 (was -1.0)
+		$this->assertArrayHasKey( 'priority', $arr['annotations'] );
+		$this->assertSame( 0.0, $arr['annotations']['priority'] );
+
+		// Unknown field should be filtered
+		$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
 	}
 
 	public function test_empty_annotations_are_not_included(): void {

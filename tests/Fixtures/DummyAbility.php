@@ -550,10 +550,10 @@ final class DummyAbility {
 				},
 				'meta'                => array(
 					'annotations' => array(
-						'audience'     => array( 'invalid-role' ), // Invalid role
-						'lastModified' => 'not-a-date',            // Invalid date
-						'priority'     => -1.0,                     // Out of range
-						'invalidField' => 'should-be-filtered',    // Unknown field
+						'audience'     => array( 'user', 'invalid-role' ), // Mixed valid and invalid roles
+						'lastModified' => 'not-a-date',                      // Invalid date
+						'priority'     => -1.0,                              // Out of range
+						'invalidField' => 'should-be-filtered',              // Unknown field
 					),
 					'mcp'         => array(
 						'public' => true,
