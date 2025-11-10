@@ -31,7 +31,7 @@ final class McpToolValidatorTest extends TestCase {
 				'required'   => array( 'param1' ),
 			),
 			'title'       => 'Test Tool',
-			'annotations' => array( 'category' => 'test' ),
+			'annotations' => array( 'readOnlyHint' => true ),
 		);
 
 		$result = McpToolValidator::validate_tool_data( $valid_tool_data, 'test-context' );

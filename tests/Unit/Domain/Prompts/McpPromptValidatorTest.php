@@ -34,7 +34,7 @@ final class McpPromptValidatorTest extends TestCase {
 					'description' => 'Optional parameter',
 				),
 			),
-			'annotations' => array( 'category' => 'test' ),
+			'annotations' => array( 'priority' => 0.5 ),
 		);
 
 		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data, 'test-context' );

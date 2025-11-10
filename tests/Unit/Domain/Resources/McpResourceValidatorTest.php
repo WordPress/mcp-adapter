@@ -25,7 +25,7 @@ final class McpResourceValidatorTest extends TestCase {
 			'description' => 'A test resource for validation',
 			'text'        => 'This is test content',
 			'mimeType'    => 'text/plain',
-			'annotations' => array( 'category' => 'test' ),
+			'annotations' => array( 'priority' => 0.5 ),
 		);
 
 		$result = McpResourceValidator::validate_resource_data( $valid_resource_data, 'test-context' );
