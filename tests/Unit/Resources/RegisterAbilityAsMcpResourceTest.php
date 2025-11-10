@@ -107,9 +107,9 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$arr = $resource->to_array();
 
 		// Priority was 2.0, should be clamped to 1.0.
-		if ( isset( $arr['annotations']['priority'] ) ) {
-			$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
-			$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
-		}
+		$this->assertArrayHasKey( 'annotations', $arr, 'Annotations should exist with clamped priority' );
+		$this->assertArrayHasKey( 'priority', $arr['annotations'], 'Priority should be clamped, not removed' );
+		$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
+		$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
 	}
 }
