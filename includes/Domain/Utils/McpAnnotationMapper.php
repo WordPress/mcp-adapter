@@ -97,4 +97,3 @@ class McpAnnotationMapper {
 		return $mcp_annotations;
 	}
 }
-
