@@ -84,10 +84,6 @@ class McpAnnotationMapper {
 			}
 
 			// Validate and normalize priority field (number between 0 and 1).
-			if ( 'priority' !== $field ) {
-				continue;
-			}
-
 			if ( ! is_numeric( $value ) ) {
 				continue;
 			}
