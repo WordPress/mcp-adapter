@@ -228,7 +228,7 @@ class McpResourceValidator {
 					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
 					continue;
 				}
-				// Validate ISO 8601 format using the prompt validator's method (reuse logic).
+				// Validate ISO 8601 format using this class's own method.
 				if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
 					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
 				}
