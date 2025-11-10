@@ -18,4 +18,98 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertArrayHasKey( 'arguments', $arr );
 		$this->assertSame( $ability, $prompt->get_ability() );
 	}
+
+	public function test_annotations_are_mapped_to_mcp_format(): void {
+		$ability = wp_get_ability( 'test/prompt-with-annotations' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-with-annotations should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->to_array();
+
+		// Verify MCP-format annotations.
+		$this->assertArrayHasKey( 'annotations', $arr );
+		$this->assertArrayHasKey( 'audience', $arr['annotations'] );
+		$this->assertArrayHasKey( 'lastModified', $arr['annotations'] );
+		$this->assertArrayHasKey( 'priority', $arr['annotations'] );
+
+		// Verify values.
+		$this->assertIsArray( $arr['annotations']['audience'] );
+		$this->assertContains( 'user', $arr['annotations']['audience'] );
+		$this->assertSame( '2024-01-15T10:30:00Z', $arr['annotations']['lastModified'] );
+		$this->assertSame( 0.9, $arr['annotations']['priority'] );
+	}
+
+	public function test_partial_annotations_are_included(): void {
+		$ability = wp_get_ability( 'test/prompt-partial-annotations' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-partial-annotations should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->to_array();
+
+		// Verify only provided annotations are present.
+		$this->assertArrayHasKey( 'annotations', $arr );
+		$this->assertArrayHasKey( 'audience', $arr['annotations'] );
+		$this->assertContains( 'assistant', $arr['annotations']['audience'] );
+		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
+		$this->assertArrayNotHasKey( 'priority', $arr['annotations'] );
+	}
+
+	public function test_invalid_annotations_are_filtered_out(): void {
+		$ability = wp_get_ability( 'test/prompt-invalid-annotations' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-invalid-annotations should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->to_array();
+
+		// Verify invalid annotations are filtered out.
+		if ( isset( $arr['annotations'] ) ) {
+			// Invalid role should be filtered
+			if ( isset( $arr['annotations']['audience'] ) ) {
+				$this->assertNotContains( 'invalid-role', $arr['annotations']['audience'] );
+			}
+			// Invalid date should be filtered
+			$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
+			// Priority should be clamped to 0.0 (was -1.0)
+			if ( isset( $arr['annotations']['priority'] ) ) {
+				$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
+			}
+			// Unknown field should be filtered
+			$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
+		}
+	}
+
+	public function test_empty_annotations_are_not_included(): void {
+		$ability = wp_get_ability( 'test/prompt' );
+		$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->to_array();
+
+		// Verify annotations field is not present when empty.
+		$this->assertArrayNotHasKey( 'annotations', $arr );
+	}
+
+	public function test_priority_is_clamped_to_valid_range(): void {
+		$ability = wp_get_ability( 'test/prompt-invalid-annotations' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-invalid-annotations should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->to_array();
+
+		// Priority was -1.0, should be clamped to 0.0.
+		if ( isset( $arr['annotations']['priority'] ) ) {
+			$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
+			$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
+		}
+	}
 }
