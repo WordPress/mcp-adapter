@@ -177,6 +177,11 @@ class McpValidator {
 			return false;
 		}
 
+		// Reject whitespace-only strings (they decode to empty string but aren't valid base64 content).
+		if ( trim( $content ) === '' ) {
+			return false;
+		}
+
 		// Check if it's valid base64 encoding.
 		return base64_decode( $content, true ) !== false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
 	}
