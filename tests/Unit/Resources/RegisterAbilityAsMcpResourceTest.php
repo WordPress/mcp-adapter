@@ -67,21 +67,19 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
 		$arr = $resource->to_array();
 
-		// Verify invalid annotations are filtered out.
-		if ( isset( $arr['annotations'] ) ) {
-			// Invalid role should be filtered
-			if ( isset( $arr['annotations']['audience'] ) ) {
-				$this->assertNotContains( 'invalid-role', $arr['annotations']['audience'] );
-			}
-			// Invalid date should be filtered
-			$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
-			// Priority should be clamped to 1.0 (was 2.0)
-			if ( isset( $arr['annotations']['priority'] ) ) {
-				$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
-			}
-			// Unknown field should be filtered
-			$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
-		}
+		// Verify invalid annotations are filtered out but valid ones remain.
+		$this->assertArrayHasKey( 'annotations', $arr, 'Annotations should exist even with some invalid data' );
+
+		// Invalid role should be filtered (all roles invalid, so audience field removed)
+		$this->assertArrayNotHasKey( 'audience', $arr['annotations'] );
+		// Invalid date should be filtered
+		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
+		// Priority should be clamped to 1.0 (was 2.0)
+		$this->assertArrayHasKey( 'priority', $arr['annotations'], 'Priority should exist and be clamped' );
+		$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
+		$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
+		// Unknown field should be filtered
+		$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
 	}
 
 	public function test_empty_annotations_are_not_included(): void {
