@@ -396,6 +396,7 @@ final class McpToolValidatorTest extends TestCase {
 		$error_message = $result->get_error_message();
 		$this->assertStringContainsString( 'Unknown annotation field: readonly', $error_message );
 		$this->assertStringContainsString( 'Unknown annotation field: invalidField', $error_message );
+		$this->assertStringContainsString( 'Annotation field readOnlyHint must be a boolean', $error_message );
 	}
 
 	public function test_validate_tool_data_with_partial_mcp_annotations(): void {
