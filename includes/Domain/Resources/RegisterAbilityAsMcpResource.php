@@ -94,7 +94,7 @@ class RegisterAbilityAsMcpResource {
 	 * Converts annotation fields according to MCP specification:
 	 * - audience: array of Role values (e.g., ["user", "assistant"])
 	 * - lastModified: ISO 8601 formatted string
-	 * - priority: number (1 = most important, 0 = least important)
+	 * - priority: number between 0.0 (lowest) and 1.0 (highest)
 	 *
 	 * Filters out null values and invalid fields.
 	 * Only returns MCP-compliant annotation fields.
