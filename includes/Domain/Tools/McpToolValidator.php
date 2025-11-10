@@ -112,8 +112,78 @@ class McpToolValidator {
 			}
 		}
 
-		if ( isset( $tool_data['annotations'] ) && ! is_array( $tool_data['annotations'] ) ) {
-			$errors[] = __( 'Tool annotations must be an array if provided', 'mcp-adapter' );
+		// Validate annotations structure if present.
+		if ( isset( $tool_data['annotations'] ) ) {
+			if ( ! is_array( $tool_data['annotations'] ) ) {
+				$errors[] = __( 'Tool annotations must be an array if provided', 'mcp-adapter' );
+			} else {
+				$annotation_errors = self::get_annotation_validation_errors( $tool_data['annotations'] );
+				if ( ! empty( $annotation_errors ) ) {
+					$errors = array_merge( $errors, $annotation_errors );
+				}
+			}
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Get validation errors for tool annotations according to MCP ToolAnnotations specification.
+	 *
+	 * Validates that annotations conform to the MCP 2025-06-18 specification:
+	 * - readOnlyHint, destructiveHint, idempotentHint, openWorldHint must be booleans
+	 * - title must be a string
+	 * - No unknown annotation fields are allowed
+	 *
+	 * @param array $annotations The annotations to validate.
+	 *
+	 * @return array Array of validation errors, empty if valid.
+	 */
+	private static function get_annotation_validation_errors( array $annotations ): array {
+		$errors = array();
+
+		// Define valid annotation fields and their expected types per MCP specification.
+		$valid_fields = array(
+			'readOnlyHint'    => 'boolean',
+			'destructiveHint' => 'boolean',
+			'idempotentHint'  => 'boolean',
+			'openWorldHint'   => 'boolean',
+			'title'           => 'string',
+		);
+
+		foreach ( $annotations as $field => $value ) {
+			// Check if field is a valid MCP annotation field.
+			if ( ! isset( $valid_fields[ $field ] ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: annotation field name */
+					__( 'Unknown annotation field: %s. Valid MCP annotation fields are: readOnlyHint, destructiveHint, idempotentHint, openWorldHint, title', 'mcp-adapter' ),
+					$field
+				);
+				continue;
+			}
+
+			// Validate type.
+			$expected_type = $valid_fields[ $field ];
+
+			if ( 'boolean' === $expected_type && ! is_bool( $value ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: annotation field name */
+					__( 'Annotation field %s must be a boolean', 'mcp-adapter' ),
+					$field
+				);
+			} elseif ( 'string' === $expected_type && ! is_string( $value ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: annotation field name */
+					__( 'Annotation field %s must be a string', 'mcp-adapter' ),
+					$field
+				);
+			} elseif ( 'string' === $expected_type && empty( trim( $value ) ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: annotation field name */
+					__( 'Annotation field %s must be a non-empty string', 'mcp-adapter' ),
+					$field
+				);
+			}
 		}
 
 		return $errors;
