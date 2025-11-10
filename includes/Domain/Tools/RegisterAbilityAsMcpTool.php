@@ -94,7 +94,7 @@ class RegisterAbilityAsMcpTool {
 		// Convert WordPress-format fields to MCP format and remove old fields.
 		foreach ( $field_mapping as $wp_field => $mcp_field ) {
 			// If WordPress-format field exists convert it.
-			if ( ! isset( $mcp_annotations[ $wp_field ] ) ) {
+			if ( ! isset( $mcp_annotations[ $wp_field ] ) || is_null( $mcp_annotations[ $wp_field ] ) ) {
 				continue;
 			}
 			$mcp_annotations[ $mcp_field ] = (bool) $mcp_annotations[ $wp_field ];
