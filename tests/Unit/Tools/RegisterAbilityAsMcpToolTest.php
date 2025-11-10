@@ -165,7 +165,6 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		if ( ! isset( $arr['annotations'] ) ) {
 			// If no annotations, test passes.
-			$this->assertTrue( true );
 			return;
 		}
 
