@@ -89,7 +89,6 @@ class RegisterAbilityAsMcpResource {
 		);
 	}
 
-
 	/**
 	 * Get the MCP resource data array.
 	 *

@@ -80,7 +80,6 @@ class RegisterAbilityAsMcpPrompt {
 		$this->ability    = $ability;
 	}
 
-
 	/**
 	 * Get the MCP prompt data array.
 	 *
