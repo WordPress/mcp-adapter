@@ -241,9 +241,11 @@ class McpResourceValidator {
 				continue;
 			}
 			$priority = (float) $value;
-			if ( $priority < 0.0 || $priority > 1.0 ) {
-				$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
+			if ( $priority >= 0.0 && $priority <= 1.0 ) {
+				continue;
 			}
+
+			$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
 		}
 
 		return $errors;
