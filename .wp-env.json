@@ -1,6 +1,6 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
-	"core": null,
+	"core": "WordPress/WordPress#master",
 	"plugins": ["WordPress/abilities-api", "./."],
 	"env": {
 		"development": {
