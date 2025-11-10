@@ -109,9 +109,8 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$arr = $prompt->to_array();
 
 		// Priority was -1.0, should be clamped to 0.0.
-		if ( isset( $arr['annotations']['priority'] ) ) {
-			$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
-			$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
-		}
+		$this->assertArrayHasKey( 'annotations', $arr );
+		$this->assertArrayHasKey( 'priority', $arr['annotations'] );
+		$this->assertSame( 0.0, $arr['annotations']['priority'] );
 	}
 }
