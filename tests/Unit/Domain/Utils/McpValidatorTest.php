@@ -245,6 +245,9 @@ final class McpValidatorTest extends TestCase {
 			'image/webp',
 			'image/bmp',
 			'image/svg+xml',
+			'image/avif',
+			'image/heic',
+			'image/tiff',
 		);
 
 		foreach ( $valid_image_types as $type ) {
@@ -261,9 +264,12 @@ final class McpValidatorTest extends TestCase {
 		$invalid_types = array(
 			'text/plain',
 			'application/json',
-			'image/invalid',
+			'audio/mp3',
+			'video/mp4',
 			'',
 			'not-an-image',
+			'image',           // Missing subtype
+			'images/png',      // Wrong prefix
 		);
 
 		foreach ( $invalid_types as $type ) {
@@ -282,6 +288,8 @@ final class McpValidatorTest extends TestCase {
 			'audio/webm',
 			'audio/aac',
 			'audio/flac',
+			'audio/opus',
+			'audio/m4a',
 		);
 
 		foreach ( $valid_audio_types as $type ) {
@@ -298,9 +306,12 @@ final class McpValidatorTest extends TestCase {
 		$invalid_types = array(
 			'text/plain',
 			'application/json',
-			'audio/invalid',
+			'image/jpeg',
+			'video/mp4',
 			'',
 			'not-an-audio',
+			'audio',           // Missing subtype
+			'audios/mp3',      // Wrong prefix
 		);
 
 		foreach ( $invalid_types as $type ) {
@@ -359,4 +370,3 @@ final class McpValidatorTest extends TestCase {
 		$this->assertIsBool( $result );
 	}
 }
-

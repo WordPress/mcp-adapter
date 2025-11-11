@@ -150,7 +150,7 @@ class McpResourceValidator {
 		if ( isset( $resource_data['mimeType'] ) ) {
 			if ( ! is_string( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a string if provided', 'mcp-adapter' );
-			} elseif ( ! self::validate_mime_type( $resource_data['mimeType'] ) ) {
+			} elseif ( ! McpValidator::validate_mime_type( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a valid MIME type format', 'mcp-adapter' );
 			}
 		}
@@ -277,16 +277,5 @@ class McpResourceValidator {
 		// Basic URI validation: must have scheme followed by colon (RFC 3986)
 		// This accepts any protocol as per MCP specification.
 		return (bool) preg_match( '/^[a-zA-Z][a-zA-Z0-9+.-]*:.+/', $uri );
-	}
-
-	/**
-	 * Validate MIME type format.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_mime_type( string $mime_type ): bool {
-		return (bool) preg_match( '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_]*$/', $mime_type );
 	}
 }

@@ -126,17 +126,7 @@ class McpValidator {
 	 * @return bool True if valid image MIME type, false otherwise.
 	 */
 	public static function validate_image_mime_type( string $mime_type ): bool {
-		$valid_image_types = array(
-			'image/jpeg',
-			'image/jpg',
-			'image/png',
-			'image/gif',
-			'image/webp',
-			'image/bmp',
-			'image/svg+xml',
-		);
-
-		return in_array( strtolower( $mime_type ), $valid_image_types, true );
+		return str_starts_with( strtolower( $mime_type ), 'image/' );
 	}
 
 	/**
@@ -149,17 +139,7 @@ class McpValidator {
 	 * @return bool True if valid audio MIME type, false otherwise.
 	 */
 	public static function validate_audio_mime_type( string $mime_type ): bool {
-		$valid_audio_types = array(
-			'audio/wav',
-			'audio/mp3',
-			'audio/mpeg',
-			'audio/ogg',
-			'audio/webm',
-			'audio/aac',
-			'audio/flac',
-		);
-
-		return in_array( strtolower( $mime_type ), $valid_audio_types, true );
+		return str_starts_with( strtolower( $mime_type ), 'audio/' );
 	}
 
 	/**

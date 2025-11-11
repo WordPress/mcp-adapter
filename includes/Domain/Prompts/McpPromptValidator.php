@@ -400,7 +400,7 @@ class McpPromptValidator {
 						__( 'Message %d image content must have a data field with base64-encoded image', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_base64( $content['data'] ) ) {
+				} elseif ( ! McpValidator::validate_base64( $content['data'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d image content data must be valid base64', 'mcp-adapter' ),
@@ -414,7 +414,7 @@ class McpPromptValidator {
 						__( 'Message %d image content must have a mimeType field', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_image_mime_type( $content['mimeType'] ) ) {
+				} elseif ( ! McpValidator::validate_image_mime_type( $content['mimeType'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d image content must have a valid image MIME type', 'mcp-adapter' ),
@@ -430,7 +430,7 @@ class McpPromptValidator {
 						__( 'Message %d audio content must have a data field with base64-encoded audio', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_base64( $content['data'] ) ) {
+				} elseif ( ! McpValidator::validate_base64( $content['data'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d audio content data must be valid base64', 'mcp-adapter' ),
@@ -444,7 +444,7 @@ class McpPromptValidator {
 						__( 'Message %d audio content must have a mimeType field', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_audio_mime_type( $content['mimeType'] ) ) {
+				} elseif ( ! McpValidator::validate_audio_mime_type( $content['mimeType'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d audio content must have a valid audio MIME type', 'mcp-adapter' ),
@@ -632,65 +632,6 @@ class McpPromptValidator {
 
 		// Only allow letters, numbers, hyphens, and underscores
 		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
-	}
-
-	/**
-	 * Validate base64 content.
-	 *
-	 * @param string $content The content to validate as base64.
-	 *
-	 * @return bool True if valid base64, false otherwise.
-	 */
-	public static function validate_base64( string $content ): bool {
-		// Base64 content should not be empty
-		if ( empty( $content ) ) {
-			return false;
-		}
-
-		// Check if it's valid base64 encoding
-		return base64_decode( $content, true ) !== false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-	}
-
-	/**
-	 * Validate image MIME type.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid image MIME type, false otherwise.
-	 */
-	public static function validate_image_mime_type( string $mime_type ): bool {
-		$valid_image_types = array(
-			'image/jpeg',
-			'image/jpg',
-			'image/png',
-			'image/gif',
-			'image/webp',
-			'image/bmp',
-			'image/svg+xml',
-		);
-
-		return in_array( strtolower( $mime_type ), $valid_image_types, true );
-	}
-
-	/**
-	 * Validate audio MIME type.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid audio MIME type, false otherwise.
-	 */
-	public static function validate_audio_mime_type( string $mime_type ): bool {
-		$valid_audio_types = array(
-			'audio/wav',
-			'audio/mp3',
-			'audio/mpeg',
-			'audio/ogg',
-			'audio/webm',
-			'audio/aac',
-			'audio/flac',
-		);
-
-		return in_array( strtolower( $mime_type ), $valid_audio_types, true );
 	}
 
 	/**

@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Unit\Domain\Resources;
 
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Resources\McpResourceValidator;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Tests\TestCase;
 
 /**
@@ -155,7 +156,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_types as $type ) {
-			$this->assertTrue( McpResourceValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
+			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
 		}
 	}
 
@@ -170,7 +171,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpResourceValidator::validate_mime_type( $type ), "MIME type '{$type}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be invalid" );
 		}
 	}
 
