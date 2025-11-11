@@ -321,48 +321,45 @@ class McpValidator {
 		$errors = array();
 
 		foreach ( $annotations as $field => $value ) {
-			// Validate audience field.
-			if ( 'audience' === $field ) {
-				if ( ! is_array( $value ) ) {
-					$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
-					continue;
-				}
-				if ( empty( $value ) ) {
-					$errors[] = __( 'Annotation field audience must be a non-empty array', 'mcp-adapter' );
-					continue;
-				}
-				if ( ! self::validate_roles_array( $value ) ) {
-					$errors[] = __( 'Annotation field audience must contain only valid roles ("user" or "assistant")', 'mcp-adapter' );
-				}
-				continue;
-			}
+			switch ( $field ) {
+				case 'audience':
+					if ( ! is_array( $value ) ) {
+						$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
+						break;
+					}
+					if ( empty( $value ) ) {
+						$errors[] = __( 'Annotation field audience must be a non-empty array', 'mcp-adapter' );
+						break;
+					}
+					if ( ! self::validate_roles_array( $value ) ) {
+						$errors[] = __( 'Annotation field audience must contain only valid roles ("user" or "assistant")', 'mcp-adapter' );
+					}
+					break;
 
-			// Validate lastModified field.
-			if ( 'lastModified' === $field ) {
-				if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
-					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
-					continue;
-				}
-				if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
-					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
-				}
-				continue;
-			}
+				case 'lastModified':
+					if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
+						$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
+						break;
+					}
+					if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
+						$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
+					}
+					break;
 
-			// Validate priority field.
-			if ( 'priority' === $field ) {
-				if ( ! is_numeric( $value ) ) {
-					$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
-					continue;
-				}
-				if ( self::validate_priority( $value ) ) {
-					continue;
-				}
-				$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
-				continue;
-			}
+				case 'priority':
+					if ( ! is_numeric( $value ) ) {
+						$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
+						break;
+					}
+					if ( ! self::validate_priority( $value ) ) {
+						$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
+					}
+					break;
 
-			// Unknown fields are ignored to allow forward compatibility.
+				default:
+					// Unknown fields are ignored to allow forward compatibility.
+					break;
+			}
 		}
 
 		return $errors;
