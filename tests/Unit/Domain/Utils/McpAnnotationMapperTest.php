@@ -218,9 +218,9 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertSame( 'untrimmed', $result['title'] );                         // String trimmed
 	}
 
-	public function test_map_with_empty_string_uses_mcp_field_name(): void {
+	public function test_map_with_null_ability_property_uses_mcp_field_name(): void {
 		$annotations = array(
-			// Fields with empty ability_property should map 1:1
+			// Fields with null ability_property should map 1:1
 			'audience'     => array( 'user' ),
 			'lastModified' => '2024-01-15T10:30:00Z',
 			'priority'     => 0.5,
@@ -230,7 +230,7 @@ final class McpAnnotationMapperTest extends TestCase {
 
 		$result = McpAnnotationMapper::map( $annotations, 'tool' );
 
-		// These should map 1:1 (ability_property is empty string)
+		// These should map 1:1 (ability_property is null)
 		$this->assertArrayHasKey( 'audience', $result );
 		$this->assertArrayHasKey( 'lastModified', $result );
 		$this->assertArrayHasKey( 'priority', $result );

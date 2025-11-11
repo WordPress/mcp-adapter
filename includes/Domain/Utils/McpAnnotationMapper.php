@@ -27,26 +27,26 @@ class McpAnnotationMapper {
 	 * Structure:
 	 * - type: The data type (boolean, string, array, number)
 	 * - features: Array of MCP features where this annotation is used (tool, resource, prompt)
-	 * - ability_property: The WordPress Ability API property name (may differ from MCP field name)
+	 * - ability_property: The WordPress Ability API property name (may differ from MCP field name), or null if mapping 1:1
 	 *
-	 * @var array<string, array{type: string, features: array<string>, ability_property: string}>
+	 * @var array<string, array{type: string, features: array<string>, ability_property: string|null}>
 	 */
 	private static array $mcp_annotations = array(
 		// Shared annotations (all features) - in annotations object.
 		'audience'        => array(
 			'type'             => 'array',
 			'features'         => array( 'tool', 'resource', 'prompt' ),
-			'ability_property' => '',
+			'ability_property' => null,
 		),
 		'lastModified'    => array(
 			'type'             => 'string',
 			'features'         => array( 'tool', 'resource', 'prompt' ),
-			'ability_property' => '',
+			'ability_property' => null,
 		),
 		'priority'        => array(
 			'type'             => 'number',
 			'features'         => array( 'tool', 'resource', 'prompt' ),
-			'ability_property' => '',
+			'ability_property' => null,
 		),
 		'readOnlyHint'    => array(
 			'type'             => 'boolean',
@@ -66,12 +66,12 @@ class McpAnnotationMapper {
 		'openWorldHint'   => array(
 			'type'             => 'boolean',
 			'features'         => array( 'tool' ),
-			'ability_property' => '',
+			'ability_property' => null,
 		),
 		'title'           => array(
 			'type'             => 'string',
 			'features'         => array( 'tool' ),
-			'ability_property' => '',
+			'ability_property' => null,
 		),
 	);
 
@@ -119,15 +119,15 @@ class McpAnnotationMapper {
 	/**
 	 * Resolve the annotation value, preferring WordPress-format overrides when available.
 	 *
-	 * @param array  $annotations     Raw annotations from the ability.
-	 * @param string $mcp_field       The MCP field name.
-	 * @param string $ability_property Optional WordPress-format field name.
+	 * @param array       $annotations     Raw annotations from the ability.
+	 * @param string      $mcp_field       The MCP field name.
+	 * @param string|null $ability_property Optional WordPress-format field name, or null if mapping 1:1.
 	 *
 	 * @return array{has_value:bool,value:mixed}
 	 */
-	private static function resolve_annotation_value( array $annotations, string $mcp_field, string $ability_property ): array {
+	private static function resolve_annotation_value( array $annotations, string $mcp_field, ?string $ability_property ): array {
 		// WordPress-format overrides take precedence when present.
-		if ( '' !== $ability_property && array_key_exists( $ability_property, $annotations ) && ! is_null( $annotations[ $ability_property ] ) ) {
+		if ( null !== $ability_property && array_key_exists( $ability_property, $annotations ) && ! is_null( $annotations[ $ability_property ] ) ) {
 			return array(
 				'has_value' => true,
 				'value'     => $annotations[ $ability_property ],
