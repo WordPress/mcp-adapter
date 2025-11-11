@@ -165,4 +165,156 @@ class McpValidator {
 		// Check if it's valid base64 encoding.
 		return base64_decode( $content, true ) !== false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
 	}
+
+	/**
+	 * Validate a resource URI format.
+	 *
+	 * Per MCP spec: "The URI can use any protocol; it is up to the server how to interpret it."
+	 * This validates basic URI structure per RFC 3986.
+	 *
+	 * @param string $uri The URI to validate.
+	 *
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_resource_uri( string $uri ): bool {
+		// URI should not be empty.
+		if ( empty( $uri ) ) {
+			return false;
+		}
+
+		// Check reasonable length constraints.
+		if ( strlen( $uri ) > 2048 ) {
+			return false;
+		}
+
+		// Basic URI validation: must have scheme followed by colon (RFC 3986).
+		// This accepts any protocol as per MCP specification.
+		return (bool) preg_match( '/^[a-zA-Z][a-zA-Z0-9+.-]*:.+/', $uri );
+	}
+
+	/**
+	 * Validate a role value according to MCP specification.
+	 *
+	 * Valid roles are "user" or "assistant".
+	 *
+	 * @param string $role The role to validate.
+	 *
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_role( string $role ): bool {
+		return in_array( $role, array( 'user', 'assistant' ), true );
+	}
+
+	/**
+	 * Validate an array of roles according to MCP specification.
+	 *
+	 * All roles must be strings and must be either "user" or "assistant".
+	 *
+	 * @param array $roles The roles array to validate.
+	 *
+	 * @return bool True if all roles are valid, false otherwise.
+	 */
+	public static function validate_roles_array( array $roles ): bool {
+		if ( empty( $roles ) ) {
+			return false;
+		}
+
+		foreach ( $roles as $role ) {
+			if ( ! is_string( $role ) || ! self::validate_role( $role ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate a priority value according to MCP specification.
+	 *
+	 * Priority must be a number between 0.0 and 1.0 (inclusive).
+	 *
+	 * @param mixed $priority The priority value to validate.
+	 *
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_priority( $priority ): bool {
+		if ( ! is_numeric( $priority ) ) {
+			return false;
+		}
+
+		$priority_float = (float) $priority;
+		return $priority_float >= 0.0 && $priority_float <= 1.0;
+	}
+
+	/**
+	 * Get validation errors for MCP annotations (for resources and prompts).
+	 *
+	 * Validates that annotations conform to the MCP 2025-06-18 specification:
+	 * - audience must be a non-empty array of valid Role values ("user", "assistant")
+	 * - lastModified must be a valid ISO 8601 formatted string
+	 * - priority must be a number between 0.0 and 1.0
+	 * - No unknown annotation fields are allowed
+	 *
+	 * @param array $annotations The annotations to validate.
+	 *
+	 * @return array Array of validation errors, empty if valid.
+	 */
+	public static function get_annotation_validation_errors( array $annotations ): array {
+		$errors = array();
+
+		// Define valid annotation fields per MCP specification.
+		$valid_fields = array( 'audience', 'lastModified', 'priority' );
+
+		foreach ( $annotations as $field => $value ) {
+			// Check if field is a valid MCP annotation field.
+			if ( ! in_array( $field, $valid_fields, true ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: annotation field name */
+					__( 'Unknown annotation field: %s. Valid MCP annotation fields are: audience, lastModified, priority', 'mcp-adapter' ),
+					$field
+				);
+				continue;
+			}
+
+			// Validate audience field.
+			if ( 'audience' === $field ) {
+				if ( ! is_array( $value ) ) {
+					$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
+					continue;
+				}
+				if ( empty( $value ) ) {
+					$errors[] = __( 'Annotation field audience must be a non-empty array', 'mcp-adapter' );
+					continue;
+				}
+				if ( ! self::validate_roles_array( $value ) ) {
+					$errors[] = __( 'Annotation field audience must contain only valid roles ("user" or "assistant")', 'mcp-adapter' );
+				}
+				continue;
+			}
+
+			// Validate lastModified field.
+			if ( 'lastModified' === $field ) {
+				if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
+					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
+					continue;
+				}
+				if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
+					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
+				}
+				continue;
+			}
+
+			// Validate priority field (only remaining valid field after audience and lastModified checks).
+			if ( ! is_numeric( $value ) ) {
+				$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
+				continue;
+			}
+			if ( self::validate_priority( $value ) ) {
+				continue;
+			}
+			$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
+		}
+
+		return $errors;
+	}
 }
