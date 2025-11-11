@@ -95,17 +95,17 @@ class McpAnnotationMapper {
 				continue;
 			}
 
-			$value_info = self::resolve_annotation_value(
+			$value = self::resolve_annotation_value(
 				$ability_annotations,
 				$mcp_field,
 				$config['ability_property']
 			);
 
-			if ( ! $value_info['has_value'] ) {
+			if ( null === $value ) {
 				continue;
 			}
 
-			$normalized = self::normalize_annotation_value( $config['type'], $value_info['value'] );
+			$normalized = self::normalize_annotation_value( $config['type'], $value );
 			if ( null === $normalized ) {
 				continue;
 			}
@@ -123,28 +123,19 @@ class McpAnnotationMapper {
 	 * @param string      $mcp_field       The MCP field name.
 	 * @param string|null $ability_property Optional WordPress-format field name, or null if mapping 1:1.
 	 *
-	 * @return array{has_value:bool,value:mixed}
+	 * @return mixed The annotation value, or null if not found.
 	 */
-	private static function resolve_annotation_value( array $annotations, string $mcp_field, ?string $ability_property ): array {
+	private static function resolve_annotation_value( array $annotations, string $mcp_field, ?string $ability_property ) {
 		// WordPress-format overrides take precedence when present.
 		if ( null !== $ability_property && array_key_exists( $ability_property, $annotations ) && ! is_null( $annotations[ $ability_property ] ) ) {
-			return array(
-				'has_value' => true,
-				'value'     => $annotations[ $ability_property ],
-			);
+			return $annotations[ $ability_property ];
 		}
 
 		if ( array_key_exists( $mcp_field, $annotations ) && ! is_null( $annotations[ $mcp_field ] ) ) {
-			return array(
-				'has_value' => true,
-				'value'     => $annotations[ $mcp_field ],
-			);
+			return $annotations[ $mcp_field ];
 		}
 
-		return array(
-			'has_value' => false,
-			'value'     => null,
-		);
+		return null;
 	}
 
 	/**
