@@ -63,30 +63,6 @@ class McpResourceValidator {
 	}
 
 	/**
-	 * Validate that the resource is unique within the MCP server.
-	 *
-	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
-	 * @param string      $context Optional context for error messages.
-	 *
-	 * @return bool|\WP_Error True if unique, WP_Error if the resource URI is not unique.
-	 */
-	public static function validate_resource_uniqueness( McpResource $the_resource, string $context = '' ) {
-		$this_resource_uri = $the_resource->get_uri();
-		$existing_resource = $the_resource->get_mcp_server()->get_resource( $this_resource_uri );
-		if ( $existing_resource ) {
-			$error_message  = $context ? "[{$context}] " : '';
-			$error_message .= sprintf(
-			/* translators: %s: resource URI */
-				__( 'Resource URI \'%s\' is not unique. It already exists in the MCP server.', 'mcp-adapter' ),
-				$this_resource_uri
-			);
-			return new \WP_Error( 'resource_not_unique', esc_html( $error_message ) );
-		}
-
-		return true;
-	}
-
-	/**
 	 * Get validation error details for debugging purposes.
 	 * This is the core validation method - all other validation methods use this.
 	 *
@@ -114,7 +90,7 @@ class McpResourceValidator {
 		// Validate the required URI field.
 		if ( empty( $resource_data['uri'] ) || ! is_string( $resource_data['uri'] ) ) {
 			$errors[] = __( 'Resource URI is required and must be a non-empty string', 'mcp-adapter' );
-		} elseif ( ! self::validate_resource_uri( $resource_data['uri'] ) ) {
+		} elseif ( ! McpValidator::validate_resource_uri( $resource_data['uri'] ) ) {
 			$errors[] = __( 'Resource URI must be a valid URI format', 'mcp-adapter' );
 		}
 
@@ -160,7 +136,7 @@ class McpResourceValidator {
 			if ( ! is_array( $resource_data['annotations'] ) ) {
 				$errors[] = __( 'Resource annotations must be an array if provided', 'mcp-adapter' );
 			} else {
-				$annotation_errors = self::get_annotation_validation_errors( $resource_data['annotations'] );
+				$annotation_errors = McpValidator::get_annotation_validation_errors( $resource_data['annotations'] );
 				if ( ! empty( $annotation_errors ) ) {
 					$errors = array_merge( $errors, $annotation_errors );
 				}
@@ -171,111 +147,26 @@ class McpResourceValidator {
 	}
 
 	/**
-	 * Get validation errors for resource annotations according to MCP Annotations specification.
+	 * Validate that the resource is unique within the MCP server.
 	 *
-	 * Validates that annotations conform to the MCP 2025-06-18 specification:
-	 * - audience must be an array of valid Role values ("user", "assistant")
-	 * - lastModified must be a valid ISO 8601 formatted string
-	 * - priority must be a number between 0 and 1
-	 * - No unknown annotation fields are allowed
+	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
+	 * @param string      $context Optional context for error messages.
 	 *
-	 * @param array $annotations The annotations to validate.
-	 *
-	 * @return array Array of validation errors, empty if valid.
+	 * @return bool|\WP_Error True if unique, WP_Error if the resource URI is not unique.
 	 */
-	private static function get_annotation_validation_errors( array $annotations ): array {
-		$errors = array();
-
-		// Define valid annotation fields per MCP specification.
-		$valid_fields = array( 'audience', 'lastModified', 'priority' );
-
-		foreach ( $annotations as $field => $value ) {
-			// Check if field is a valid MCP annotation field.
-			if ( ! in_array( $field, $valid_fields, true ) ) {
-				$errors[] = sprintf(
-					/* translators: %s: annotation field name */
-					__( 'Unknown annotation field: %s. Valid MCP annotation fields are: audience, lastModified, priority', 'mcp-adapter' ),
-					$field
-				);
-				continue;
-			}
-
-			// Validate audience field.
-			if ( 'audience' === $field ) {
-				if ( ! is_array( $value ) ) {
-					$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
-					continue;
-				}
-				if ( empty( $value ) ) {
-					$errors[] = __( 'Annotation field audience must be a non-empty array', 'mcp-adapter' );
-					continue;
-				}
-				$valid_roles = array( 'user', 'assistant' );
-				foreach ( $value as $role ) {
-					if ( ! is_string( $role ) || ! in_array( $role, $valid_roles, true ) ) {
-						$errors[] = sprintf(
-							/* translators: %s: role value */
-							__( 'Annotation field audience must contain only valid roles ("user" or "assistant"), found: %s', 'mcp-adapter' ),
-							is_string( $role ) ? $role : gettype( $role )
-						);
-						break; // Only report first invalid role.
-					}
-				}
-				continue;
-			}
-
-			// Validate lastModified field.
-			if ( 'lastModified' === $field ) {
-				if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
-					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
-					continue;
-				}
-				// Validate ISO 8601 format using shared utility.
-				if ( ! McpValidator::validate_iso8601_timestamp( trim( $value ) ) ) {
-					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
-				}
-				continue;
-			}
-
-			// Validate priority field (only remaining valid field after audience and lastModified checks).
-			if ( ! is_numeric( $value ) ) {
-				$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
-				continue;
-			}
-			$priority = (float) $value;
-			if ( $priority >= 0.0 && $priority <= 1.0 ) {
-				continue;
-			}
-
-			$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
+	public static function validate_resource_uniqueness( McpResource $the_resource, string $context = '' ) {
+		$this_resource_uri = $the_resource->get_uri();
+		$existing_resource = $the_resource->get_mcp_server()->get_resource( $this_resource_uri );
+		if ( $existing_resource ) {
+			$error_message  = $context ? "[{$context}] " : '';
+			$error_message .= sprintf(
+			/* translators: %s: resource URI */
+				__( 'Resource URI \'%s\' is not unique. It already exists in the MCP server.', 'mcp-adapter' ),
+				$this_resource_uri
+			);
+			return new \WP_Error( 'resource_not_unique', esc_html( $error_message ) );
 		}
 
-		return $errors;
-	}
-
-	/**
-	 * Check if a resource URI follows valid format according to MCP specification.
-	 *
-	 * Per MCP spec: "The URI can use any protocol; it is up to the server how to interpret it."
-	 * This validates basic URI structure per RFC 3986.
-	 *
-	 * @param string $uri The URI to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_resource_uri( string $uri ): bool {
-		// URI should not be empty.
-		if ( empty( $uri ) ) {
-			return false;
-		}
-
-		// Check reasonable length constraints.
-		if ( strlen( $uri ) > 2048 ) {
-			return false;
-		}
-
-		// Basic URI validation: must have scheme followed by colon (RFC 3986)
-		// This accepts any protocol as per MCP specification.
-		return (bool) preg_match( '/^[a-zA-Z][a-zA-Z0-9+.-]*:.+/', $uri );
+		return true;
 	}
 }
