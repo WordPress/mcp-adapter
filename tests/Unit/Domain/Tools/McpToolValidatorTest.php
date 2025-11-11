@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Unit\Domain\Tools;
 
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\McpToolValidator;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Tests\TestCase;
 
 /**
@@ -149,7 +150,7 @@ final class McpToolValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpToolValidator::validate_tool_name( $name ), "Name '{$name}' should be valid" );
+			$this->assertTrue( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be valid" );
 		}
 	}
 
@@ -163,7 +164,7 @@ final class McpToolValidatorTest extends TestCase {
 		);
 
 		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpToolValidator::validate_tool_name( $name ), "Name '{$name}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be invalid" );
 		}
 	}
 
@@ -223,7 +224,7 @@ final class McpToolValidatorTest extends TestCase {
 			'inputSchema' => array( 'type' => 'object' ),
 		);
 
-		$this->assertTrue( McpToolValidator::is_valid_tool_data( $valid_data ) );
+		$this->assertTrue( empty( McpToolValidator::get_validation_errors( $valid_data ) ) );
 	}
 
 	public function test_is_valid_tool_data_with_invalid_data(): void {
@@ -232,7 +233,7 @@ final class McpToolValidatorTest extends TestCase {
 			'description' => '',
 		);
 
-		$this->assertFalse( McpToolValidator::is_valid_tool_data( $invalid_data ) );
+		$this->assertFalse( empty( McpToolValidator::get_validation_errors( $invalid_data ) ) );
 	}
 
 	public function test_validate_tool_data_with_complex_schema(): void {

@@ -170,96 +170,18 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'Prompt annotations must be an array if provided', $result->get_error_message() );
 	}
 
-	public function test_validate_prompt_name_with_valid_names(): void {
-		$valid_names = array(
-			'simple-prompt',
-			'prompt_with_underscores',
-			'prompt123',
-			'a',
-			'very-long-prompt-name-that-is-still-under-255-characters',
-		);
-
-		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpPromptValidator::validate_prompt_name( $name ), "Name '{$name}' should be valid" );
-		}
-	}
-
-	public function test_validate_prompt_name_with_invalid_names(): void {
-		$invalid_names = array(
-			'',                           // Empty
-			'prompt with spaces',         // Spaces
-			'prompt@invalid',            // Special characters
-			'prompt.invalid',            // Dots
-			str_repeat( 'a', 256 ),      // Too long
-		);
-
-		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpPromptValidator::validate_prompt_name( $name ), "Name '{$name}' should be invalid" );
-		}
-	}
-
-	public function test_validate_argument_name_with_valid_names(): void {
-		$valid_names = array(
-			'simple-arg',
-			'arg_with_underscores',
-			'arg123',
-			'a',
-		);
-
-		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpPromptValidator::validate_argument_name( $name ), "Argument name '{$name}' should be valid" );
-		}
-	}
-
-	public function test_validate_argument_name_with_invalid_names(): void {
-		$invalid_names = array(
-			'',                           // Empty
-			'arg with spaces',            // Spaces
-			'arg@invalid',               // Special characters
-			str_repeat( 'a', 65 ),       // Too long (over 64 chars)
-		);
-
-		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpPromptValidator::validate_argument_name( $name ), "Argument name '{$name}' should be invalid" );
-		}
-	}
-
-
-	public function test_validate_iso8601_timestamp(): void {
-		$valid_timestamps = array(
-			'2023-12-25T10:30:00Z',
-			'2023-12-25T10:30:00+02:00',
-			// Note: Microsecond formats may not be supported by all DateTime implementations
-		);
-
-		foreach ( $valid_timestamps as $timestamp ) {
-			$this->assertTrue( McpPromptValidator::validate_iso8601_timestamp( $timestamp ), "Timestamp '{$timestamp}' should be valid" );
-		}
-
-		$invalid_timestamps = array(
-			'2023-12-25',
-			'10:30:00',
-			'not-a-timestamp',
-			'2023/12/25 10:30:00',
-		);
-
-		foreach ( $invalid_timestamps as $timestamp ) {
-			$this->assertFalse( McpPromptValidator::validate_iso8601_timestamp( $timestamp ), "Timestamp '{$timestamp}' should be invalid" );
-		}
-	}
-
 	public function test_is_valid_prompt_data(): void {
 		$valid_data = array(
 			'name' => 'valid-prompt',
 		);
 
-		$this->assertTrue( McpPromptValidator::is_valid_prompt_data( $valid_data ) );
+		$this->assertTrue( empty( McpPromptValidator::get_validation_errors( $valid_data ) ) );
 
 		$invalid_data = array(
 			'name' => '',
 		);
 
-		$this->assertFalse( McpPromptValidator::is_valid_prompt_data( $invalid_data ) );
+		$this->assertFalse( empty( McpPromptValidator::get_validation_errors( $invalid_data ) ) );
 	}
 
 	public function test_validate_prompt_messages_with_valid_messages(): void {

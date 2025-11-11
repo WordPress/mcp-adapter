@@ -369,4 +369,245 @@ final class McpValidatorTest extends TestCase {
 		$result = McpValidator::validate_base64( $valid_no_padding );
 		$this->assertIsBool( $result );
 	}
+
+	// Resource URI Validation Tests
+
+	public function test_validate_resource_uri_with_valid_uris(): void {
+		$valid_uris = array(
+			'file:///path/to/file.txt',
+			'http://example.com/resource',
+			'https://example.com/resource',
+			'ftp://ftp.example.com/file',
+			'custom://my-resource',
+			'app://resource/123',
+			'wordpress://post/42',
+		);
+
+		foreach ( $valid_uris as $uri ) {
+			$this->assertTrue( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be valid" );
+		}
+	}
+
+	public function test_validate_resource_uri_rejects_empty(): void {
+		$this->assertFalse( McpValidator::validate_resource_uri( '' ) );
+	}
+
+	public function test_validate_resource_uri_rejects_no_scheme(): void {
+		$invalid_uris = array(
+			'/path/to/file',
+			'example.com',
+			'resource',
+		);
+
+		foreach ( $invalid_uris as $uri ) {
+			$this->assertFalse( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid (no scheme)" );
+		}
+	}
+
+	public function test_validate_resource_uri_rejects_too_long(): void {
+		$long_uri = 'http://example.com/' . str_repeat( 'a', 2048 );
+		$this->assertFalse( McpValidator::validate_resource_uri( $long_uri ) );
+	}
+
+	public function test_validate_resource_uri_accepts_max_length(): void {
+		// Build a URI that's exactly 2048 characters
+		$path         = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
+		$max_length_uri = 'http://a.com/' . $path;
+		$this->assertTrue( McpValidator::validate_resource_uri( $max_length_uri ) );
+	}
+
+	// Role Validation Tests
+
+	public function test_validate_role_with_valid_roles(): void {
+		$this->assertTrue( McpValidator::validate_role( 'user' ) );
+		$this->assertTrue( McpValidator::validate_role( 'assistant' ) );
+	}
+
+	public function test_validate_role_rejects_invalid_roles(): void {
+		$invalid_roles = array(
+			'admin',
+			'system',
+			'moderator',
+			'',
+			'User',       // Case sensitive
+			'ASSISTANT',  // Case sensitive
+		);
+
+		foreach ( $invalid_roles as $role ) {
+			$this->assertFalse( McpValidator::validate_role( $role ), "Role '{$role}' should be invalid" );
+		}
+	}
+
+	// Roles Array Validation Tests
+
+	public function test_validate_roles_array_with_valid_arrays(): void {
+		$valid_arrays = array(
+			array( 'user' ),
+			array( 'assistant' ),
+			array( 'user', 'assistant' ),
+			array( 'assistant', 'user' ),
+		);
+
+		foreach ( $valid_arrays as $roles ) {
+			$this->assertTrue( McpValidator::validate_roles_array( $roles ), 'Roles array should be valid' );
+		}
+	}
+
+	public function test_validate_roles_array_rejects_empty_array(): void {
+		$this->assertFalse( McpValidator::validate_roles_array( array() ) );
+	}
+
+	public function test_validate_roles_array_rejects_invalid_roles(): void {
+		$invalid_arrays = array(
+			array( 'admin' ),
+			array( 'user', 'admin' ),
+			array( 'User' ),              // Case sensitive
+			array( 'user', 'assistant', 'system' ),
+		);
+
+		foreach ( $invalid_arrays as $roles ) {
+			$this->assertFalse( McpValidator::validate_roles_array( $roles ), 'Roles array should be invalid' );
+		}
+	}
+
+	public function test_validate_roles_array_rejects_non_string_values(): void {
+		$invalid_arrays = array(
+			array( 1, 2 ),
+			array( 'user', 123 ),
+			array( 'user', null ),
+			array( 'user', true ),
+		);
+
+		foreach ( $invalid_arrays as $roles ) {
+			$this->assertFalse( McpValidator::validate_roles_array( $roles ), 'Roles array with non-strings should be invalid' );
+		}
+	}
+
+	// Priority Validation Tests
+
+	public function test_validate_priority_with_valid_values(): void {
+		$valid_priorities = array(
+			0.0,
+			0.5,
+			1.0,
+			0,
+			1,
+			0.25,
+			0.75,
+			'0.5',  // Numeric string
+		);
+
+		foreach ( $valid_priorities as $priority ) {
+			$this->assertTrue( McpValidator::validate_priority( $priority ), "Priority '{$priority}' should be valid" );
+		}
+	}
+
+	public function test_validate_priority_rejects_out_of_range(): void {
+		$invalid_priorities = array(
+			-0.1,
+			1.1,
+			2,
+			-1,
+			100,
+		);
+
+		foreach ( $invalid_priorities as $priority ) {
+			$this->assertFalse( McpValidator::validate_priority( $priority ), "Priority '{$priority}' should be invalid" );
+		}
+	}
+
+	public function test_validate_priority_rejects_non_numeric(): void {
+		$invalid_priorities = array(
+			'not-a-number',
+			'',
+			null,
+			true,
+			false,
+			array(),
+		);
+
+		foreach ( $invalid_priorities as $priority ) {
+			$this->assertFalse( McpValidator::validate_priority( $priority ), 'Non-numeric priority should be invalid' );
+		}
+	}
+
+	// Annotation Validation Tests
+
+	public function test_get_annotation_validation_errors_with_valid_annotations(): void {
+		$valid_annotations = array(
+			'audience'     => array( 'user', 'assistant' ),
+			'lastModified' => '2024-01-15T10:30:00Z',
+			'priority'     => 0.5,
+		);
+
+		$errors = McpValidator::get_annotation_validation_errors( $valid_annotations );
+		$this->assertEmpty( $errors );
+	}
+
+	public function test_get_annotation_validation_errors_with_partial_annotations(): void {
+		// Only audience
+		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array( 'user' ) ) );
+		$this->assertEmpty( $errors );
+
+		// Only lastModified
+		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15T10:30:00Z' ) );
+		$this->assertEmpty( $errors );
+
+		// Only priority
+		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 0.5 ) );
+		$this->assertEmpty( $errors );
+	}
+
+	public function test_get_annotation_validation_errors_rejects_unknown_fields(): void {
+		$annotations = array(
+			'audience'    => array( 'user' ),
+			'customField' => 'value',
+		);
+
+		$errors = McpValidator::get_annotation_validation_errors( $annotations );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'Unknown annotation field', $errors[0] );
+	}
+
+	public function test_get_annotation_validation_errors_validates_audience(): void {
+		// Invalid: not an array
+		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => 'user' ) );
+		$this->assertNotEmpty( $errors );
+
+		// Invalid: empty array
+		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array() ) );
+		$this->assertNotEmpty( $errors );
+
+		// Invalid: invalid role
+		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array( 'admin' ) ) );
+		$this->assertNotEmpty( $errors );
+	}
+
+	public function test_get_annotation_validation_errors_validates_lastModified(): void {
+		// Invalid: not a string
+		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => 12345 ) );
+		$this->assertNotEmpty( $errors );
+
+		// Invalid: empty string
+		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => '' ) );
+		$this->assertNotEmpty( $errors );
+
+		// Invalid: invalid timestamp format
+		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15' ) );
+		$this->assertNotEmpty( $errors );
+	}
+
+	public function test_get_annotation_validation_errors_validates_priority(): void {
+		// Invalid: not numeric
+		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 'high' ) );
+		$this->assertNotEmpty( $errors );
+
+		// Invalid: out of range (too low)
+		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => -0.1 ) );
+		$this->assertNotEmpty( $errors );
+
+		// Invalid: out of range (too high)
+		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 1.5 ) );
+		$this->assertNotEmpty( $errors );
+	}
 }

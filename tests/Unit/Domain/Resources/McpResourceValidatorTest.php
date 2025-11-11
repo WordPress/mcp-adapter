@@ -126,7 +126,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_uris as $uri ) {
-			$this->assertTrue( McpResourceValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be valid" );
+			$this->assertTrue( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be valid" );
 		}
 	}
 
@@ -140,7 +140,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $invalid_uris as $uri ) {
-			$this->assertFalse( McpResourceValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid" );
 		}
 	}
 
