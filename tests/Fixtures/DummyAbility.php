@@ -220,7 +220,7 @@ final class DummyAbility {
 					return true;
 				},
 				'meta'                => array(
-					'uri' => "  WordPress://local/resource-whitespace  ",
+					'uri' => '  WordPress://local/resource-whitespace  ',
 				),
 			)
 		);
@@ -617,6 +617,7 @@ final class DummyAbility {
 			'test/prompt-with-annotations',
 			'test/prompt-partial-annotations',
 			'test/prompt-invalid-annotations',
+			'test/resource-whitespace-uri',
 		);
 
 		foreach ( $names as $name ) {

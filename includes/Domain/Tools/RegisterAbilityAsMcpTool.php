@@ -85,8 +85,9 @@ class RegisterAbilityAsMcpTool {
 
 		// Add optional title from ability label.
 		$label = $this->ability->get_label();
+		$label = trim( $label );
 		if ( ! empty( $label ) ) {
-			$tool_data['title'] = trim( $label );
+			$tool_data['title'] = $label;
 		}
 
 		// Add optional output schema.
