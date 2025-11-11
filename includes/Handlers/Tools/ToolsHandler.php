@@ -131,6 +131,9 @@ class ToolsHandler {
 				// Tool execution errors (convert to isError: true format):
 				// - permission_denied, permission_check_failed
 				// - wp_error, execution_failed
+				// Note: Error format varies by ability implementation. ExecuteAbilityAbility
+				// returns errors as plain strings, while other abilities return an array
+				// with a 'message' key. This handles both formats here for compatibility (#89).
 				if ( is_string( $result['error'] ) ) {
 					$error_message = $result['error'];
 				} else {
