@@ -323,4 +323,48 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'callback', $tool );
 		$this->assertArrayNotHasKey( 'permission_callback', $tool );
 	}
+
+	public function test_call_tool_with_string_error_from_execute(): void {
+		wp_set_current_user( 1 );
+
+		$this->register_ability_in_hook(
+			'test/string-error',
+			array(
+				'label'               => 'String Error',
+				'description'         => 'Returns string error from execute',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array(
+						'success' => false,
+						'error'   => 'Test string error',
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array( 'test/string-error' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-string-error',
+				),
+			)
+		);
+
+		$this->assertTrue( $res['isError'] );
+		$this->assertEquals( 'Test string error', $res['content'][0]['text'] );
+
+		wp_unregister_ability( 'test/string-error' );
+	}
 }
