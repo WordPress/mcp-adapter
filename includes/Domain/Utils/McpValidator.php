@@ -276,23 +276,27 @@ class McpValidator {
 			}
 
 			// Validate title field.
-			if ( 'title' === $field ) {
-				if ( ! is_string( $value ) ) {
-					$errors[] = sprintf(
-						/* translators: %s: annotation field name */
-						__( 'Tool annotation field %s must be a string', 'mcp-adapter' ),
-						$field
-					);
-					continue;
-				}
-				if ( empty( trim( $value ) ) ) {
-					$errors[] = sprintf(
-						/* translators: %s: annotation field name */
-						__( 'Tool annotation field %s must be a non-empty string', 'mcp-adapter' ),
-						$field
-					);
-				}
+			if ( 'title' !== $field ) {
+				continue;
 			}
+
+			if ( ! is_string( $value ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: annotation field name */
+					__( 'Tool annotation field %s must be a string', 'mcp-adapter' ),
+					$field
+				);
+				continue;
+			}
+			if ( ! empty( trim( $value ) ) ) {
+				continue;
+			}
+
+			$errors[] = sprintf(
+				/* translators: %s: annotation field name */
+				__( 'Tool annotation field %s must be a non-empty string', 'mcp-adapter' ),
+				$field
+			);
 		}
 
 		return $errors;

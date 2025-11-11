@@ -75,12 +75,12 @@ class RegisterAbilityAsMcpResource {
 		$ability_meta = $this->ability->get_meta();
 
 			// First try to get URI from ability meta and normalize whitespace.
-			if ( isset( $ability_meta['uri'] ) && is_string( $ability_meta['uri'] ) ) {
-				$uri = trim( $ability_meta['uri'] );
-				if ( '' !== $uri ) {
-					return $uri;
-				}
+		if ( isset( $ability_meta['uri'] ) && is_string( $ability_meta['uri'] ) ) {
+			$uri = trim( $ability_meta['uri'] );
+			if ( '' !== $uri ) {
+				return $uri;
 			}
+		}
 
 		// If not found in meta, return error since URI should be provided in ability meta
 		return new \WP_Error(
