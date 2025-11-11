@@ -136,7 +136,7 @@ class ToolsHandler {
 				} else {
 					$error_message = $result['error']['message'] ?? 'An error occurred while executing the tool.';
 				}
-				$response      = array(
+				$response = array(
 					'content' => array(
 						array(
 							'type' => 'text',
