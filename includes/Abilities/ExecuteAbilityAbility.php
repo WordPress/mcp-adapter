@@ -69,9 +69,9 @@ final class ExecuteAbilityAbility {
 				'execute_callback'    => array( self::class, 'execute' ),
 				'meta'                => array(
 					'annotations' => array(
-						'priority'      => '1.0',
-						'readOnlyHint'  => false,
-						'openWorldHint' => true,
+						'readonly'  => false,
+						'destructive' => true,
+						'idempotent'  => false,
 					),
 				),
 			)
