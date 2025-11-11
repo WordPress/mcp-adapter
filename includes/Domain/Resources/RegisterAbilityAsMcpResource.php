@@ -74,10 +74,13 @@ class RegisterAbilityAsMcpResource {
 	public function get_uri() {
 		$ability_meta = $this->ability->get_meta();
 
-		// First try to get URI from ability meta
-		if ( ! empty( $ability_meta['uri'] ) ) {
-			return $ability_meta['uri'];
-		}
+			// First try to get URI from ability meta and normalize whitespace.
+			if ( isset( $ability_meta['uri'] ) && is_string( $ability_meta['uri'] ) ) {
+				$uri = trim( $ability_meta['uri'] );
+				if ( '' !== $uri ) {
+					return $uri;
+				}
+			}
 
 		// If not found in meta, return error since URI should be provided in ability meta
 		return new \WP_Error(
@@ -106,13 +109,13 @@ class RegisterAbilityAsMcpResource {
 		);
 
 		// Add optional name from ability label
-		$label = $this->ability->get_label();
+		$label = trim( $this->ability->get_label() );
 		if ( ! empty( $label ) ) {
 			$resource_data['name'] = $label;
 		}
 
 		// Add optional description
-		$description = $this->ability->get_description();
+		$description = trim( $this->ability->get_description() );
 		if ( ! empty( $description ) ) {
 			$resource_data['description'] = $description;
 		}
@@ -129,10 +132,10 @@ class RegisterAbilityAsMcpResource {
 			$resource_data['mimeType'] = $content['mimeType'];
 		}
 
-		// Map annotations from ability meta to MCP format.
+		// Map annotations from ability meta to MCP format using unified mapper.
 		$ability_meta = $this->ability->get_meta();
 		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
-			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'] );
+			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'], 'resource' );
 			if ( ! empty( $mcp_annotations ) ) {
 				$resource_data['annotations'] = $mcp_annotations;
 			}

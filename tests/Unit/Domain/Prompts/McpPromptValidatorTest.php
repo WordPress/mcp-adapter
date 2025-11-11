@@ -252,6 +252,25 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'content type \'invalid-type\' is not supported', implode( ' ', $errors ) );
 	}
 
+	public function test_validate_prompt_messages_with_invalid_embedded_resource(): void {
+		$invalid_messages = array(
+			array(
+				'role'    => 'assistant',
+				'content' => array(
+					'type'     => 'resource',
+					'resource' => array(
+						// Missing URI should trigger McpResourceValidator errors.
+						'text' => 'Some content',
+					),
+				),
+			),
+		);
+
+		$errors = McpPromptValidator::validate_prompt_messages( $invalid_messages );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'Resource URI is required', implode( ' ', $errors ) );
+	}
+
 	public function test_validate_prompt_instance_with_valid_prompt(): void {
 		$server = $this->makeServer();
 
@@ -265,6 +284,17 @@ final class McpPromptValidatorTest extends TestCase {
 
 		$result = McpPromptValidator::validate_prompt_instance( $prompt, 'test-context' );
 		$this->assertTrue( $result );
+	}
+
+	public function test_validate_prompt_requires_server(): void {
+		$prompt = new McpPrompt(
+			'test/missing-server',
+			'prompt-without-server'
+		);
+
+		$result = $prompt->validate();
+		$this->assertWPError( $result );
+		$this->assertSame( 'prompt_missing_mcp_server', $result->get_error_code() );
 	}
 
 	public function test_validate_prompt_uniqueness_method_exists(): void {
@@ -315,19 +345,18 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_prompt_data_with_invalid_annotation_field_name(): void {
-		$invalid_prompt_data = array(
+	public function test_validate_prompt_data_with_unknown_annotation_field_name(): void {
+		// Unknown fields should be ignored (filtered out by mapper before validation)
+		$valid_prompt_data = array(
 			'name'        => 'test-prompt',
 			'annotations' => array(
-				'invalidField' => 'value', // Unknown field
+				'invalidField' => 'value', // Unknown field, should be ignored
 			),
 		);
 
-		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data );
 
-		$this->assertWPError( $result );
-		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Unknown annotation field: invalidField', $result->get_error_message() );
+		$this->assertTrue( $result, 'Unknown annotation fields should be ignored' );
 	}
 
 	public function test_validate_prompt_data_with_invalid_audience_type(): void {

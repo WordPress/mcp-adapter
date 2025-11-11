@@ -193,6 +193,17 @@ final class McpResourceValidatorTest extends TestCase {
 		$this->assertTrue( $result );
 	}
 
+	public function test_validate_resource_requires_server_before_validation(): void {
+		$resource = new McpResource(
+			'test/missing-server',
+			'WordPress://local/missing-server'
+		);
+
+		$result = $resource->validate();
+		$this->assertWPError( $result );
+		$this->assertSame( 'resource_missing_mcp_server', $result->get_error_code() );
+	}
+
 	public function test_validate_resource_uniqueness_method_exists(): void {
 		// Test that the uniqueness validation method exists and is callable
 		$server = $this->makeServer();
@@ -297,20 +308,19 @@ final class McpResourceValidatorTest extends TestCase {
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_data_with_invalid_annotation_field_name(): void {
-		$invalid_resource_data = array(
-			'uri'         => 'WordPress://local/invalid-annotations',
+	public function test_validate_resource_data_with_unknown_annotation_field_name(): void {
+		// Unknown fields should be ignored (filtered out by mapper before validation)
+		$valid_resource_data = array(
+			'uri'         => 'WordPress://local/unknown-annotations',
 			'text'        => 'Test content',
 			'annotations' => array(
-				'invalidField' => 'value', // Unknown field
+				'invalidField' => 'value', // Unknown field, should be ignored
 			),
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
+		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
 
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Unknown annotation field: invalidField', $result->get_error_message() );
+		$this->assertTrue( $result, 'Unknown annotation fields should be ignored' );
 	}
 
 	public function test_validate_resource_data_with_invalid_audience_type(): void {

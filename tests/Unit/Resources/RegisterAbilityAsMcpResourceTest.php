@@ -58,56 +58,27 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
 	}
 
-	public function test_invalid_annotations_are_filtered_out(): void {
-		$ability = wp_get_ability( 'test/resource-invalid-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/resource-invalid-annotations should be registered' );
+		public function test_empty_annotations_are_not_included(): void {
+			$ability = wp_get_ability( 'test/resource' );
+			$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
 
-		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
-		$this->assertNotWPError( $resource );
+			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
+			$this->assertNotWPError( $resource );
 
-		$arr = $resource->to_array();
+			$arr = $resource->to_array();
 
-		// Verify invalid annotations are filtered out but valid ones remain.
-		$this->assertArrayHasKey( 'annotations', $arr, 'Annotations should exist even with some invalid data' );
+			// Verify annotations field is not present when empty.
+			$this->assertArrayNotHasKey( 'annotations', $arr );
+		}
 
-		// Invalid role should be filtered (all roles invalid, so audience field removed)
-		$this->assertArrayNotHasKey( 'audience', $arr['annotations'] );
-		// Invalid date should be filtered
-		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
-		// Priority should be clamped to 1.0 (was 2.0)
-		$this->assertArrayHasKey( 'priority', $arr['annotations'], 'Priority should exist and be clamped' );
-		$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
-		$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
-		// Unknown field should be filtered
-		$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
-	}
+		public function test_get_uri_trims_whitespace_from_meta(): void {
+			$ability = wp_get_ability( 'test/resource-whitespace-uri' );
+			$this->assertNotNull( $ability, 'Ability test/resource-whitespace-uri should be registered' );
 
-	public function test_empty_annotations_are_not_included(): void {
-		$ability = wp_get_ability( 'test/resource' );
-		$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
+			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
+			$this->assertNotWPError( $resource );
 
-		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
-		$this->assertNotWPError( $resource );
-
-		$arr = $resource->to_array();
-
-		// Verify annotations field is not present when empty.
-		$this->assertArrayNotHasKey( 'annotations', $arr );
-	}
-
-	public function test_priority_is_clamped_to_valid_range(): void {
-		$ability = wp_get_ability( 'test/resource-invalid-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/resource-invalid-annotations should be registered' );
-
-		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
-		$this->assertNotWPError( $resource );
-
-		$arr = $resource->to_array();
-
-		// Priority was 2.0, should be clamped to 1.0.
-		$this->assertArrayHasKey( 'annotations', $arr, 'Annotations should exist with clamped priority' );
-		$this->assertArrayHasKey( 'priority', $arr['annotations'], 'Priority should be clamped, not removed' );
-		$this->assertGreaterThanOrEqual( 0.0, $arr['annotations']['priority'] );
-		$this->assertLessThanOrEqual( 1.0, $arr['annotations']['priority'] );
-	}
+			$arr = $resource->to_array();
+			$this->assertSame( 'WordPress://local/resource-whitespace', $arr['uri'] );
+		}
 }

@@ -74,9 +74,9 @@ class McpTool {
 	/**
 	 * The MCP server instance this tool belongs to.
 	 *
-	 * @var \WP\MCP\Core\McpServer
+	 * @var \WP\MCP\Core\McpServer|null
 	 */
-	private McpServer $mcp_server;
+	private ?McpServer $mcp_server = null;
 
 	/**
 	 * Constructor for McpTool.
@@ -265,6 +265,10 @@ class McpTool {
 	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
+		if ( null === $this->mcp_server ) {
+			throw new \RuntimeException( 'MCP server has not been set on this tool instance.' );
+		}
+
 		return $this->mcp_server;
 	}
 
@@ -342,6 +346,13 @@ class McpTool {
 	 * @return self|\WP_Error Returns the validated tool instance or WP_Error if validation fails.
 	 */
 	public function validate( string $context = '' ) {
+		if ( null === $this->mcp_server ) {
+			return new \WP_Error(
+				'tool_missing_mcp_server',
+				esc_html__( 'MCP server must be set before validating a tool.', 'mcp-adapter' )
+			);
+		}
+
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}

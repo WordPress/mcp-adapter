@@ -19,80 +19,162 @@ namespace WP\MCP\Domain\Utils;
 class McpAnnotationMapper {
 
 	/**
-	 * Map WordPress ability annotations to MCP Annotations format.
+	 * Comprehensive mapping of MCP annotations.
 	 *
-	 * Converts annotation fields according to MCP specification:
-	 * - audience: array of Role values (e.g., ["user", "assistant"])
-	 * - lastModified: ISO 8601 formatted string
-	 * - priority: number (1 = most important, 0 = least important)
+	 * Maps MCP annotation fields to their type, which features they apply to,
+	 * and their WordPress Ability API equivalent property names.
 	 *
-	 * Filters out null values and invalid fields.
-	 * Only returns MCP-compliant annotation fields.
+	 * Structure:
+	 * - type: The data type (boolean, string, array, number)
+	 * - features: Array of MCP features where this annotation is used (tool, resource, prompt)
+	 * - ability_property: The WordPress Ability API property name (may differ from MCP field name)
 	 *
-	 * @param array $ability_annotations WordPress ability annotations.
-	 *
-	 * @return array MCP-compliant Annotations.
+	 * @var array<string, array{type: string, features: array<string>, ability_property: string}>
 	 */
-	public static function map( array $ability_annotations ): array {
-		$valid_mcp_fields = array(
-			'audience'     => 'array',
-			'lastModified' => 'string',
-			'priority'     => 'number',
-		);
+	private static array $mcp_annotations = array(
+		// Shared annotations (all features) - in annotations object.
+		'audience'        => array(
+			'type'             => 'array',
+			'features'         => array( 'tool', 'resource', 'prompt' ),
+			'ability_property' => '',
+		),
+		'lastModified'    => array(
+			'type'             => 'string',
+			'features'         => array( 'tool', 'resource', 'prompt' ),
+			'ability_property' => '',
+		),
+		'priority'        => array(
+			'type'             => 'number',
+			'features'         => array( 'tool', 'resource', 'prompt' ),
+			'ability_property' => '',
+		),
+		'readOnlyHint'    => array(
+			'type'             => 'boolean',
+			'features'         => array( 'tool' ),
+			'ability_property' => 'readonly',
+		),
+		'destructiveHint' => array(
+			'type'             => 'boolean',
+			'features'         => array( 'tool' ),
+			'ability_property' => 'destructive',
+		),
+		'idempotentHint'  => array(
+			'type'             => 'boolean',
+			'features'         => array( 'tool' ),
+			'ability_property' => 'idempotent',
+		),
+		'openWorldHint'   => array(
+			'type'             => 'boolean',
+			'features'         => array( 'tool' ),
+			'ability_property' => '',
+		),
+		'title'           => array(
+			'type'             => 'string',
+			'features'         => array( 'tool' ),
+			'ability_property' => '',
+		),
+	);
 
-		$mcp_annotations = array();
+	/**
+	 * Map WordPress ability annotation property names to MCP field names.
+	 *
+	 * Maps WordPress-format field names to MCP equivalents (e.g., readonly → readOnlyHint).
+	 * Only includes annotations applicable to the specified feature type.
+	 * Null values are excluded from the result.
+	 *
+	 * @param array  $ability_annotations WordPress ability annotations.
+	 * @param string $feature_type        The MCP feature type ('tool', 'resource', or 'prompt').
+	 *
+	 * @return array Mapped annotations for the specified feature type.
+	 */
+	public static function map( array $ability_annotations, string $feature_type ): array {
+		$result = array();
 
-		foreach ( $valid_mcp_fields as $field => $field_type ) {
-			if ( ! isset( $ability_annotations[ $field ] ) ) {
+		foreach ( self::$mcp_annotations as $mcp_field => $config ) {
+			if ( ! in_array( $feature_type, $config['features'], true ) ) {
 				continue;
 			}
 
-			$value = $ability_annotations[ $field ];
+			$value_info = self::resolve_annotation_value(
+				$ability_annotations,
+				$mcp_field,
+				$config['ability_property']
+			);
 
-			// Validate and normalize audience field.
-			if ( 'audience' === $field ) {
-				if ( ! is_array( $value ) ) {
-					continue;
-				}
-				// Filter valid roles and ensure they're strings.
-				$valid_roles       = array( 'user', 'assistant' );
-				$filtered_audience = array();
-				foreach ( $value as $role ) {
-					if ( ! is_string( $role ) || ! in_array( $role, $valid_roles, true ) ) {
-						continue;
-					}
-					$filtered_audience[] = $role;
-				}
-				if ( ! empty( $filtered_audience ) ) {
-					$mcp_annotations[ $field ] = $filtered_audience;
-				}
+			if ( ! $value_info['has_value'] ) {
 				continue;
 			}
 
-			// Validate and normalize lastModified field (ISO 8601 string).
-			if ( 'lastModified' === $field ) {
-				if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
-					continue;
-				}
-				$trimmed_value = trim( $value );
-				// Validate ISO 8601 format - filter out invalid dates.
-				if ( ! McpValidator::validate_iso8601_timestamp( $trimmed_value ) ) {
-					continue;
-				}
-				$mcp_annotations[ $field ] = $trimmed_value;
+			$normalized = self::normalize_annotation_value( $config['type'], $value_info['value'] );
+			if ( null === $normalized ) {
 				continue;
 			}
 
-			// Validate and normalize priority field (number between 0 and 1).
-			if ( ! is_numeric( $value ) ) {
-				continue;
-			}
-			$priority = (float) $value;
-			// Clamp priority between 0 and 1 per MCP spec.
-			$priority                  = max( 0.0, min( 1.0, $priority ) );
-			$mcp_annotations[ $field ] = $priority;
+			$result[ $mcp_field ] = $normalized;
 		}
 
-		return $mcp_annotations;
+		return $result;
+	}
+
+	/**
+	 * Resolve the annotation value, preferring WordPress-format overrides when available.
+	 *
+	 * @param array  $annotations     Raw annotations from the ability.
+	 * @param string $mcp_field       The MCP field name.
+	 * @param string $ability_property Optional WordPress-format field name.
+	 *
+	 * @return array{has_value:bool,value:mixed}
+	 */
+	private static function resolve_annotation_value( array $annotations, string $mcp_field, string $ability_property ): array {
+		// WordPress-format overrides take precedence when present.
+		if ( '' !== $ability_property && array_key_exists( $ability_property, $annotations ) && ! is_null( $annotations[ $ability_property ] ) ) {
+			return array(
+				'has_value' => true,
+				'value'     => $annotations[ $ability_property ],
+			);
+		}
+
+		if ( array_key_exists( $mcp_field, $annotations ) && ! is_null( $annotations[ $mcp_field ] ) ) {
+			return array(
+				'has_value' => true,
+				'value'     => $annotations[ $mcp_field ],
+			);
+		}
+
+		return array(
+			'has_value' => false,
+			'value'     => null,
+		);
+	}
+
+	/**
+	 * Normalize annotation values to the types expected by MCP.
+	 *
+	 * @param string $field_type Expected MCP type (boolean, string, array, number).
+	 * @param mixed  $value      Raw annotation value.
+	 *
+	 * @return mixed|null Normalized value or null if invalid.
+	 */
+	private static function normalize_annotation_value( string $field_type, $value ) {
+		switch ( $field_type ) {
+			case 'boolean':
+				return (bool) $value;
+
+			case 'string':
+				if ( ! is_scalar( $value ) ) {
+					return null;
+				}
+				$trimmed = trim( (string) $value );
+				return '' === $trimmed ? null : $trimmed;
+
+			case 'array':
+				return is_array( $value ) && ! empty( $value ) ? $value : null;
+
+			case 'number':
+				return is_numeric( $value ) ? (float) $value : null;
+
+			default:
+				return $value;
+		}
 	}
 }

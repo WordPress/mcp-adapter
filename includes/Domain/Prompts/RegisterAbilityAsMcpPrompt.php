@@ -86,19 +86,20 @@ class RegisterAbilityAsMcpPrompt {
 	 * @return array<string,mixed>
 	 */
 	private function get_data(): array {
-		$prompt_data = array(
-			'ability' => $this->ability->get_name(),
-			'name'    => str_replace( '/', '-', $this->ability->get_name() ),
+		$ability_name = trim( $this->ability->get_name() );
+		$prompt_data  = array(
+			'ability' => $ability_name,
+			'name'    => str_replace( '/', '-', $ability_name ),
 		);
 
 		// Add optional title from ability label
-		$label = $this->ability->get_label();
+		$label = trim( $this->ability->get_label() );
 		if ( ! empty( $label ) ) {
 			$prompt_data['title'] = $label;
 		}
 
 		// Add optional description
-		$description = $this->ability->get_description();
+		$description = trim( $this->ability->get_description() );
 		if ( ! empty( $description ) ) {
 			$prompt_data['description'] = $description;
 		}
@@ -111,10 +112,10 @@ class RegisterAbilityAsMcpPrompt {
 			}
 		}
 
-		// Map annotations from ability meta to MCP format.
+		// Map annotations from ability meta to MCP format using unified mapper.
 		$ability_meta = $this->ability->get_meta();
 		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
-			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'] );
+			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'], 'prompt' );
 			if ( ! empty( $mcp_annotations ) ) {
 				$prompt_data['annotations'] = $mcp_annotations;
 			}

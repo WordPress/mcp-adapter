@@ -206,6 +206,25 @@ final class DummyAbility {
 			)
 		);
 
+		// Resource ability with extra whitespace around URI for normalization tests
+		wp_register_ability(
+			'test/resource-whitespace-uri',
+			array(
+				'label'               => 'Resource With Whitespace URI',
+				'description'         => 'Resource whose URI includes leading/trailing spaces',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => "  WordPress://local/resource-whitespace  ",
+				),
+			)
+		);
+
 		// Prompt ability with arguments
 		wp_register_ability(
 			'test/prompt',

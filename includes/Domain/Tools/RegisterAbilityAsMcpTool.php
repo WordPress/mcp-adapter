@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP_Ability;
 
 /**
@@ -60,76 +61,6 @@ class RegisterAbilityAsMcpTool {
 	}
 
 	/**
-	 * Map WordPress ability annotations to MCP ToolAnnotations format.
-	 *
-	 * Converts annotation field names from WordPress format to MCP specification:
-	 * - readonly → readOnlyHint
-	 * - destructive → destructiveHint
-	 * - idempotent → idempotentHint
-	 *
-	 * Filters out null values, WordPress-format fields, and the deprecated 'instructions' field.
-	 * Only returns MCP-compliant annotation fields.
-	 *
-	 * @param array $ability_annotations WordPress ability annotations.
-	 *
-	 * @return array MCP-compliant ToolAnnotations.
-	 */
-	private function map_annotations_to_mcp( array $ability_annotations ): array {
-		$field_mapping = array(
-			'readonly'    => 'readOnlyHint',
-			'destructive' => 'destructiveHint',
-			'idempotent'  => 'idempotentHint',
-		);
-
-		$valid_mcp_fields = array(
-			'readOnlyHint'    => 'boolean',
-			'destructiveHint' => 'boolean',
-			'idempotentHint'  => 'boolean',
-			'openWorldHint'   => 'boolean',
-			'title'           => 'string',
-		);
-
-		$mcp_annotations = $ability_annotations;
-
-		// Convert WordPress-format fields to MCP format and remove old fields.
-		foreach ( $field_mapping as $wp_field => $mcp_field ) {
-			// If WordPress-format field exists convert it.
-			if ( ! isset( $mcp_annotations[ $wp_field ] ) || is_null( $mcp_annotations[ $wp_field ] ) ) {
-				continue;
-			}
-			$mcp_annotations[ $mcp_field ] = (bool) $mcp_annotations[ $wp_field ];
-			// Remove the WordPress-format field from the result.
-			unset( $mcp_annotations[ $wp_field ] );
-		}
-
-		// Filter and normalize valid MCP annotation fields.
-		$filtered_annotations = array();
-		foreach ( $mcp_annotations as $field => $value ) {
-			// Skip if not a valid MCP field.
-			if ( ! isset( $valid_mcp_fields[ $field ] ) ) {
-				continue;
-			}
-
-			$field_type = $valid_mcp_fields[ $field ];
-
-			// Handle boolean hint fields: always include (cast to bool, even if false).
-			if ( 'boolean' === $field_type ) {
-				$filtered_annotations[ $field ] = (bool) $value;
-				continue;
-			}
-
-			// Handle string fields: only include if not empty.
-			// This is the only remaining type after boolean check.
-			if ( empty( $value ) ) {
-				continue;
-			}
-			$filtered_annotations[ $field ] = (string) $value;
-		}
-
-		return $filtered_annotations;
-	}
-
-	/**
 	 * Get the MCP tool data array.
 	 *
 	 * @return array<string,mixed>
@@ -147,15 +78,15 @@ class RegisterAbilityAsMcpTool {
 
 		$tool_data = array(
 			'ability'     => $this->ability->get_name(),
-			'name'        => str_replace( '/', '-', $this->ability->get_name() ),
-			'description' => $this->ability->get_description(),
+			'name'        => str_replace( '/', '-', trim( $this->ability->get_name() ) ),
+			'description' => trim( $this->ability->get_description() ),
 			'inputSchema' => $input_schema,
 		);
 
 		// Add optional title from ability label.
 		$label = $this->ability->get_label();
 		if ( ! empty( $label ) ) {
-			$tool_data['title'] = $label;
+			$tool_data['title'] = trim( $label );
 		}
 
 		// Add optional output schema.
@@ -164,10 +95,10 @@ class RegisterAbilityAsMcpTool {
 			$tool_data['outputSchema'] = $output_schema;
 		}
 
-		// Map annotations from ability meta to MCP format.
+		// Map annotations from ability meta to MCP format using unified mapper.
 		$ability_meta = $this->ability->get_meta();
 		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
-			$mcp_annotations = $this->map_annotations_to_mcp( $ability_meta['annotations'] );
+			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'], 'tool' );
 			if ( ! empty( $mcp_annotations ) ) {
 				$tool_data['annotations'] = $mcp_annotations;
 			}

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
+use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Domain\Utils\McpValidator;
 
 /**
@@ -378,8 +379,8 @@ class McpPromptValidator {
 						$message_index
 					);
 				} else {
-					// Validate embedded resource using resource validator
-					$resource_errors = self::get_validation_errors( $content['resource'] );
+					// Validate embedded resource using the resource validator for strict MCP compliance.
+					$resource_errors = McpResourceValidator::get_validation_errors( $content['resource'] );
 					foreach ( $resource_errors as $resource_error ) {
 						$errors[] = sprintf(
 						/* translators: %1$d: message index, %2$s: resource error */

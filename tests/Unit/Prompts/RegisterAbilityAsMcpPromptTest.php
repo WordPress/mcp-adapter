@@ -58,34 +58,6 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertArrayNotHasKey( 'priority', $arr['annotations'] );
 	}
 
-	public function test_invalid_annotations_are_filtered_out(): void {
-		$ability = wp_get_ability( 'test/prompt-invalid-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-invalid-annotations should be registered' );
-
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->to_array();
-
-		// Verify annotations are present
-		$this->assertArrayHasKey( 'annotations', $arr );
-
-		// Invalid role should be filtered from audience
-		$this->assertArrayHasKey( 'audience', $arr['annotations'] );
-		$this->assertNotContains( 'invalid-role', $arr['annotations']['audience'] );
-		$this->assertContains( 'user', $arr['annotations']['audience'] );
-
-		// Invalid date should be filtered
-		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
-
-		// Priority should be clamped to 0.0 (was -1.0)
-		$this->assertArrayHasKey( 'priority', $arr['annotations'] );
-		$this->assertSame( 0.0, $arr['annotations']['priority'] );
-
-		// Unknown field should be filtered
-		$this->assertArrayNotHasKey( 'invalidField', $arr['annotations'] );
-	}
-
 	public function test_empty_annotations_are_not_included(): void {
 		$ability = wp_get_ability( 'test/prompt' );
 		$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
@@ -97,20 +69,5 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 
 		// Verify annotations field is not present when empty.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
-	}
-
-	public function test_priority_is_clamped_to_valid_range(): void {
-		$ability = wp_get_ability( 'test/prompt-invalid-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-invalid-annotations should be registered' );
-
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->makeServer() );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->to_array();
-
-		// Priority was -1.0, should be clamped to 0.0.
-		$this->assertArrayHasKey( 'annotations', $arr );
-		$this->assertArrayHasKey( 'priority', $arr['annotations'] );
-		$this->assertSame( 0.0, $arr['annotations']['priority'] );
 	}
 }

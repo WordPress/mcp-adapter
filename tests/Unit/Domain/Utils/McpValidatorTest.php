@@ -558,15 +558,15 @@ final class McpValidatorTest extends TestCase {
 		$this->assertEmpty( $errors );
 	}
 
-	public function test_get_annotation_validation_errors_rejects_unknown_fields(): void {
+	public function test_get_annotation_validation_errors_ignores_unknown_fields(): void {
+		// Unknown fields should be ignored, not cause errors
 		$annotations = array(
 			'audience'    => array( 'user' ),
 			'customField' => 'value',
 		);
 
 		$errors = McpValidator::get_annotation_validation_errors( $annotations );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'Unknown annotation field', $errors[0] );
+		$this->assertEmpty( $errors, 'Unknown fields should be ignored' );
 	}
 
 	public function test_get_annotation_validation_errors_validates_audience(): void {

@@ -14,11 +14,13 @@ use WP\MCP\Tests\TestCase;
 
 /**
  * Test McpAnnotationMapper functionality.
+ *
+ * Tests only property name mapping. Normalization and validation are tested separately.
  */
 final class McpAnnotationMapperTest extends TestCase {
 
 	public function test_map_with_empty_array(): void {
-		$result = McpAnnotationMapper::map( array() );
+		$result = McpAnnotationMapper::map( array(), 'resource' );
 		$this->assertIsArray( $result );
 		$this->assertEmpty( $result );
 	}
@@ -30,240 +32,21 @@ final class McpAnnotationMapperTest extends TestCase {
 			'audience'     => array( 'user' ),
 		);
 
-		$result = McpAnnotationMapper::map( $annotations );
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
 
 		$this->assertArrayHasKey( 'audience', $result );
 		$this->assertArrayNotHasKey( 'customField', $result );
 		$this->assertArrayNotHasKey( 'invalidField', $result );
 	}
 
-	public function test_map_with_valid_audience(): void {
-		$annotations = array(
-			'audience' => array( 'user', 'assistant' ),
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'audience', $result );
-		$this->assertIsArray( $result['audience'] );
-		$this->assertContains( 'user', $result['audience'] );
-		$this->assertContains( 'assistant', $result['audience'] );
-		$this->assertCount( 2, $result['audience'] );
-	}
-
-	public function test_map_filters_invalid_audience_roles(): void {
-		$annotations = array(
-			'audience' => array( 'user', 'invalid-role', 'assistant', 'another-invalid' ),
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'audience', $result );
-		$this->assertContains( 'user', $result['audience'] );
-		$this->assertContains( 'assistant', $result['audience'] );
-		$this->assertNotContains( 'invalid-role', $result['audience'] );
-		$this->assertNotContains( 'another-invalid', $result['audience'] );
-		$this->assertCount( 2, $result['audience'] );
-	}
-
-	public function test_map_filters_out_all_invalid_audience_roles(): void {
-		$annotations = array(
-			'audience' => array( 'invalid-role-1', 'invalid-role-2' ),
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'audience', $result );
-	}
-
-	public function test_map_filters_out_non_array_audience(): void {
-		$annotations = array(
-			'audience' => 'not-an-array',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'audience', $result );
-	}
-
-	public function test_map_filters_out_empty_audience_array(): void {
-		$annotations = array(
-			'audience' => array(),
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'audience', $result );
-	}
-
-	public function test_map_filters_out_non_string_audience_roles(): void {
-		$annotations = array(
-			'audience' => array( 'user', 123, true, array( 'nested' ) ),
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'audience', $result );
-		$this->assertContains( 'user', $result['audience'] );
-		$this->assertCount( 1, $result['audience'] );
-	}
-
-	public function test_map_with_valid_lastmodified(): void {
-		$annotations = array(
-			'lastModified' => '2024-01-15T10:30:00Z',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'lastModified', $result );
-		$this->assertSame( '2024-01-15T10:30:00Z', $result['lastModified'] );
-	}
-
-	public function test_map_trims_lastmodified_whitespace(): void {
-		$annotations = array(
-			'lastModified' => '  2024-01-15T10:30:00Z  ',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'lastModified', $result );
-		$this->assertSame( '2024-01-15T10:30:00Z', $result['lastModified'] );
-	}
-
-	public function test_map_filters_out_invalid_lastmodified_format(): void {
-		$annotations = array(
-			'lastModified' => 'invalid-date-format',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'lastModified', $result );
-	}
-
-	public function test_map_filters_out_empty_lastmodified(): void {
-		$annotations = array(
-			'lastModified' => '',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'lastModified', $result );
-	}
-
-	public function test_map_filters_out_whitespace_only_lastmodified(): void {
-		$annotations = array(
-			'lastModified' => '   ',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'lastModified', $result );
-	}
-
-	public function test_map_filters_out_non_string_lastmodified(): void {
-		$annotations = array(
-			'lastModified' => 1234567890,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'lastModified', $result );
-	}
-
-	public function test_map_with_valid_priority(): void {
-		$annotations = array(
-			'priority' => 0.5,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertSame( 0.5, $result['priority'] );
-	}
-
-	public function test_map_with_priority_as_string_number(): void {
-		$annotations = array(
-			'priority' => '0.7',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertSame( 0.7, $result['priority'] );
-	}
-
-	public function test_map_clamps_priority_below_zero(): void {
-		$annotations = array(
-			'priority' => -1.0,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertSame( 0.0, $result['priority'] );
-	}
-
-	public function test_map_clamps_priority_above_one(): void {
-		$annotations = array(
-			'priority' => 2.0,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertSame( 1.0, $result['priority'] );
-	}
-
-	public function test_map_preserves_priority_at_zero(): void {
-		$annotations = array(
-			'priority' => 0.0,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertSame( 0.0, $result['priority'] );
-	}
-
-	public function test_map_preserves_priority_at_one(): void {
-		$annotations = array(
-			'priority' => 1.0,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertSame( 1.0, $result['priority'] );
-	}
-
-	public function test_map_filters_out_non_numeric_priority(): void {
-		$annotations = array(
-			'priority' => 'not-a-number',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'priority', $result );
-	}
-
-	public function test_map_filters_out_null_priority(): void {
-		$annotations = array(
-			'priority' => null,
-		);
-
-		$result = McpAnnotationMapper::map( $annotations );
-
-		$this->assertArrayNotHasKey( 'priority', $result );
-	}
-
-	public function test_map_with_all_valid_fields(): void {
+	public function test_map_includes_valid_fields_for_resource(): void {
 		$annotations = array(
 			'audience'     => array( 'user', 'assistant' ),
 			'lastModified' => '2024-01-15T10:30:00Z',
 			'priority'     => 0.8,
 		);
 
-		$result = McpAnnotationMapper::map( $annotations );
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
 
 		$this->assertArrayHasKey( 'audience', $result );
 		$this->assertArrayHasKey( 'lastModified', $result );
@@ -271,106 +54,187 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertCount( 3, $result );
 	}
 
-	public function test_map_with_partial_fields(): void {
+	public function test_map_includes_valid_fields_for_prompt(): void {
 		$annotations = array(
-			'audience' => array( 'user' ),
-			'priority' => 0.5,
+			'audience'     => array( 'user' ),
+			'lastModified' => '2024-01-15T10:30:00Z',
+			'priority'     => 0.5,
 		);
 
-		$result = McpAnnotationMapper::map( $annotations );
+		$result = McpAnnotationMapper::map( $annotations, 'prompt' );
 
 		$this->assertArrayHasKey( 'audience', $result );
+		$this->assertArrayHasKey( 'lastModified', $result );
 		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertArrayNotHasKey( 'lastModified', $result );
-		$this->assertCount( 2, $result );
+		$this->assertCount( 3, $result );
 	}
 
-	public function test_map_with_missing_fields(): void {
+	public function test_map_includes_tool_specific_fields(): void {
 		$annotations = array(
-			'customField' => 'value',
+			'readonly'     => true,
+			'destructive'  => false,
+			'idempotent'   => true,
+			'openWorldHint' => false,
+			'title'        => 'Tool Title',
 		);
 
-		$result = McpAnnotationMapper::map( $annotations );
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
 
-		$this->assertEmpty( $result );
+		// Tool-specific fields should be included for tools
+		$this->assertArrayHasKey( 'readOnlyHint', $result );
+		$this->assertArrayHasKey( 'destructiveHint', $result );
+		$this->assertArrayHasKey( 'idempotentHint', $result );
+		$this->assertArrayHasKey( 'openWorldHint', $result );
+		$this->assertArrayHasKey( 'title', $result );
+		$this->assertCount( 5, $result );
 	}
 
-	public function test_map_with_iso8601_variations(): void {
-		// Test formats that are reliably supported
-		$valid_formats = array(
-			'2024-01-15T10:30:00Z',
-			'2024-01-15T10:30:00+00:00',
+	public function test_map_maps_readonly_to_readonlyhint(): void {
+		$annotations = array(
+			'readonly' => true,
 		);
 
-		foreach ( $valid_formats as $format ) {
-			$annotations = array(
-				'lastModified' => $format,
-			);
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
 
-			$result = McpAnnotationMapper::map( $annotations );
-
-			$this->assertArrayHasKey( 'lastModified', $result, "Format '{$format}' should be valid" );
-		}
-
-		// Test microseconds formats (may not be supported by all DateTime implementations)
-		$microsecond_formats = array(
-			'2024-01-15T10:30:00.123Z',
-			'2024-01-15T10:30:00.123+00:00',
-		);
-
-		foreach ( $microsecond_formats as $format ) {
-			$annotations = array(
-				'lastModified' => $format,
-			);
-
-			$result = McpAnnotationMapper::map( $annotations );
-			// Microseconds support is implementation-dependent, so accept either result
-			// If supported, it should be in the result; if not, it should be filtered out
-			$this->assertIsArray( $result );
-		}
+		$this->assertArrayHasKey( 'readOnlyHint', $result );
+		$this->assertArrayNotHasKey( 'readonly', $result );
+		$this->assertTrue( $result['readOnlyHint'] );
 	}
 
-	public function test_map_with_priority_edge_cases(): void {
-		$test_cases = array(
-			array(
-				'input'    => -0.5,
-				'expected' => 0.0,
-			),
-			array(
-				'input'    => 0.25,
-				'expected' => 0.25,
-			),
-			array(
-				'input'    => 0.75,
-				'expected' => 0.75,
-			),
-			array(
-				'input'    => 1.5,
-				'expected' => 1.0,
-			),
-			array(
-				'input'    => '0',
-				'expected' => 0.0,
-			),
-			array(
-				'input'    => '1',
-				'expected' => 1.0,
-			),
-			array(
-				'input'    => '0.5',
-				'expected' => 0.5,
-			),
+	public function test_map_retains_existing_mcp_field_when_no_override(): void {
+		$annotations = array(
+			'readOnlyHint' => false,
 		);
 
-		foreach ( $test_cases as $test_case ) {
-			$annotations = array(
-				'priority' => $test_case['input'],
-			);
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
 
-			$result = McpAnnotationMapper::map( $annotations );
+		$this->assertArrayHasKey( 'readOnlyHint', $result );
+		$this->assertFalse( $result['readOnlyHint'] );
+	}
 
-			$this->assertArrayHasKey( 'priority', $result, "Priority {$test_case['input']} should be processed" );
-			$this->assertSame( $test_case['expected'], $result['priority'], "Priority {$test_case['input']} should be {$test_case['expected']}" );
-		}
+	public function test_readonly_override_takes_precedence_over_readonlyhint(): void {
+		$annotations = array(
+			'readOnlyHint' => false,
+			'readonly'     => true,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayHasKey( 'readOnlyHint', $result );
+		$this->assertTrue( $result['readOnlyHint'], 'WordPress-format readonly should override readOnlyHint value' );
+	}
+
+	public function test_map_maps_destructive_to_destructivehint(): void {
+		$annotations = array(
+			'destructive' => false,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayHasKey( 'destructiveHint', $result );
+		$this->assertArrayNotHasKey( 'destructive', $result );
+		$this->assertFalse( $result['destructiveHint'] );
+	}
+
+	public function test_map_maps_idempotent_to_idempotenthint(): void {
+		$annotations = array(
+			'idempotent' => true,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayHasKey( 'idempotentHint', $result );
+		$this->assertArrayNotHasKey( 'idempotent', $result );
+		$this->assertTrue( $result['idempotentHint'] );
+	}
+
+	public function test_map_excludes_tool_fields_for_resource(): void {
+		$annotations = array(
+			'readonly'    => true,
+			'destructive' => false,
+			'title'       => 'Some Title',
+			'audience'    => array( 'user' ),
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
+
+		// Tool-specific fields should NOT be included for resources
+		$this->assertArrayNotHasKey( 'readOnlyHint', $result );
+		$this->assertArrayNotHasKey( 'destructiveHint', $result );
+		$this->assertArrayNotHasKey( 'title', $result );
+
+		// But shared fields should be included
+		$this->assertArrayHasKey( 'audience', $result );
+		$this->assertCount( 1, $result );
+	}
+
+	public function test_map_excludes_tool_fields_for_prompt(): void {
+		$annotations = array(
+			'readonly'    => true,
+			'title'       => 'Some Title',
+			'priority'    => 0.5,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'prompt' );
+
+		// Tool-specific fields should NOT be included for prompts
+		$this->assertArrayNotHasKey( 'readOnlyHint', $result );
+		$this->assertArrayNotHasKey( 'title', $result );
+
+		// But shared fields should be included
+		$this->assertArrayHasKey( 'priority', $result );
+		$this->assertCount( 1, $result );
+	}
+
+	public function test_map_filters_out_null_values(): void {
+		$annotations = array(
+			'audience'     => null,
+			'lastModified' => '2024-01-15T10:30:00Z',
+			'priority'     => null,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
+
+		$this->assertArrayNotHasKey( 'audience', $result );
+		$this->assertArrayHasKey( 'lastModified', $result );
+		$this->assertArrayNotHasKey( 'priority', $result );
+		$this->assertCount( 1, $result );
+	}
+
+	public function test_map_performs_light_type_validation(): void {
+		$annotations = array(
+			'audience'     => array( 'user', 'invalid-role' ), // Invalid role passed through
+			'lastModified' => '  whitespace  ',                // Strings get trimmed
+			'priority'     => -0.5,                            // Numbers cast to float, not clamped
+			'title'        => '  untrimmed  ',                 // Strings get trimmed
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		// Light validation: basic type checks and trimming only
+		$this->assertSame( array( 'user', 'invalid-role' ), $result['audience'] ); // Array passed through
+		$this->assertSame( 'whitespace', $result['lastModified'] );                 // String trimmed
+		$this->assertSame( -0.5, $result['priority'] );                             // Number not clamped
+		$this->assertSame( 'untrimmed', $result['title'] );                         // String trimmed
+	}
+
+	public function test_map_with_empty_string_uses_mcp_field_name(): void {
+		$annotations = array(
+			// Fields with empty ability_property should map 1:1
+			'audience'     => array( 'user' ),
+			'lastModified' => '2024-01-15T10:30:00Z',
+			'priority'     => 0.5,
+			'openWorldHint' => true,
+			'title'        => 'Test',
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		// These should map 1:1 (ability_property is empty string)
+		$this->assertArrayHasKey( 'audience', $result );
+		$this->assertArrayHasKey( 'lastModified', $result );
+		$this->assertArrayHasKey( 'priority', $result );
+		$this->assertArrayHasKey( 'openWorldHint', $result );
+		$this->assertArrayHasKey( 'title', $result );
 	}
 }

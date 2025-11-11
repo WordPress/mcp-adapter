@@ -247,13 +247,67 @@ class McpValidator {
 	}
 
 	/**
-	 * Get validation errors for MCP annotations (for resources and prompts).
+	 * Get validation errors for tool-specific MCP annotations.
 	 *
-	 * Validates that annotations conform to the MCP 2025-06-18 specification:
+	 * Validates tool annotation fields per MCP 2025-06-18 specification:
+	 * - readOnlyHint, destructiveHint, idempotentHint, openWorldHint must be booleans
+	 * - title must be a non-empty string
+	 *
+	 * Only validates known tool annotation fields. Unknown fields are ignored.
+	 *
+	 * @param array $annotations The annotations to validate.
+	 *
+	 * @return array Array of validation errors, empty if valid.
+	 */
+	public static function get_tool_annotation_validation_errors( array $annotations ): array {
+		$errors = array();
+
+		foreach ( $annotations as $field => $value ) {
+			// Validate boolean hint fields.
+			if ( in_array( $field, array( 'readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint' ), true ) ) {
+				if ( ! is_bool( $value ) ) {
+					$errors[] = sprintf(
+						/* translators: %s: annotation field name */
+						__( 'Tool annotation field %s must be a boolean', 'mcp-adapter' ),
+						$field
+					);
+				}
+				continue;
+			}
+
+			// Validate title field.
+			if ( 'title' === $field ) {
+				if ( ! is_string( $value ) ) {
+					$errors[] = sprintf(
+						/* translators: %s: annotation field name */
+						__( 'Tool annotation field %s must be a string', 'mcp-adapter' ),
+						$field
+					);
+					continue;
+				}
+				if ( empty( trim( $value ) ) ) {
+					$errors[] = sprintf(
+						/* translators: %s: annotation field name */
+						__( 'Tool annotation field %s must be a non-empty string', 'mcp-adapter' ),
+						$field
+					);
+				}
+			}
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Get validation errors for shared MCP annotations.
+	 *
+	 * Validates shared annotation fields per MCP 2025-06-18 specification:
 	 * - audience must be a non-empty array of valid Role values ("user", "assistant")
 	 * - lastModified must be a valid ISO 8601 formatted string
 	 * - priority must be a number between 0.0 and 1.0
-	 * - No unknown annotation fields are allowed
+	 *
+	 * Only validates known shared annotation fields. Unknown fields are ignored.
+	 * Used by resources, prompts, and tools.
 	 *
 	 * @param array $annotations The annotations to validate.
 	 *
@@ -262,20 +316,7 @@ class McpValidator {
 	public static function get_annotation_validation_errors( array $annotations ): array {
 		$errors = array();
 
-		// Define valid annotation fields per MCP specification.
-		$valid_fields = array( 'audience', 'lastModified', 'priority' );
-
 		foreach ( $annotations as $field => $value ) {
-			// Check if field is a valid MCP annotation field.
-			if ( ! in_array( $field, $valid_fields, true ) ) {
-				$errors[] = sprintf(
-					/* translators: %s: annotation field name */
-					__( 'Unknown annotation field: %s. Valid MCP annotation fields are: audience, lastModified, priority', 'mcp-adapter' ),
-					$field
-				);
-				continue;
-			}
-
 			// Validate audience field.
 			if ( 'audience' === $field ) {
 				if ( ! is_array( $value ) ) {
@@ -304,15 +345,20 @@ class McpValidator {
 				continue;
 			}
 
-			// Validate priority field (only remaining valid field after audience and lastModified checks).
-			if ( ! is_numeric( $value ) ) {
-				$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
+			// Validate priority field.
+			if ( 'priority' === $field ) {
+				if ( ! is_numeric( $value ) ) {
+					$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
+					continue;
+				}
+				if ( self::validate_priority( $value ) ) {
+					continue;
+				}
+				$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
 				continue;
 			}
-			if ( self::validate_priority( $value ) ) {
-				continue;
-			}
-			$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
+
+			// Unknown fields are ignored to allow forward compatibility.
 		}
 
 		return $errors;

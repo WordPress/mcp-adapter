@@ -168,8 +168,18 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 			return;
 		}
 
-		// Verify ONLY MCP-spec fields are present (no 'priority' or other custom fields).
-		$valid_mcp_fields = array( 'readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint', 'title' );
+		// Verify ONLY MCP-spec fields are present.
+		// Includes tool-specific hints and shared annotations (audience, lastModified, priority).
+		$valid_mcp_fields = array(
+			'readOnlyHint',
+			'destructiveHint',
+			'idempotentHint',
+			'openWorldHint',
+			'title',
+			'audience',
+			'lastModified',
+			'priority',
+		);
 		foreach ( array_keys( $arr['annotations'] ) as $field ) {
 			$this->assertContains( $field, $valid_mcp_fields, "Non-MCP field '{$field}' should be filtered out" );
 		}
@@ -178,6 +188,5 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertArrayNotHasKey( 'readonly', $arr['annotations'] );
 		$this->assertArrayNotHasKey( 'destructive', $arr['annotations'] );
 		$this->assertArrayNotHasKey( 'idempotent', $arr['annotations'] );
-		$this->assertArrayNotHasKey( 'priority', $arr['annotations'], 'Non-MCP field "priority" should be filtered out' );
 	}
 }
