@@ -432,8 +432,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'annotations', $meta );
 
 		$annotations = $meta['annotations'];
-		$this->assertEquals( 1.0, $annotations['priority'] );
-		$this->assertFalse( $annotations['readOnlyHint'] );
-		$this->assertTrue( $annotations['openWorldHint'] );
+		$this->assertFalse( $annotations['readonly'] );
+		$this->assertTrue( $annotations['destructive'] );
+		$this->assertFalse( $annotations['idempotent'] );
 	}
 }
