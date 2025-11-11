@@ -263,40 +263,42 @@ class McpValidator {
 		$errors = array();
 
 		foreach ( $annotations as $field => $value ) {
-			// Validate boolean hint fields.
-			if ( in_array( $field, array( 'readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint' ), true ) ) {
-				if ( ! is_bool( $value ) ) {
-					$errors[] = sprintf(
-						/* translators: %s: annotation field name */
-						__( 'Tool annotation field %s must be a boolean', 'mcp-adapter' ),
-						$field
-					);
-				}
-				continue;
-			}
+			switch ( $field ) {
+				case 'readOnlyHint':
+				case 'destructiveHint':
+				case 'idempotentHint':
+				case 'openWorldHint':
+					if ( ! is_bool( $value ) ) {
+						$errors[] = sprintf(
+							/* translators: %s: annotation field name */
+							__( 'Tool annotation field %s must be a boolean', 'mcp-adapter' ),
+							$field
+						);
+					}
+					break;
 
-			// Validate title field.
-			if ( 'title' !== $field ) {
-				continue;
-			}
+				case 'title':
+					if ( ! is_string( $value ) ) {
+						$errors[] = sprintf(
+							/* translators: %s: annotation field name */
+							__( 'Tool annotation field %s must be a string', 'mcp-adapter' ),
+							$field
+						);
+						break;
+					}
+					if ( empty( trim( $value ) ) ) {
+						$errors[] = sprintf(
+							/* translators: %s: annotation field name */
+							__( 'Tool annotation field %s must be a non-empty string', 'mcp-adapter' ),
+							$field
+						);
+					}
+					break;
 
-			if ( ! is_string( $value ) ) {
-				$errors[] = sprintf(
-					/* translators: %s: annotation field name */
-					__( 'Tool annotation field %s must be a string', 'mcp-adapter' ),
-					$field
-				);
-				continue;
+				default:
+					// Unknown fields are ignored to allow forward compatibility.
+					break;
 			}
-			if ( ! empty( trim( $value ) ) ) {
-				continue;
-			}
-
-			$errors[] = sprintf(
-				/* translators: %s: annotation field name */
-				__( 'Tool annotation field %s must be a non-empty string', 'mcp-adapter' ),
-				$field
-			);
 		}
 
 		return $errors;
