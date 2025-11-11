@@ -105,6 +105,11 @@ class RegisterAbilityAsMcpTool {
 			}
 		}
 
+		// Set annotations.title from label if annotations exist but don't have a title.
+		if ( ! empty( $label ) && isset( $tool_data['annotations'] ) && ! isset( $tool_data['annotations']['title'] ) ) {
+			$tool_data['annotations']['title'] = $label;
+		}
+
 		return $tool_data;
 	}
 
