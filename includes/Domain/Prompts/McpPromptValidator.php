@@ -62,7 +62,6 @@ class McpPromptValidator {
 		return self::validate_prompt_data( $prompt->to_array(), $context );
 	}
 
-
 	/**
 	 * Validate that the resource is unique within the MCP server.
 	 *
@@ -110,7 +109,7 @@ class McpPromptValidator {
 		}
 
 		// Check required fields
-		if ( empty( $prompt_data['name'] ) || ! is_string( $prompt_data['name'] ) || ! self::validate_prompt_name( $prompt_data['name'] ) ) {
+		if ( empty( $prompt_data['name'] ) || ! is_string( $prompt_data['name'] ) || ! McpValidator::validate_tool_or_prompt_name( $prompt_data['name'] ) ) {
 			$errors[] = __( 'Prompt name is required and must only contain letters, numbers, hyphens (-), and underscores (_), and be 255 characters or less', 'mcp-adapter' );
 		}
 
@@ -136,93 +135,11 @@ class McpPromptValidator {
 			if ( ! is_array( $prompt_data['annotations'] ) ) {
 				$errors[] = __( 'Prompt annotations must be an array if provided', 'mcp-adapter' );
 			} else {
-				$annotation_errors = self::get_annotation_validation_errors( $prompt_data['annotations'] );
+				$annotation_errors = McpValidator::get_annotation_validation_errors( $prompt_data['annotations'] );
 				if ( ! empty( $annotation_errors ) ) {
 					$errors = array_merge( $errors, $annotation_errors );
 				}
 			}
-		}
-
-		return $errors;
-	}
-
-	/**
-	 * Get validation errors for prompt annotations according to MCP Annotations specification.
-	 *
-	 * Validates that annotations conform to the MCP 2025-06-18 specification:
-	 * - audience must be an array of valid Role values ("user", "assistant")
-	 * - lastModified must be a valid ISO 8601 formatted string
-	 * - priority must be a number between 0 and 1
-	 * - No unknown annotation fields are allowed
-	 *
-	 * @param array $annotations The annotations to validate.
-	 *
-	 * @return array Array of validation errors, empty if valid.
-	 */
-	private static function get_annotation_validation_errors( array $annotations ): array {
-		$errors = array();
-
-		// Define valid annotation fields per MCP specification.
-		$valid_fields = array( 'audience', 'lastModified', 'priority' );
-
-		foreach ( $annotations as $field => $value ) {
-			// Check if field is a valid MCP annotation field.
-			if ( ! in_array( $field, $valid_fields, true ) ) {
-				$errors[] = sprintf(
-					/* translators: %s: annotation field name */
-					__( 'Unknown annotation field: %s. Valid MCP annotation fields are: audience, lastModified, priority', 'mcp-adapter' ),
-					$field
-				);
-				continue;
-			}
-
-			// Validate audience field.
-			if ( 'audience' === $field ) {
-				if ( ! is_array( $value ) ) {
-					$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
-					continue;
-				}
-				if ( empty( $value ) ) {
-					$errors[] = __( 'Annotation field audience must be a non-empty array', 'mcp-adapter' );
-					continue;
-				}
-				$valid_roles = array( 'user', 'assistant' );
-				foreach ( $value as $role ) {
-					if ( ! is_string( $role ) || ! in_array( $role, $valid_roles, true ) ) {
-						$errors[] = sprintf(
-							/* translators: %s: role value */
-							__( 'Annotation field audience must contain only valid roles ("user" or "assistant"), found: %s', 'mcp-adapter' ),
-							is_string( $role ) ? $role : gettype( $role )
-						);
-						break; // Only report first invalid role.
-					}
-				}
-				continue;
-			}
-
-			// Validate lastModified field.
-			if ( 'lastModified' === $field ) {
-				if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
-					$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
-					continue;
-				}
-				if ( ! McpValidator::validate_iso8601_timestamp( trim( $value ) ) ) {
-					$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
-				}
-				continue;
-			}
-
-			// Validate priority field (only remaining valid field after audience and lastModified checks).
-			if ( ! is_numeric( $value ) ) {
-				$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
-				continue;
-			}
-			$priority = (float) $value;
-			if ( $priority >= 0.0 && $priority <= 1.0 ) {
-				continue;
-			}
-
-			$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
 		}
 
 		return $errors;
@@ -265,7 +182,7 @@ class McpPromptValidator {
 			}
 
 			// Validate argument name format
-			if ( ! self::validate_argument_name( $argument['name'] ) ) {
+			if ( ! McpValidator::validate_argument_name( $argument['name'] ) ) {
 				$errors[] = sprintf(
 				/* translators: %s: argument name */
 					__( 'Prompt argument \'%s\' name must only contain letters, numbers, hyphens (-), and underscores (_), and be 64 characters or less', 'mcp-adapter' ),
@@ -486,162 +403,20 @@ class McpPromptValidator {
 
 		// Check optional annotations
 		if ( isset( $content['annotations'] ) ) {
-			$annotation_errors = self::get_content_annotation_validation_errors( $content['annotations'], $message_index );
-			if ( ! empty( $annotation_errors ) ) {
-				$errors = array_merge( $errors, $annotation_errors );
-			}
-		}
-
-		return $errors;
-	}
-
-	/**
-	 * Get validation errors for message content annotations.
-	 *
-	 * @param array|mixed $annotations The annotations to validate.
-	 * @param int         $message_index The message index for error reporting.
-	 *
-	 * @return array Array of validation errors, empty if valid.
-	 */
-	private static function get_content_annotation_validation_errors( $annotations, int $message_index ): array {
-		$errors = array();
-
-		// Annotations must be an array
-		if ( ! is_array( $annotations ) ) {
-			return array(
-				sprintf(
+			if ( ! is_array( $content['annotations'] ) ) {
+				$errors[] = sprintf(
 				/* translators: %d: message index */
 					__( 'Message %d content annotations must be an array if provided', 'mcp-adapter' ),
 					$message_index
-				),
-			);
-		}
-
-		// Validate audience field if present
-		if ( isset( $annotations['audience'] ) ) {
-			if ( ! is_array( $annotations['audience'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'audience\' must be an array', 'mcp-adapter' ),
-					$message_index
 				);
 			} else {
-				$valid_audiences = array( 'user', 'assistant' );
-				foreach ( $annotations['audience'] as $audience ) {
-					if ( in_array( $audience, $valid_audiences, true ) ) {
-						continue;
-					}
-
-					$errors[] = sprintf(
-					/* translators: %1$d: message index, %2$s: audience value */
-						__( 'Message %1$d content annotation audience \'%2$s\' must be \'user\' or \'assistant\'', 'mcp-adapter' ),
-						$message_index,
-						$audience
-					);
+				$annotation_errors = McpValidator::get_annotation_validation_errors( $content['annotations'] );
+				if ( ! empty( $annotation_errors ) ) {
+					$errors = array_merge( $errors, $annotation_errors );
 				}
 			}
 		}
 
-		// Validate priority field if present
-		if ( isset( $annotations['priority'] ) ) {
-			if ( ! is_numeric( $annotations['priority'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'priority\' must be a number', 'mcp-adapter' ),
-					$message_index
-				);
-			} elseif ( $annotations['priority'] < 0.0 || $annotations['priority'] > 1.0 ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'priority\' must be between 0.0 and 1.0', 'mcp-adapter' ),
-					$message_index
-				);
-			}
-		}
-
-		// Validate lastModified field if present
-		if ( isset( $annotations['lastModified'] ) ) {
-			if ( ! is_string( $annotations['lastModified'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'lastModified\' must be a string', 'mcp-adapter' ),
-					$message_index
-				);
-			} elseif ( ! McpValidator::validate_iso8601_timestamp( $annotations['lastModified'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'lastModified\' must be a valid ISO 8601 timestamp', 'mcp-adapter' ),
-					$message_index
-				);
-			}
-		}
-
 		return $errors;
-	}
-
-	/**
-	 * Check if prompt data is valid without throwing exceptions.
-	 *
-	 * @param array $prompt_data The prompt data to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function is_valid_prompt_data( array $prompt_data ): bool {
-		return empty( self::get_validation_errors( $prompt_data ) );
-	}
-
-	/**
-	 * Check if a prompt name follows MCP naming conventions.
-	 *
-	 * @param string $name The prompt name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_prompt_name( string $name ): bool {
-		// Prompt names should not be empty
-		if ( empty( $name ) ) {
-			return false;
-		}
-
-		// Check length constraints (reasonable limits)
-		if ( strlen( $name ) > 255 ) {
-			return false;
-		}
-
-		// Only allow letters, numbers, hyphens, and underscores
-		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
-	}
-
-	/**
-	 * Check if an argument name follows MCP naming conventions.
-	 *
-	 * @param string $name The argument name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_argument_name( string $name ): bool {
-		// Argument names should not be empty
-		if ( empty( $name ) ) {
-			return false;
-		}
-
-		// Check length constraints (shorter than prompt names)
-		if ( strlen( $name ) > 64 ) {
-			return false;
-		}
-
-		// Only allow letters, numbers, hyphens, and underscores
-		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
-	}
-
-	/**
-	 * Validate ISO 8601 timestamp format.
-	 *
-	 * @param string $timestamp The timestamp to validate.
-	 *
-	 * @return bool True if valid ISO 8601 timestamp, false otherwise.
-	 */
-	public static function validate_iso8601_timestamp( string $timestamp ): bool {
-		return McpValidator::validate_iso8601_timestamp( $timestamp );
 	}
 }
