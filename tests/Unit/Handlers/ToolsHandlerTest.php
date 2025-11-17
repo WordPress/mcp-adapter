@@ -380,4 +380,60 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'callback', $tool );
 		$this->assertArrayNotHasKey( 'permission_callback', $tool );
 	}
+
+	public function test_call_tool_wraps_scalar_return_values(): void {
+		wp_set_current_user( 1 );
+
+		// Register an ability that returns a scalar (string) value
+		$this->register_ability_in_hook(
+			'test/scalar-return',
+			array(
+				'label'               => 'Scalar Return Test',
+				'description'         => 'Returns a scalar string value',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'hello-world';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array( 'test/scalar-return' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-scalar-return',
+				),
+			)
+		);
+
+		// Should not have an error
+		$this->assertArrayNotHasKey( 'error', $res );
+		$this->assertArrayNotHasKey( 'isError', $res );
+
+		// Should have content
+		$this->assertArrayHasKey( 'content', $res );
+		$this->assertArrayHasKey( 'structuredContent', $res );
+
+		// The scalar value should be wrapped in an array with 'result' key
+		$this->assertArrayHasKey( 'result', $res['structuredContent'] );
+		$this->assertSame( 'hello-world', $res['structuredContent']['result'] );
+
+		// Should have metadata at the top level (not inside structuredContent)
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertArrayNotHasKey( '_metadata', $res['structuredContent'] );
+		$this->assertSame( 'tool', $res['_metadata']['component_type'] );
+		$this->assertSame( 'test-scalar-return', $res['_metadata']['tool_name'] );
+
+		wp_unregister_ability( 'test/scalar-return' );
+	}
 }

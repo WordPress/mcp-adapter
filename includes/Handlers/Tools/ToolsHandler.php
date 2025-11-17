@@ -400,6 +400,11 @@ class ToolsHandler {
 				$result         = array( $output_wrapper => $result );
 			}
 
+			// Ensure $result is always an array before adding metadata.
+			if ( ! is_array( $result ) ) {
+				$result = array( 'result' => $result );
+			}
+
 			// Successful execution - add metadata.
 			$result['_metadata'] = array(
 				'component_type' => 'tool',
