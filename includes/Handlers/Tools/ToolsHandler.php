@@ -37,11 +37,11 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle the tools/list request.
+	 * Handles the tools/list request.
 	 *
-	 * @param int $request_id The request ID for JSON-RPC.
+	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with tools list and metadata.
 	 */
 	public function list_tools( int $request_id = 0 ): array {
 		$tools      = $this->mcp->get_tools();
@@ -61,11 +61,11 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle the tools/list/all request.
+	 * Handles the tools/list/all request.
 	 *
-	 * @param int $request_id The request ID for JSON-RPC.
+	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with all tools including availability status and metadata.
 	 */
 	public function list_all_tools( int $request_id = 0 ): array {
 		// Return all tools with additional details.
@@ -88,12 +88,12 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle the tools/call request.
+	 * Handles the tools/call request.
 	 *
 	 * @param array $message    Request message.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with tool execution results or error.
 	 */
 	public function call_tool( array $message, int $request_id = 0 ): array {
 		// Extract parameters using helper method.
@@ -203,7 +203,7 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Sanitize tool data for JSON encoding by removing callback functions and other problematic data.
+	 * Sanitizes tool data for JSON encoding by removing callback functions and other problematic data.
 	 *
 	 * @param \WP\MCP\Domain\Tools\McpTool $tool Raw tool data.
 	 *
@@ -241,12 +241,12 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle tool call request.
+	 * Handles tool call request.
 	 *
 	 * @param array $params     The request parameters.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with tool execution results or error.
 	 */
 	public function handle_tool_call( array $params, int $request_id = 0 ): array {
 		$tool_name = $params['name'];
