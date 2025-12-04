@@ -25,7 +25,9 @@ final class Plugin {
 	private static self $instance;
 
 	/**
-	 * {@inheritDoc}
+	 * Gets the singleton instance of the plugin.
+	 *
+	 * @return self The plugin instance.
 	 */
 	public static function instance(): self {
 		if ( ! isset( self::$instance ) ) {
@@ -44,7 +46,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Setup the plugin.
+	 * Sets up the plugin.
 	 */
 	private function setup(): void {
 		// Bail if dependencies are not met.
@@ -56,7 +58,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Check if all required dependencies are available.
+	 * Checks if all required dependencies are available.
 	 *
 	 * Will log an admin notice if dependencies are missing.
 	 *
@@ -85,7 +87,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Prevent the class from being cloned.
+	 * Prevents the class from being cloned.
 	 */
 	public function __clone() {
 		_doing_it_wrong(
@@ -100,7 +102,7 @@ final class Plugin {
 	}
 
 	/**
-	 * Prevent the class from being deserialized.
+	 * Prevents the class from being deserialized.
 	 */
 	public function __wakeup() {
 		_doing_it_wrong(

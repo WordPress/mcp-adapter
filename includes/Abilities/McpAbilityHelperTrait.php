@@ -17,7 +17,7 @@ namespace WP\MCP\Abilities;
 trait McpAbilityHelperTrait {
 
 	/**
-	 * Check if ability is publicly exposed via MCP.
+	 * Checks if ability is publicly exposed via MCP.
 	 *
 	 * Validates against the ability's mcp.public metadata flag.
 	 * Only abilities with mcp.public=true are accessible via default MCP server.
@@ -47,7 +47,7 @@ trait McpAbilityHelperTrait {
 	}
 
 	/**
-	 * Check if ability is publicly exposed via MCP (simple boolean version).
+	 * Checks if ability is publicly exposed via MCP (simple boolean version).
 	 *
 	 * This is a simplified version that returns only boolean values,
 	 * useful for filtering operations where WP_Error handling isn't needed.
@@ -62,7 +62,7 @@ trait McpAbilityHelperTrait {
 	}
 
 	/**
-	 * Get the MCP type of an ability.
+	 * Gets the MCP type of an ability.
 	 *
 	 * Returns the type specified in meta.mcp.type, defaulting to 'tool' if not specified.
 	 *
