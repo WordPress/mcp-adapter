@@ -290,6 +290,81 @@ final class RequestRouterTest extends TestCase {
 		$this->assertEquals( 'test-transport', $first_success['tags']['transport'] );
 	}
 
+	public function test_route_request_initialize_unauthenticated_returns_correct_error_structure(): void {
+		// Set no user (unauthenticated)
+		wp_set_current_user( 0 );
+
+		$request      = new WP_REST_Request( 'POST', '/test-mcp' );
+		$http_context = new HttpRequestContext( $request );
+
+		$result = $this->router->route_request(
+			'initialize',
+			array(
+				'protocolVersion' => '2025-06-18',
+				'clientInfo'      => array(
+					'name'    => 'test-client',
+					'version' => '1.0.0',
+				),
+			),
+			1,
+			'test-transport',
+			$http_context
+		);
+
+		// Verify error response structure (not double-wrapped)
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+
+		// The error should be a proper error object with code and message
+		$this->assertArrayHasKey( 'code', $result['error'] );
+		$this->assertArrayHasKey( 'message', $result['error'] );
+
+		// Should NOT have nested jsonrpc/id/error (double-wrapping)
+		$this->assertArrayNotHasKey( 'jsonrpc', $result['error'] );
+		$this->assertArrayNotHasKey( 'id', $result['error'] );
+
+		// Verify the correct error code (unauthorized)
+		$this->assertEquals( McpErrorFactory::UNAUTHORIZED, $result['error']['code'] );
+		$this->assertStringContainsString( 'authentication', strtolower( $result['error']['message'] ) );
+
+		// Restore user
+		wp_set_current_user( $this->test_user_id );
+	}
+
+	public function test_route_request_initialize_session_error_has_correct_code(): void {
+		// Set no user (unauthenticated) to trigger session creation failure
+		wp_set_current_user( 0 );
+
+		$request      = new WP_REST_Request( 'POST', '/test-mcp' );
+		$http_context = new HttpRequestContext( $request );
+
+		$result = $this->router->route_request(
+			'initialize',
+			array(
+				'protocolVersion' => '2025-06-18',
+				'clientInfo'      => array(
+					'name'    => 'test-client',
+					'version' => '1.0.0',
+				),
+			),
+			1,
+			'test-transport',
+			$http_context
+		);
+
+		// Verify error has correct structure for HTTP status mapping
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertArrayHasKey( 'code', $result['error'] );
+
+		// The error code should map to HTTP 401
+		$http_status = McpErrorFactory::get_http_status_for_error( array( 'error' => $result['error'] ) );
+		$this->assertEquals( 401, $http_status );
+
+		// Restore user
+		wp_set_current_user( $this->test_user_id );
+	}
+
 	private function createTransportContext( McpServer $server ): McpTransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $server );

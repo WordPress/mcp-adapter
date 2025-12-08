@@ -269,6 +269,57 @@ final class HttpTransportTest extends TestCase {
 		$this->assertStringContainsString( 'Missing Mcp-Session-Id header', $data['error']['message'] );
 	}
 
+	public function test_post_request_initialize_unauthenticated_returns_proper_json_rpc_error(): void {
+		// Set no user (unauthenticated)
+		wp_set_current_user( 0 );
+
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-06-18',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		$request->set_header( 'Accept', 'application/json, text/event-stream' );
+		$request->set_header( 'Content-Type', 'application/json' );
+
+		$response = $this->transport->handle_request( $request );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+
+		// Should return HTTP 401 for unauthorized
+		$this->assertEquals( 401, $response->get_status() );
+
+		$data = $response->get_data();
+
+		// Verify JSON-RPC 2.0 response structure
+		$this->assertArrayHasKey( 'jsonrpc', $data );
+		$this->assertEquals( '2.0', $data['jsonrpc'] );
+		$this->assertArrayHasKey( 'id', $data );
+		$this->assertEquals( 1, $data['id'] );
+		$this->assertArrayHasKey( 'error', $data );
+
+		// Verify error is NOT double-wrapped (no nested jsonrpc/id/error)
+		$this->assertArrayHasKey( 'code', $data['error'] );
+		$this->assertArrayHasKey( 'message', $data['error'] );
+		$this->assertArrayNotHasKey( 'jsonrpc', $data['error'] );
+		$this->assertArrayNotHasKey( 'id', $data['error'] );
+
+		// Verify correct error code
+		$this->assertEquals( McpErrorFactory::UNAUTHORIZED, $data['error']['code'] );
+		$this->assertStringContainsString( 'authentication', strtolower( $data['error']['message'] ) );
+
+		// Restore user
+		wp_set_current_user( 1 );
+	}
+
 	// ========== GET Request Tests ==========
 
 	public function test_get_request_for_sse_stream(): void {
@@ -278,12 +329,9 @@ final class HttpTransportTest extends TestCase {
 		$response = $this->transport->handle_request( $request );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		// Currently returns 405 as SSE is not yet implemented
+		// SSE not implemented returns 405 with no body per HTTP standards
 		$this->assertEquals( 405, $response->get_status() );
-
-		$data = $response->get_data();
-		$this->assertArrayHasKey( 'error', $data );
-		$this->assertStringContainsString( 'SSE streaming not yet implemented', $data['error']['message'] );
+		$this->assertNull( $response->get_data() );
 	}
 
 

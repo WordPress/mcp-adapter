@@ -160,8 +160,8 @@ class RequestRouter {
 			$session_result = HttpSessionValidator::create_session( $params );
 
 			if ( is_array( $session_result ) ) {
-				// Session creation failed, return error
-				return array( 'error' => $session_result );
+				// Session creation failed - extract inner error from JSON-RPC response
+				return array( 'error' => $session_result['error'] ?? $session_result );
 			}
 
 			// Store session ID in result for HttpRequestHandler to add as header
