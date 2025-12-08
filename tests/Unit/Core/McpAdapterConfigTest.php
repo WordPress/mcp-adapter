@@ -245,10 +245,26 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertSame( array( HttpTransport::class ), $received_config['mcp_transports'] );
 		$this->assertSame( ErrorLogMcpErrorHandler::class, $received_config['error_handler'] );
 		$this->assertSame( NullMcpObservabilityHandler::class, $received_config['observability_handler'] );
-		// Auto-discovered resources from test fixtures (test/resource has mcp.public=true and mcp.type='resource')
-		$this->assertSame( array( 'test/resource' ), $received_config['resources'] );
+		// Auto-discovered resources from test fixtures (test/resource* abilities have mcp.public=true and mcp.type='resource', resulting in 4 discovered resources)
+		$this->assertSame(
+			array(
+				'test/resource',
+				'test/resource-with-annotations',
+				'test/resource-partial-annotations',
+				'test/resource-invalid-annotations',
+			),
+			$received_config['resources']
+		);
 		// Auto-discovered prompts from test fixtures (test/prompt has mcp.public=true and mcp.type='prompt')
-		$this->assertSame( array( 'test/prompt' ), $received_config['prompts'] );
+		$this->assertSame(
+			array(
+				'test/prompt',
+				'test/prompt-with-annotations',
+				'test/prompt-partial-annotations',
+				'test/prompt-invalid-annotations',
+			),
+			$received_config['prompts']
+		);
 	}
 
 	public function test_multiple_config_modifications(): void {

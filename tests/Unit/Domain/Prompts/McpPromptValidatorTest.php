@@ -34,7 +34,7 @@ final class McpPromptValidatorTest extends TestCase {
 					'description' => 'Optional parameter',
 				),
 			),
-			'annotations' => array( 'category' => 'test' ),
+			'annotations' => array( 'priority' => 0.5 ),
 		);
 
 		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data, 'test-context' );
@@ -170,175 +170,18 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'Prompt annotations must be an array if provided', $result->get_error_message() );
 	}
 
-	public function test_validate_prompt_name_with_valid_names(): void {
-		$valid_names = array(
-			'simple-prompt',
-			'prompt_with_underscores',
-			'prompt123',
-			'a',
-			'very-long-prompt-name-that-is-still-under-255-characters',
-		);
-
-		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpPromptValidator::validate_prompt_name( $name ), "Name '{$name}' should be valid" );
-		}
-	}
-
-	public function test_validate_prompt_name_with_invalid_names(): void {
-		$invalid_names = array(
-			'',                           // Empty
-			'prompt with spaces',         // Spaces
-			'prompt@invalid',            // Special characters
-			'prompt.invalid',            // Dots
-			str_repeat( 'a', 256 ),      // Too long
-		);
-
-		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpPromptValidator::validate_prompt_name( $name ), "Name '{$name}' should be invalid" );
-		}
-	}
-
-	public function test_validate_argument_name_with_valid_names(): void {
-		$valid_names = array(
-			'simple-arg',
-			'arg_with_underscores',
-			'arg123',
-			'a',
-		);
-
-		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpPromptValidator::validate_argument_name( $name ), "Argument name '{$name}' should be valid" );
-		}
-	}
-
-	public function test_validate_argument_name_with_invalid_names(): void {
-		$invalid_names = array(
-			'',                           // Empty
-			'arg with spaces',            // Spaces
-			'arg@invalid',               // Special characters
-			str_repeat( 'a', 65 ),       // Too long (over 64 chars)
-		);
-
-		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpPromptValidator::validate_argument_name( $name ), "Argument name '{$name}' should be invalid" );
-		}
-	}
-
-	public function test_validate_base64_with_valid_data(): void {
-		$valid_base64_strings = array(
-			'SGVsbG8gV29ybGQ=',           // "Hello World"
-			'VGVzdCBkYXRh',              // "Test data"
-			'',                          // Empty (should be invalid)
-		);
-
-		$this->assertTrue( McpPromptValidator::validate_base64( $valid_base64_strings[0] ) );
-		$this->assertTrue( McpPromptValidator::validate_base64( $valid_base64_strings[1] ) );
-		$this->assertFalse( McpPromptValidator::validate_base64( $valid_base64_strings[2] ) ); // Empty should be invalid
-	}
-
-	public function test_validate_base64_with_invalid_data(): void {
-		$invalid_base64_strings = array(
-			'not-base64!',
-			'Invalid@#$%',
-		);
-
-		foreach ( $invalid_base64_strings as $data ) {
-			$this->assertFalse( McpPromptValidator::validate_base64( $data ), "Data '{$data}' should be invalid base64" );
-		}
-
-		// Note: 'SGVsbG8gV29ybGQ' (without padding) is actually valid base64 in PHP
-		// PHP's base64_decode is more lenient than strict base64 validation
-	}
-
-	public function test_validate_image_mime_type(): void {
-		$valid_types = array(
-			'image/jpeg',
-			'image/jpg',
-			'image/png',
-			'image/gif',
-			'image/webp',
-			'image/bmp',
-			'image/svg+xml',
-		);
-
-		foreach ( $valid_types as $type ) {
-			$this->assertTrue( McpPromptValidator::validate_image_mime_type( $type ), "MIME type '{$type}' should be valid" );
-		}
-
-		$invalid_types = array(
-			'text/plain',
-			'application/json',
-			'audio/mp3',
-			'invalid/type',
-		);
-
-		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpPromptValidator::validate_image_mime_type( $type ), "MIME type '{$type}' should be invalid for images" );
-		}
-	}
-
-	public function test_validate_audio_mime_type(): void {
-		$valid_types = array(
-			'audio/wav',
-			'audio/mp3',
-			'audio/mpeg',
-			'audio/ogg',
-			'audio/webm',
-			'audio/aac',
-			'audio/flac',
-		);
-
-		foreach ( $valid_types as $type ) {
-			$this->assertTrue( McpPromptValidator::validate_audio_mime_type( $type ), "MIME type '{$type}' should be valid" );
-		}
-
-		$invalid_types = array(
-			'image/jpeg',
-			'text/plain',
-			'video/mp4',
-			'invalid/type',
-		);
-
-		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpPromptValidator::validate_audio_mime_type( $type ), "MIME type '{$type}' should be invalid for audio" );
-		}
-	}
-
-	public function test_validate_iso8601_timestamp(): void {
-		$valid_timestamps = array(
-			'2023-12-25T10:30:00Z',
-			'2023-12-25T10:30:00+02:00',
-			// Note: Microsecond formats may not be supported by all DateTime implementations
-		);
-
-		foreach ( $valid_timestamps as $timestamp ) {
-			$this->assertTrue( McpPromptValidator::validate_iso8601_timestamp( $timestamp ), "Timestamp '{$timestamp}' should be valid" );
-		}
-
-		$invalid_timestamps = array(
-			'2023-12-25',
-			'10:30:00',
-			'not-a-timestamp',
-			'2023/12/25 10:30:00',
-		);
-
-		foreach ( $invalid_timestamps as $timestamp ) {
-			$this->assertFalse( McpPromptValidator::validate_iso8601_timestamp( $timestamp ), "Timestamp '{$timestamp}' should be invalid" );
-		}
-	}
-
 	public function test_is_valid_prompt_data(): void {
 		$valid_data = array(
 			'name' => 'valid-prompt',
 		);
 
-		$this->assertTrue( McpPromptValidator::is_valid_prompt_data( $valid_data ) );
+		$this->assertTrue( empty( McpPromptValidator::get_validation_errors( $valid_data ) ) );
 
 		$invalid_data = array(
 			'name' => '',
 		);
 
-		$this->assertFalse( McpPromptValidator::is_valid_prompt_data( $invalid_data ) );
+		$this->assertFalse( empty( McpPromptValidator::get_validation_errors( $invalid_data ) ) );
 	}
 
 	public function test_validate_prompt_messages_with_valid_messages(): void {
@@ -409,6 +252,25 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'content type \'invalid-type\' is not supported', implode( ' ', $errors ) );
 	}
 
+	public function test_validate_prompt_messages_with_invalid_embedded_resource(): void {
+		$invalid_messages = array(
+			array(
+				'role'    => 'assistant',
+				'content' => array(
+					'type'     => 'resource',
+					'resource' => array(
+						// Missing URI should trigger McpResourceValidator errors.
+						'text' => 'Some content',
+					),
+				),
+			),
+		);
+
+		$errors = McpPromptValidator::validate_prompt_messages( $invalid_messages );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'Resource URI is required', implode( ' ', $errors ) );
+	}
+
 	public function test_validate_prompt_instance_with_valid_prompt(): void {
 		$server = $this->makeServer();
 
@@ -422,6 +284,17 @@ final class McpPromptValidatorTest extends TestCase {
 
 		$result = McpPromptValidator::validate_prompt_instance( $prompt, 'test-context' );
 		$this->assertTrue( $result );
+	}
+
+	public function test_validate_prompt_requires_server(): void {
+		$prompt = new McpPrompt(
+			'test/missing-server',
+			'prompt-without-server'
+		);
+
+		$result = $prompt->validate();
+		$this->assertWPError( $result );
+		$this->assertSame( 'prompt_missing_mcp_server', $result->get_error_code() );
 	}
 
 	public function test_validate_prompt_uniqueness_method_exists(): void {
@@ -456,5 +329,106 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertIsArray( $errors );
 		$this->assertNotEmpty( $errors );
 		$this->assertGreaterThan( 2, count( $errors ) ); // Should have multiple validation errors
+	}
+
+	public function test_validate_prompt_data_with_valid_mcp_annotations(): void {
+		$valid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'audience'     => array( 'user', 'assistant' ),
+				'lastModified' => '2024-01-15T10:30:00Z',
+				'priority'     => 0.8,
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data );
+		$this->assertTrue( $result );
+	}
+
+	public function test_validate_prompt_data_with_unknown_annotation_field_name(): void {
+		// Unknown fields should be ignored (filtered out by mapper before validation)
+		$valid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'invalidField' => 'value', // Unknown field, should be ignored
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data );
+
+		$this->assertTrue( $result, 'Unknown annotation fields should be ignored' );
+	}
+
+	public function test_validate_prompt_data_with_invalid_audience_type(): void {
+		$invalid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'audience' => 'not-an-array', // Should be array
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Annotation field audience must be an array', $result->get_error_message() );
+	}
+
+	public function test_validate_prompt_data_with_invalid_audience_role(): void {
+		$invalid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'audience' => array( 'invalid-role' ), // Invalid role
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'audience must contain only valid roles', $result->get_error_message() );
+	}
+
+	public function test_validate_prompt_data_with_invalid_lastModified_format(): void {
+		$invalid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'lastModified' => 'not-a-date', // Invalid ISO 8601 format
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'lastModified must be a valid ISO 8601 timestamp', $result->get_error_message() );
+	}
+
+	public function test_validate_prompt_data_with_invalid_priority_range(): void {
+		$invalid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'priority' => 2.0, // Out of range (should be 0-1)
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $invalid_prompt_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'prompt_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'priority must be between 0.0 and 1.0', $result->get_error_message() );
+	}
+
+	public function test_validate_prompt_data_with_partial_annotations(): void {
+		// Should be valid - not all annotation fields are required
+		$valid_prompt_data = array(
+			'name'        => 'test-prompt',
+			'annotations' => array(
+				'priority' => 0.5,
+			),
+		);
+
+		$result = McpPromptValidator::validate_prompt_data( $valid_prompt_data );
+		$this->assertTrue( $result );
 	}
 }

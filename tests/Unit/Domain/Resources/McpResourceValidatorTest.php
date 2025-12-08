@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Unit\Domain\Resources;
 
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Resources\McpResourceValidator;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Tests\TestCase;
 
 /**
@@ -25,7 +26,7 @@ final class McpResourceValidatorTest extends TestCase {
 			'description' => 'A test resource for validation',
 			'text'        => 'This is test content',
 			'mimeType'    => 'text/plain',
-			'annotations' => array( 'category' => 'test' ),
+			'annotations' => array( 'priority' => 0.5 ),
 		);
 
 		$result = McpResourceValidator::validate_resource_data( $valid_resource_data, 'test-context' );
@@ -125,7 +126,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_uris as $uri ) {
-			$this->assertTrue( McpResourceValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be valid" );
+			$this->assertTrue( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be valid" );
 		}
 	}
 
@@ -139,7 +140,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $invalid_uris as $uri ) {
-			$this->assertFalse( McpResourceValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid" );
 		}
 	}
 
@@ -155,7 +156,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_types as $type ) {
-			$this->assertTrue( McpResourceValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
+			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
 		}
 	}
 
@@ -170,7 +171,7 @@ final class McpResourceValidatorTest extends TestCase {
 		);
 
 		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpResourceValidator::validate_mime_type( $type ), "MIME type '{$type}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be invalid" );
 		}
 	}
 
@@ -190,6 +191,17 @@ final class McpResourceValidatorTest extends TestCase {
 
 		$result = McpResourceValidator::validate_resource_instance( $resource, 'test-context' );
 		$this->assertTrue( $result );
+	}
+
+	public function test_validate_resource_requires_server_before_validation(): void {
+		$resource = new McpResource(
+			'test/missing-server',
+			'WordPress://local/missing-server'
+		);
+
+		$result = $resource->validate();
+		$this->assertWPError( $result );
+		$this->assertSame( 'resource_missing_mcp_server', $result->get_error_code() );
 	}
 
 	public function test_validate_resource_uniqueness_method_exists(): void {
@@ -279,5 +291,113 @@ final class McpResourceValidatorTest extends TestCase {
 		$this->assertWPError( $result );
 		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'Resource must have either text or blob content', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_data_with_valid_mcp_annotations(): void {
+		$valid_resource_data = array(
+			'uri'         => 'WordPress://local/annotated-resource',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'audience'     => array( 'user', 'assistant' ),
+				'lastModified' => '2024-01-15T10:30:00Z',
+				'priority'     => 0.8,
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
+		$this->assertTrue( $result );
+	}
+
+	public function test_validate_resource_data_with_unknown_annotation_field_name(): void {
+		// Unknown fields should be ignored (filtered out by mapper before validation)
+		$valid_resource_data = array(
+			'uri'         => 'WordPress://local/unknown-annotations',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'invalidField' => 'value', // Unknown field, should be ignored
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
+
+		$this->assertTrue( $result, 'Unknown annotation fields should be ignored' );
+	}
+
+	public function test_validate_resource_data_with_invalid_audience_type(): void {
+		$invalid_resource_data = array(
+			'uri'         => 'WordPress://local/invalid-audience',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'audience' => 'not-an-array', // Should be array
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Annotation field audience must be an array', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_data_with_invalid_audience_role(): void {
+		$invalid_resource_data = array(
+			'uri'         => 'WordPress://local/invalid-audience-role',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'audience' => array( 'invalid-role' ), // Invalid role
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'audience must contain only valid roles', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_data_with_invalid_lastModified_format(): void {
+		$invalid_resource_data = array(
+			'uri'         => 'WordPress://local/invalid-date',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'lastModified' => 'not-a-date', // Invalid ISO 8601 format
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'lastModified must be a valid ISO 8601 timestamp', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_data_with_invalid_priority_range(): void {
+		$invalid_resource_data = array(
+			'uri'         => 'WordPress://local/invalid-priority',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'priority' => 2.0, // Out of range (should be 0-1)
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
+
+		$this->assertWPError( $result );
+		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'priority must be between 0.0 and 1.0', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_data_with_partial_annotations(): void {
+		// Should be valid - not all annotation fields are required
+		$valid_resource_data = array(
+			'uri'         => 'WordPress://local/partial-annotations',
+			'text'        => 'Test content',
+			'annotations' => array(
+				'priority' => 0.5,
+			),
+		);
+
+		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
+		$this->assertTrue( $result );
 	}
 }

@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
+use WP\MCP\Domain\Utils\McpValidator;
+
 /**
  * Validates MCP resources against the Model Context Protocol specification.
  *
@@ -61,30 +63,6 @@ class McpResourceValidator {
 	}
 
 	/**
-	 * Validate that the resource is unique within the MCP server.
-	 *
-	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
-	 * @param string      $context Optional context for error messages.
-	 *
-	 * @return bool|\WP_Error True if unique, WP_Error if the resource URI is not unique.
-	 */
-	public static function validate_resource_uniqueness( McpResource $the_resource, string $context = '' ) {
-		$this_resource_uri = $the_resource->get_uri();
-		$existing_resource = $the_resource->get_mcp_server()->get_resource( $this_resource_uri );
-		if ( $existing_resource ) {
-			$error_message  = $context ? "[{$context}] " : '';
-			$error_message .= sprintf(
-			/* translators: %s: resource URI */
-				__( 'Resource URI \'%s\' is not unique. It already exists in the MCP server.', 'mcp-adapter' ),
-				$this_resource_uri
-			);
-			return new \WP_Error( 'resource_not_unique', esc_html( $error_message ) );
-		}
-
-		return true;
-	}
-
-	/**
 	 * Get validation error details for debugging purposes.
 	 * This is the core validation method - all other validation methods use this.
 	 *
@@ -112,7 +90,7 @@ class McpResourceValidator {
 		// Validate the required URI field.
 		if ( empty( $resource_data['uri'] ) || ! is_string( $resource_data['uri'] ) ) {
 			$errors[] = __( 'Resource URI is required and must be a non-empty string', 'mcp-adapter' );
-		} elseif ( ! self::validate_resource_uri( $resource_data['uri'] ) ) {
+		} elseif ( ! McpValidator::validate_resource_uri( $resource_data['uri'] ) ) {
 			$errors[] = __( 'Resource URI must be a valid URI format', 'mcp-adapter' );
 		}
 
@@ -148,52 +126,47 @@ class McpResourceValidator {
 		if ( isset( $resource_data['mimeType'] ) ) {
 			if ( ! is_string( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a string if provided', 'mcp-adapter' );
-			} elseif ( ! self::validate_mime_type( $resource_data['mimeType'] ) ) {
+			} elseif ( ! McpValidator::validate_mime_type( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a valid MIME type format', 'mcp-adapter' );
 			}
 		}
 
-		if ( isset( $resource_data['annotations'] ) && ! is_array( $resource_data['annotations'] ) ) {
-			$errors[] = __( 'Resource annotations must be an array if provided', 'mcp-adapter' );
+		// Validate annotations structure if present.
+		if ( isset( $resource_data['annotations'] ) ) {
+			if ( ! is_array( $resource_data['annotations'] ) ) {
+				$errors[] = __( 'Resource annotations must be an array if provided', 'mcp-adapter' );
+			} else {
+				$annotation_errors = McpValidator::get_annotation_validation_errors( $resource_data['annotations'] );
+				if ( ! empty( $annotation_errors ) ) {
+					$errors = array_merge( $errors, $annotation_errors );
+				}
+			}
 		}
 
 		return $errors;
 	}
 
 	/**
-	 * Check if a resource URI follows valid format according to MCP specification.
+	 * Validate that the resource is unique within the MCP server.
 	 *
-	 * Per MCP spec: "The URI can use any protocol; it is up to the server how to interpret it."
-	 * This validates basic URI structure per RFC 3986.
+	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
+	 * @param string      $context Optional context for error messages.
 	 *
-	 * @param string $uri The URI to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
+	 * @return bool|\WP_Error True if unique, WP_Error if the resource URI is not unique.
 	 */
-	public static function validate_resource_uri( string $uri ): bool {
-		// URI should not be empty.
-		if ( empty( $uri ) ) {
-			return false;
+	public static function validate_resource_uniqueness( McpResource $the_resource, string $context = '' ) {
+		$this_resource_uri = $the_resource->get_uri();
+		$existing_resource = $the_resource->get_mcp_server()->get_resource( $this_resource_uri );
+		if ( $existing_resource ) {
+			$error_message  = $context ? "[{$context}] " : '';
+			$error_message .= sprintf(
+			/* translators: %s: resource URI */
+				__( 'Resource URI \'%s\' is not unique. It already exists in the MCP server.', 'mcp-adapter' ),
+				$this_resource_uri
+			);
+			return new \WP_Error( 'resource_not_unique', esc_html( $error_message ) );
 		}
 
-		// Check reasonable length constraints.
-		if ( strlen( $uri ) > 2048 ) {
-			return false;
-		}
-
-		// Basic URI validation: must have scheme followed by colon (RFC 3986)
-		// This accepts any protocol as per MCP specification.
-		return (bool) preg_match( '/^[a-zA-Z][a-zA-Z0-9+.-]*:.+/', $uri );
-	}
-
-	/**
-	 * Validate MIME type format.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_mime_type( string $mime_type ): bool {
-		return (bool) preg_match( '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_]*$/', $mime_type );
+		return true;
 	}
 }

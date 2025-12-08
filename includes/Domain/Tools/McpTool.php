@@ -72,11 +72,18 @@ class McpTool {
 	private array $annotations;
 
 	/**
+	 * Internal metadata used by the server (not exposed to MCP clients).
+	 *
+	 * @var array
+	 */
+	private array $metadata;
+
+	/**
 	 * The MCP server instance this tool belongs to.
 	 *
-	 * @var \WP\MCP\Core\McpServer
+	 * @var \WP\MCP\Core\McpServer|null
 	 */
-	private McpServer $mcp_server;
+	private ?McpServer $mcp_server = null;
 
 	/**
 	 * Constructor for McpTool.
@@ -88,6 +95,7 @@ class McpTool {
 	 * @param string|null $title Optional human-readable name for display.
 	 * @param array|null  $output_schema Optional JSON Schema for output structure.
 	 * @param array       $annotations Optional properties describing tool behavior.
+	 * @param array       $metadata Internal metadata used by the server (not returned to clients).
 	 */
 	public function __construct(
 		string $ability,
@@ -96,7 +104,8 @@ class McpTool {
 		array $input_schema,
 		?string $title = null,
 		?array $output_schema = null,
-		array $annotations = array()
+		array $annotations = array(),
+		array $metadata = array()
 	) {
 		$this->ability       = $ability;
 		$this->name          = $name;
@@ -105,6 +114,7 @@ class McpTool {
 		$this->input_schema  = $input_schema;
 		$this->output_schema = $output_schema;
 		$this->annotations   = $annotations;
+		$this->metadata      = $metadata;
 	}
 
 	/**
@@ -182,6 +192,15 @@ class McpTool {
 	}
 
 	/**
+	 * Get internal metadata for server-side processing.
+	 *
+	 * @return array
+	 */
+	public function get_metadata(): array {
+		return $this->metadata;
+	}
+
+	/**
 	 * Set the tool title.
 	 *
 	 * @param string|null $title The title to set.
@@ -237,6 +256,17 @@ class McpTool {
 	}
 
 	/**
+	 * Set internal metadata.
+	 *
+	 * @param array $metadata Internal metadata values.
+	 *
+	 * @return void
+	 */
+	public function set_metadata( array $metadata ): void {
+		$this->metadata = $metadata;
+	}
+
+	/**
 	 * Add an annotation.
 	 *
 	 * @param string $key The annotation key.
@@ -265,6 +295,10 @@ class McpTool {
 	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
+		if ( null === $this->mcp_server ) {
+			throw new \RuntimeException( 'MCP server has not been set on this tool instance.' );
+		}
+
 		return $this->mcp_server;
 	}
 
@@ -326,7 +360,8 @@ class McpTool {
 			$data['inputSchema'] ?? array(),
 			$data['title'] ?? null,
 			$data['outputSchema'] ?? null,
-			$data['annotations'] ?? array()
+			$data['annotations'] ?? array(),
+			$data['_metadata'] ?? array()
 		);
 		$tool->set_mcp_server( $mcp_server );
 
@@ -342,6 +377,13 @@ class McpTool {
 	 * @return self|\WP_Error Returns the validated tool instance or WP_Error if validation fails.
 	 */
 	public function validate( string $context = '' ) {
+		if ( null === $this->mcp_server ) {
+			return new \WP_Error(
+				'tool_missing_mcp_server',
+				esc_html__( 'MCP server must be set before validating a tool.', 'mcp-adapter' )
+			);
+		}
+
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}

@@ -206,6 +206,25 @@ final class DummyAbility {
 			)
 		);
 
+		// Resource ability with extra whitespace around URI for normalization tests
+		wp_register_ability(
+			'test/resource-whitespace-uri',
+			array(
+				'label'               => 'Resource With Whitespace URI',
+				'description'         => 'Resource whose URI includes leading/trailing spaces',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => '  WordPress://local/resource-whitespace  ',
+				),
+			)
+		);
+
 		// Prompt ability with arguments
 		wp_register_ability(
 			'test/prompt',
@@ -247,6 +266,321 @@ final class DummyAbility {
 				),
 			)
 		);
+
+		// Test abilities for annotation mapping tests
+		wp_register_ability(
+			'test/annotated-ability',
+			array(
+				'label'               => 'Annotated Ability',
+				'description'         => 'Test ability with annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'input_schema'        => array( 'type' => 'object' ),
+				'meta'                => array(
+					'annotations' => array(
+						'readonly'    => true,
+						'destructive' => false,
+						'idempotent'  => true,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'test/null-annotations',
+			array(
+				'label'               => 'Null Annotations',
+				'description'         => 'Test ability with null annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'input_schema'        => array( 'type' => 'object' ),
+				'meta'                => array(
+					'annotations' => array(
+						'readonly'    => null,
+						'destructive' => null,
+						'idempotent'  => false,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'test/with-instructions',
+			array(
+				'label'               => 'With Instructions',
+				'description'         => 'Test ability with instructions',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'input_schema'        => array( 'type' => 'object' ),
+				'meta'                => array(
+					'annotations' => array(
+						'instructions' => 'These are instructions',
+						'readonly'     => true,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'test/mcp-native',
+			array(
+				'label'               => 'MCP Native',
+				'description'         => 'Test ability with MCP-native annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'input_schema'        => array( 'type' => 'object' ),
+				'meta'                => array(
+					'annotations' => array(
+						'openWorldHint' => true,
+						'title'         => 'Custom Annotation Title',
+						'readonly'      => false,
+					),
+				),
+			)
+		);
+
+		wp_register_ability(
+			'test/no-annotations',
+			array(
+				'label'               => 'No Annotations',
+				'description'         => 'Test ability without annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'input_schema'        => array( 'type' => 'object' ),
+			)
+		);
+
+		wp_register_ability(
+			'test/all-null-annotations',
+			array(
+				'label'               => 'All Null Annotations',
+				'description'         => 'Test ability with all null annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'input_schema'        => array( 'type' => 'object' ),
+				'meta'                => array(
+					'annotations' => array(
+						'readonly'    => null,
+						'destructive' => null,
+						'idempotent'  => null,
+					),
+				),
+			)
+		);
+
+		// Resource with annotations
+		wp_register_ability(
+			'test/resource-with-annotations',
+			array(
+				'label'               => 'Resource With Annotations',
+				'description'         => 'A resource with MCP annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri'         => 'WordPress://local/resource-annotated',
+					'annotations' => array(
+						'audience'     => array( 'user', 'assistant' ),
+						'lastModified' => '2024-01-15T10:30:00Z',
+						'priority'     => 0.8,
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		// Resource with partial annotations
+		wp_register_ability(
+			'test/resource-partial-annotations',
+			array(
+				'label'               => 'Resource Partial Annotations',
+				'description'         => 'A resource with only some annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri'         => 'WordPress://local/resource-partial',
+					'annotations' => array(
+						'priority' => 0.5,
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		// Resource with invalid annotations (should be filtered)
+		wp_register_ability(
+			'test/resource-invalid-annotations',
+			array(
+				'label'               => 'Resource Invalid Annotations',
+				'description'         => 'A resource with invalid annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri'         => 'WordPress://local/resource-invalid',
+					'annotations' => array(
+						'audience'     => array( 'invalid-role' ), // Invalid role
+						'lastModified' => 'not-a-date',            // Invalid date
+						'priority'     => 2.0,                      // Out of range
+						'invalidField' => 'should-be-filtered',    // Unknown field
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		// Prompt with annotations
+		wp_register_ability(
+			'test/prompt-with-annotations',
+			array(
+				'label'               => 'Prompt With Annotations',
+				'description'         => 'A prompt with MCP annotations',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'code' => array(
+							'type'        => 'string',
+							'description' => 'Code to review',
+						),
+					),
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array(
+						'messages' => array(
+							array(
+								'role'    => 'assistant',
+								'content' => array(
+									'type' => 'text',
+									'text' => 'hi',
+								),
+							),
+						),
+					);
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'annotations' => array(
+						'audience'     => array( 'user' ),
+						'lastModified' => '2024-01-15T10:30:00Z',
+						'priority'     => 0.9,
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with partial annotations
+		wp_register_ability(
+			'test/prompt-partial-annotations',
+			array(
+				'label'               => 'Prompt Partial Annotations',
+				'description'         => 'A prompt with only some annotations',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'annotations' => array(
+						'audience' => array( 'assistant' ),
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with invalid annotations (should be filtered)
+		wp_register_ability(
+			'test/prompt-invalid-annotations',
+			array(
+				'label'               => 'Prompt Invalid Annotations',
+				'description'         => 'A prompt with invalid annotations',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'annotations' => array(
+						'audience'     => array( 'user', 'invalid-role' ), // Mixed valid and invalid roles
+						'lastModified' => 'not-a-date',                      // Invalid date
+						'priority'     => -1.0,                              // Out of range
+						'invalidField' => 'should-be-filtered',              // Unknown field
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -271,6 +605,19 @@ final class DummyAbility {
 			'test/image',
 			'test/resource',
 			'test/prompt',
+			'test/annotated-ability',
+			'test/null-annotations',
+			'test/with-instructions',
+			'test/mcp-native',
+			'test/no-annotations',
+			'test/all-null-annotations',
+			'test/resource-with-annotations',
+			'test/resource-partial-annotations',
+			'test/resource-invalid-annotations',
+			'test/prompt-with-annotations',
+			'test/prompt-partial-annotations',
+			'test/prompt-invalid-annotations',
+			'test/resource-whitespace-uri',
 		);
 
 		foreach ( $names as $name ) {

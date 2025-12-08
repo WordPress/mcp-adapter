@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
+use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP_Ability;
 
 /**
@@ -65,39 +67,63 @@ class RegisterAbilityAsMcpTool {
 	 * @return array<string,mixed>
 	 */
 	private function get_data(): array {
-		$input_schema = $this->ability->get_input_schema();
-
-		// If ability has no input schema, use an empty object schema for MCP
-		if ( empty( $input_schema ) ) {
-			$input_schema = array(
-				'type'                 => 'object',
-				'additionalProperties' => false,
-			);
-		}
+		// Transform input schema to MCP-compatible object format
+		$input_transform = SchemaTransformer::transform_to_object_schema(
+			$this->ability->get_input_schema()
+		);
 
 		$tool_data = array(
 			'ability'     => $this->ability->get_name(),
-			'name'        => str_replace( '/', '-', $this->ability->get_name() ),
-			'description' => $this->ability->get_description(),
-			'inputSchema' => $input_schema,
+			'name'        => str_replace( '/', '-', trim( $this->ability->get_name() ) ),
+			'description' => trim( $this->ability->get_description() ),
+			'inputSchema' => $input_transform['schema'],
 		);
 
 		// Add optional title from ability label.
 		$label = $this->ability->get_label();
+		$label = trim( $label );
 		if ( ! empty( $label ) ) {
 			$tool_data['title'] = $label;
 		}
 
-		// Add optional output schema.
-		$output_schema = $this->ability->get_output_schema();
+		// Add optional output schema, transformed to object format if needed.
+		$output_schema    = $this->ability->get_output_schema();
+		$output_transform = null;
 		if ( ! empty( $output_schema ) ) {
-			$tool_data['outputSchema'] = $output_schema;
+			$output_transform          = SchemaTransformer::transform_to_object_schema(
+				$output_schema,
+				'result'
+			);
+			$tool_data['outputSchema'] = $output_transform['schema'];
 		}
 
-		// get annotations from ability meta.
+		// Map annotations from ability meta to MCP format using unified mapper.
 		$ability_meta = $this->ability->get_meta();
-		if ( ! empty( $ability_meta['annotations'] ) ) {
-			$tool_data['annotations'] = $ability_meta['annotations'];
+		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
+			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'], 'tool' );
+			if ( ! empty( $mcp_annotations ) ) {
+				$tool_data['annotations'] = $mcp_annotations;
+			}
+		}
+
+		// Set annotations.title from label if annotations exist but don't have a title.
+		if ( ! empty( $label ) && isset( $tool_data['annotations'] ) && ! isset( $tool_data['annotations']['title'] ) ) {
+			$tool_data['annotations']['title'] = $label;
+		}
+
+		// Store transformation metadata as internal metadata (stripped before responding to clients).
+		if ( $input_transform['was_transformed'] || ( $output_transform && $output_transform['was_transformed'] ) ) {
+			$tool_data['_metadata'] = array();
+
+			if ( $input_transform['was_transformed'] ) {
+				$tool_data['_metadata']['_input_schema_transformed'] = true;
+				$tool_data['_metadata']['_input_schema_wrapper']     = $input_transform['wrapper_property'] ?? 'input';
+			}
+
+			if ( $output_transform && $output_transform['was_transformed'] ) {
+				$tool_data['_metadata']['_output_schema_transformed'] = true;
+				$tool_data['_metadata']['_output_schema_wrapper']     = $output_transform['wrapper_property'] ?? 'result';
+			}
 		}
 
 		return $tool_data;

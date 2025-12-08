@@ -211,11 +211,8 @@ class HttpRequestHandler {
 	 * @return \WP_REST_Response SSE response.
 	 */
 	private function handle_sse_request( HttpRequestContext $context ): \WP_REST_Response {
-		// SSE streaming not yet implemented
-		return new \WP_REST_Response(
-			McpErrorFactory::internal_error( 0, 'SSE streaming not yet implemented' ),
-			405
-		);
+		// SSE streaming not yet implemented - return HTTP 405 with no body
+		return new \WP_REST_Response( null, 405 );
 	}
 
 	/**

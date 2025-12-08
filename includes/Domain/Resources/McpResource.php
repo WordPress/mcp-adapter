@@ -81,9 +81,9 @@ class McpResource {
 	/**
 	 * The MCP server instance this resource belongs to.
 	 *
-	 * @var \WP\MCP\Core\McpServer
+	 * @var \WP\MCP\Core\McpServer|null
 	 */
-	private McpServer $mcp_server;
+	private ?McpServer $mcp_server = null;
 
 	/**
 	 * Constructor for McpResource.
@@ -307,6 +307,10 @@ class McpResource {
 	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
+		if ( null === $this->mcp_server ) {
+			throw new \RuntimeException( 'MCP server has not been set on this resource instance.' );
+		}
+
 		return $this->mcp_server;
 	}
 
@@ -420,6 +424,13 @@ class McpResource {
 	 * @return \WP\MCP\Domain\Resources\McpResource|\WP_Error Resource instance on success, WP_Error on failure.
 	 */
 	public function validate( string $context = '' ) {
+		if ( null === $this->mcp_server ) {
+			return new \WP_Error(
+				'resource_missing_mcp_server',
+				esc_html__( 'MCP server must be set before validating a resource.', 'mcp-adapter' )
+			);
+		}
+
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}

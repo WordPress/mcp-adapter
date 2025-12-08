@@ -66,9 +66,9 @@ class McpPrompt {
 	/**
 	 * The MCP server instance this prompt belongs to.
 	 *
-	 * @var \WP\MCP\Core\McpServer
+	 * @var \WP\MCP\Core\McpServer|null
 	 */
-	private McpServer $mcp_server;
+	private ?McpServer $mcp_server = null;
 
 	/**
 	 * Constructor for McpPrompt.
@@ -356,6 +356,13 @@ class McpPrompt {
 	 * @return self|\WP_Error Returns the validated prompt instance or WP_Error if validation fails.
 	 */
 	public function validate( string $context = '' ) {
+		if ( null === $this->mcp_server ) {
+			return new \WP_Error(
+				'prompt_missing_mcp_server',
+				esc_html__( 'MCP server must be set before validating a prompt.', 'mcp-adapter' )
+			);
+		}
+
 		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
 			return $this;
 		}
@@ -401,6 +408,10 @@ class McpPrompt {
 	 * @return \WP\MCP\Core\McpServer
 	 */
 	public function get_mcp_server(): McpServer {
+		if ( null === $this->mcp_server ) {
+			throw new \RuntimeException( 'MCP server has not been set on this prompt instance.' );
+		}
+
 		return $this->mcp_server;
 	}
 

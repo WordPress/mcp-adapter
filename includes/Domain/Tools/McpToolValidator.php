@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
+use WP\MCP\Domain\Utils\McpValidator;
 use stdClass;
 
 /**
@@ -85,7 +86,7 @@ class McpToolValidator {
 		}
 
 		// Check the required fields.
-		if ( empty( $tool_data['name'] ) || ! is_string( $tool_data['name'] ) || ! self::validate_tool_name( $tool_data['name'] ) ) {
+		if ( empty( $tool_data['name'] ) || ! is_string( $tool_data['name'] ) || ! McpValidator::validate_tool_or_prompt_name( $tool_data['name'] ) ) {
 			$errors[] = __( 'Tool name is required and must only contain letters, numbers, hyphens (-), and underscores (_), and be 255 characters or less', 'mcp-adapter' );
 		}
 
@@ -112,8 +113,23 @@ class McpToolValidator {
 			}
 		}
 
-		if ( isset( $tool_data['annotations'] ) && ! is_array( $tool_data['annotations'] ) ) {
-			$errors[] = __( 'Tool annotations must be an array if provided', 'mcp-adapter' );
+		// Validate annotations structure if present.
+		if ( isset( $tool_data['annotations'] ) ) {
+			if ( ! is_array( $tool_data['annotations'] ) ) {
+				$errors[] = __( 'Tool annotations must be an array if provided', 'mcp-adapter' );
+			} else {
+				// Validate shared annotations (audience, lastModified, priority).
+				$shared_annotation_errors = McpValidator::get_annotation_validation_errors( $tool_data['annotations'] );
+				if ( ! empty( $shared_annotation_errors ) ) {
+					$errors = array_merge( $errors, $shared_annotation_errors );
+				}
+
+				// Validate tool-specific annotations (readOnlyHint, destructiveHint, etc.).
+				$tool_annotation_errors = McpValidator::get_tool_annotation_validation_errors( $tool_data['annotations'] );
+				if ( ! empty( $tool_annotation_errors ) ) {
+					$errors = array_merge( $errors, $tool_annotation_errors );
+				}
+			}
 		}
 
 		return $errors;
@@ -229,39 +245,6 @@ class McpToolValidator {
 		}
 
 		return $errors;
-	}
-
-	/**
-	 * Check if tool data is valid without throwing exceptions.
-	 *
-	 * @param array $tool_data The tool data to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function is_valid_tool_data( array $tool_data ): bool {
-		return empty( self::get_validation_errors( $tool_data ) );
-	}
-
-	/**
-	 * Check if a tool name follows MCP naming conventions.
-	 *
-	 * @param string $name The tool name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_tool_name( string $name ): bool {
-		// Tool names should not be empty.
-		if ( empty( $name ) ) {
-			return false;
-		}
-
-		// Check length constraints (reasonable limits).
-		if ( strlen( $name ) > 255 ) {
-			return false;
-		}
-
-		// Only allow letters, numbers, hyphens, and underscores.
-		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
 	}
 
 	/**

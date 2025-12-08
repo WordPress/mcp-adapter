@@ -9,6 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
+use WP\MCP\Domain\Resources\McpResourceValidator;
+use WP\MCP\Domain\Utils\McpValidator;
+
 /**
  * Validates MCP prompts against the Model Context Protocol specification.
  *
@@ -60,7 +63,6 @@ class McpPromptValidator {
 		return self::validate_prompt_data( $prompt->to_array(), $context );
 	}
 
-
 	/**
 	 * Validate that the resource is unique within the MCP server.
 	 *
@@ -108,7 +110,7 @@ class McpPromptValidator {
 		}
 
 		// Check required fields
-		if ( empty( $prompt_data['name'] ) || ! is_string( $prompt_data['name'] ) || ! self::validate_prompt_name( $prompt_data['name'] ) ) {
+		if ( empty( $prompt_data['name'] ) || ! is_string( $prompt_data['name'] ) || ! McpValidator::validate_tool_or_prompt_name( $prompt_data['name'] ) ) {
 			$errors[] = __( 'Prompt name is required and must only contain letters, numbers, hyphens (-), and underscores (_), and be 255 characters or less', 'mcp-adapter' );
 		}
 
@@ -129,9 +131,16 @@ class McpPromptValidator {
 			}
 		}
 
-		// Validate annotations (optional field)
-		if ( isset( $prompt_data['annotations'] ) && ! is_array( $prompt_data['annotations'] ) ) {
-			$errors[] = __( 'Prompt annotations must be an array if provided', 'mcp-adapter' );
+		// Validate annotations structure if present.
+		if ( isset( $prompt_data['annotations'] ) ) {
+			if ( ! is_array( $prompt_data['annotations'] ) ) {
+				$errors[] = __( 'Prompt annotations must be an array if provided', 'mcp-adapter' );
+			} else {
+				$annotation_errors = McpValidator::get_annotation_validation_errors( $prompt_data['annotations'] );
+				if ( ! empty( $annotation_errors ) ) {
+					$errors = array_merge( $errors, $annotation_errors );
+				}
+			}
 		}
 
 		return $errors;
@@ -174,7 +183,7 @@ class McpPromptValidator {
 			}
 
 			// Validate argument name format
-			if ( ! self::validate_argument_name( $argument['name'] ) ) {
+			if ( ! McpValidator::validate_argument_name( $argument['name'] ) ) {
 				$errors[] = sprintf(
 				/* translators: %s: argument name */
 					__( 'Prompt argument \'%s\' name must only contain letters, numbers, hyphens (-), and underscores (_), and be 64 characters or less', 'mcp-adapter' ),
@@ -309,7 +318,7 @@ class McpPromptValidator {
 						__( 'Message %d image content must have a data field with base64-encoded image', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_base64( $content['data'] ) ) {
+				} elseif ( ! McpValidator::validate_base64( $content['data'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d image content data must be valid base64', 'mcp-adapter' ),
@@ -323,7 +332,7 @@ class McpPromptValidator {
 						__( 'Message %d image content must have a mimeType field', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_image_mime_type( $content['mimeType'] ) ) {
+				} elseif ( ! McpValidator::validate_image_mime_type( $content['mimeType'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d image content must have a valid image MIME type', 'mcp-adapter' ),
@@ -339,7 +348,7 @@ class McpPromptValidator {
 						__( 'Message %d audio content must have a data field with base64-encoded audio', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_base64( $content['data'] ) ) {
+				} elseif ( ! McpValidator::validate_base64( $content['data'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d audio content data must be valid base64', 'mcp-adapter' ),
@@ -353,7 +362,7 @@ class McpPromptValidator {
 						__( 'Message %d audio content must have a mimeType field', 'mcp-adapter' ),
 						$message_index
 					);
-				} elseif ( ! self::validate_audio_mime_type( $content['mimeType'] ) ) {
+				} elseif ( ! McpValidator::validate_audio_mime_type( $content['mimeType'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d audio content must have a valid audio MIME type', 'mcp-adapter' ),
@@ -370,8 +379,8 @@ class McpPromptValidator {
 						$message_index
 					);
 				} else {
-					// Validate embedded resource using resource validator
-					$resource_errors = self::get_validation_errors( $content['resource'] );
+					// Validate embedded resource using the resource validator for strict MCP compliance.
+					$resource_errors = McpResourceValidator::get_validation_errors( $content['resource'] );
 					foreach ( $resource_errors as $resource_error ) {
 						$errors[] = sprintf(
 						/* translators: %1$d: message index, %2$s: resource error */
@@ -395,242 +404,20 @@ class McpPromptValidator {
 
 		// Check optional annotations
 		if ( isset( $content['annotations'] ) ) {
-			$annotation_errors = self::get_content_annotation_validation_errors( $content['annotations'], $message_index );
-			if ( ! empty( $annotation_errors ) ) {
-				$errors = array_merge( $errors, $annotation_errors );
-			}
-		}
-
-		return $errors;
-	}
-
-	/**
-	 * Get validation errors for message content annotations.
-	 *
-	 * @param array|mixed $annotations The annotations to validate.
-	 * @param int         $message_index The message index for error reporting.
-	 *
-	 * @return array Array of validation errors, empty if valid.
-	 */
-	private static function get_content_annotation_validation_errors( $annotations, int $message_index ): array {
-		$errors = array();
-
-		// Annotations must be an array
-		if ( ! is_array( $annotations ) ) {
-			return array(
-				sprintf(
+			if ( ! is_array( $content['annotations'] ) ) {
+				$errors[] = sprintf(
 				/* translators: %d: message index */
 					__( 'Message %d content annotations must be an array if provided', 'mcp-adapter' ),
 					$message_index
-				),
-			);
-		}
-
-		// Validate audience field if present
-		if ( isset( $annotations['audience'] ) ) {
-			if ( ! is_array( $annotations['audience'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'audience\' must be an array', 'mcp-adapter' ),
-					$message_index
 				);
 			} else {
-				$valid_audiences = array( 'user', 'assistant' );
-				foreach ( $annotations['audience'] as $audience ) {
-					if ( in_array( $audience, $valid_audiences, true ) ) {
-						continue;
-					}
-
-					$errors[] = sprintf(
-					/* translators: %1$d: message index, %2$s: audience value */
-						__( 'Message %1$d content annotation audience \'%2$s\' must be \'user\' or \'assistant\'', 'mcp-adapter' ),
-						$message_index,
-						$audience
-					);
+				$annotation_errors = McpValidator::get_annotation_validation_errors( $content['annotations'] );
+				if ( ! empty( $annotation_errors ) ) {
+					$errors = array_merge( $errors, $annotation_errors );
 				}
 			}
 		}
 
-		// Validate priority field if present
-		if ( isset( $annotations['priority'] ) ) {
-			if ( ! is_numeric( $annotations['priority'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'priority\' must be a number', 'mcp-adapter' ),
-					$message_index
-				);
-			} elseif ( $annotations['priority'] < 0.0 || $annotations['priority'] > 1.0 ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'priority\' must be between 0.0 and 1.0', 'mcp-adapter' ),
-					$message_index
-				);
-			}
-		}
-
-		// Validate lastModified field if present
-		if ( isset( $annotations['lastModified'] ) ) {
-			if ( ! is_string( $annotations['lastModified'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'lastModified\' must be a string', 'mcp-adapter' ),
-					$message_index
-				);
-			} elseif ( ! self::validate_iso8601_timestamp( $annotations['lastModified'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %d: message index */
-					__( 'Message %d content annotation \'lastModified\' must be a valid ISO 8601 timestamp', 'mcp-adapter' ),
-					$message_index
-				);
-			}
-		}
-
 		return $errors;
-	}
-
-	/**
-	 * Check if prompt data is valid without throwing exceptions.
-	 *
-	 * @param array $prompt_data The prompt data to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function is_valid_prompt_data( array $prompt_data ): bool {
-		return empty( self::get_validation_errors( $prompt_data ) );
-	}
-
-	/**
-	 * Check if a prompt name follows MCP naming conventions.
-	 *
-	 * @param string $name The prompt name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_prompt_name( string $name ): bool {
-		// Prompt names should not be empty
-		if ( empty( $name ) ) {
-			return false;
-		}
-
-		// Check length constraints (reasonable limits)
-		if ( strlen( $name ) > 255 ) {
-			return false;
-		}
-
-		// Only allow letters, numbers, hyphens, and underscores
-		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
-	}
-
-	/**
-	 * Check if an argument name follows MCP naming conventions.
-	 *
-	 * @param string $name The argument name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_argument_name( string $name ): bool {
-		// Argument names should not be empty
-		if ( empty( $name ) ) {
-			return false;
-		}
-
-		// Check length constraints (shorter than prompt names)
-		if ( strlen( $name ) > 64 ) {
-			return false;
-		}
-
-		// Only allow letters, numbers, hyphens, and underscores
-		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
-	}
-
-	/**
-	 * Validate base64 content.
-	 *
-	 * @param string $content The content to validate as base64.
-	 *
-	 * @return bool True if valid base64, false otherwise.
-	 */
-	public static function validate_base64( string $content ): bool {
-		// Base64 content should not be empty
-		if ( empty( $content ) ) {
-			return false;
-		}
-
-		// Check if it's valid base64 encoding
-		return base64_decode( $content, true ) !== false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-	}
-
-	/**
-	 * Validate image MIME type.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid image MIME type, false otherwise.
-	 */
-	public static function validate_image_mime_type( string $mime_type ): bool {
-		$valid_image_types = array(
-			'image/jpeg',
-			'image/jpg',
-			'image/png',
-			'image/gif',
-			'image/webp',
-			'image/bmp',
-			'image/svg+xml',
-		);
-
-		return in_array( strtolower( $mime_type ), $valid_image_types, true );
-	}
-
-	/**
-	 * Validate audio MIME type.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid audio MIME type, false otherwise.
-	 */
-	public static function validate_audio_mime_type( string $mime_type ): bool {
-		$valid_audio_types = array(
-			'audio/wav',
-			'audio/mp3',
-			'audio/mpeg',
-			'audio/ogg',
-			'audio/webm',
-			'audio/aac',
-			'audio/flac',
-		);
-
-		return in_array( strtolower( $mime_type ), $valid_audio_types, true );
-	}
-
-	/**
-	 * Validate ISO 8601 timestamp format.
-	 *
-	 * @param string $timestamp The timestamp to validate.
-	 *
-	 * @return bool True if valid ISO 8601 timestamp, false otherwise.
-	 */
-	public static function validate_iso8601_timestamp( string $timestamp ): bool {
-		// Try to parse as DateTime with ISO 8601 format
-		$datetime = \DateTime::createFromFormat( \DateTime::ATOM, $timestamp );
-		if ( $datetime && $datetime->format( \DateTime::ATOM ) === $timestamp ) {
-			return true;
-		}
-
-		// Try alternative ISO 8601 formats
-		$formats = array(
-			'Y-m-d\TH:i:s\Z',           // UTC format
-			'Y-m-d\TH:i:sP',            // With timezone offset
-			'Y-m-d\TH:i:s.u\Z',         // With microseconds UTC
-			'Y-m-d\TH:i:s.uP',          // With microseconds and timezone
-		);
-
-		foreach ( $formats as $format ) {
-			$datetime = \DateTime::createFromFormat( $format, $timestamp );
-			if ( $datetime && $datetime->format( $format ) === $timestamp ) {
-				return true;
-			}
-		}
-
-		return false;
 	}
 }

@@ -304,6 +304,63 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertEquals( 'permission_denied', $res['_metadata']['failure_reason'] );
 	}
 
+	public function test_call_tool_uses_metadata_flags_without_exposing_them(): void {
+		wp_set_current_user( 1 );
+		$captured_input = null;
+
+		$this->register_ability_in_hook(
+			'test/flat-transform-call',
+			array(
+				'label'               => 'Flat Transform Call',
+				'description'         => 'Uses flat schemas',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'string' ),
+				'output_schema'       => array( 'type' => 'string' ),
+				'execute_callback'    => static function ( $input ) use ( &$captured_input ) {
+					$captured_input = $input;
+					return $input;
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array( 'test/flat-transform-call' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+
+		$list       = $handler->list_tools();
+		$tool_entry = null;
+		foreach ( $list['tools'] as $tool ) {
+			if ( 'test-flat-transform-call' === $tool['name'] ) {
+				$tool_entry = $tool;
+				break;
+			}
+		}
+
+		$this->assertNotNull( $tool_entry );
+		$this->assertArrayNotHasKey( '_metadata', $tool_entry );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-flat-transform-call',
+					'arguments' => array( 'input' => 'hello-world' ),
+				),
+			)
+		);
+
+		$this->assertSame( 'hello-world', $captured_input, 'Ability should receive unwrapped argument from metadata flag.' );
+		$this->assertArrayHasKey( 'structuredContent', $res );
+		$this->assertArrayNotHasKey( '_metadata', $res['structuredContent'] );
+		$this->assertSame( array( 'result' => 'hello-world' ), $res['structuredContent'] );
+
+		wp_unregister_ability( 'test/flat-transform-call' );
+	}
+
 	public function test_list_tools_sanitizes_tool_data(): void {
 		wp_set_current_user( 1 );
 
@@ -366,5 +423,61 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertEquals( 'Test string error', $res['content'][0]['text'] );
 
 		wp_unregister_ability( 'test/string-error' );
+	}
+
+	public function test_call_tool_wraps_scalar_return_values(): void {
+		wp_set_current_user( 1 );
+
+		// Register an ability that returns a scalar (string) value
+		$this->register_ability_in_hook(
+			'test/scalar-return',
+			array(
+				'label'               => 'Scalar Return Test',
+				'description'         => 'Returns a scalar string value',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'hello-world';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
+		$server  = $this->makeServer( array( 'test/scalar-return' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+
+		$res = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-scalar-return',
+				),
+			)
+		);
+
+		// Should not have an error
+		$this->assertArrayNotHasKey( 'error', $res );
+		$this->assertArrayNotHasKey( 'isError', $res );
+
+		// Should have content
+		$this->assertArrayHasKey( 'content', $res );
+		$this->assertArrayHasKey( 'structuredContent', $res );
+
+		// The scalar value should be wrapped in an array with 'result' key
+		$this->assertArrayHasKey( 'result', $res['structuredContent'] );
+		$this->assertSame( 'hello-world', $res['structuredContent']['result'] );
+
+		// Should have metadata at the top level (not inside structuredContent)
+		$this->assertArrayHasKey( '_metadata', $res );
+		$this->assertArrayNotHasKey( '_metadata', $res['structuredContent'] );
+		$this->assertSame( 'tool', $res['_metadata']['component_type'] );
+		$this->assertSame( 'test-scalar-return', $res['_metadata']['tool_name'] );
+
+		wp_unregister_ability( 'test/scalar-return' );
 	}
 }

@@ -270,10 +270,8 @@ final class HttpRequestHandlerTest extends TestCase {
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
 		$this->assertEquals( 405, $response->get_status() );
-
-		$data = $response->get_data();
-		$this->assertArrayHasKey( 'error', $data );
-		$this->assertStringContainsString( 'SSE streaming not yet implemented', $data['error']['message'] );
+		// SSE not implemented returns 405 with no body per HTTP standards
+		$this->assertNull( $response->get_data() );
 	}
 
 	public function test_handle_request_delete_session(): void {

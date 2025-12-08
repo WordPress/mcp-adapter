@@ -37,11 +37,11 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle the tools/list request.
+	 * Handles the tools/list request.
 	 *
-	 * @param int $request_id The request ID for JSON-RPC.
+	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with tools list and metadata.
 	 */
 	public function list_tools( int $request_id = 0 ): array {
 		$tools      = $this->mcp->get_tools();
@@ -61,11 +61,11 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle the tools/list/all request.
+	 * Handles the tools/list/all request.
 	 *
-	 * @param int $request_id The request ID for JSON-RPC.
+	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with all tools including availability status and metadata.
 	 */
 	public function list_all_tools( int $request_id = 0 ): array {
 		// Return all tools with additional details.
@@ -88,12 +88,12 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle the tools/call request.
+	 * Handles the tools/call request.
 	 *
 	 * @param array $message    Request message.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with tool execution results or error.
 	 */
 	public function call_tool( array $message, int $request_id = 0 ): array {
 		// Extract parameters using helper method.
@@ -210,7 +210,7 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Sanitize tool data for JSON encoding by removing callback functions and other problematic data.
+	 * Sanitizes tool data for JSON encoding by removing callback functions and other problematic data.
 	 *
 	 * @param \WP\MCP\Domain\Tools\McpTool $tool Raw tool data.
 	 *
@@ -248,12 +248,12 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handle tool call request.
+	 * Handles tool call request.
 	 *
 	 * @param array $params     The request parameters.
-	 * @param int   $request_id The request ID for JSON-RPC.
+	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array
+	 * @return array Response with tool execution results or error.
 	 */
 	public function handle_tool_call( array $params, int $request_id = 0 ): array {
 		$tool_name = $params['name'];
@@ -307,6 +307,15 @@ class ToolsHandler {
 					'error_code'     => $ability->get_error_code(),
 				),
 			);
+		}
+
+		// Unwrap arguments if schema was transformed from flattened to object format
+		$tool_metadata = $tool->get_metadata();
+		$input_wrapped = ! empty( $tool_metadata['_input_schema_transformed'] );
+		if ( $input_wrapped ) {
+			// Unwrap: {input: "value"} → "value"
+			$input_wrapper = $tool_metadata['_input_schema_wrapper'] ?? 'input';
+			$args          = is_array( $args ) ? ( $args[ $input_wrapper ] ?? null ) : null;
 		}
 
 		// If ability has no input schema and args is empty, pass null instead
@@ -388,6 +397,19 @@ class ToolsHandler {
 						'error_code'     => $result->get_error_code(),
 					),
 				);
+			}
+
+			// Wrap result if output schema was transformed from flattened to object format
+			$output_wrapped = ! empty( $tool_metadata['_output_schema_transformed'] );
+			if ( $output_wrapped ) {
+				// Wrap: "value" → {result: "value"}
+				$output_wrapper = $tool_metadata['_output_schema_wrapper'] ?? 'result';
+				$result         = array( $output_wrapper => $result );
+			}
+
+			// Ensure $result is always an array before adding metadata.
+			if ( ! is_array( $result ) ) {
+				$result = array( 'result' => $result );
 			}
 
 			// Successful execution - add metadata.

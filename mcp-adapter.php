@@ -12,7 +12,7 @@
  * Plugin URI:        https://github.com/WordPress/mcp-adapter
  * Description:       Adapter for Abilities API, letting the abilities to be used as MCP tools, resources or prompts.
  * Requires at least: 6.8
- * Version:           0.1.0
+ * Version:           0.4.0
  * Requires PHP:      7.4
  * Author:            WordPress.org Contributors
  * Author URI:        https://github.com/WordPress/mcp-adapter/graphs/contributors
@@ -40,7 +40,7 @@ function constants(): void {
 	/**
 	 * Version of the plugin.
 	 */
-	define( 'WP_MCP_VERSION', '0.1.0' );
+	define( 'WP_MCP_VERSION', '0.4.0' );
 }
 
 constants();

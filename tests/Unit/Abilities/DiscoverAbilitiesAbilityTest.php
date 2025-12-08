@@ -247,10 +247,8 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'annotations', $meta );
 
 		$annotations = $meta['annotations'];
-		$this->assertEquals( 1.0, $annotations['priority'] );
-		$this->assertTrue( $annotations['readOnlyHint'] );
-		$this->assertFalse( $annotations['destructiveHint'] );
-		$this->assertTrue( $annotations['idempotentHint'] );
-		$this->assertFalse( $annotations['openWorldHint'] );
+		$this->assertTrue( $annotations['readonly'] );
+		$this->assertFalse( $annotations['destructive'] );
+		$this->assertTrue( $annotations['idempotent'] );
 	}
 }
