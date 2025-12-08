@@ -24,7 +24,7 @@ use WP\MCP\Servers\DefaultServerFactory;
  */
 final class McpAdapter {
 
-	public const VERSION = '0.4.0';
+	public const VERSION = '0.4.1';
 
 	/**
 	 * Registry instance
