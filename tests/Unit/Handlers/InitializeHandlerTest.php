@@ -10,6 +10,7 @@ use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\Lifecycle\Implementation;
+use WP\McpSchema\Common\McpConstants;
 use WP\McpSchema\Common\Protocol\InitializeResult;
 use WP\McpSchema\Server\Lifecycle\ServerCapabilities;
 
@@ -33,7 +34,7 @@ final class InitializeHandlerTest extends TestCase {
 
 		// Returns InitializeResult DTO.
 		$this->assertInstanceOf( InitializeResult::class, $result );
-		$this->assertSame( '2025-06-18', $result->getProtocolVersion() );
+		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $result->getProtocolVersion() );
 
 		// Server info.
 		$server_info = $result->getServerInfo();
@@ -69,7 +70,7 @@ final class InitializeHandlerTest extends TestCase {
 		$array = $result->toArray();
 
 		$this->assertIsArray( $array );
-		$this->assertSame( '2025-06-18', $array['protocolVersion'] );
+		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $array['protocolVersion'] );
 		$this->assertSame( 'Test Server', $array['serverInfo']['name'] );
 		$this->assertSame( '1.0.0', $array['serverInfo']['version'] );
 		$this->assertIsArray( $array['capabilities'] );

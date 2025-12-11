@@ -12,6 +12,7 @@ namespace WP\MCP\Handlers\Initialize;
 use stdClass;
 use WP\MCP\Core\McpServer;
 use WP\McpSchema\Common\Lifecycle\Implementation;
+use WP\McpSchema\Common\McpConstants;
 use WP\McpSchema\Common\Protocol\InitializeResult;
 use WP\McpSchema\Server\Lifecycle\ServerCapabilities;
 use WP\McpSchema\Server\Lifecycle\ServerCapabilitiesPrompts;
@@ -65,7 +66,7 @@ class InitializeHandler {
 		);
 
 		return new InitializeResult(
-			'2025-06-18',
+			McpConstants::LATEST_PROTOCOL_VERSION,
 			$capabilities,
 			$server_info,
 			null, // _meta
