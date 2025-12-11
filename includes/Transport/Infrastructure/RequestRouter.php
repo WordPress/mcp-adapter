@@ -156,25 +156,31 @@ class RequestRouter {
 	/**
 	 * Handle initialize requests with session management.
 	 *
+	 * Converts InitializeResult DTO to array and adds session management.
+	 *
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
 	 * @return array
 	 */
 	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context ): array {
-		// Get the initialize response from the handler
-		$result = $this->context->initialize_handler->handle( $request_id );
+		// Get the initialize response from the handler (returns InitializeResult DTO).
+		$init_result = $this->context->initialize_handler->handle( $request_id );
 
-		// Handle session creation if HTTP context is provided and initialize was successful
-		if ( $http_context && ! isset( $result['error'] ) && ! $http_context->session_id ) {
+		// Convert DTO to array for response serialization.
+		$result = $init_result->toArray();
+
+		// Handle session creation if HTTP context is provided.
+		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
+		if ( $http_context && ! $http_context->session_id ) {
 			$session_result = HttpSessionValidator::create_session( $params );
 
 			if ( is_array( $session_result ) ) {
-				// Session creation failed - extract inner error from JSON-RPC response
+				// Session creation failed - extract inner error from JSON-RPC response.
 				return array( 'error' => $session_result['error'] ?? $session_result );
 			}
 
-			// Store session ID in result for HttpRequestHandler to add as header
+			// Store session ID in result for HttpRequestHandler to add as header.
 			$result['_session_id'] = $session_result;
 		}
 
