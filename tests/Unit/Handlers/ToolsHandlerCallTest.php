@@ -7,6 +7,8 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\Content\ImageContent;
+use WP\McpSchema\Common\Content\TextContent;
 use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\CallToolResult;
 
@@ -19,9 +21,11 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		// Missing name is a protocol error - returns JSONRPCErrorResponse
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( 'code', $res['error'] );
+		// Use DTO getter methods instead of toArray()
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getCode() );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_unknown_tool_logs_and_returns_error(): void {
@@ -31,8 +35,10 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		// Tool not found is a protocol error - returns JSONRPCErrorResponse
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'error', $res );
+		// Use DTO getter methods instead of toArray()
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
@@ -47,13 +53,12 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		// Permission denied is a tool execution error - returns CallToolResult with isError
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
-		$this->assertIsArray( $res['content'] );
-		$this->assertArrayHasKey( 'text', $res['content'][0] );
-		$this->assertStringContainsString( 'Permission denied', $res['content'][0]['text'] );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertStringContainsString( 'Permission denied', $content[0]->getText() );
 	}
 
 	public function test_permission_exception_logs_and_returns_error(): void {
@@ -67,9 +72,11 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		// Permission check exception is a tool execution error - returns CallToolResult with isError
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
@@ -84,13 +91,12 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		// Execute exceptions are tool execution errors - returns CallToolResult with isError
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
-		$this->assertIsArray( $res['content'] );
-		$this->assertArrayHasKey( 'type', $res['content'][0] );
-		$this->assertEquals( 'text', $res['content'][0]['type'] );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertEquals( 'text', $content[0]->getType() );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
@@ -105,13 +111,12 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		// Successful image result returns CallToolResult
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'content', $res, 'Response should have content key' );
-		$this->assertIsArray( $res['content'], 'Content should be an array' );
-		$this->assertNotEmpty( $res['content'], 'Content array should not be empty' );
-		$this->assertArrayHasKey( 0, $res['content'], 'Content should have at least one element' );
-		$this->assertSame( 'image', $res['content'][0]['type'] );
-		$this->assertArrayHasKey( 'data', $res['content'][0] );
-		$this->assertArrayHasKey( 'mimeType', $res['content'][0] );
+		// Use DTO getter methods instead of toArray()
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+		$this->assertInstanceOf( ImageContent::class, $content[0] );
+		$this->assertSame( 'image', $content[0]->getType() );
+		$this->assertNotEmpty( $content[0]->getData() );
+		$this->assertNotEmpty( $content[0]->getMimeType() );
 	}
 }

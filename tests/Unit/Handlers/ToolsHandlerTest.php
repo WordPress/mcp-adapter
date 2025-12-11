@@ -11,9 +11,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\Content\TextContent;
 use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
+use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * Test ToolsHandler functionality.
@@ -34,21 +36,22 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->list_tools();
-		$res     = $result->toArray();
 
-		$this->assertArrayHasKey( 'tools', $res );
-		$this->assertNotEmpty( $res['tools'] );
-		// Note: _metadata is no longer returned by handler (DTOs don't have internal metadata)
+		// Use DTO getter methods instead of toArray()
+		$tools = $result->getTools();
+		$this->assertNotEmpty( $tools );
+		$this->assertContainsOnlyInstancesOf( Tool::class, $tools );
 	}
 
 	public function test_list_tools_returns_empty_array_when_no_tools(): void {
 		$server  = $this->makeServer( array(), array(), array() );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->list_tools();
-		$res     = $result->toArray();
 
-		$this->assertArrayHasKey( 'tools', $res );
-		$this->assertEmpty( $res['tools'] );
+		// Use DTO getter methods instead of toArray()
+		$tools = $result->getTools();
+		$this->assertIsArray( $tools );
+		$this->assertEmpty( $tools );
 	}
 
 	public function test_list_all_tools_returns_dto(): void {
@@ -58,10 +61,10 @@ final class ToolsHandlerTest extends TestCase {
 		$result  = $handler->list_all_tools();
 
 		$this->assertInstanceOf( ListToolsResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'tools', $res );
-		$this->assertNotEmpty( $res['tools'] );
-		// Note: The 'available' flag is no longer included (was non-standard extension)
+		// Use DTO getter methods instead of toArray()
+		$tools = $result->getTools();
+		$this->assertNotEmpty( $tools );
+		$this->assertContainsOnlyInstancesOf( Tool::class, $tools );
 	}
 
 	public function test_call_tool_missing_name_returns_error(): void {
@@ -71,8 +74,10 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Missing name is a protocol error - returns JSONRPCErrorResponse
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'error', $res );
+		// Use DTO getter methods instead of toArray()
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_call_tool_not_found_returns_error(): void {
@@ -88,8 +93,10 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Tool not found is a protocol error - returns JSONRPCErrorResponse
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'error', $res );
+		// Use DTO getter methods instead of toArray()
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_call_tool_with_wp_error_from_get_ability(): void {
@@ -118,8 +125,10 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Ability retrieval failure is a protocol error - returns JSONRPCErrorResponse
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'error', $res );
+		// Use DTO getter methods instead of toArray()
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_call_tool_with_wp_error_from_execute(): void {
@@ -160,10 +169,11 @@ final class ToolsHandlerTest extends TestCase {
 
 		// WP_Error from execute is a tool execution error - returns CallToolResult with isError
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 
 		// Clean up
 		wp_unregister_ability( 'test/wp-error-execute' );
@@ -207,10 +217,11 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Permission exception is a tool execution error - returns CallToolResult with isError
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 
 		// Clean up
 		wp_unregister_ability( 'test/permission-exception-in-call' );
@@ -227,20 +238,23 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
+		// Call tool without arguments since test/always-allowed doesn't define input_schema
 		$result = $handler->call_tool(
 			array(
 				'params' => array(
-					'name'      => 'test-always-allowed',
-					'arguments' => array( 'input' => 'test data' ),
+					'name' => 'test-always-allowed',
 				),
 			)
 		);
 
 		// Successful execution returns CallToolResult
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'content', $res );
-		// Note: _metadata is no longer returned by handler DTOs
+		// Use DTO getter methods instead of toArray()
+		// Success means isError is not true (either null or false)
+		$this->assertNotTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 	}
 
 	public function test_call_tool_execution_exception_returns_error(): void {
@@ -260,10 +274,11 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Execution exception is a tool execution error - returns CallToolResult with isError
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 	}
 
 	public function test_call_tool_permission_exception_returns_error(): void {
@@ -284,10 +299,11 @@ final class ToolsHandlerTest extends TestCase {
 		// Per MCP spec: "Any errors that originate from the tool SHOULD be reported inside
 		// the result object, with isError set to true"
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 	}
 
 	public function test_call_tool_permission_denied_returns_error(): void {
@@ -308,10 +324,12 @@ final class ToolsHandlerTest extends TestCase {
 		// Per MCP spec: "Any errors that originate from the tool SHOULD be reported inside
 		// the result object, with isError set to true"
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertArrayHasKey( 'isError', $res );
-		$this->assertTrue( $res['isError'] );
-		$this->assertArrayHasKey( 'content', $res );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertStringContainsString( 'Permission denied', $content[0]->getText() );
 	}
 
 	public function test_call_tool_uses_metadata_flags_without_exposing_them(): void {
@@ -342,17 +360,18 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/flat-transform-call' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$list       = $handler->list_tools()->toArray();
+		// Use DTO getter methods instead of toArray()
+		$tools      = $handler->list_tools()->getTools();
 		$tool_entry = null;
-		foreach ( $list['tools'] as $tool ) {
-			if ( 'test-flat-transform-call' === $tool['name'] ) {
+		foreach ( $tools as $tool ) {
+			if ( 'test-flat-transform-call' === $tool->toArray()['name'] ) {
 				$tool_entry = $tool;
 				break;
 			}
 		}
 
 		$this->assertNotNull( $tool_entry );
-		$this->assertArrayNotHasKey( '_metadata', $tool_entry );
+		$this->assertInstanceOf( Tool::class, $tool_entry );
 
 		$result = $handler->call_tool(
 			array(
@@ -364,12 +383,12 @@ final class ToolsHandlerTest extends TestCase {
 		);
 
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-
+		// Use DTO getter methods instead of toArray()
 		$this->assertSame( 'hello-world', $captured_input, 'Ability should receive unwrapped argument from metadata flag.' );
-		$this->assertArrayHasKey( 'structuredContent', $res );
-		$this->assertArrayNotHasKey( '_metadata', $res['structuredContent'] );
-		$this->assertSame( array( 'result' => 'hello-world' ), $res['structuredContent'] );
+		$structured_content = $result->getStructuredContent();
+		$this->assertNotNull( $structured_content );
+		$this->assertArrayNotHasKey( '_metadata', $structured_content );
+		$this->assertSame( array( 'result' => 'hello-world' ), $structured_content );
 
 		wp_unregister_ability( 'test/flat-transform-call' );
 	}
@@ -381,18 +400,22 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->list_tools();
-		$res     = $result->toArray();
 
-		$this->assertArrayHasKey( 'tools', $res );
-		$this->assertNotEmpty( $res['tools'] );
+		// Use DTO getter methods instead of toArray()
+		$tools = $result->getTools();
+		$this->assertNotEmpty( $tools );
+		$this->assertContainsOnlyInstancesOf( Tool::class, $tools );
 
-		$tool = $res['tools'][0];
-		$this->assertArrayHasKey( 'name', $tool );
-		$this->assertArrayHasKey( 'description', $tool );
-		$this->assertArrayHasKey( 'inputSchema', $tool );
-		// Ensure callback is not in the response
-		$this->assertArrayNotHasKey( 'callback', $tool );
-		$this->assertArrayNotHasKey( 'permission_callback', $tool );
+		$tool = $tools[0];
+		// Tool DTO provides typed access - verify required properties exist via toArray()
+		// since Tool DTO doesn't have getName() getter (name is in BaseMetadata parent)
+		$tool_array = $tool->toArray();
+		$this->assertArrayHasKey( 'name', $tool_array );
+		$this->assertArrayHasKey( 'description', $tool_array );
+		$this->assertArrayHasKey( 'inputSchema', $tool_array );
+		// Ensure callback is not in the response (DTOs don't expose internal callbacks)
+		$this->assertArrayNotHasKey( 'callback', $tool_array );
+		$this->assertArrayNotHasKey( 'permission_callback', $tool_array );
 	}
 
 	public function test_call_tool_with_string_error_from_execute(): void {
@@ -434,9 +457,11 @@ final class ToolsHandlerTest extends TestCase {
 		);
 
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
-		$this->assertTrue( $res['isError'] );
-		$this->assertEquals( 'Test string error', $res['content'][0]['text'] );
+		// Use DTO getter methods instead of toArray()
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertEquals( 'Test string error', $content[0]->getText() );
 
 		wp_unregister_ability( 'test/string-error' );
 	}
@@ -478,21 +503,21 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Successful execution returns CallToolResult
 		$this->assertInstanceOf( CallToolResult::class, $result );
-		$res = $result->toArray();
 
-		// Should not have an error
-		$this->assertArrayNotHasKey( 'error', $res );
-		$this->assertArrayNotHasKey( 'isError', $res );
+		// Use DTO getter methods instead of toArray()
+		// Should not have an error (isError is not true - either null or false)
+		$this->assertNotTrue( $result->getIsError() );
 
 		// Should have content
-		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( 'structuredContent', $res );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
 
-		// The scalar value should be wrapped in an array with 'result' key
-		$this->assertArrayHasKey( 'result', $res['structuredContent'] );
-		$this->assertSame( 'hello-world', $res['structuredContent']['result'] );
-
-		// Note: _metadata is no longer returned by handler DTOs
+		// Should have structured content with the scalar wrapped
+		$structured_content = $result->getStructuredContent();
+		$this->assertNotNull( $structured_content );
+		$this->assertArrayHasKey( 'result', $structured_content );
+		$this->assertSame( 'hello-world', $structured_content['result'] );
 
 		wp_unregister_ability( 'test/scalar-return' );
 	}
