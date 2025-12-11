@@ -48,6 +48,10 @@
 				"wpackagist-plugin/*",
 				"wpackagist-theme/*"
 			]
+		},
+		{
+			"type": "vcs",
+			"url": "https://github.com/WordPress/php-mcp-schema.git"
 		}
 	],
 	"extra": {
@@ -70,7 +74,8 @@
 		}
 	},
 	"require": {
-		"php": "^7.4 || ^8.0"
+		"php": "^7.4 || ^8.0",
+		"wordpress/php-mcp-schema": "dev-feat/mcp-schema-2025-11-25"
 	},
 	"require-dev": {
 		"automattic/vipwpcs": "^3.0",

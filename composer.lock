@@ -4,8 +4,67 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "242e822bd9a3c1b6d52d56a60de533c7",
-    "packages": [],
+    "content-hash": "8354288485736b31bab4f7fd63fab003",
+    "packages": [
+        {
+            "name": "wordpress/php-mcp-schema",
+            "version": "dev-feat/mcp-schema-2025-11-25",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/WordPress/php-mcp-schema.git",
+                "reference": "18324955d9487c2e506e176bc6381663ab927c99"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/18324955d9487c2e506e176bc6381663ab927c99",
+                "reference": "18324955d9487c2e506e176bc6381663ab927c99",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^1.10"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "WP\\McpSchema\\": "src/"
+                }
+            },
+            "scripts": {
+                "analyse": [
+                    "phpstan analyse"
+                ],
+                "phpstan": [
+                    "@analyse"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "WordPress",
+                    "homepage": "https://wordpress.org"
+                }
+            ],
+            "description": "PHP DTOs for the Model Context Protocol (MCP) specification",
+            "homepage": "https://github.com/WordPress/php-mcp-schema",
+            "keywords": [
+                "dto",
+                "mcp",
+                "model-context-protocol",
+                "php",
+                "schema"
+            ],
+            "support": {
+                "source": "https://github.com/WordPress/php-mcp-schema/tree/feat/mcp-schema-2025-11-25",
+                "issues": "https://github.com/WordPress/php-mcp-schema/issues"
+            },
+            "time": "2025-12-11T15:25:12+00:00"
+        }
+    ],
     "packages-dev": [
         {
             "name": "automattic/vipwpcs",
@@ -3321,7 +3380,8 @@
     ],
     "minimum-stability": "dev",
     "stability-flags": {
-        "phpcompatibility/php-compatibility": 20
+        "phpcompatibility/php-compatibility": 20,
+        "wordpress/php-mcp-schema": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
@@ -3332,5 +3392,5 @@
     "platform-overrides": {
         "php": "7.4"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
