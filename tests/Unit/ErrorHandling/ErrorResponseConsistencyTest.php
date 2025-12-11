@@ -40,7 +40,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test parameter validation errors (INVALID_PARAMS) from all handlers
-		$tools_error     = $tools_handler->call_tool( array( 'params' => array() ) ); // Missing 'name'
+		// ToolsHandler returns DTOs, convert to array for consistent testing.
+		$tools_error     = $tools_handler->call_tool( array( 'params' => array() ) )->toArray(); // Missing 'name'
 		$prompts_error   = $prompts_handler->get_prompt( array( 'params' => array() ) ); // Missing 'name'
 		$resources_error = $resources_handler->read_resource( array( 'params' => array() ) ); // Missing 'uri'
 
@@ -150,7 +151,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test "not found" errors from all handlers
-		$tool_not_found     = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) );
+		// ToolsHandler returns DTOs, convert to array for consistent testing.
+		$tool_not_found     = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) )->toArray();
 		$prompt_not_found   = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) );
 		$resource_not_found = $resources_handler->read_resource( array( 'params' => array( 'uri' => 'nonexistent://resource' ) ) );
 
@@ -261,8 +263,9 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$resources_handler = new ResourcesHandler( $this->server );
 
 		// Test parameter validation error messages (INVALID_PARAMS error code)
+		// ToolsHandler returns DTOs, convert to array for consistent testing.
 		$errors = array(
-			$tools_handler->call_tool( array( 'params' => array() ) ), // Missing name
+			$tools_handler->call_tool( array( 'params' => array() ) )->toArray(), // Missing name
 			$prompts_handler->get_prompt( array( 'params' => array() ) ), // Missing name
 			$resources_handler->read_resource( array( 'params' => array() ) ), // Missing uri
 		);

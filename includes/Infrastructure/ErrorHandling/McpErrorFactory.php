@@ -412,7 +412,7 @@ class McpErrorFactory {
 	 *
 	 * @param mixed $message The message to validate.
 	 *
-	 * @return bool|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse Returns true if valid, or JSONRPCErrorResponse DTO if invalid.
+	 * @return true|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse Returns true if valid, or JSONRPCErrorResponse DTO if invalid.
 	 */
 	public static function validate_jsonrpc_message( $message ) {
 		if ( ! is_array( $message ) ) {

@@ -89,14 +89,15 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$handler = new ToolsHandler( $server );
 
 		// Test missing parameter error
-		$result = $handler->call_tool( array( 'params' => array() ) );
+		// ToolsHandler now returns DTOs, convert to array for testing.
+		$result = $handler->call_tool( array( 'params' => array() ) )->toArray();
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
 		// Error codes are now float from DTOs
 		$this->assertEquals( (float) McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 
 		// Test tool not found error
-		$result = $handler->call_tool( array( 'params' => array( 'name' => 'nonexistent-tool' ) ) );
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'nonexistent-tool' ) ) )->toArray();
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
 		$this->assertEquals( (float) McpErrorFactory::TOOL_NOT_FOUND, $result['error']['code'] );
@@ -107,7 +108,8 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$handler = new ToolsHandler( $server );
 
 		// This should trigger an error and log it
-		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-permission-exception' ) ) );
+		// ToolsHandler now returns DTOs, convert to array for testing.
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-permission-exception' ) ) )->toArray();
 
 		// Permission exceptions are tool execution errors (isError: true)
 		$this->assertArrayHasKey( 'isError', $result );

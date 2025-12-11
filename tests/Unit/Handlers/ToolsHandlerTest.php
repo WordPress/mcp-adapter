@@ -11,60 +11,74 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Tools\CallToolResult;
+use WP\McpSchema\Server\Tools\ListToolsResult;
 
 /**
  * Test ToolsHandler functionality.
  */
 final class ToolsHandlerTest extends TestCase {
 
+	public function test_list_tools_returns_dto(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->list_tools();
+
+		$this->assertInstanceOf( ListToolsResult::class, $result );
+	}
+
 	public function test_list_tools_returns_registered_tools(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
-		$res     = $handler->list_tools();
+		$result  = $handler->list_tools();
+		$res     = $result->toArray();
 
 		$this->assertArrayHasKey( 'tools', $res );
 		$this->assertNotEmpty( $res['tools'] );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'tools', $res['_metadata']['component_type'] );
-		$this->assertArrayHasKey( 'tools_count', $res['_metadata'] );
+		// Note: _metadata is no longer returned by handler (DTOs don't have internal metadata)
 	}
 
 	public function test_list_tools_returns_empty_array_when_no_tools(): void {
 		$server  = $this->makeServer( array(), array(), array() );
 		$handler = new ToolsHandler( $server );
-		$res     = $handler->list_tools();
+		$result  = $handler->list_tools();
+		$res     = $result->toArray();
 
 		$this->assertArrayHasKey( 'tools', $res );
 		$this->assertEmpty( $res['tools'] );
-		$this->assertEquals( 0, $res['_metadata']['tools_count'] );
 	}
 
-	public function test_list_all_tools_includes_available_flag(): void {
+	public function test_list_all_tools_returns_dto(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
-		$res     = $handler->list_all_tools();
+		$result  = $handler->list_all_tools();
 
+		$this->assertInstanceOf( ListToolsResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'tools', $res );
 		$this->assertNotEmpty( $res['tools'] );
-		$this->assertTrue( $res['tools'][0]['available'] );
+		// Note: The 'available' flag is no longer included (was non-standard extension)
 	}
 
 	public function test_call_tool_missing_name_returns_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
-		$res     = $handler->call_tool( array( 'params' => array() ) );
+		$result  = $handler->call_tool( array( 'params' => array() ) );
 
+		// Missing name is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'missing_parameter', $res['_metadata']['failure_reason'] );
 	}
 
 	public function test_call_tool_not_found_returns_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
-		$res     = $handler->call_tool(
+		$result  = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'nonexistent-tool',
@@ -72,9 +86,10 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
+		// Tool not found is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'not_found', $res['_metadata']['failure_reason'] );
 	}
 
 	public function test_call_tool_with_wp_error_from_get_ability(): void {
@@ -93,7 +108,7 @@ final class ToolsHandlerTest extends TestCase {
 
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-nonexistent-tool',
@@ -101,12 +116,10 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return JSON-RPC error (protocol error)
+		// Ability retrieval failure is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'ability_retrieval_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_code', $res['_metadata'] );
-		$this->assertEquals( 'ability_not_found', $res['_metadata']['error_code'] );
 	}
 
 	public function test_call_tool_with_wp_error_from_execute(): void {
@@ -137,7 +150,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/wp-error-execute' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-wp-error-execute',
@@ -145,13 +158,12 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return isError format (tool execution error)
+		// WP_Error from execute is a tool execution error - returns CallToolResult with isError
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'isError', $res );
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'wp_error', $res['_metadata']['failure_reason'] );
-		$this->assertEquals( 'test_error', $res['_metadata']['error_code'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/wp-error-execute' );
@@ -185,7 +197,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/permission-exception-in-call' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-permission-exception-in-call',
@@ -193,13 +205,12 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return isError format (tool execution error)
+		// Permission exception is a tool execution error - returns CallToolResult with isError
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'isError', $res );
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'permission_check_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/permission-exception-in-call' );
@@ -216,7 +227,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name'      => 'test-always-allowed',
@@ -225,11 +236,11 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
+		// Successful execution returns CallToolResult
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'tool', $res['_metadata']['component_type'] );
-		$this->assertArrayHasKey( 'tool_name', $res['_metadata'] );
-		$this->assertArrayHasKey( 'ability_name', $res['_metadata'] );
+		// Note: _metadata is no longer returned by handler DTOs
 	}
 
 	public function test_call_tool_execution_exception_returns_error(): void {
@@ -239,7 +250,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/execute-exception' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-execute-exception',
@@ -247,12 +258,12 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
+		// Execution exception is a tool execution error - returns CallToolResult with isError
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'isError', $res );
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'execution_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
 	}
 
 	public function test_call_tool_permission_exception_returns_error(): void {
@@ -262,7 +273,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/permission-exception' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-permission-exception',
@@ -272,12 +283,11 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Per MCP spec: "Any errors that originate from the tool SHOULD be reported inside
 		// the result object, with isError set to true"
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'isError', $res );
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'permission_check_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
 	}
 
 	public function test_call_tool_permission_denied_returns_error(): void {
@@ -287,7 +297,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/permission-denied' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-permission-denied',
@@ -297,11 +307,11 @@ final class ToolsHandlerTest extends TestCase {
 
 		// Per MCP spec: "Any errors that originate from the tool SHOULD be reported inside
 		// the result object, with isError set to true"
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertArrayHasKey( 'isError', $res );
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'permission_denied', $res['_metadata']['failure_reason'] );
 	}
 
 	public function test_call_tool_uses_metadata_flags_without_exposing_them(): void {
@@ -332,7 +342,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/flat-transform-call' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$list       = $handler->list_tools();
+		$list       = $handler->list_tools()->toArray();
 		$tool_entry = null;
 		foreach ( $list['tools'] as $tool ) {
 			if ( 'test-flat-transform-call' === $tool['name'] ) {
@@ -344,7 +354,7 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertNotNull( $tool_entry );
 		$this->assertArrayNotHasKey( '_metadata', $tool_entry );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name'      => 'test-flat-transform-call',
@@ -352,6 +362,9 @@ final class ToolsHandlerTest extends TestCase {
 				),
 			)
 		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 
 		$this->assertSame( 'hello-world', $captured_input, 'Ability should receive unwrapped argument from metadata flag.' );
 		$this->assertArrayHasKey( 'structuredContent', $res );
@@ -367,7 +380,8 @@ final class ToolsHandlerTest extends TestCase {
 		// Use the existing test/always-allowed ability
 		$server  = $this->makeServer( array( 'test/always-allowed' ), array(), array() );
 		$handler = new ToolsHandler( $server );
-		$res     = $handler->list_tools();
+		$result  = $handler->list_tools();
+		$res     = $result->toArray();
 
 		$this->assertArrayHasKey( 'tools', $res );
 		$this->assertNotEmpty( $res['tools'] );
@@ -411,7 +425,7 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/string-error' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-string-error',
@@ -419,6 +433,8 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 		$this->assertTrue( $res['isError'] );
 		$this->assertEquals( 'Test string error', $res['content'][0]['text'] );
 
@@ -452,13 +468,17 @@ final class ToolsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/scalar-return' ), array(), array() );
 		$handler = new ToolsHandler( $server );
 
-		$res = $handler->call_tool(
+		$result = $handler->call_tool(
 			array(
 				'params' => array(
 					'name' => 'test-scalar-return',
 				),
 			)
 		);
+
+		// Successful execution returns CallToolResult
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$res = $result->toArray();
 
 		// Should not have an error
 		$this->assertArrayNotHasKey( 'error', $res );
@@ -472,11 +492,7 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertArrayHasKey( 'result', $res['structuredContent'] );
 		$this->assertSame( 'hello-world', $res['structuredContent']['result'] );
 
-		// Should have metadata at the top level (not inside structuredContent)
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertArrayNotHasKey( '_metadata', $res['structuredContent'] );
-		$this->assertSame( 'tool', $res['_metadata']['component_type'] );
-		$this->assertSame( 'test-scalar-return', $res['_metadata']['tool_name'] );
+		// Note: _metadata is no longer returned by handler DTOs
 
 		wp_unregister_ability( 'test/scalar-return' );
 	}

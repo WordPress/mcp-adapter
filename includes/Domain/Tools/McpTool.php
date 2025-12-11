@@ -10,6 +10,10 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Core\McpServer;
+use WP\McpSchema\Server\Tools\Tool as ToolDto;
+use WP\McpSchema\Server\Tools\ToolAnnotations;
+use WP\McpSchema\Server\Tools\ToolInputSchema;
+use WP\McpSchema\Server\Tools\ToolOutputSchema;
 
 /**
  * Represents an MCP tool according to the Model Context Protocol specification.
@@ -329,11 +333,11 @@ class McpTool {
 			'inputSchema' => $input_schema_for_json,
 		);
 
-		if ( ! is_null( $this->title ) ) {
+		if ( null !== $this->title ) {
 			$tool_data['title'] = $this->title;
 		}
 
-		if ( ! is_null( $this->output_schema ) ) {
+		if ( null !== $this->output_schema ) {
 			$tool_data['outputSchema'] = $this->output_schema;
 		}
 
@@ -342,6 +346,81 @@ class McpTool {
 		}
 
 		return $tool_data;
+	}
+
+	/**
+	 * Convert the tool to a php-mcp-schema Tool DTO.
+	 *
+	 * This method creates a typed DTO from the domain object for use in
+	 * MCP protocol responses. The DTO provides type safety and ensures
+	 * protocol compliance.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\Tool
+	 */
+	public function to_schema_dto(): ToolDto {
+		// Build input schema DTO - defaults to empty object if no schema defined.
+		$input_schema_data = empty( $this->input_schema )
+			? array( 'type' => 'object' )
+			: $this->input_schema;
+
+		// Prepare input schema for DTO by converting properties values to objects.
+		// ToolInputSchema expects properties to be array<string, object>.
+		$input_schema_data = $this->prepare_schema_for_dto( $input_schema_data );
+		$input_schema_dto  = ToolInputSchema::fromArray( $input_schema_data );
+
+		// Build output schema DTO if present.
+		$output_schema_dto = null;
+		if ( null !== $this->output_schema ) {
+			$output_schema_data = $this->prepare_schema_for_dto( $this->output_schema );
+			$output_schema_dto  = ToolOutputSchema::fromArray( $output_schema_data );
+		}
+
+		// Build annotations DTO if present.
+		$annotations_dto = null;
+		if ( ! empty( $this->annotations ) ) {
+			$annotations_dto = ToolAnnotations::fromArray( $this->annotations );
+		}
+
+		return new ToolDto(
+			$this->name,
+			$input_schema_dto,
+			$this->title,
+			$this->description,
+			null, // execution - not currently supported
+			$output_schema_dto,
+			$annotations_dto,
+			null, // _meta - not exposed to MCP clients
+			null  // icons - not currently supported
+		);
+	}
+
+	/**
+	 * Prepare a JSON Schema array for DTO conversion.
+	 *
+	 * The php-mcp-schema library expects JSON Schema `properties` values to be
+	 * stdClass objects, not arrays. This method recursively converts nested
+	 * arrays to objects where needed to satisfy the DTO validation.
+	 *
+	 * @param array $schema The JSON Schema as an array.
+	 *
+	 * @return array The schema with properties values converted to objects.
+	 */
+	private function prepare_schema_for_dto( array $schema ): array {
+		// Convert properties values from arrays to objects.
+		if ( isset( $schema['properties'] ) && is_array( $schema['properties'] ) ) {
+			$converted_properties = array();
+			foreach ( $schema['properties'] as $prop_name => $prop_schema ) {
+				// Each property schema should be an object (stdClass), not an array.
+				// Recursively prepare nested schemas first, then convert to object.
+				if ( is_array( $prop_schema ) ) {
+					$prop_schema = $this->prepare_schema_for_dto( $prop_schema );
+				}
+				$converted_properties[ $prop_name ] = (object) $prop_schema;
+			}
+			$schema['properties'] = $converted_properties;
+		}
+
+		return $schema;
 	}
 
 	/**

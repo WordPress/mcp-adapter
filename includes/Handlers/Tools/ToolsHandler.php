@@ -12,7 +12,12 @@ namespace WP\MCP\Handlers\Tools;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Handlers\HandlerHelperTrait;
+use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+// phpcs:ignore SlevomatCodingStandard.Namespaces.UnusedUses.UnusedUse -- Used in @return PHPDoc
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Tools\CallToolResult;
+use WP\McpSchema\Server\Tools\ListToolsResult;
 
 /**
  * Handles tools-related MCP methods.
@@ -39,155 +44,140 @@ class ToolsHandler {
 	/**
 	 * Handles the tools/list request.
 	 *
+	 * Returns a ListToolsResult DTO containing all registered tools.
+	 * The internal _metadata is no longer included as it's stripped by the RequestRouter
+	 * and DTOs handle MCP-spec _meta separately.
+	 *
 	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with tools list and metadata.
+	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with tools list.
 	 */
-	public function list_tools( int $request_id = 0 ): array {
-		$tools      = $this->mcp->get_tools();
-		$safe_tools = array();
+	public function list_tools( int $request_id = 0 ): ListToolsResult {
+		$tools = $this->mcp->get_tools();
 
-		foreach ( $tools as $tool ) {
-			$safe_tools[] = $this->sanitize_tool_data( $tool );
-		}
-
-		return array(
-			'tools'     => $safe_tools,
-			'_metadata' => array(
-				'component_type' => 'tools',
-				'tools_count'    => count( $safe_tools ),
-			),
+		// Convert each McpTool domain object to a php-mcp-schema Tool DTO.
+		// Use array_values() to ensure numeric keys for MCP protocol compliance.
+		// The internal tools array uses tool names as keys for fast lookup.
+		$tool_dtos = array_values(
+			array_map(
+				static fn( McpTool $tool ) => $tool->to_schema_dto(),
+				$tools
+			)
 		);
+
+		return new ListToolsResult( $tool_dtos );
 	}
 
 	/**
 	 * Handles the tools/list/all request.
 	 *
+	 * This is a custom extension to the MCP spec that includes availability status.
+	 * Returns a ListToolsResult DTO containing all registered tools.
+	 *
+	 * Note: The 'available' flag is a non-standard extension. Since Tool DTOs don't
+	 * support arbitrary fields, this information would need to be communicated via
+	 * _meta if needed. For now, we return the standard ListToolsResult.
+	 *
 	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with all tools including availability status and metadata.
+	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with all tools.
 	 */
-	public function list_all_tools( int $request_id = 0 ): array {
-		// Return all tools with additional details.
-		$tools      = $this->mcp->get_tools();
-		$safe_tools = array();
-
-		foreach ( $tools as $tool ) {
-			$safe_tool              = $this->sanitize_tool_data( $tool );
-			$safe_tool['available'] = true;
-			$safe_tools[]           = $safe_tool;
-		}
-
-		return array(
-			'tools'     => $safe_tools,
-			'_metadata' => array(
-				'component_type' => 'tools',
-				'tools_count'    => count( $safe_tools ),
-			),
-		);
+	public function list_all_tools( int $request_id = 0 ): ListToolsResult {
+		// Return all tools - availability checking can be done via _meta if needed.
+		return $this->list_tools( $request_id );
 	}
 
 	/**
 	 * Handles the tools/call request.
 	 *
+	 * Returns either a CallToolResult DTO (for success or tool execution errors)
+	 * or a JSONRPCErrorResponse DTO (for protocol errors like tool not found).
+	 *
+	 * The MCP spec distinguishes between:
+	 * 1. **Protocol errors** (tool not found, server error) → JSONRPCErrorResponse
+	 * 2. **Tool execution errors** (permission denied, runtime error) → CallToolResult with isError=true
+	 *
+	 * This distinction is critical for LLM self-correction - execution errors are
+	 * visible to the LLM, while protocol errors indicate infrastructure issues.
+	 *
 	 * @param array $message    Request message.
 	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with tool execution results or error.
+	 * @return \WP\McpSchema\Server\Tools\CallToolResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
-	public function call_tool( array $message, int $request_id = 0 ): array {
+	public function call_tool( array $message, int $request_id = 0 ) {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $message );
 
 		if ( ! isset( $request_params['name'] ) ) {
-			return array(
-				'error'     => McpErrorFactory::missing_parameter( $request_id, 'tool name' )->getError()->toArray(),
-				'_metadata' => array(
-					'component_type' => 'tool',
-					'failure_reason' => 'missing_parameter',
-				),
-			);
+			return McpErrorFactory::missing_parameter( $request_id, 'tool name' );
 		}
 
 		try {
-			// Implement a tool calling logic here.
+			// Delegate to handle_tool_call which returns array with results or error info.
 			$result = $this->handle_tool_call( $request_params, $request_id );
 
 			// Check if the result contains an error.
-			// Distinguish between protocol errors (JSON-RPC format) and tool execution errors (isError format).
 			if ( isset( $result['error'] ) ) {
 				$failure_reason = $result['_metadata']['failure_reason'] ?? '';
 
-				// Protocol errors (keep JSON-RPC error format):
+				// Protocol errors (return JSON-RPC error response):
 				// - not_found (tool doesn't exist)
 				// - ability_retrieval_failed (internal error getting ability)
 				$protocol_errors = array( 'not_found', 'ability_retrieval_failed' );
 
-				if ( in_array( $failure_reason, $protocol_errors, true ) ) {
-					// Return as JSON-RPC error
-					return $result;
+				if ( \in_array( $failure_reason, $protocol_errors, true ) ) {
+					// Return the JSONRPCErrorResponse directly from handle_tool_call.
+					return $result['_error_response'];
 				}
 
-				// Tool execution errors (convert to isError: true format):
+				// Tool execution errors (return CallToolResult with isError=true):
 				// - permission_denied, permission_check_failed
 				// - wp_error, execution_failed
 				// Note: Error format varies by ability implementation. ExecuteAbilityAbility
 				// returns errors as plain strings, while other abilities return an array
-				// with a 'message' key. This handles both formats here for compatibility (#89).
-				if ( is_string( $result['error'] ) ) {
+				// with a 'message' key. This handles both formats for compatibility (#89).
+				if ( \is_string( $result['error'] ) ) {
 					$error_message = $result['error'];
 				} else {
 					$error_message = $result['error']['message'] ?? 'An error occurred while executing the tool.';
 				}
-				$response = array(
-					'content' => array(
-						array(
-							'type' => 'text',
-							'text' => $error_message,
-						),
-					),
-					'isError' => true,
+
+				return new CallToolResult(
+					array( ContentBlockHelper::text( $error_message ) ),
+					null, // _meta
+					null, // structuredContent
+					true  // isError
 				);
-
-				// Preserve metadata if present.
-				if ( isset( $result['_metadata'] ) ) {
-					$response['_metadata'] = $result['_metadata'];
-				}
-
-				return $response;
 			}
 
-			// Successful tool execution - format the response.
-			$response = array(
-				'content' => array(
-					array(
-						'type' => 'text',
-					),
-				),
-			);
-
-			// Extract and store metadata before adding result to response content.
-			$response['_metadata'] = $result['_metadata'] ?? array(
-				'component_type' => 'tool',
-				'tool_name'      => $request_params['name'],
-			);
-
-			// Remove metadata from result so it doesn't appear in content or structuredContent.
+			// Successful tool execution - build CallToolResult DTO.
+			// Remove internal metadata before building response.
 			unset( $result['_metadata'] );
 
+			// Handle image results.
 			// @todo: add support for EmbeddedResource schema.ts:619.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] ) {
-				$response['content'][0]['type'] = 'image';
-				$response['content'][0]['data'] = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+				$mime_type  = $result['mimeType'] ?? 'image/png';
 
-				// @todo: improve this ?!.
-				$response['content'][0]['mimeType'] = $result['mimeType'] ?? 'image/png';
-			} else {
-				$response['content'][0]['text'] = wp_json_encode( $result );
-				$response['structuredContent']  = $result;
+				return new CallToolResult(
+					array( ContentBlockHelper::image( $image_data, $mime_type ) ),
+					null, // _meta
+					null, // structuredContent - images don't have structured content
+					null  // isError
+				);
 			}
 
-			return $response;
+			// Standard result - JSON-encode for text content, include as structuredContent.
+			$json_text = wp_json_encode( $result );
+
+			return new CallToolResult(
+				array( ContentBlockHelper::text( (string) $json_text ) ),
+				null,    // _meta
+				$result, // structuredContent
+				null     // isError
+			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->error_handler->log(
 				'Error calling tool',
@@ -197,54 +187,8 @@ class ToolsHandler {
 				)
 			);
 
-			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' )->getError()->toArray(),
-				'_metadata' => array(
-					'component_type' => 'tool',
-					'tool_name'      => $request_params['name'],
-					'failure_reason' => 'exception',
-					'error_type'     => get_class( $exception ),
-				),
-			);
+			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
-	}
-
-	/**
-	 * Sanitizes tool data for JSON encoding by removing callback functions and other problematic data.
-	 *
-	 * @param \WP\MCP\Domain\Tools\McpTool $tool Raw tool data.
-	 *
-	 * @return array Sanitized tool data safe for JSON encoding.
-	 */
-	private function sanitize_tool_data( McpTool $tool ): array {
-		// Convert the tool to an array representation.
-		$tool = $tool->to_array();
-		// Create a safe copy with only JSON-serializable data.
-		$safe_tool = array(
-			'name'        => $tool['name'] ?? '',
-			'description' => $tool['description'] ?? '',
-			'type'        => $tool['type'] ?? 'action',
-		);
-
-		// Include input schema if present (should be JSON-safe).
-		if ( isset( $tool['inputSchema'] ) && is_array( $tool['inputSchema'] ) ) {
-			$safe_tool['inputSchema'] = $tool['inputSchema'];
-		}
-
-		// Include output schema if present (should be JSON-safe).
-		if ( isset( $tool['outputSchema'] ) && is_array( $tool['outputSchema'] ) ) {
-			$safe_tool['outputSchema'] = $tool['outputSchema'];
-		}
-
-		// Include annotations if present.
-		if ( isset( $tool['annotations'] ) && is_array( $tool['annotations'] ) ) {
-			$safe_tool['annotations'] = $tool['annotations'];
-		}
-
-		// Note: We deliberately exclude 'callback' and 'permission_callback'
-		// as these are PHP callables that can cause circular references during JSON encoding.
-
-		return $safe_tool;
 	}
 
 	/**
@@ -271,9 +215,11 @@ class ToolsHandler {
 				)
 			);
 
+			$error_response = McpErrorFactory::tool_not_found( $request_id, $tool_name );
 			return array(
-				'error'     => McpErrorFactory::tool_not_found( $request_id, $tool_name )->getError()->toArray(),
-				'_metadata' => array(
+				'error'           => $error_response->getError()->toArray(),
+				'_error_response' => $error_response,
+				'_metadata'       => array(
 					'component_type' => 'tool',
 					'tool_name'      => $tool_name,
 					'failure_reason' => 'not_found',
@@ -298,9 +244,11 @@ class ToolsHandler {
 				)
 			);
 
+			$error_response = McpErrorFactory::internal_error( $request_id, $ability->get_error_message() );
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )->getError()->toArray(),
-				'_metadata' => array(
+				'error'           => $error_response->getError()->toArray(),
+				'_error_response' => $error_response,
+				'_metadata'       => array(
 					'component_type' => 'tool',
 					'tool_name'      => $tool_name,
 					'failure_reason' => 'ability_retrieval_failed',

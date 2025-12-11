@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Common\AbstractDataTransferObject;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -78,10 +80,32 @@ class RequestRouter {
 		);
 
 		try {
-			$result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method );
+			$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method );
 
 			// Calculate request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
+
+			// Handle DTO results from migrated handlers.
+			// DTOs are converted to arrays at the serialization boundary (here).
+			if ( $handler_result instanceof JSONRPCErrorResponse ) {
+				// JSON-RPC error response DTO - convert to array.
+				$result             = $handler_result->toArray();
+				$tags               = array_merge( $common_tags, array( 'status' => 'error' ) );
+				$tags['error_code'] = $handler_result->getError()->getCode();
+				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+				return $result;
+			}
+
+			if ( $handler_result instanceof AbstractDataTransferObject ) {
+				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
+				$result = $handler_result->toArray();
+				$tags   = array_merge( $common_tags, array( 'status' => 'success' ) );
+				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+				return $result;
+			}
+
+			// Legacy array result from non-migrated handlers.
+			$result = $handler_result;
 
 			// Extract metadata from handler response (if present).
 			$metadata = $result['_metadata'] ?? array();
