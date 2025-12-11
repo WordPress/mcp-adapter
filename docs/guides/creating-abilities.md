@@ -541,6 +541,82 @@ wp_register_ability('my-plugin/count-posts', [
 - The callback should return the unwrapped output value (e.g., `42` instead of `['result' => 42]`)
 - The adapter automatically handles wrapping/unwrapping for MCP clients
 
+### Tool Response Structure
+
+When a tool executes successfully, the MCP Adapter returns a `CallToolResult` with both human-readable and machine-readable formats:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"post_id\":123,\"url\":\"https://example.com/?p=123\",\"status\":\"draft\"}"
+    }
+  ],
+  "structuredContent": {
+    "post_id": 123,
+    "url": "https://example.com/?p=123",
+    "status": "draft"
+  },
+  "isError": false
+}
+```
+
+| Field | Purpose | Format |
+|-------|---------|--------|
+| `content` | Human/LLM readable output | Array of content blocks (TextContent, ImageContent, etc.) |
+| `structuredContent` | Machine-readable output | Raw data structure matching your `output_schema` |
+| `isError` | Indicates execution failure | Boolean (false for success, true for errors) |
+
+**Why both formats?**
+
+- **`content`**: Contains JSON-encoded text that LLMs can read and understand. This is the primary output for AI assistants.
+- **`structuredContent`**: Contains the raw data structure for programmatic clients that need to parse and process the result directly.
+
+**Image Results**
+
+For tools that return images, the adapter uses `ImageContent` instead of text:
+
+```php
+// In your execute_callback:
+return [
+    'type' => 'image',
+    'results' => $image_binary_data,
+    'mimeType' => 'image/png'  // Optional, defaults to 'image/png'
+];
+```
+
+This produces:
+
+```json
+{
+  "content": [
+    {
+      "type": "image",
+      "data": "base64-encoded-image-data...",
+      "mimeType": "image/png"
+    }
+  ],
+  "isError": false
+}
+```
+
+**Error Results**
+
+When a tool returns an error (via `['error' => 'message']`), the response uses `isError: true`:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Failed to create post: Invalid title"
+    }
+  ],
+  "isError": true
+}
+```
+
 ## Creating Resources
 
 Resources provide access to data or content. They require a `uri` in the meta field and should set `type: 'resource'` in the MCP configuration:
