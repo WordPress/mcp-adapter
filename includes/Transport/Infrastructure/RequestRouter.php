@@ -70,7 +70,7 @@ class RequestRouter {
 			'tools/list'          => fn() => $this->context->tools_handler->list_tools( $request_id ),
 			'tools/list/all'      => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
 			'tools/call'          => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
-			'resources/list'      => fn() => $this->add_cursor_compatibility( $this->context->resources_handler->list_resources( $request_id ) ),
+			'resources/list'      => fn() => $this->context->resources_handler->list_resources( $request_id ),
 			'resources/read'      => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
 			'prompts/list'        => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
 			'prompts/get'         => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
@@ -151,20 +151,6 @@ class RequestRouter {
 			// Create error response from exception.
 			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )->getError()->toArray() );
 		}
-	}
-
-	/**
-	 * Add nextCursor for backward compatibility with existing API.
-	 *
-	 * @param array $result The result array.
-	 * @return array
-	 */
-	public function add_cursor_compatibility( array $result ): array {
-		if ( ! isset( $result['nextCursor'] ) ) {
-			$result['nextCursor'] = '';
-		}
-
-		return $result;
 	}
 
 	/**

@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Core\McpServer;
+use WP\McpSchema\Common\Protocol\Annotations;
+use WP\McpSchema\Server\Resources\Resource as ResourceDto;
 
 /**
  * Represents an MCP resource according to the Model Context Protocol specification.
@@ -371,6 +373,54 @@ class McpResource {
 	public function to_json(): string {
 		$json = wp_json_encode( $this->to_array() );
 		return false !== $json ? $json : '{}';
+	}
+
+	/**
+	 * Convert the resource to a php-mcp-schema Resource DTO.
+	 *
+	 * This method creates a typed DTO from the domain object for use in
+	 * MCP protocol responses. The DTO provides type safety and ensures
+	 * protocol compliance.
+	 *
+	 * @return \WP\McpSchema\Server\Resources\Resource
+	 */
+	public function to_schema_dto(): ResourceDto {
+		// Build annotations DTO if present.
+		$annotations_dto = null;
+		if ( ! empty( $this->annotations ) ) {
+			$annotations_dto = Annotations::fromArray( $this->annotations );
+		}
+
+		// The Resource DTO uses 'name' as the primary identifier (required field).
+		// If name is not set, use a derived name from the URI.
+		$name = $this->name ?? $this->derive_name_from_uri();
+
+		return new ResourceDto(
+			$name,
+			$this->uri,
+			null, // title - not currently used in McpResource
+			$this->description,
+			$this->mime_type,
+			$annotations_dto,
+			null, // size - not currently tracked
+			null, // _meta - not exposed to MCP clients
+			null  // icons - not currently supported
+		);
+	}
+
+	/**
+	 * Derive a human-readable name from the resource URI.
+	 *
+	 * @return string
+	 */
+	private function derive_name_from_uri(): string {
+		// Extract the last path segment from the URI as a fallback name.
+		$path = wp_parse_url( $this->uri, PHP_URL_PATH );
+		if ( $path ) {
+			$segments = explode( '/', trim( $path, '/' ) );
+			return end( $segments ) ?: $this->uri;
+		}
+		return $this->uri;
 	}
 
 	/**
