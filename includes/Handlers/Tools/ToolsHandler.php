@@ -101,7 +101,7 @@ class ToolsHandler {
 
 		if ( ! isset( $request_params['name'] ) ) {
 			return array(
-				'error'     => McpErrorFactory::missing_parameter( $request_id, 'tool name' )['error'],
+				'error'     => McpErrorFactory::missing_parameter( $request_id, 'tool name' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'tool',
 					'failure_reason' => 'missing_parameter',
@@ -198,7 +198,7 @@ class ToolsHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' )['error'],
+				'error'     => McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'tool',
 					'tool_name'      => $request_params['name'],
@@ -272,7 +272,7 @@ class ToolsHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::tool_not_found( $request_id, $tool_name )['error'],
+				'error'     => McpErrorFactory::tool_not_found( $request_id, $tool_name )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'tool',
 					'tool_name'      => $tool_name,
@@ -299,7 +299,7 @@ class ToolsHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )['error'],
+				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'tool',
 					'tool_name'      => $tool_name,
@@ -338,7 +338,7 @@ class ToolsHandler {
 				}
 
 				return array(
-					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )['error'],
+					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )->getError()->toArray(),
 					'_metadata' => array(
 						'component_type' => 'tool',
 						'tool_name'      => $tool_name,
@@ -357,7 +357,7 @@ class ToolsHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Error running ability permission callback' )['error'],
+				'error'     => McpErrorFactory::internal_error( $request_id, 'Error running ability permission callback' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'tool',
 					'tool_name'      => $tool_name,

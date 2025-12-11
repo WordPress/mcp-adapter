@@ -37,7 +37,7 @@ class SystemHandler {
 	 */
 	public function set_logging_level( array $params, int $request_id = 0 ): array {
 		if ( ! isset( $params['params']['level'] ) && ! isset( $params['level'] ) ) {
-			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'level' )['error'] );
+			return array( 'error' => McpErrorFactory::missing_parameter( $request_id, 'level' )->getError()->toArray() );
 		}
 
 		// @todo: Implement logging level setting logic here.
@@ -85,6 +85,6 @@ class SystemHandler {
 	public function method_not_found( array $params, int $request_id = 0 ): array {
 		$method = $params['method'] ?? 'unknown';
 
-		return array( 'error' => McpErrorFactory::method_not_found( $request_id, $method )['error'] );
+		return array( 'error' => McpErrorFactory::method_not_found( $request_id, $method )->getError()->toArray() );
 	}
 }

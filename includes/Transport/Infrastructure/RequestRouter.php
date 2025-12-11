@@ -125,7 +125,7 @@ class RequestRouter {
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			// Create error response from exception.
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )['error'] );
+			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )->getError()->toArray() );
 		}
 	}
 
@@ -179,7 +179,7 @@ class RequestRouter {
 	 */
 	private function create_method_not_found_error( string $method ): array {
 		return array(
-			'error' => McpErrorFactory::method_not_found( 0, $method )['error'],
+			'error' => McpErrorFactory::method_not_found( 0, $method )->getError()->toArray(),
 		);
 	}
 

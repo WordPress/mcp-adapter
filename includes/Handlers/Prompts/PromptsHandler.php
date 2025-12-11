@@ -73,7 +73,7 @@ class PromptsHandler {
 
 		if ( ! isset( $request_params['name'] ) ) {
 			return array(
-				'error'     => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'],
+				'error'     => McpErrorFactory::missing_parameter( $request_id, 'name' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'prompt',
 					'failure_reason' => 'missing_parameter',
@@ -87,7 +87,7 @@ class PromptsHandler {
 
 		if ( ! $prompt ) {
 			return array(
-				'error'     => McpErrorFactory::prompt_not_found( $request_id, $prompt_name )['error'],
+				'error'     => McpErrorFactory::prompt_not_found( $request_id, $prompt_name )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'prompt',
 					'prompt_name'    => $prompt_name,
@@ -107,7 +107,7 @@ class PromptsHandler {
 				$has_permission = $prompt->check_permission_direct( $arguments );
 				if ( ! $has_permission ) {
 					return array(
-						'error'     => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'],
+						'error'     => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )->getError()->toArray(),
 						'_metadata' => array(
 							'component_type' => 'prompt',
 							'prompt_name'    => $prompt_name,
@@ -147,7 +147,7 @@ class PromptsHandler {
 				);
 
 				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )['error'],
+					'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )->getError()->toArray(),
 					'_metadata' => array(
 						'component_type' => 'prompt',
 						'prompt_name'    => $prompt_name,
@@ -176,7 +176,7 @@ class PromptsHandler {
 				}
 
 				return array(
-					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )['error'],
+					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )->getError()->toArray(),
 					'_metadata' => array(
 						'component_type' => 'prompt',
 						'prompt_name'    => $prompt_name,
@@ -201,7 +201,7 @@ class PromptsHandler {
 				);
 
 				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $result->get_error_message() )['error'],
+					'error'     => McpErrorFactory::internal_error( $request_id, $result->get_error_message() )->getError()->toArray(),
 					'_metadata' => array(
 						'component_type' => 'prompt',
 						'prompt_name'    => $prompt_name,
@@ -233,7 +233,7 @@ class PromptsHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )['error'],
+				'error'     => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'prompt',
 					'prompt_name'    => $prompt_name,

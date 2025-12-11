@@ -12,6 +12,7 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 
 final class ErrorResponseConsistencyTest extends TestCase {
 
@@ -49,7 +50,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			$this->assertIsInt( $error['error']['code'] );
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility
+			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 		}
 	}
@@ -80,7 +82,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			$this->assertIsInt( $error['error']['code'] );
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility
+			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 			$this->assertNotEmpty( $error['error']['message'] );
 		}
@@ -96,7 +99,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		// Test parameter validation error from both factory and helper
 		// Note: missing_parameter() is a convenience wrapper that returns INVALID_PARAMS error code
-		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' );
+		// Factory now returns a DTO, convert it to array for comparison
+		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' )->toArray();
 		$helper_error  = $invalid_param_method->invoke( $tools_handler, 'test_param', 100 );
 
 		// Both should have the same structure
@@ -104,8 +108,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $helper_error );
 
 		// Error codes should match (both use INVALID_PARAMS)
-		$this->assertSame( $factory_error['error']['code'], $helper_error['error']['code'] );
-		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $factory_error['error']['code'] );
+		$this->assertEquals( $factory_error['error']['code'], $helper_error['error']['code'] );
+		$this->assertEquals( (float) McpErrorFactory::INVALID_PARAMS, $factory_error['error']['code'] );
 
 		// Both should contain the parameter name
 		$this->assertStringContainsString( 'test_param', $factory_error['error']['message'] );
@@ -120,15 +124,17 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$extract_error_method = $reflection->getMethod( 'extract_error' );
 		$extract_error_method->setAccessible( true );
 
-		// Test with McpErrorFactory response
+		// Test with McpErrorFactory response (now returns DTO)
 		$factory_response = McpErrorFactory::tool_not_found( 200, 'test_tool' );
-		$extracted_error  = $extract_error_method->invoke( $tools_handler, $factory_response );
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $factory_response );
+
+		$extracted_error = $extract_error_method->invoke( $tools_handler, $factory_response );
 
 		$this->assertArrayHasKey( 'code', $extracted_error );
 		$this->assertArrayHasKey( 'message', $extracted_error );
-		$this->assertSame( $factory_response['error'], $extracted_error );
+		$this->assertEquals( $factory_response->getError()->toArray(), $extracted_error );
 
-		// Test with plain error array
+		// Test with plain error array (backwards compatibility)
 		$plain_error     = array(
 			'code'    => 300,
 			'message' => 'Plain error',
@@ -154,7 +160,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			$this->assertIsInt( $error['error']['code'] );
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility
+			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 
 			// All "not found" errors should have negative codes (MCP convention)

@@ -73,7 +73,7 @@ class ResourcesHandler {
 
 		if ( ! isset( $request_params['uri'] ) ) {
 			return array(
-				'error'     => McpErrorFactory::missing_parameter( $request_id, 'uri' )['error'],
+				'error'     => McpErrorFactory::missing_parameter( $request_id, 'uri' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'resource',
 					'failure_reason' => 'missing_parameter',
@@ -87,7 +87,7 @@ class ResourcesHandler {
 
 		if ( ! $resource ) {
 			return array(
-				'error'     => McpErrorFactory::resource_not_found( $request_id, $uri )['error'],
+				'error'     => McpErrorFactory::resource_not_found( $request_id, $uri )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'resource',
 					'resource_uri'   => $uri,
@@ -114,7 +114,7 @@ class ResourcesHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )['error'],
+				'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'resource',
 					'resource_uri'   => $uri,
@@ -138,7 +138,7 @@ class ResourcesHandler {
 				}
 
 				return array(
-					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )['error'],
+					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )->getError()->toArray(),
 					'_metadata' => array(
 						'component_type' => 'resource',
 						'resource_uri'   => $uri,
@@ -163,7 +163,7 @@ class ResourcesHandler {
 				);
 
 				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $contents->get_error_message() )['error'],
+					'error'     => McpErrorFactory::internal_error( $request_id, $contents->get_error_message() )->getError()->toArray(),
 					'_metadata' => array(
 						'component_type' => 'resource',
 						'resource_uri'   => $uri,
@@ -195,7 +195,7 @@ class ResourcesHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Failed to read resource' )['error'],
+				'error'     => McpErrorFactory::internal_error( $request_id, 'Failed to read resource' )->getError()->toArray(),
 				'_metadata' => array(
 					'component_type' => 'resource',
 					'resource_uri'   => $uri,

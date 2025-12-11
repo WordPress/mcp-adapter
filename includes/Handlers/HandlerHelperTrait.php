@@ -54,14 +54,20 @@ trait HandlerHelperTrait {
 	/**
 	 * Extracts error array from McpErrorFactory response.
 	 *
-	 * McpErrorFactory methods return ['error' => [...]] but handlers
-	 * often need just the error array itself.
+	 * McpErrorFactory methods now return JSONRPCErrorResponse DTOs.
+	 * This helper extracts the error array for handlers that need it.
 	 *
-	 * @param array $factory_response Response from McpErrorFactory method.
+	 * @param \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse|array $factory_response Response from McpErrorFactory method (DTO or legacy array).
 	 *
 	 * @return array Error array (without wrapping 'error' key).
 	 */
-	protected function extract_error( array $factory_response ): array {
+	protected function extract_error( $factory_response ): array {
+		// Handle DTO responses
+		if ( $factory_response instanceof \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse ) {
+			return $factory_response->getError()->toArray();
+		}
+
+		// Handle legacy array responses
 		return $factory_response['error'] ?? $factory_response;
 	}
 
@@ -74,7 +80,7 @@ trait HandlerHelperTrait {
 	 * @return array Error response array.
 	 */
 	protected function missing_parameter_error( string $param_name, int $request_id = 0 ): array {
-		return array( 'error' => McpErrorFactory::missing_parameter( $request_id, $param_name )['error'] );
+		return array( 'error' => McpErrorFactory::missing_parameter( $request_id, $param_name )->getError()->toArray() );
 	}
 
 	/**
@@ -86,7 +92,7 @@ trait HandlerHelperTrait {
 	 * @return array Error response array.
 	 */
 	protected function permission_denied_error( string $denied_resource, int $request_id = 0 ): array {
-		return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for: ' . $denied_resource )['error'] );
+		return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for: ' . $denied_resource )->getError()->toArray() );
 	}
 
 	/**
@@ -98,7 +104,7 @@ trait HandlerHelperTrait {
 	 * @return array Error response array.
 	 */
 	protected function internal_error( string $message, int $request_id = 0 ): array {
-		return array( 'error' => McpErrorFactory::internal_error( $request_id, $message )['error'] );
+		return array( 'error' => McpErrorFactory::internal_error( $request_id, $message )->getError()->toArray() );
 	}
 
 	/**
