@@ -162,7 +162,6 @@ final class RequestRouterTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'resources', $result );
-		$this->assertArrayHasKey( 'nextCursor', $result ); // Cursor compatibility
 		$this->assertIsArray( $result['resources'] );
 	}
 
@@ -227,34 +226,6 @@ final class RequestRouterTest extends TestCase {
 			}
 		);
 		$this->assertNotEmpty( $error_event );
-	}
-
-	public function test_add_cursor_compatibility(): void {
-		$result_without_cursor = array(
-			'resources' => array(
-				array( 'uri' => 'test://resource1' ),
-				array( 'uri' => 'test://resource2' ),
-			),
-		);
-
-		$result = $this->router->add_cursor_compatibility( $result_without_cursor );
-
-		$this->assertArrayHasKey( 'nextCursor', $result );
-		$this->assertEquals( '', $result['nextCursor'] );
-		$this->assertArrayHasKey( 'resources', $result );
-		$this->assertCount( 2, $result['resources'] );
-	}
-
-	public function test_add_cursor_compatibility_preserves_existing(): void {
-		$result_with_cursor = array(
-			'resources'  => array(),
-			'nextCursor' => 'existing-cursor-value',
-		);
-
-		$result = $this->router->add_cursor_compatibility( $result_with_cursor );
-
-		$this->assertArrayHasKey( 'nextCursor', $result );
-		$this->assertEquals( 'existing-cursor-value', $result['nextCursor'] );
 	}
 
 	public function test_route_request_observability_metrics(): void {
