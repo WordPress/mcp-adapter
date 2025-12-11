@@ -10,6 +10,9 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\McpSchema\Common\Protocol\Annotations;
+use WP\McpSchema\Server\Prompts\Prompt as PromptDto;
+use WP\McpSchema\Server\Prompts\PromptArgument;
 
 /**
  * Represents an MCP prompt according to the Model Context Protocol specification.
@@ -323,6 +326,38 @@ class McpPrompt {
 	public function to_json(): string {
 		$json = wp_json_encode( $this->to_array() );
 		return false !== $json ? $json : '{}';
+	}
+
+	/**
+	 * Convert the domain prompt to a typed PromptDto for MCP responses.
+	 *
+	 * @return PromptDto
+	 */
+	public function to_schema_dto(): PromptDto {
+		// Convert arguments array to PromptArgument DTOs.
+		$argument_dtos = null;
+		if ( ! empty( $this->arguments ) ) {
+			$argument_dtos = array_map(
+				static function ( array $arg ): PromptArgument {
+					return new PromptArgument(
+						$arg['name'],
+						$arg['title'] ?? null,
+						$arg['description'] ?? null,
+						$arg['required'] ?? null
+					);
+				},
+				$this->arguments
+			);
+		}
+
+		return new PromptDto(
+			$this->name,
+			$this->title,
+			$this->description,
+			$argument_dtos,
+			null, // _meta
+			null  // icons
+		);
 	}
 
 	/**

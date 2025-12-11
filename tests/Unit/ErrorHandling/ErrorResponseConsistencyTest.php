@@ -39,10 +39,10 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test parameter validation errors (INVALID_PARAMS) from all handlers
-		// ToolsHandler and ResourcesHandler return DTOs, convert to array for consistent testing.
+		// Test parameter validation errors (INVALID_PARAMS) from all handlers.
+		// All handlers now return DTOs, convert to array for consistent testing.
 		$tools_error     = $tools_handler->call_tool( array( 'params' => array() ) )->toArray(); // Missing 'name'
-		$prompts_error   = $prompts_handler->get_prompt( array( 'params' => array() ) ); // Missing 'name'
+		$prompts_error   = $prompts_handler->get_prompt( array( 'params' => array() ) )->toArray(); // Missing 'name'
 		$resources_error = $resources_handler->read_resource( array( 'params' => array() ) )->toArray(); // Missing 'uri'
 
 		$errors = array( $tools_error, $prompts_error, $resources_error );
@@ -51,7 +51,7 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			// Note: Error codes are now float (from DTOs) for JSON number compatibility
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility.
 			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 		}
@@ -150,10 +150,10 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test "not found" errors from all handlers
-		// ToolsHandler and ResourcesHandler return DTOs, convert to array for consistent testing.
+		// Test "not found" errors from all handlers.
+		// All handlers now return DTOs, convert to array for consistent testing.
 		$tool_not_found     = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) )->toArray();
-		$prompt_not_found   = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) );
+		$prompt_not_found   = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) )->toArray();
 		$resource_not_found = $resources_handler->read_resource( array( 'params' => array( 'uri' => 'nonexistent://resource' ) ) )->toArray();
 
 		$errors = array( $tool_not_found, $prompt_not_found, $resource_not_found );
@@ -162,11 +162,11 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			// Note: Error codes are now float (from DTOs) for JSON number compatibility
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility.
 			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 
-			// All "not found" errors should have negative codes (MCP convention)
+			// All "not found" errors should have negative codes (MCP convention).
 			$this->assertLessThan( 0, $error['error']['code'] );
 		}
 	}
@@ -262,23 +262,23 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test parameter validation error messages (INVALID_PARAMS error code)
-		// ToolsHandler and ResourcesHandler return DTOs, convert to array for consistent testing.
+		// Test parameter validation error messages (INVALID_PARAMS error code).
+		// All handlers now return DTOs, convert to array for consistent testing.
 		$errors = array(
 			$tools_handler->call_tool( array( 'params' => array() ) )->toArray(), // Missing name
-			$prompts_handler->get_prompt( array( 'params' => array() ) ), // Missing name
+			$prompts_handler->get_prompt( array( 'params' => array() ) )->toArray(), // Missing name
 			$resources_handler->read_resource( array( 'params' => array() ) )->toArray(), // Missing uri
 		);
 
 		foreach ( $errors as $error ) {
 			$message = $error['error']['message'];
 
-			// Error messages should be informative
+			// Error messages should be informative.
 			$this->assertNotEmpty( $message );
 			$this->assertGreaterThan( 10, strlen( $message ) ); // Not too short
 			$this->assertLessThan( 200, strlen( $message ) ); // Not too long
 
-			// Should mention what's missing or invalid
+			// Should mention what's missing or invalid.
 			$this->assertTrue(
 				strpos( $message, 'missing' ) !== false ||
 				strpos( $message, 'required' ) !== false ||

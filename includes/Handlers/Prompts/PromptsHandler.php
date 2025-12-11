@@ -10,8 +10,13 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Prompts\GetPromptResult;
+use WP\McpSchema\Server\Prompts\ListPromptsResult;
+use WP\McpSchema\Server\Prompts\PromptMessage;
 
 /**
  * Handles prompts-related MCP methods.
@@ -41,22 +46,20 @@ class PromptsHandler {
 	 *
 	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with prompts list and metadata.
+	 * @return ListPromptsResult Response with prompts list DTO.
 	 */
-	public function list_prompts( int $request_id = 0 ): array {
-		// Get the registered prompts from the MCP instance and extract only the args.
-		$prompts = array();
-		foreach ( $this->mcp->get_prompts() as $prompt ) {
-			$prompts[] = $prompt->to_array();
-		}
+	public function list_prompts( int $request_id = 0 ): ListPromptsResult {
+		$prompts = $this->mcp->get_prompts();
 
-		return array(
-			'prompts'   => $prompts,
-			'_metadata' => array(
-				'component_type' => 'prompts',
-				'prompts_count'  => count( $prompts ),
-			),
+		// Convert domain prompts to DTOs.
+		$prompt_dtos = array_values(
+			array_map(
+				static fn( McpPrompt $prompt ) => $prompt->to_schema_dto(),
+				$prompts
+			)
 		);
+
+		return new ListPromptsResult( $prompt_dtos );
 	}
 
 	/**
@@ -65,20 +68,14 @@ class PromptsHandler {
 	 * @param array $params     Request parameters.
 	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with prompt execution results or error.
+	 * @return GetPromptResult|JSONRPCErrorResponse Response with prompt execution results or error.
 	 */
-	public function get_prompt( array $params, int $request_id = 0 ): array {
+	public function get_prompt( array $params, int $request_id = 0 ) {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['name'] ) ) {
-			return array(
-				'error'     => McpErrorFactory::missing_parameter( $request_id, 'name' )->getError()->toArray(),
-				'_metadata' => array(
-					'component_type' => 'prompt',
-					'failure_reason' => 'missing_parameter',
-				),
-			);
+			return McpErrorFactory::missing_parameter( $request_id, 'name' );
 		}
 
 		// Get the prompt by name.
@@ -86,14 +83,7 @@ class PromptsHandler {
 		$prompt      = $this->mcp->get_prompt( $prompt_name );
 
 		if ( ! $prompt ) {
-			return array(
-				'error'     => McpErrorFactory::prompt_not_found( $request_id, $prompt_name )->getError()->toArray(),
-				'_metadata' => array(
-					'component_type' => 'prompt',
-					'prompt_name'    => $prompt_name,
-					'failure_reason' => 'not_found',
-				),
-			);
+			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
 		}
 
 		// Get the arguments for the prompt.
@@ -106,25 +96,12 @@ class PromptsHandler {
 				// Note: Builder permission checks return bool only, not WP_Error
 				$has_permission = $prompt->check_permission_direct( $arguments );
 				if ( ! $has_permission ) {
-					return array(
-						'error'     => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )->getError()->toArray(),
-						'_metadata' => array(
-							'component_type' => 'prompt',
-							'prompt_name'    => $prompt_name,
-							'failure_reason' => 'permission_denied',
-							'is_builder'     => true,
-						),
-					);
+					return McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name );
 				}
 
-				$result              = $prompt->execute_direct( $arguments );
-				$result['_metadata'] = array(
-					'component_type' => 'prompt',
-					'prompt_name'    => $prompt_name,
-					'is_builder'     => true,
-				);
+				$result = $prompt->execute_direct( $arguments );
 
-				return $result;
+				return $this->convert_result_to_dto( $result, $prompt );
 			}
 
 			/**
@@ -146,16 +123,7 @@ class PromptsHandler {
 					)
 				);
 
-				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )->getError()->toArray(),
-					'_metadata' => array(
-						'component_type' => 'prompt',
-						'prompt_name'    => $prompt_name,
-						'failure_reason' => 'ability_retrieval_failed',
-						'error_code'     => $ability->get_error_code(),
-						'is_builder'     => false,
-					),
-				);
+				return McpErrorFactory::internal_error( $request_id, $ability->get_error_message() );
 			}
 
 			// If ability has no input schema and arguments is empty, pass null
@@ -167,24 +135,13 @@ class PromptsHandler {
 			$has_permission = $ability->check_permissions( $arguments );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message and code if WP_Error was returned
-				$error_message  = 'Access denied for prompt: ' . $prompt_name;
-				$failure_reason = 'permission_denied';
+				$error_message = 'Access denied for prompt: ' . $prompt_name;
 
 				if ( is_wp_error( $has_permission ) ) {
-					$error_message  = $has_permission->get_error_message();
-					$failure_reason = $has_permission->get_error_code(); // Use WP_Error code as failure_reason
+					$error_message = $has_permission->get_error_message();
 				}
 
-				return array(
-					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )->getError()->toArray(),
-					'_metadata' => array(
-						'component_type' => 'prompt',
-						'prompt_name'    => $prompt_name,
-						'ability_name'   => $ability->get_name(),
-						'failure_reason' => $failure_reason,
-						'is_builder'     => false,
-					),
-				);
+				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
 			$result = $ability->execute( $arguments );
@@ -200,28 +157,10 @@ class PromptsHandler {
 					)
 				);
 
-				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $result->get_error_message() )->getError()->toArray(),
-					'_metadata' => array(
-						'component_type' => 'prompt',
-						'prompt_name'    => $prompt_name,
-						'ability_name'   => $ability->get_name(),
-						'failure_reason' => 'wp_error',
-						'error_code'     => $result->get_error_code(),
-						'is_builder'     => false,
-					),
-				);
+				return McpErrorFactory::internal_error( $request_id, $result->get_error_message() );
 			}
 
-			// Successful execution - add metadata.
-			$result['_metadata'] = array(
-				'component_type' => 'prompt',
-				'prompt_name'    => $prompt_name,
-				'ability_name'   => $ability->get_name(),
-				'is_builder'     => false,
-			);
-
-			return $result;
+			return $this->convert_result_to_dto( $result, $prompt );
 		} catch ( \Throwable $e ) {
 			$this->mcp->error_handler->log(
 				'Prompt execution failed',
@@ -232,15 +171,62 @@ class PromptsHandler {
 				)
 			);
 
-			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )->getError()->toArray(),
-				'_metadata' => array(
-					'component_type' => 'prompt',
-					'prompt_name'    => $prompt_name,
-					'failure_reason' => 'execution_failed',
-					'error_type'     => get_class( $e ),
-				),
+			return McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' );
+		}
+	}
+
+	/**
+	 * Converts the ability result to a GetPromptResult DTO.
+	 *
+	 * Handles both:
+	 * 1. MCP-compliant results with 'messages' array
+	 * 2. Builder prompts returning arbitrary data (wraps as text content)
+	 *
+	 * @param array    $result The result from ability execution.
+	 * @param McpPrompt $prompt The prompt being executed.
+	 *
+	 * @return GetPromptResult
+	 */
+	private function convert_result_to_dto( array $result, McpPrompt $prompt ): GetPromptResult {
+		// Check if result already has properly structured messages.
+		if ( isset( $result['messages'] ) && is_array( $result['messages'] ) ) {
+			$message_dtos = array_map(
+				static function ( array $message ): PromptMessage {
+					return PromptMessage::fromArray( $message );
+				},
+				$result['messages']
+			);
+
+			return new GetPromptResult(
+				$message_dtos,
+				null, // _meta
+				$result['description'] ?? $prompt->get_description()
 			);
 		}
+
+		// For builder prompts or non-compliant results, wrap the entire result as a text message.
+		// This ensures backward compatibility with existing builder implementations.
+		$json_content = wp_json_encode( $result, JSON_PRETTY_PRINT );
+		if ( false === $json_content ) {
+			$json_content = '{}';
+		}
+
+		$message_dtos = array(
+			PromptMessage::fromArray(
+				array(
+					'role'    => 'assistant',
+					'content' => array(
+						'type' => 'text',
+						'text' => $json_content,
+					),
+				)
+			),
+		);
+
+		return new GetPromptResult(
+			$message_dtos,
+			null, // _meta
+			$prompt->get_description()
+		);
 	}
 }

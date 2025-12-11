@@ -6,6 +6,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Prompts\GetPromptResult;
+use WP\McpSchema\Server\Prompts\ListPromptsResult;
+use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\PromptMessage;
 
 final class PromptsHandlerTest extends TestCase {
 
@@ -13,29 +18,43 @@ final class PromptsHandlerTest extends TestCase {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
 		$handler = new PromptsHandler( $server );
-		$res     = $handler->list_prompts();
-		$this->assertArrayHasKey( 'prompts', $res );
-		$this->assertNotEmpty( $res['prompts'] );
+		$result  = $handler->list_prompts();
+
+		// Returns ListPromptsResult DTO.
+		$this->assertInstanceOf( ListPromptsResult::class, $result );
+		$prompts = $result->getPrompts();
+		$this->assertNotEmpty( $prompts );
+		$this->assertContainsOnlyInstancesOf( Prompt::class, $prompts );
 	}
 
 	public function test_get_prompt_missing_name_returns_error(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
 		$handler = new PromptsHandler( $server );
-		$res     = $handler->get_prompt( array( 'params' => array() ) );
-		$this->assertArrayHasKey( 'error', $res );
+		$result  = $handler->get_prompt( array( 'params' => array() ) );
+
+		// Missing name is a protocol error - returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_get_prompt_unknown_returns_error(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
 		$handler = new PromptsHandler( $server );
-		$res     = $handler->get_prompt( array( 'params' => array( 'name' => 'unknown' ) ) );
-		$this->assertArrayHasKey( 'error', $res );
+		$result  = $handler->get_prompt( array( 'params' => array( 'name' => 'unknown' ) ) );
+
+		// Prompt not found is a protocol error - returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_get_prompt_success_runs_ability(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
 		$handler = new PromptsHandler( $server );
-		$res     = $handler->get_prompt(
+		$result  = $handler->get_prompt(
 			array(
 				'params' => array(
 					'name'      => 'test-prompt',
@@ -43,14 +62,18 @@ final class PromptsHandlerTest extends TestCase {
 				),
 			)
 		);
-		$this->assertIsArray( $res );
-		$this->assertArrayHasKey( '_metadata', $res );
+
+		// Successful execution returns GetPromptResult DTO.
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$messages = $result->getMessages();
+		$this->assertNotEmpty( $messages );
+		$this->assertContainsOnlyInstancesOf( PromptMessage::class, $messages );
 	}
 
 	public function test_get_prompt_with_wp_error_from_get_ability(): void {
 		wp_set_current_user( 1 );
 
-		// Register a prompt first, then unregister the ability to simulate get_ability() returning WP_Error
+		// Register a prompt first, then unregister the ability to simulate get_ability() returning WP_Error.
 		$this->register_ability_in_hook(
 			'test/prompt-to-remove',
 			array(
@@ -81,10 +104,10 @@ final class PromptsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt-to-remove' ) );
 		$handler = new PromptsHandler( $server );
 
-		// Now unregister the ability to simulate get_ability() returning WP_Error
+		// Now unregister the ability to simulate get_ability() returning WP_Error.
 		wp_unregister_ability( 'test/prompt-to-remove' );
 
-		$res = $handler->get_prompt(
+		$result = $handler->get_prompt(
 			array(
 				'params' => array(
 					'name'      => 'test-prompt-to-remove',
@@ -93,17 +116,17 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return error
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'ability_retrieval_failed', $res['_metadata']['failure_reason'] );
-		$this->assertEquals( 'ability_not_found', $res['_metadata']['error_code'] );
+		// Ability retrieval failure is a protocol error - returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_get_prompt_with_wp_error_from_execute(): void {
 		wp_set_current_user( 1 );
 
-		// Register an ability that returns WP_Error
+		// Register an ability that returns WP_Error.
 		$this->register_ability_in_hook(
 			'test/wp-error-prompt-execute',
 			array(
@@ -134,7 +157,7 @@ final class PromptsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array(), array(), array( 'test/wp-error-prompt-execute' ) );
 		$handler = new PromptsHandler( $server );
 
-		$res = $handler->get_prompt(
+		$result = $handler->get_prompt(
 			array(
 				'params' => array(
 					'name'      => 'test-wp-error-prompt-execute',
@@ -143,20 +166,20 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return error
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'wp_error', $res['_metadata']['failure_reason'] );
-		$this->assertEquals( 'test_error', $res['_metadata']['error_code'] );
+		// WP_Error from execute is a protocol error - returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 
-		// Clean up
+		// Clean up.
 		wp_unregister_ability( 'test/wp-error-prompt-execute' );
 	}
 
 	public function test_get_prompt_with_exception(): void {
 		wp_set_current_user( 1 );
 
-		// Register an ability that throws exception during execute
+		// Register an ability that throws exception during execute.
 		$this->register_ability_in_hook(
 			'test/prompt-execute-exception',
 			array(
@@ -187,7 +210,7 @@ final class PromptsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt-execute-exception' ) );
 		$handler = new PromptsHandler( $server );
 
-		$res = $handler->get_prompt(
+		$result = $handler->get_prompt(
 			array(
 				'params' => array(
 					'name'      => 'test-prompt-execute-exception',
@@ -196,16 +219,16 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return error
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'execution_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+		// Exception is a protocol error - returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 
-		// Clean up
+		// Clean up.
 		wp_unregister_ability( 'test/prompt-execute-exception' );
 	}
 
 	// Note: Error path testing for prompts is covered by integration tests
-	// and the existing basic error tests above
+	// and the existing basic error tests above.
 }
