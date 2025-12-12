@@ -49,7 +49,7 @@ class HttpRequestHandler {
 			return $this->handle_mcp_request( $context );
 		}
 
-		// Handle GET requests (listening for messages from server via SSE)
+		// Handle GET requests (reserved for SSE streaming; currently not implemented).
 		if ( 'GET' === $context->method ) {
 			return $this->handle_sse_request( $context );
 		}

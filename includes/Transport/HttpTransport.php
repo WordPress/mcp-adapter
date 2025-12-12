@@ -1,9 +1,11 @@
 <?php
 /**
- * MCP HTTP Transport for WordPress - MCP 2025-11-25 Compliant
+ * MCP HTTP Transport for WordPress (MCP 2025-11-25 baseline)
  *
- * This transport implements the MCP Streamable HTTP specification and can work
- * both with and without the mcp-wordpress-remote proxy.
+ * This transport implements the MCP HTTP transport surface used by this plugin.
+ * It can work both with and without the mcp-wordpress-remote proxy.
+ *
+ * Note: SSE (GET streaming) is not yet implemented; GET currently returns 405.
  *
  * @package McpAdapter
  */
@@ -21,7 +23,9 @@ use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 /**
  * MCP HTTP Transport - Unified transport for both proxy and direct clients
  *
- * Implements MCP 2025-11-25 Streamable HTTP specification
+ * Implements the MCP 2025-11-25 HTTP transport shape used by this adapter (POST + sessions).
+ *
+ * Note: SSE (GET streaming) is not yet implemented; GET currently returns 405.
  */
 class HttpTransport implements McpRestTransportInterface {
 	use McpTransportHelperTrait;
@@ -50,7 +54,8 @@ class HttpTransport implements McpRestTransportInterface {
 		// Get server info from request handler's transport context
 		$server = $this->request_handler->transport_context->mcp_server;
 
-		// Single endpoint for MCP communication (POST, GET for SSE, DELETE for session termination)
+		// Single endpoint for MCP communication (POST, GET reserved for SSE, DELETE for session termination).
+		// Do not remove GET: it is part of the MCP HTTP transport shape and will be implemented (SSE) in a future iteration.
 		register_rest_route(
 			$server->get_server_route_namespace(),
 			$server->get_server_route(),

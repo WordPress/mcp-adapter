@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for MCP HTTP Transport - MCP 2025-11-25 Streamable HTTP Compliance
+ * Tests for MCP HTTP Transport behavior (MCP 2025-11-25 baseline).
  *
  * @package WP\MCP\Tests
  */
@@ -25,11 +25,11 @@ use WP_REST_Request;
 use WP_REST_Response;
 
 /**
- * Test MCP HTTP Transport compliance with MCP 2025-11-25 Streamable HTTP specification
+ * Test MCP HTTP Transport behavior against the MCP 2025-11-25 baseline.
  *
  * Tests cover:
  * - POST requests with JSON-RPC messages
- * - GET requests for SSE streaming
+ * - GET requests for SSE streaming (currently returns 405)
  * - DELETE requests for session termination
  * - OPTIONS requests for CORS preflight
  * - Session management
