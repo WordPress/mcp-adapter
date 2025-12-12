@@ -38,7 +38,7 @@ final class MetaStripper {
 	 * @return array<mixed>
 	 */
 	public static function strip_array( array $data ): array {
-		if ( isset( $data['_meta'] ) && is_array( $data['_meta'] ) && isset( $data['_meta']['mcp_adapter'] ) ) {
+		if ( isset( $data['_meta'] ) && is_array( $data['_meta'] ) && array_key_exists( 'mcp_adapter', $data['_meta'] ) ) {
 			unset( $data['_meta']['mcp_adapter'] );
 			if ( empty( $data['_meta'] ) ) {
 				unset( $data['_meta'] );

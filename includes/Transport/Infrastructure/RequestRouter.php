@@ -90,8 +90,9 @@ class RequestRouter {
 			// Handle DTO results from migrated handlers.
 			// DTOs are converted to arrays at the serialization boundary (here).
 			if ( $handler_result instanceof JSONRPCErrorResponse ) {
-				// JSON-RPC error response DTO - convert to array.
-				$result             = $handler_result->toArray();
+				// Normalize to transport-level shape: only the JSON-RPC error object.
+				// The JSON-RPC envelope is created by the transport boundary.
+				$result             = array( 'error' => $handler_result->getError()->toArray() );
 				$tags               = array_merge( $common_tags, array( 'status' => 'error' ) );
 				$tags['error_code'] = $handler_result->getError()->getCode();
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
@@ -124,7 +125,7 @@ class RequestRouter {
 
 			// Handlers should only return schema DTOs.
 			$unexpected_error   = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
-			$result             = $unexpected_error->toArray();
+			$result             = array( 'error' => $unexpected_error->getError()->toArray() );
 			$tags               = array_merge( $common_tags, array( 'status' => 'error' ) );
 			$tags['error_code'] = $unexpected_error->getError()->getCode();
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
@@ -146,7 +147,8 @@ class RequestRouter {
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			// Create error response from exception.
-			return McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )->toArray();
+			$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Handler error occurred' );
+			return array( 'error' => $unexpected_error->getError()->toArray() );
 		}
 	}
 

@@ -210,6 +210,8 @@ final class RequestRouterTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
+		$this->assertArrayNotHasKey( 'jsonrpc', $result );
+		$this->assertArrayNotHasKey( 'id', $result );
 		$this->assertEquals( McpErrorFactory::METHOD_NOT_FOUND, $result['error']['code'] );
 		$this->assertStringContainsString( 'unknown/method', $result['error']['message'] );
 
@@ -310,6 +312,8 @@ final class RequestRouterTest extends TestCase {
 		// Verify error response structure (not double-wrapped)
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
+		$this->assertArrayNotHasKey( 'jsonrpc', $result );
+		$this->assertArrayNotHasKey( 'id', $result );
 
 		// The error should be a proper error object with code and message
 		$this->assertArrayHasKey( 'code', $result['error'] );

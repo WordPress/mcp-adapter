@@ -59,6 +59,21 @@ final class MetaStripperTest extends TestCase {
 		$this->assertArrayNotHasKey( '_meta', $result['drop_me'] );
 	}
 
+	public function test_strip_array_removes_null_mcp_adapter_key(): void {
+		$input = array(
+			'_meta' => array(
+				'mcp_adapter' => null,
+				'keep'        => 'value',
+			),
+		);
+
+		$result = MetaStripper::strip_array( $input );
+
+		$this->assertArrayHasKey( '_meta', $result );
+		$this->assertArrayNotHasKey( 'mcp_adapter', $result['_meta'] );
+		$this->assertSame( 'value', $result['_meta']['keep'] );
+	}
+
 	/**
 	 * @param mixed $value
 	 */
@@ -76,4 +91,3 @@ final class MetaStripperTest extends TestCase {
 		}
 	}
 }
-
