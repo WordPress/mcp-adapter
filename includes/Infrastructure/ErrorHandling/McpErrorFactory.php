@@ -11,6 +11,7 @@ namespace WP\MCP\Infrastructure\ErrorHandling;
 
 use WP\McpSchema\Common\JsonRpc\Error;
 use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\McpConstants;
 
 /**
  * Factory for creating standardized MCP error responses.
@@ -24,11 +25,11 @@ class McpErrorFactory {
 	/**
 	 * Standard JSON-RPC error codes as defined in the specification.
 	 */
-	public const PARSE_ERROR      = -32700;
-	public const INVALID_REQUEST  = -32600;
-	public const METHOD_NOT_FOUND = -32601;
-	public const INVALID_PARAMS   = -32602;
-	public const INTERNAL_ERROR   = -32603;
+	public const PARSE_ERROR      = McpConstants::PARSE_ERROR;
+	public const INVALID_REQUEST  = McpConstants::INVALID_REQUEST;
+	public const METHOD_NOT_FOUND = McpConstants::METHOD_NOT_FOUND;
+	public const INVALID_PARAMS   = McpConstants::INVALID_PARAMS;
+	public const INTERNAL_ERROR   = McpConstants::INTERNAL_ERROR;
 
 	/**
 	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
@@ -52,7 +53,13 @@ class McpErrorFactory {
 	 * @return \WP\McpSchema\Common\JsonRpc\Error
 	 */
 	public static function create_error( int $code, string $message, $data = null ): Error {
-		return new Error( (float) $code, $message, $data );
+		return Error::fromArray(
+			array(
+				'code'    => (float) $code,
+				'message' => $message,
+				'data'    => $data,
+			)
+		);
 	}
 
 	/**
@@ -66,10 +73,12 @@ class McpErrorFactory {
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
 	public static function create_error_response( $id, int $code, string $message, $data = null ): JSONRPCErrorResponse {
-		return new JSONRPCErrorResponse(
-			'2.0',
-			self::create_error( $code, $message, $data ),
-			$id
+		return JSONRPCErrorResponse::fromArray(
+			array(
+				'jsonrpc' => McpConstants::JSONRPC_VERSION,
+				'error'   => self::create_error( $code, $message, $data ),
+				'id'      => $id,
+			)
 		);
 	}
 
@@ -420,8 +429,15 @@ class McpErrorFactory {
 		}
 
 		// Must have jsonrpc field with value "2.0".
-		if ( ! isset( $message['jsonrpc'] ) || '2.0' !== $message['jsonrpc'] ) {
-			return self::invalid_request( 0, __( 'jsonrpc version must be "2.0"', 'mcp-adapter' ) );
+		if ( ! isset( $message['jsonrpc'] ) || McpConstants::JSONRPC_VERSION !== $message['jsonrpc'] ) {
+			return self::invalid_request(
+				0,
+				sprintf(
+					/* translators: %s: JSON-RPC version */
+					__( 'jsonrpc version must be "%s"', 'mcp-adapter' ),
+					McpConstants::JSONRPC_VERSION
+				)
+			);
 		}
 
 		// Must be either a request/notification (has method) or a response (has result/error).
