@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Infrastructure\Dto\MetaStripper;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
@@ -54,6 +55,8 @@ class RequestRouter {
 		// Track request start time.
 		$start_time = microtime( true );
 
+		$new_session_id = null;
+
 		// Common tags for all metrics.
 		$common_tags = array(
 			'method'     => $method,
@@ -65,7 +68,9 @@ class RequestRouter {
 		);
 
 		$handlers = array(
-			'initialize'          => fn() => $this->handle_initialize_with_session( $params, $request_id, $http_context ),
+			'initialize'          => function () use ( $params, $request_id, $http_context, &$new_session_id ) {
+				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $new_session_id );
+			},
 			'ping'                => fn() => $this->context->system_handler->ping( $request_id ),
 			'tools/list'          => fn() => $this->context->tools_handler->list_tools( $request_id ),
 			'tools/list/all'      => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
@@ -80,7 +85,7 @@ class RequestRouter {
 		);
 
 		try {
-			$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method );
+			$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
 
 			// Calculate request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
@@ -98,38 +103,33 @@ class RequestRouter {
 
 			if ( $handler_result instanceof AbstractDataTransferObject ) {
 				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
-				$result = $handler_result->toArray();
-				$tags   = array_merge( $common_tags, array( 'status' => 'success' ) );
+				$raw_result = $handler_result->toArray();
+
+				// Extract internal adapter metadata from MCP-spec _meta (if present) for observability.
+				$metadata = array();
+				if ( isset( $raw_result['_meta'] ) && is_array( $raw_result['_meta'] ) && isset( $raw_result['_meta']['mcp_adapter'] ) && is_array( $raw_result['_meta']['mcp_adapter'] ) ) {
+					$metadata = $raw_result['_meta']['mcp_adapter'];
+				}
+
+				if ( null !== $new_session_id ) {
+					$metadata['new_session_id'] = $new_session_id;
+				}
+
+				$result = MetaStripper::strip_array( $raw_result );
+				if ( null !== $new_session_id ) {
+					$result['_session_id'] = $new_session_id;
+				}
+
+				$tags   = array_merge( $common_tags, $metadata, array( 'status' => 'success' ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 				return $result;
 			}
 
-			// Legacy array result from non-migrated handlers.
-			$result = $handler_result;
-
-			// Extract metadata from handler response (if present).
-			$metadata = $result['_metadata'] ?? array();
-			unset( $result['_metadata'] ); // Don't send to client.
-
-			// Capture newly created session ID from initialize if present.
-			if ( isset( $result['_session_id'] ) ) {
-				$metadata['new_session_id'] = $result['_session_id'];
-			}
-
-			// Merge common tags with handler metadata.
-			$tags = array_merge( $common_tags, $metadata );
-
-			// Determine status and record event.
-			if ( isset( $result['error'] ) ) {
-				$tags['status']     = 'error';
-				$tags['error_code'] = $result['error']['code'] ?? -32603;
-				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
-
-				return $result;
-			}
-
-			// Successful request.
-			$tags['status'] = 'success';
+			// Handlers should only return schema DTOs.
+			$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
+			$result           = $unexpected_error->toArray();
+			$tags             = array_merge( $common_tags, array( 'status' => 'error' ) );
+			$tags['error_code'] = $unexpected_error->getError()->getCode();
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			return $result;
@@ -149,7 +149,7 @@ class RequestRouter {
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			// Create error response from exception.
-			return array( 'error' => McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )->getError()->toArray() );
+			return McpErrorFactory::internal_error( $request_id, 'Handler error occurred' )->toArray();
 		}
 	}
 
@@ -161,14 +161,13 @@ class RequestRouter {
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
-	 * @return array
+	 * @param string|null $new_session_id Newly created session id, if any.
+	 *
+	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
 	 */
-	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context ): array {
+	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
 		// Get the initialize response from the handler (returns InitializeResult DTO).
 		$init_result = $this->context->initialize_handler->handle( $request_id );
-
-		// Convert DTO to array for response serialization.
-		$result = $init_result->toArray();
 
 		// Handle session creation if HTTP context is provided.
 		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
@@ -176,27 +175,32 @@ class RequestRouter {
 			$session_result = HttpSessionValidator::create_session( $params );
 
 			if ( is_array( $session_result ) ) {
-				// Session creation failed - extract inner error from JSON-RPC response.
-				return array( 'error' => $session_result['error'] ?? $session_result );
+				$error = $session_result['error'] ?? array();
+
+				return McpErrorFactory::create_error_response(
+					$request_id,
+					isset( $error['code'] ) ? (int) $error['code'] : McpErrorFactory::INTERNAL_ERROR,
+					(string) ( $error['message'] ?? __( 'Failed to create session', 'mcp-adapter' ) ),
+					$error['data'] ?? null
+				);
 			}
 
-			// Store session ID in result for HttpRequestHandler to add as header.
-			$result['_session_id'] = $session_result;
+			$new_session_id = $session_result;
 		}
 
-		return $result;
+		return $init_result;
 	}
 
 	/**
 	 * Create a method not found error with generic format.
 	 *
 	 * @param string $method The method that was not found.
-	 * @return array
+	 * @param mixed $request_id The request ID.
+	 *
+	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
-	private function create_method_not_found_error( string $method ): array {
-		return array(
-			'error' => McpErrorFactory::method_not_found( 0, $method )->getError()->toArray(),
-		);
+	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
+		return McpErrorFactory::method_not_found( $request_id, $method );
 	}
 
 	/**

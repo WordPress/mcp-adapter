@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\McpSchema\Common\McpConstants;
+
 /**
  * Builds standardized JSON-RPC 2.0 responses for MCP transport.
  *
@@ -27,7 +29,7 @@ class JsonRpcResponseBuilder {
 	 */
 	public static function create_success_response( $request_id, $result ): array {
 		return array(
-			'jsonrpc' => '2.0',
+			'jsonrpc' => McpConstants::JSONRPC_VERSION,
 			'id'      => $request_id,
 			// Make sure the result is an object (not an array)
 			'result'  => (object) $result,
@@ -44,7 +46,7 @@ class JsonRpcResponseBuilder {
 	 */
 	public static function create_error_response( $request_id, array $error ): array {
 		return array(
-			'jsonrpc' => '2.0',
+			'jsonrpc' => McpConstants::JSONRPC_VERSION,
 			'id'      => $request_id,
 			'error'   => $error,
 		);
