@@ -101,6 +101,9 @@ class RequestRouter {
 
 			if ( $handler_result instanceof AbstractDataTransferObject ) {
 				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
+				// Note: If a future schema version ever returns nested DTO objects inside `toArray()`,
+				// we may need to add a deep normalizer at this boundary (before MetaStripper and
+				// JSON serialization) to prevent placeholder `{}` objects in client output.
 				$raw_result = $handler_result->toArray();
 
 				// Extract internal adapter metadata from MCP-spec _meta (if present) for observability.
