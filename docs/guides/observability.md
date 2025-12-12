@@ -140,7 +140,7 @@ All events use a **consistent naming pattern with status tags** for easier filte
     'server_id' => 'default',
     'request_id' => 1,
     'session_id' => null, // No session yet
-    'params' => ['protocolVersion' => '2025-06-18', 'client_name' => 'Bruno'],
+    'params' => ['protocolVersion' => '2025-11-25', 'client_name' => 'Bruno'],
     'new_session_id' => 'a3f2c1d4-5e6f-7890-abcd-ef1234567890', // Newly created
   ],
   'duration_ms' => 12.34

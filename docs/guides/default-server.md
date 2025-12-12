@@ -7,7 +7,7 @@ The MCP Adapter automatically creates a default server that provides core MCP fu
 ### Basic Details
 - **Server ID**: `mcp-adapter-default-server`
 - **Endpoint**: `/wp-json/mcp/mcp-adapter-default-server`
-- **Transport**: HTTP (MCP 2025-06-18 compliant)
+- **Transport**: HTTP (MCP 2025-11-25 compliant)
 - **Authentication**: Requires logged-in WordPress user with `read` capability (customizable via filters)
 
 ### Default Configuration

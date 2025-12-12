@@ -6,7 +6,7 @@ The official WordPress package for MCP integration that exposes WordPress abilit
 
 ## Overview
 
-This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
+This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
 
 ## Features
 
@@ -15,7 +15,7 @@ This adapter bridges WordPress's Abilities API with the [MCP specification](http
 - **Ability-to-MCP Conversion**: Automatically converts WordPress abilities into MCP tools, resources, and prompts
 - **Multi-Server Management**: Create and manage multiple MCP servers with unique configurations
 - **Extensible Transport Layer**:
-    - **HTTP Transport**: Unified transport implementing [MCP 2025-06-18 specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports.md) for HTTP-based communication
+    - **HTTP Transport**: Unified transport implementing [MCP 2025-11-25 specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports.md) for HTTP-based communication
     - **STDIO Transport**: Process-based communication via standard input/output for local development and CLI integration
     - **Custom Transport Support**: Implement `McpTransportInterface` to create specialized communication protocols
     - **Multi-Transport Configuration**: Configure servers with multiple transport methods simultaneously
@@ -28,14 +28,14 @@ This adapter bridges WordPress's Abilities API with the [MCP specification](http
     - **Built-in Observability**: Default zero-overhead metrics tracking with configurable handlers
     - **Custom Observability Handlers**: Implement `McpObservabilityHandlerInterface` for integration with monitoring
       systems
-- **Validation**: Built-in validation for tools, resources, and prompts with extensible validation rules
+- **Schema DTOs**: Uses `wordpress/php-mcp-schema` DTOs end-to-end (tools/resources/prompts), enforcing MCP shapes at construction time
 - **Permission Control**: Granular permission checking for all exposed functionality with configurable [transport permissions](docs/guides/transport-permissions.md)
 
 ### MCP Component Support
 
-- **[Tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools.md)**: Convert WordPress abilities into executable MCP tools for AI agent interactions
-- **[Resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources.md)**: Expose WordPress data as MCP resources for contextual information access
-- **[Prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts.md)**: Transform abilities into structured MCP prompts for AI guidance and templates
+- **[Tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools.md)**: Convert WordPress abilities into executable MCP tools for AI agent interactions
+- **[Resources](https://modelcontextprotocol.io/specification/2025-11-25/server/resources.md)**: Expose WordPress data as MCP resources for contextual information access
+- **[Prompts](https://modelcontextprotocol.io/specification/2025-11-25/server/prompts.md)**: Transform abilities into structured MCP prompts for AI guidance and templates
 - **Server Discovery**: Automatic registration and discovery of MCP servers following MCP protocol standards
 - **Built-in Abilities**: Core WordPress abilities for system introspection and ability management
 - **CLI Integration**: WP-CLI commands supporting STDIO transport as defined in MCP specification
@@ -48,7 +48,7 @@ The MCP Adapter transforms WordPress abilities into MCP components:
 - **Resources**: WordPress abilities expose data as MCP resources for contextual information
 - **Prompts**: WordPress abilities provide structured MCP prompts for AI guidance
 
-For detailed information about MCP components, see the [Model Context Protocol specification](https://modelcontextprotocol.io/specification/2025-06-18/).
+For detailed information about MCP components, see the [Model Context Protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/).
 
 
 ## Architecture
@@ -127,7 +127,7 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │   ├── Contracts/
 │   │   ├── McpTransportInterface.php     # Base transport interface
 │   │   └── McpRestTransportInterface.php # REST transport interface
-│   ├── HttpTransport.php                 # Unified HTTP transport (MCP 2025-06-18)
+│   ├── HttpTransport.php                 # Unified HTTP transport (MCP 2025-11-25)
 │   │   # Transport infrastructure
 │   └── Infrastructure/
 │       ├── HttpRequestContext.php       # HTTP request context
@@ -282,7 +282,7 @@ The MCP Adapter automatically creates a default server that exposes all register
 
 **How it works:**
 - All WordPress abilities registered via `wp_register_ability()` are automatically available
-- The default server supports both HTTP and STDIO transports with MCP 2025-06-18 compliance
+- The default server supports both HTTP and STDIO transports with MCP 2025-11-25 compliance
 - Abilities are exposed as tools, resources, or prompts based on their characteristics
 - Built-in error handling and observability are included
 - Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
@@ -458,7 +458,7 @@ add_action('mcp_adapter_init', function($adapter) {
         'Description of my server',       // Server description
         'v1.0.0',                        // Server version
         [                                 // Transport methods
-            \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-06-18 compliant
+            \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-11-25 compliant
         ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
         \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class, // Observability handler

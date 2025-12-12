@@ -117,7 +117,7 @@ interface McpRestTransportInterface extends McpTransportInterface {
 
 ### Built-in Transports
 
-- **HttpTransport**: Recommended (MCP 2025-06-18 compliant)
+- **HttpTransport**: Recommended (MCP 2025-11-25 compliant)
 - **STDIO Transport**: Via WP-CLI commands
 
 ### Dependency Injection

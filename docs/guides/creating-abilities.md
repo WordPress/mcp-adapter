@@ -732,7 +732,7 @@ wp_register_ability('my-plugin/code-review', [
 
 ### Message Content Annotations (MCP Specification)
 
-You can also annotate the generated message content according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts#promptmessage):
+You can also annotate the generated message content according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/server/prompts#promptmessage):
 
 ```php
 wp_register_ability('my-plugin/analysis-prompt', [

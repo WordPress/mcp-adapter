@@ -76,7 +76,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -190,7 +190,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$format_response_method->setAccessible( true );
 
 		$result = array(
-			'protocolVersion' => '2025-06-18',
+			'protocolVersion' => '2025-11-25',
 			'serverInfo'      => array(
 				'name'    => 'Test Server',
 				'version' => '1.0.0',

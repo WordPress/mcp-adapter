@@ -76,7 +76,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -116,7 +116,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -272,7 +272,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -313,7 +313,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',

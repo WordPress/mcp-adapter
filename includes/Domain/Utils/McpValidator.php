@@ -249,7 +249,7 @@ class McpValidator {
 	/**
 	 * Get validation errors for tool-specific MCP annotations.
 	 *
-	 * Validates tool annotation fields per MCP 2025-06-18 specification:
+	 * Validates tool annotation fields per MCP 2025-11-25 specification:
 	 * - readOnlyHint, destructiveHint, idempotentHint, openWorldHint must be booleans
 	 * - title must be a non-empty string
 	 *
@@ -307,7 +307,7 @@ class McpValidator {
 	/**
 	 * Get validation errors for shared MCP annotations.
 	 *
-	 * Validates shared annotation fields per MCP 2025-06-18 specification:
+	 * Validates shared annotation fields per MCP 2025-11-25 specification:
 	 * - audience must be a non-empty array of valid Role values ("user", "assistant")
 	 * - lastModified must be a valid ISO 8601 formatted string
 	 * - priority must be a number between 0.0 and 1.0

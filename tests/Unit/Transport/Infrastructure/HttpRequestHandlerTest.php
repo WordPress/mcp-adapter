@@ -98,7 +98,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -151,7 +151,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -197,7 +197,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -282,7 +282,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',

@@ -1,6 +1,6 @@
 <?php
 /**
- * MCP HTTP Transport for WordPress - MCP 2025-06-18 Compliant
+ * MCP HTTP Transport for WordPress - MCP 2025-11-25 Compliant
  *
  * This transport implements the MCP Streamable HTTP specification and can work
  * both with and without the mcp-wordpress-remote proxy.
@@ -21,7 +21,7 @@ use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 /**
  * MCP HTTP Transport - Unified transport for both proxy and direct clients
  *
- * Implements MCP 2025-06-18 Streamable HTTP specification
+ * Implements MCP 2025-11-25 Streamable HTTP specification
  */
 class HttpTransport implements McpRestTransportInterface {
 	use McpTransportHelperTrait;
@@ -117,7 +117,7 @@ class HttpTransport implements McpRestTransportInterface {
 	}
 
 	/**
-	 * Handle HTTP requests according to MCP 2025-06-18 specification
+	 * Handle HTTP requests according to MCP 2025-11-25 specification
 	 *
 	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *

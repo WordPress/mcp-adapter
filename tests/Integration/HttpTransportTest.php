@@ -1,6 +1,6 @@
 <?php
 /**
- * Tests for MCP HTTP Transport - MCP 2025-06-18 Streamable HTTP Compliance
+ * Tests for MCP HTTP Transport - MCP 2025-11-25 Streamable HTTP Compliance
  *
  * @package WP\MCP\Tests
  */
@@ -25,7 +25,7 @@ use WP_REST_Request;
 use WP_REST_Response;
 
 /**
- * Test MCP HTTP Transport compliance with MCP 2025-06-18 Streamable HTTP specification
+ * Test MCP HTTP Transport compliance with MCP 2025-11-25 Streamable HTTP specification
  *
  * Tests cover:
  * - POST requests with JSON-RPC messages
@@ -82,7 +82,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -125,7 +125,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -164,7 +164,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -279,7 +279,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -345,7 +345,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -409,7 +409,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -442,7 +442,7 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -949,11 +949,11 @@ final class HttpTransportTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 				),
 			)
 		);
-		$request->set_header( 'MCP-Protocol-Version', '2025-06-18' );
+		$request->set_header( 'MCP-Protocol-Version', '2025-11-25' );
 
 		$response = $this->transport->handle_request( $request );
 
