@@ -68,20 +68,17 @@ class RequestRouter {
 		);
 
 		$handlers = array(
-			'initialize'          => function () use ( $params, $request_id, $http_context, &$new_session_id ) {
+			'initialize'     => function () use ( $params, $request_id, $http_context, &$new_session_id ) {
 				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $new_session_id );
 			},
-			'ping'                => fn() => $this->context->system_handler->ping( $request_id ),
-			'tools/list'          => fn() => $this->context->tools_handler->list_tools( $request_id ),
-			'tools/list/all'      => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
-			'tools/call'          => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
-			'resources/list'      => fn() => $this->context->resources_handler->list_resources( $request_id ),
-			'resources/read'      => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
-			'prompts/list'        => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
-			'prompts/get'         => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
-			'logging/setLevel'    => fn() => $this->context->system_handler->set_logging_level( $params, $request_id ),
-			'completion/complete' => fn() => $this->context->system_handler->complete( $request_id ),
-			'roots/list'          => fn() => $this->context->system_handler->list_roots( $request_id ),
+			'ping'           => fn() => $this->context->system_handler->ping( $request_id ),
+			'tools/list'     => fn() => $this->context->tools_handler->list_tools( $request_id ),
+			'tools/list/all' => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
+			'tools/call'     => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
+			'resources/list' => fn() => $this->context->resources_handler->list_resources( $request_id ),
+			'resources/read' => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
+			'prompts/list'   => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
+			'prompts/get'    => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
 		);
 
 		try {
@@ -120,15 +117,15 @@ class RequestRouter {
 					$result['_session_id'] = $new_session_id;
 				}
 
-				$tags   = array_merge( $common_tags, $metadata, array( 'status' => 'success' ) );
+				$tags = array_merge( $common_tags, $metadata, array( 'status' => 'success' ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 				return $result;
 			}
 
 			// Handlers should only return schema DTOs.
-			$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
-			$result           = $unexpected_error->toArray();
-			$tags             = array_merge( $common_tags, array( 'status' => 'error' ) );
+			$unexpected_error   = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
+			$result             = $unexpected_error->toArray();
+			$tags               = array_merge( $common_tags, array( 'status' => 'error' ) );
 			$tags['error_code'] = $unexpected_error->getError()->getCode();
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 

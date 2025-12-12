@@ -62,9 +62,6 @@ $handlers = [
     'prompts/list'        => PromptsHandler::list_prompts(),
     'prompts/get'         => PromptsHandler::get_prompt(),
     'ping'                => SystemHandler::ping(),
-    'logging/setLevel'    => SystemHandler::set_logging_level(),
-    'completion/complete' => SystemHandler::complete(),
-    'roots/list'          => SystemHandler::list_roots(),
 ];
 ```
 
