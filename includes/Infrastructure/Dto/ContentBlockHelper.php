@@ -43,7 +43,14 @@ final class ContentBlockHelper {
 	 * @return \WP\McpSchema\Common\Content\TextContent The created TextContent DTO.
 	 */
 	public static function text( string $text, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
-		return new TextContent( $text, $annotations, $_meta );
+		return TextContent::fromArray(
+			array(
+				'type'        => TextContent::TYPE,
+				'text'        => $text,
+				'annotations' => $annotations,
+				'_meta'       => $_meta,
+			)
+		);
 	}
 
 	/**
@@ -57,7 +64,15 @@ final class ContentBlockHelper {
 	 * @return \WP\McpSchema\Common\Content\ImageContent The created ImageContent DTO.
 	 */
 	public static function image( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): ImageContent {
-		return new ImageContent( $data, $mime_type, $annotations, $_meta );
+		return ImageContent::fromArray(
+			array(
+				'type'        => ImageContent::TYPE,
+				'data'        => $data,
+				'mimeType'    => $mime_type,
+				'annotations' => $annotations,
+				'_meta'       => $_meta,
+			)
+		);
 	}
 
 	/**
@@ -71,7 +86,15 @@ final class ContentBlockHelper {
 	 * @return \WP\McpSchema\Common\Content\AudioContent The created AudioContent DTO.
 	 */
 	public static function audio( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): AudioContent {
-		return new AudioContent( $data, $mime_type, $annotations, $_meta );
+		return AudioContent::fromArray(
+			array(
+				'type'        => AudioContent::TYPE,
+				'data'        => $data,
+				'mimeType'    => $mime_type,
+				'annotations' => $annotations,
+				'_meta'       => $_meta,
+			)
+		);
 	}
 
 	/**
@@ -94,9 +117,22 @@ final class ContentBlockHelper {
 		?Annotations $annotations = null,
 		?array $_meta = null
 	): EmbeddedResource {
-		$resource = new TextResourceContents( $uri, $text, $mime_type );
+		$resource = TextResourceContents::fromArray(
+			array(
+				'uri'      => $uri,
+				'text'     => $text,
+				'mimeType' => $mime_type,
+			)
+		);
 
-		return new EmbeddedResource( $resource, $annotations, $_meta );
+		return EmbeddedResource::fromArray(
+			array(
+				'type'        => EmbeddedResource::TYPE,
+				'resource'    => $resource,
+				'annotations' => $annotations,
+				'_meta'       => $_meta,
+			)
+		);
 	}
 
 	/**
@@ -119,9 +155,22 @@ final class ContentBlockHelper {
 		?Annotations $annotations = null,
 		?array $_meta = null
 	): EmbeddedResource {
-		$resource = new BlobResourceContents( $uri, $blob, $mime_type );
+		$resource = BlobResourceContents::fromArray(
+			array(
+				'uri'      => $uri,
+				'blob'     => $blob,
+				'mimeType' => $mime_type,
+			)
+		);
 
-		return new EmbeddedResource( $resource, $annotations, $_meta );
+		return EmbeddedResource::fromArray(
+			array(
+				'type'        => EmbeddedResource::TYPE,
+				'resource'    => $resource,
+				'annotations' => $annotations,
+				'_meta'       => $_meta,
+			)
+		);
 	}
 
 	/**
