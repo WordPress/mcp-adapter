@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
+use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -55,74 +57,46 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	protected array $annotations = array();
 
 	/**
-	 * Build and return the MCP prompt instance.
+	 * Build and return the Prompt DTO instance.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt The built prompt.
-	 * @throws \InvalidArgumentException If validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\Prompt The built prompt DTO.
 	 */
-	public function build(): McpPrompt {
+	public function build(): Prompt {
 		$this->configure();
 
-		// Create a synthetic ability name for the prompt
-		// Use empty string if name is empty (validation will catch it)
-		$synthetic_ability = empty( $this->name ) ? 'synthetic/' : 'synthetic/' . $this->name;
+		$argument_dtos = null;
+		if ( ! empty( $this->arguments ) ) {
+			$argument_dtos = array_map(
+				static function ( array $arg ): PromptArgument {
+					return PromptArgument::fromArray(
+						array(
+							'name'        => $arg['name'],
+							'title'       => $arg['title'] ?? null,
+							'description' => $arg['description'] ?? null,
+							'required'    => $arg['required'] ?? null,
+						)
+					);
+				},
+				$this->arguments
+			);
+		}
 
-		// Create a builder-based prompt that completely bypasses abilities
-		$builder = $this;
-		$prompt  = new class(
-			$synthetic_ability,
-			$this->name,
-			$this->title,
-			$this->description,
-			$this->arguments,
-			$this->annotations,
-			$builder
-		) extends McpPrompt {
-			private McpPromptBuilderInterface $builder;
+		// Builder prompts intentionally have no ability; they are executed via registry builder mapping.
+		$_meta = array(
+			'mcp_adapter' => array(
+				'builder' => true,
+			),
+		);
 
-			public function __construct(
-				string $ability,
-				string $name,
-				?string $title,
-				?string $description,
-				array $arguments,
-				array $annotations,
-				McpPromptBuilderInterface $builder
-			) {
-				parent::__construct( $ability, $name, $title, $description, $arguments, $annotations );
-				$this->builder = $builder;
-			}
-
-			// This prompt is builder-based and doesn't need abilities
-			public function is_builder_based(): bool {
-				return true;
-			}
-
-			// Direct execution through the builder
-			public function execute_direct( array $arguments ): array {
-				return $this->builder->handle( $arguments );
-			}
-
-			// Direct permission checking through the builder
-			public function check_permission_direct( array $arguments ): bool {
-				return $this->builder->has_permission( $arguments );
-			}
-
-			/**
-			 * Fallback for ability-based execution (should not be used).
-			 *
-			 * @return \WP_Error Always returns an error as builder-based prompts don't have abilities.
-			 */
-			public function get_ability(): \WP_Error {
-				// This should not be called for builder-based prompts
-				return new \WP_Error(
-					'builder_has_no_ability',
-					esc_html__( 'Builder-based prompts do not have an associated ability.', 'mcp-adapter' )
-				);
-			}
-		};
-
-		return $prompt;
+		return Prompt::fromArray(
+			array(
+				'name'        => $this->name,
+				'title'       => $this->title,
+				'description' => $this->description,
+				'arguments'   => $argument_dtos,
+				'_meta'       => $_meta,
+			)
+		);
 	}
 
 	/**
