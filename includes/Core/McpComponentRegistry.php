@@ -10,14 +10,14 @@ declare( strict_types=1 );
 namespace WP\MCP\Core;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
-use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
-use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
-use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
+use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * Registry for managing MCP server components (tools, resources, prompts).
@@ -26,23 +26,30 @@ class McpComponentRegistry {
 	/**
 	 * Tools registered to the server.
 	 *
-	 * @var array
+	 * @var array<string, \WP\McpSchema\Server\Tools\Tool>
 	 */
 	private array $tools = array();
 
 	/**
 	 * Resources registered to the server.
 	 *
-	 * @var array
+	 * @var array<string, \WP\McpSchema\Server\Resources\Resource>
 	 */
 	private array $resources = array();
 
 	/**
 	 * Prompts registered to the server.
 	 *
-	 * @var array
+	 * @var array<string, \WP\McpSchema\Server\Prompts\Prompt>
 	 */
 	private array $prompts = array();
+
+	/**
+	 * Prompt builder instances keyed by prompt name (builder-based prompts).
+	 *
+	 * @var array<string, \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface>
+	 */
+	private array $prompt_builders = array();
 
 	/**
 	 * MCP Server instance.
@@ -66,13 +73,6 @@ class McpComponentRegistry {
 	private McpObservabilityHandlerInterface $observability_handler;
 
 	/**
-	 * Whether MCP validation is enabled.
-	 *
-	 * @var bool
-	 */
-	private bool $mcp_validation_enabled;
-
-	/**
 	 * Whether to record component registration.
 	 *
 	 * @var bool
@@ -85,18 +85,15 @@ class McpComponentRegistry {
 	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler Error handler instance.
 	 * @param \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface $observability_handler Observability handler instance.
-	 * @param bool                                                                       $mcp_validation_enabled Whether MCP validation is enabled.
 	 */
 	public function __construct(
 		McpServer $mcp_server,
 		McpErrorHandlerInterface $error_handler,
-		McpObservabilityHandlerInterface $observability_handler,
-		bool $mcp_validation_enabled
+		McpObservabilityHandlerInterface $observability_handler
 	) {
-		$this->mcp_server             = $mcp_server;
-		$this->error_handler          = $error_handler;
-		$this->observability_handler  = $observability_handler;
-		$this->mcp_validation_enabled = $mcp_validation_enabled;
+		$this->mcp_server            = $mcp_server;
+		$this->error_handler         = $error_handler;
+		$this->observability_handler = $observability_handler;
 
 		// Allow filtering whether component registration events should be recorded.
 		// Default is false to avoid polluting observability logs during startup.
@@ -117,7 +114,7 @@ class McpComponentRegistry {
 			}
 
 			// Treat as ability name
-			$ability = wp_get_ability( $tool_item );
+			$ability = \wp_get_ability( $tool_item );
 
 			if ( ! $ability ) {
 				$this->error_handler->log( "WordPress ability '{$tool_item}' does not exist.", array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
@@ -138,7 +135,7 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			$tool = RegisterAbilityAsMcpTool::make( $ability, $this->mcp_server );
+			$tool = RegisterAbilityAsMcpTool::make( $ability );
 
 			// Check if tool creation returned an error
 			if ( is_wp_error( $tool ) ) {
@@ -160,34 +157,8 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			// If registry has validation enabled, validate the tool (bypassing server's validation flag)
-			if ( $this->mcp_validation_enabled ) {
-				$context_to_use    = "McpComponentRegistry::register_tools::{$tool_item}";
-				$validation_result = \WP\MCP\Domain\Tools\McpToolValidator::validate_tool_instance( $tool, $context_to_use );
-
-				// Check if validation returned an error
-				if ( is_wp_error( $validation_result ) ) {
-					$this->error_handler->log( $validation_result->get_error_message(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
-
-					// Track ability tool registration failure.
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'failed',
-								'component_type' => 'ability_tool',
-								'component_name' => $tool_item,
-								'error_code'     => $validation_result->get_error_code(),
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
-					continue;
-				}
-			}
-
 			// Add the processed tools to this server.
-			$this->tools[ $tool->get_name() ] = $tool;
+			$this->tools[ $tool->getName() ] = $tool;
 
 			// Track successful ability tool registration.
 			if ( ! $this->should_record_component_registration ) {
@@ -207,44 +178,15 @@ class McpComponentRegistry {
 	}
 
 	/**
-	 * Register a McpTool instance directly to the server.
+	 * Register a Tool DTO instance directly to the server.
 	 *
-	 * @param \WP\MCP\Domain\Tools\McpTool $tool The tool instance to register.
+	 * @param \WP\McpSchema\Server\Tools\Tool $tool The tool DTO to register.
 	 *
 	 * @return void
 	 */
-	public function add_tool( McpTool $tool ): void {
-		// Set the MCP server before validation (validation needs it to check if validation is enabled)
-		$tool->set_mcp_server( $this->mcp_server );
-
-		// Validate if validation is enabled (call validator directly to respect registry's validation flag)
-		if ( $this->mcp_validation_enabled ) {
-			$context_to_use    = "McpComponentRegistry::add_tool::{$tool->get_name()}";
-			$validation_result = \WP\MCP\Domain\Tools\McpToolValidator::validate_tool_instance( $tool, $context_to_use );
-
-			// Check if validation returned an error
-			if ( is_wp_error( $validation_result ) ) {
-				$this->error_handler->log( $validation_result->get_error_message(), array( "McpComponentRegistry::add_tool::{$tool->get_name()}" ) );
-
-				// Track tool registration failure
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'failed',
-							'component_type' => 'tool',
-							'component_name' => $tool->get_name(),
-							'error_code'     => $validation_result->get_error_code(),
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
-				return;
-			}
-		}
-
-		// Add the tool to this server
-		$this->tools[ $tool->get_name() ] = $tool;
+	public function add_tool( Tool $tool ): void {
+		// Add the tool to this server.
+		$this->tools[ $tool->getName() ] = $tool;
 
 		// Track successful tool registration
 		if ( ! $this->should_record_component_registration ) {
@@ -256,7 +198,7 @@ class McpComponentRegistry {
 			array(
 				'status'         => 'success',
 				'component_type' => 'tool',
-				'component_name' => $tool->get_name(),
+				'component_name' => $tool->getName(),
 				'server_id'      => $this->mcp_server->get_server_id(),
 			)
 		);
@@ -275,7 +217,7 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			$ability = wp_get_ability( $ability_name );
+			$ability = \wp_get_ability( $ability_name );
 
 			if ( ! $ability ) {
 				$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
@@ -296,7 +238,7 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->mcp_server );
+			$resource = RegisterAbilityAsMcpResource::make( $ability );
 
 			// Check if resource creation returned an error
 			if ( is_wp_error( $resource ) ) {
@@ -319,7 +261,7 @@ class McpComponentRegistry {
 			}
 
 			// Add the processed resources to this server.
-			$this->resources[ $resource->get_uri() ] = $resource;
+			$this->resources[ $resource->getUri() ] = $resource;
 
 			// Track successful resource registration.
 			if ( ! $this->should_record_component_registration ) {
@@ -376,37 +318,9 @@ class McpComponentRegistry {
 					continue;
 				}
 
-				// Set the MCP server after building
-				$prompt->set_mcp_server( $this->mcp_server );
-
-				// Validate if validation is enabled (call validator directly to respect registry's validation flag)
-				if ( $this->mcp_validation_enabled ) {
-					$context_to_use    = "McpPromptBuilder::{$prompt_item}";
-					$validation_result = \WP\MCP\Domain\Prompts\McpPromptValidator::validate_prompt_instance( $prompt, $context_to_use );
-
-					// Check if validation returned an error
-					if ( is_wp_error( $validation_result ) ) {
-						$this->error_handler->log( $validation_result->get_error_message(), array( "McpPromptBuilder::{$prompt_item}" ) );
-
-						// Track prompt registration failure
-						if ( $this->should_record_component_registration ) {
-							$this->observability_handler->record_event(
-								'mcp.component.registration',
-								array(
-									'status'         => 'failed',
-									'component_type' => 'prompt',
-									'component_name' => $prompt_item,
-									'error_code'     => $validation_result->get_error_code(),
-									'server_id'      => $this->mcp_server->get_server_id(),
-								)
-							);
-						}
-						continue;
-					}
-				}
-
-				// Add the prompt to this server
-				$this->prompts[ $prompt->get_name() ] = $prompt;
+				// Add the prompt DTO to this server and keep the builder for execution.
+				$this->prompts[ $prompt->getName() ]         = $prompt;
+				$this->prompt_builders[ $prompt->getName() ] = $builder;
 
 				// Track successful prompt registration
 				if ( $this->should_record_component_registration ) {
@@ -422,7 +336,7 @@ class McpComponentRegistry {
 				}
 			} else {
 				// Treat as ability name (legacy behavior)
-				$ability = wp_get_ability( $prompt_item );
+				$ability = \wp_get_ability( $prompt_item );
 
 				if ( ! $ability ) {
 					$this->error_handler->log( "WordPress ability '{$prompt_item}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
@@ -444,7 +358,7 @@ class McpComponentRegistry {
 				}
 
 				// Use RegisterMcpPrompt to handle all validation and processing.
-				$prompt = RegisterAbilityAsMcpPrompt::make( $ability, $this->mcp_server );
+				$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 
 				// Check if prompt creation returned an error
 				if ( is_wp_error( $prompt ) ) {
@@ -467,7 +381,7 @@ class McpComponentRegistry {
 				}
 
 				// Add the processed prompts to this server.
-				$this->prompts[ $prompt->get_name() ] = $prompt;
+				$this->prompts[ $prompt->getName() ] = $prompt;
 
 				// Track successful prompt registration.
 				if ( $this->should_record_component_registration ) {
@@ -488,7 +402,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all tools registered to the server.
 	 *
-	 * @return \WP\MCP\Domain\Tools\McpTool[]
+	 * @return array<string, \WP\McpSchema\Server\Tools\Tool>
 	 */
 	public function get_tools(): array {
 		return $this->tools;
@@ -497,7 +411,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all resources registered to the server.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource[]
+	 * @return array<string, \WP\McpSchema\Server\Resources\Resource>
 	 */
 	public function get_resources(): array {
 		return $this->resources;
@@ -506,7 +420,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all prompts registered to the server.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt[]
+	 * @return array<string, \WP\McpSchema\Server\Prompts\Prompt>
 	 */
 	public function get_prompts(): array {
 		return $this->prompts;
@@ -517,9 +431,9 @@ class McpComponentRegistry {
 	 *
 	 * @param string $tool_name Tool name.
 	 *
-	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 * @return \WP\McpSchema\Server\Tools\Tool|null
 	 */
-	public function get_tool( string $tool_name ): ?McpTool {
+	public function get_tool( string $tool_name ): ?Tool {
 		return $this->tools[ $tool_name ] ?? null;
 	}
 
@@ -528,9 +442,9 @@ class McpComponentRegistry {
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 * @return \WP\McpSchema\Server\Resources\Resource|null
 	 */
-	public function get_resource( string $resource_uri ): ?McpResource {
+	public function get_resource( string $resource_uri ): ?Resource {
 		return $this->resources[ $resource_uri ] ?? null;
 	}
 
@@ -539,9 +453,20 @@ class McpComponentRegistry {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 * @return \WP\McpSchema\Server\Prompts\Prompt|null
 	 */
-	public function get_prompt( string $prompt_name ): ?McpPrompt {
+	public function get_prompt( string $prompt_name ): ?Prompt {
 		return $this->prompts[ $prompt_name ] ?? null;
+	}
+
+	/**
+	 * Get a prompt builder instance by prompt name (builder-based prompts).
+	 *
+	 * @param string $prompt_name Prompt name.
+	 *
+	 * @return \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|null
+	 */
+	public function get_prompt_builder( string $prompt_name ): ?McpPromptBuilderInterface {
+		return $this->prompt_builders[ $prompt_name ] ?? null;
 	}
 }
