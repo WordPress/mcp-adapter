@@ -113,9 +113,11 @@ class ToolsHandler {
 			// Implement a tool calling logic here.
 			$result = $this->handle_tool_call( $request_params, $request_id );
 
-			// Check if the result contains an error.
-			// Distinguish between protocol errors (JSON-RPC format) and tool execution errors (isError format).
-			if ( isset( $result['error'] ) ) {
+			// Check if the result contains a *reserved* error.
+			// We only treat it as a tools/call failure when it comes from our internal error paths
+			// (which always set _metadata.failure_reason). This avoids masking legitimate tool outputs
+			// that include a top‑level "error" field as part of their schema (e.g. ExecuteAbilityAbility).
+			if ( isset( $result['error'] ) && isset( $result['_metadata']['failure_reason'] ) ) {
 				$failure_reason = $result['_metadata']['failure_reason'] ?? '';
 
 				// Protocol errors (keep JSON-RPC error format):
