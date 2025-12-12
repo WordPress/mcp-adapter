@@ -9,14 +9,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
-use WP\MCP\Domain\Prompts\McpPrompt;
-use WP\MCP\Domain\Resources\McpResource;
-use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -200,8 +200,7 @@ class McpServer {
 		$this->component_registry = new McpComponentRegistry(
 			$this,
 			$this->error_handler,
-			$this->observability_handler,
-			$this->mcp_validation_enabled
+			$this->observability_handler
 		);
 
 		// Initialize transport factory
@@ -319,7 +318,7 @@ class McpServer {
 	/**
 	 * Get all tools registered to this server.
 	 *
-	 * @return array
+	 * @return array<string, \WP\McpSchema\Server\Tools\Tool>
 	 */
 	public function get_tools(): array {
 		return $this->component_registry->get_tools();
@@ -328,7 +327,7 @@ class McpServer {
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource[]
+	 * @return array<string, \WP\McpSchema\Server\Resources\Resource>
 	 */
 	public function get_resources(): array {
 		return $this->component_registry->get_resources();
@@ -337,7 +336,7 @@ class McpServer {
 	/**
 	 * Get all prompts registered to this server.
 	 *
-	 * @return array
+	 * @return array<string, \WP\McpSchema\Server\Prompts\Prompt>
 	 */
 	public function get_prompts(): array {
 		return $this->component_registry->get_prompts();
@@ -348,9 +347,9 @@ class McpServer {
 	 *
 	 * @param string $tool_name Tool name.
 	 *
-	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 * @return \WP\McpSchema\Server\Tools\Tool|null
 	 */
-	public function get_tool( string $tool_name ): ?McpTool {
+	public function get_tool( string $tool_name ): ?Tool {
 		return $this->component_registry->get_tool( $tool_name );
 	}
 
@@ -359,9 +358,9 @@ class McpServer {
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 * @return \WP\McpSchema\Server\Resources\Resource|null
 	 */
-	public function get_resource( string $resource_uri ): ?McpResource {
+	public function get_resource( string $resource_uri ): ?Resource {
 		return $this->component_registry->get_resource( $resource_uri );
 	}
 
@@ -370,10 +369,21 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 * @return \WP\McpSchema\Server\Prompts\Prompt|null
 	 */
-	public function get_prompt( string $prompt_name ): ?McpPrompt {
+	public function get_prompt( string $prompt_name ): ?Prompt {
 		return $this->component_registry->get_prompt( $prompt_name );
+	}
+
+	/**
+	 * Get a prompt builder instance by prompt name (builder-based prompts).
+	 *
+	 * @param string $prompt_name Prompt name.
+	 *
+	 * @return \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|null
+	 */
+	public function get_prompt_builder( string $prompt_name ): ?\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface {
+		return $this->component_registry->get_prompt_builder( $prompt_name );
 	}
 
 	/**
