@@ -182,6 +182,60 @@ final class DummyAbility {
 			)
 		);
 
+		// Tool ability: returns an EmbeddedResource-style payload (text).
+		wp_register_ability(
+			'test/embedded-text-resource',
+			array(
+				'label'               => 'Embedded Text Resource Tool',
+				'description'         => 'Returns an embedded text resource payload',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array(
+						'type'     => 'resource',
+						'uri'      => 'WordPress://local/tool-embedded-text',
+						'text'     => 'hello from embedded resource',
+						'mimeType' => 'text/plain',
+					);
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
+				),
+			)
+		);
+
+		// Tool ability: returns an EmbeddedResource-style payload (blob).
+		wp_register_ability(
+			'test/embedded-blob-resource',
+			array(
+				'label'               => 'Embedded Blob Resource Tool',
+				'description'         => 'Returns an embedded blob resource payload',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array(
+						'type'     => 'resource',
+						'uri'      => 'WordPress://local/tool-embedded-blob',
+						'blob'     => base64_encode( 'blob-bytes' ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+						'mimeType' => 'application/octet-stream',
+					);
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
+				),
+			)
+		);
+
 		// Resource ability with URI in meta
 		wp_register_ability(
 			'test/resource',
