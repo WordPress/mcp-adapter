@@ -117,7 +117,7 @@ final class ExecuteAbilityAbility {
 		// Check if the user has permission to execute the target ability.
 		// Preserve empty objects {} instead of converting them to null. Some abilities
 		// require an object (type: object) and will fail if passed null.
-		$parameters        = array_key_exists( 'parameters', $input ) ? $input['parameters'] : null;
+		$parameters = array_key_exists( 'parameters', $input ) ? $input['parameters'] : null;
 		$permission_result = $ability->check_permissions( $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
@@ -164,7 +164,7 @@ final class ExecuteAbilityAbility {
 	public static function execute( $input = array() ): array {
 		$ability_name = $input['ability_name'] ?? '';
 		// Same logic as in check_permission: preserve {} when provided.
-		$parameters   = array_key_exists( 'parameters', $input ) ? $input['parameters'] : null;
+		$parameters = array_key_exists( 'parameters', $input ) ? $input['parameters'] : null;
 
 		if ( empty( $ability_name ) ) {
 			return array(

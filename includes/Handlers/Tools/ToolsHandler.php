@@ -116,7 +116,7 @@ class ToolsHandler {
 			// Check if the result contains a *reserved* error.
 			// We only treat it as a tools/call failure when it comes from our internal error paths
 			// (which always set _metadata.failure_reason). This avoids masking legitimate tool outputs
-			// that include a top‑level "error" field as part of their schema (e.g. ExecuteAbilityAbility).
+			// that include a top-level "error" field as part of their schema (e.g. ExecuteAbilityAbility).
 			if ( isset( $result['error'] ) && isset( $result['_metadata']['failure_reason'] ) ) {
 				$failure_reason = $result['_metadata']['failure_reason'] ?? '';
 
