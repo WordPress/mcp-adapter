@@ -236,6 +236,45 @@ final class DummyAbility {
 			)
 		);
 
+		// Tool ability: returns nested internal _meta to verify it is never exposed to clients.
+		wp_register_ability(
+			'test/meta-leak',
+			array(
+				'label'               => 'Meta Leak Tool',
+				'description'         => 'Returns a payload containing internal adapter metadata for redaction tests',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array(
+						'ok'     => true,
+						'_meta'  => array(
+							'mcp_adapter' => array(
+								'should_not' => 'leak',
+							),
+							'keep'        => 'top',
+						),
+						'nested' => array(
+							'value' => 123,
+							'_meta' => array(
+								'mcp_adapter' => array(
+									'should_not' => 'leak',
+								),
+								'keep'        => 'nested',
+							),
+						),
+					);
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
+				),
+			)
+		);
+
 		// Resource ability with URI in meta
 		wp_register_ability(
 			'test/resource',

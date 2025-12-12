@@ -52,7 +52,7 @@ final class RequestRouterTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
-			array( 'test/always-allowed' ),
+			array( 'test/always-allowed', 'test/meta-leak' ),
 			array( 'test/resource' ),
 			array( 'test/prompt' )
 		);
@@ -164,6 +164,25 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		// Should either have content or error
 		$this->assertTrue( isset( $result['content'] ) || isset( $result['error'] ) );
+	}
+
+	public function test_route_request_tools_call_does_not_leak_internal_meta_in_text_content(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-meta-leak',
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertIsArray( $result['content'] );
+		$this->assertNotEmpty( $result['content'] );
+		$this->assertSame( 'text', $result['content'][0]['type'] );
+		$this->assertIsString( $result['content'][0]['text'] );
+		$this->assertStringNotContainsString( 'mcp_adapter', $result['content'][0]['text'] );
 	}
 
 	public function test_route_request_resources_list(): void {

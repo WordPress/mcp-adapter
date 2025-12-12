@@ -13,6 +13,7 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Tools\ToolMetadataHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
+use WP\MCP\Infrastructure\Dto\MetaStripper;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
@@ -148,13 +149,9 @@ class ToolsHandler {
 			}
 
 			// Successful tool execution - build CallToolResult DTO.
-			// Remove internal adapter metadata before building response.
-			if ( isset( $result['_meta'] ) && is_array( $result['_meta'] ) && isset( $result['_meta']['mcp_adapter'] ) ) {
-				unset( $result['_meta']['mcp_adapter'] );
-				if ( empty( $result['_meta'] ) ) {
-					unset( $result['_meta'] );
-				}
-			}
+			// Internal adapter metadata (`_meta.mcp_adapter`) MUST NOT leak to clients, including inside JSON strings.
+			// Strip it here (pre-serialization) so both structuredContent and JSON-encoded text content are clean.
+			$result = MetaStripper::strip_array( $result );
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
