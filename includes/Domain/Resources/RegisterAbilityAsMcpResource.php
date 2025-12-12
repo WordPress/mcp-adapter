@@ -9,8 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
+use WP\McpSchema\Server\Resources\Resource;
 use WP_Ability;
 
 /**
@@ -35,22 +35,14 @@ class RegisterAbilityAsMcpResource {
 	private WP_Ability $ability;
 
 	/**
-	 * The MCP server.
-	 *
-	 * @var \WP\MCP\Core\McpServer
-	 */
-	private McpServer $mcp_server;
-
-	/**
 	 * Make a new instance of the class.
 	 *
-	 * @param \WP_Ability            $ability    The ability.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
+	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource|\WP_Error Returns resource instance or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Resources\Resource|\WP_Error Returns Resource DTO or WP_Error if validation fails.
 	 */
-	public static function make( WP_Ability $ability, McpServer $mcp_server ) {
-		$resource = new self( $ability, $mcp_server );
+	public static function make( WP_Ability $ability ) {
+		$resource = new self( $ability );
 
 		return $resource->get_resource();
 	}
@@ -58,12 +50,10 @@ class RegisterAbilityAsMcpResource {
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP_Ability            $ability    The ability.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
+	 * @param \WP_Ability $ability The ability.
 	 */
-	private function __construct( WP_Ability $ability, McpServer $mcp_server ) {
-		$this->mcp_server = $mcp_server;
-		$this->ability    = $ability;
+	private function __construct( WP_Ability $ability ) {
+		$this->ability = $ability;
 	}
 
 	/**
@@ -174,9 +164,10 @@ class RegisterAbilityAsMcpResource {
 
 	/**
 	 * Get the MCP resource instance.
-	 * Uses the centralized McpResourceValidator for consistent validation.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource|\WP_Error Returns the MCP resource instance or WP_Error if validation fails.
+	 * Resource schema validity is enforced by the php-mcp-schema DTO constructor.
+	 *
+	 * @return \WP\McpSchema\Server\Resources\Resource|\WP_Error Returns the Resource DTO or WP_Error if validation fails.
 	 */
 	private function get_resource() {
 		$data = $this->get_data();
@@ -184,6 +175,19 @@ class RegisterAbilityAsMcpResource {
 			return $data;
 		}
 
-		return McpResource::from_array( $data, $this->mcp_server );
+		$data['_meta'] = array(
+			'mcp_adapter' => array(
+				'ability' => $this->ability->get_name(),
+			),
+		);
+
+		try {
+			return Resource::fromArray( $data );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_resource_schema_invalid',
+				$e->getMessage()
+			);
+		}
 	}
 }
