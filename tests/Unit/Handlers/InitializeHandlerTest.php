@@ -74,6 +74,11 @@ final class InitializeHandlerTest extends TestCase {
 		$this->assertSame( 'Test Server', $array['serverInfo']['name'] );
 		$this->assertSame( '1.0.0', $array['serverInfo']['version'] );
 		$this->assertIsArray( $array['capabilities'] );
+		$this->assertArrayHasKey( 'tools', $array['capabilities'] );
+		$this->assertArrayHasKey( 'resources', $array['capabilities'] );
+		$this->assertArrayHasKey( 'prompts', $array['capabilities'] );
+		$this->assertArrayNotHasKey( 'logging', $array['capabilities'] );
+		$this->assertArrayNotHasKey( 'completions', $array['capabilities'] );
 		$this->assertSame( 'Desc', $array['instructions'] );
 	}
 }

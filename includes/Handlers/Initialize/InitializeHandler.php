@@ -50,14 +50,12 @@ class InitializeHandler {
 			)
 		);
 
-		// Empty arrays indicate support for the capability without additional options.
+		// Capabilities should only be advertised if they are implemented end-to-end.
 		$capabilities = ServerCapabilities::fromArray(
 			array(
-				'logging'     => new \stdClass(),
-				'completions' => new \stdClass(),
-				'prompts'     => array(),
-				'resources'   => array(),
-				'tools'       => array(),
+				'prompts'   => array(),
+				'resources' => array(),
+				'tools'     => array(),
 			)
 		);
 
