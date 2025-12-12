@@ -7,8 +7,9 @@
 
 namespace WP\MCP\Domain\Prompts;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
+use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\PromptArgument;
 use WP_Ability;
 
 /**
@@ -49,22 +50,14 @@ class RegisterAbilityAsMcpPrompt {
 	private WP_Ability $ability;
 
 	/**
-	 * The MCP server.
-	 *
-	 * @var \WP\MCP\Core\McpServer
-	 */
-	private McpServer $mcp_server;
-
-	/**
 	 * Make a new instance of the class.
 	 *
-	 * @param \WP_Ability            $ability    The ability.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
+	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt|\WP_Error Returns prompt instance or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
 	 */
-	public static function make( WP_Ability $ability, McpServer $mcp_server ) {
-		$prompt = new self( $ability, $mcp_server );
+	public static function make( WP_Ability $ability ) {
+		$prompt = new self( $ability );
 
 		return $prompt->get_prompt();
 	}
@@ -72,12 +65,10 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP_Ability            $ability    The ability.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
+	 * @param \WP_Ability $ability The ability.
 	 */
-	private function __construct( WP_Ability $ability, McpServer $mcp_server ) {
-		$this->mcp_server = $mcp_server;
-		$this->ability    = $ability;
+	private function __construct( WP_Ability $ability ) {
+		$this->ability = $ability;
 	}
 
 	/**
@@ -88,8 +79,7 @@ class RegisterAbilityAsMcpPrompt {
 	private function get_data(): array {
 		$ability_name = trim( $this->ability->get_name() );
 		$prompt_data  = array(
-			'ability' => $ability_name,
-			'name'    => str_replace( '/', '-', $ability_name ),
+			'name' => str_replace( '/', '-', $ability_name ),
 		);
 
 		// Add optional title from ability label
@@ -144,7 +134,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * ]
 	 *
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
-	 * @return array<int,array<string,mixed>> MCP-formatted arguments array.
+	 * @return array<int, \WP\McpSchema\Server\Prompts\PromptArgument> Argument DTO list.
 	 */
 	private function convert_input_schema_to_arguments( array $input_schema ): array {
 		$arguments = array();
@@ -160,23 +150,20 @@ class RegisterAbilityAsMcpPrompt {
 			$required_fields = $input_schema['required'];
 		}
 
-		// Convert each property to an MCP argument
+		// Convert each property to an MCP argument.
 		foreach ( $input_schema['properties'] as $property_name => $property_schema ) {
 			if ( ! is_array( $property_schema ) ) {
 				continue;
 			}
 
-			$argument = array(
-				'name'     => $property_name,
-				'required' => in_array( $property_name, $required_fields, true ),
+			$arguments[] = PromptArgument::fromArray(
+				array(
+					'name'        => $property_name,
+					'title'       => null,
+					'description' => ! empty( $property_schema['description'] ) ? (string) $property_schema['description'] : null,
+					'required'    => in_array( $property_name, $required_fields, true ),
+				)
 			);
-
-			// Add description if available
-			if ( ! empty( $property_schema['description'] ) ) {
-				$argument['description'] = $property_schema['description'];
-			}
-
-			$arguments[] = $argument;
 		}
 
 		return $arguments;
@@ -185,9 +172,23 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt instance.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt|\WP_Error MCP prompt instance or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 */
 	private function get_prompt() {
-		return McpPrompt::from_array( $this->get_data(), $this->mcp_server );
+		$data          = $this->get_data();
+		$data['_meta'] = array(
+			'mcp_adapter' => array(
+				'ability' => $this->ability->get_name(),
+			),
+		);
+
+		try {
+			return Prompt::fromArray( $data );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_prompt_schema_invalid',
+				$e->getMessage()
+			);
+		}
 	}
 }
