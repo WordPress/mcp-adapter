@@ -9,9 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\SchemaTransformer;
+use WP\McpSchema\Server\Tools\Tool;
 use WP_Ability;
 
 /**
@@ -30,22 +30,14 @@ class RegisterAbilityAsMcpTool {
 	private WP_Ability $ability;
 
 	/**
-	 * The MCP server.
-	 *
-	 * @var \WP\MCP\Core\McpServer
-	 */
-	private McpServer $mcp_server;
-
-	/**
 	 * Make a new instance of the class.
 	 *
-	 * @param \WP_Ability            $ability    The ability.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
+	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\MCP\Domain\Tools\McpTool|\WP_Error Returns a new instance of McpTool or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Tools\Tool|\WP_Error Returns a Tool DTO or WP_Error if validation fails.
 	 */
-	public static function make( WP_Ability $ability, McpServer $mcp_server ) {
-		$tool = new self( $ability, $mcp_server );
+	public static function make( WP_Ability $ability ) {
+		$tool = new self( $ability );
 
 		return $tool->get_tool();
 	}
@@ -53,12 +45,10 @@ class RegisterAbilityAsMcpTool {
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP_Ability            $ability    The ability.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server.
+	 * @param \WP_Ability $ability The ability.
 	 */
-	private function __construct( WP_Ability $ability, McpServer $mcp_server ) {
-		$this->mcp_server = $mcp_server;
-		$this->ability    = $ability;
+	private function __construct( WP_Ability $ability ) {
+		$this->ability = $ability;
 	}
 
 	/**
@@ -73,7 +63,6 @@ class RegisterAbilityAsMcpTool {
 		);
 
 		$tool_data = array(
-			'ability'     => $this->ability->get_name(),
 			'name'        => str_replace( '/', '-', trim( $this->ability->get_name() ) ),
 			'description' => trim( $this->ability->get_description() ),
 			'inputSchema' => $input_transform['schema'],
@@ -112,29 +101,71 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		// Store transformation metadata as internal metadata (stripped before responding to clients).
-		if ( $input_transform['was_transformed'] || ( $output_transform && $output_transform['was_transformed'] ) ) {
-			$tool_data['_metadata'] = array();
+		$tool_data['_meta'] = array(
+			'mcp_adapter' => array(
+				'ability'                   => $this->ability->get_name(),
+				'input_schema_transformed'  => (bool) ( $input_transform['was_transformed'] ?? false ),
+				'input_schema_wrapper'      => $input_transform['wrapper_property'] ?? 'input',
+				'output_schema_transformed' => (bool) ( $output_transform['was_transformed'] ?? false ),
+				'output_schema_wrapper'     => $output_transform['wrapper_property'] ?? 'result',
+			),
+		);
 
-			if ( $input_transform['was_transformed'] ) {
-				$tool_data['_metadata']['_input_schema_transformed'] = true;
-				$tool_data['_metadata']['_input_schema_wrapper']     = $input_transform['wrapper_property'] ?? 'input';
-			}
+		// If no transformations happened, avoid storing unnecessary metadata.
+		if ( ! $tool_data['_meta']['mcp_adapter']['input_schema_transformed'] && ! $tool_data['_meta']['mcp_adapter']['output_schema_transformed'] ) {
+			unset( $tool_data['_meta']['mcp_adapter']['input_schema_transformed'] );
+			unset( $tool_data['_meta']['mcp_adapter']['input_schema_wrapper'] );
+			unset( $tool_data['_meta']['mcp_adapter']['output_schema_transformed'] );
+			unset( $tool_data['_meta']['mcp_adapter']['output_schema_wrapper'] );
+		}
 
-			if ( $output_transform && $output_transform['was_transformed'] ) {
-				$tool_data['_metadata']['_output_schema_transformed'] = true;
-				$tool_data['_metadata']['_output_schema_wrapper']     = $output_transform['wrapper_property'] ?? 'result';
-			}
+		// Prepare schema arrays for php-mcp-schema DTO expectations (properties map values must be objects).
+		$tool_data['inputSchema'] = $this->prepare_schema_for_dto( $tool_data['inputSchema'] );
+		if ( isset( $tool_data['outputSchema'] ) && is_array( $tool_data['outputSchema'] ) ) {
+			$tool_data['outputSchema'] = $this->prepare_schema_for_dto( $tool_data['outputSchema'] );
 		}
 
 		return $tool_data;
 	}
 
 	/**
-	 * Get the MCP tool instance.
+	 * Get the MCP Tool DTO instance.
 	 *
-	 * @return \WP\MCP\Domain\Tools\McpTool|\WP_Error The validated MCP tool instance or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Tools\Tool|\WP_Error The Tool DTO instance or WP_Error if validation fails.
 	 */
 	private function get_tool() {
-		return McpTool::from_array( $this->get_data(), $this->mcp_server );
+		try {
+			return Tool::fromArray( $this->get_data() );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_tool_schema_invalid',
+				$e->getMessage()
+			);
+		}
+	}
+
+	/**
+	 * Prepare a JSON Schema array for DTO conversion.
+	 *
+	 * The php-mcp-schema library expects JSON Schema `properties` values to be objects, not arrays.
+	 * This method recursively converts nested schema arrays into stdClass objects where needed.
+	 *
+	 * @param array $schema The JSON schema array.
+	 *
+	 * @return array The schema with properties values converted to objects.
+	 */
+	private function prepare_schema_for_dto( array $schema ): array {
+		if ( isset( $schema['properties'] ) && is_array( $schema['properties'] ) ) {
+			$converted_properties = array();
+			foreach ( $schema['properties'] as $prop_name => $prop_schema ) {
+				if ( is_array( $prop_schema ) ) {
+					$prop_schema = $this->prepare_schema_for_dto( $prop_schema );
+				}
+				$converted_properties[ $prop_name ] = (object) $prop_schema;
+			}
+			$schema['properties'] = $converted_properties;
+		}
+
+		return $schema;
 	}
 }
