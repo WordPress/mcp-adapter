@@ -49,6 +49,7 @@ class MyTransport implements McpRestTransportInterface {
     
     // Provides get_transport_name() method
 }
+```
 
 ## Creating Custom Transports
 
