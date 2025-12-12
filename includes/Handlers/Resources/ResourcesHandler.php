@@ -10,11 +10,10 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Resources\McpResource;
+use WP\MCP\Domain\Resources\ResourceMetadataHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-// phpcs:ignore SlevomatCodingStandard.Namespaces.UnusedUses.UnusedUse -- Used in @return PHPDoc
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\TextResourceContents;
 use WP\McpSchema\Server\Resources\ListResourcesResult;
 use WP\McpSchema\Server\Resources\ReadResourceResult;
@@ -46,27 +45,21 @@ class ResourcesHandler {
 	 * Handles the resources/list request.
 	 *
 	 * Returns a ListResourcesResult DTO containing all registered resources.
-	 * The internal _metadata is no longer included as it's stripped by the RequestRouter
-	 * and DTOs handle MCP-spec _meta separately.
+	 * Internal adapter metadata is stored under `_meta['mcp_adapter']` and stripped at the
+	 * transport boundary (RequestRouter) before returning to MCP clients.
 	 *
-	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Resources\ListResourcesResult Response with resources list.
 	 */
-	public function list_resources( int $request_id = 0 ): ListResourcesResult {
-		$resources = $this->mcp->get_resources();
+	public function list_resources( $request_id = 0 ): ListResourcesResult {
+		$resources = array_values( $this->mcp->get_resources() );
 
-		// Convert each McpResource domain object to a php-mcp-schema Resource DTO.
-		// Use array_values() to ensure numeric keys for MCP protocol compliance.
-		// The internal resources array uses URIs as keys for fast lookup.
-		$resource_dtos = array_values(
-			array_map(
-				static fn( McpResource $resource ) => $resource->to_schema_dto(),
-				$resources
+		return ListResourcesResult::fromArray(
+			array(
+				'resources' => $resources,
 			)
 		);
-
-		return new ListResourcesResult( $resource_dtos );
 	}
 
 	/**
@@ -79,11 +72,11 @@ class ResourcesHandler {
 	 * reported with isError=true. Resource reads either succeed or fail at the protocol level.
 	 *
 	 * @param array $params     Request parameters.
-	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Resources\ReadResourceResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
-	public function read_resource( array $params, int $request_id = 0 ) {
+	public function read_resource( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -99,31 +92,21 @@ class ResourcesHandler {
 			return McpErrorFactory::resource_not_found( $request_id, $uri );
 		}
 
-		/**
-		 * Get the ability
-		 *
-		 * @var \WP_Ability|\WP_Error $ability
-		 */
-		$ability = $resource->get_ability();
+		$ability_name = ResourceMetadataHelper::get_ability_name( $resource );
+		if ( null === $ability_name ) {
+			return McpErrorFactory::internal_error( $request_id, 'Resource is missing ability metadata.' );
+		}
 
-		// Check if getting the ability returned an error.
-		if ( is_wp_error( $ability ) ) {
-			$this->mcp->error_handler->log(
-				'Failed to get ability for resource',
-				array(
-					'resource_uri'  => $uri,
-					'error_message' => $ability->get_error_message(),
-				)
-			);
-
-			return McpErrorFactory::internal_error( $request_id, $ability->get_error_message() );
+		$ability = \wp_get_ability( $ability_name );
+		if ( ! $ability ) {
+			return McpErrorFactory::internal_error( $request_id, "Ability '{$ability_name}' not found for resource." );
 		}
 
 		try {
 			$has_permission = $ability->check_permissions();
 			if ( true !== $has_permission ) {
 				// Extract detailed error message if WP_Error was returned.
-				$error_message = 'Access denied for resource: ' . $resource->get_name();
+				$error_message = 'Access denied for resource: ' . $resource->getName();
 
 				if ( is_wp_error( $has_permission ) ) {
 					$error_message = $has_permission->get_error_message();
@@ -154,7 +137,11 @@ class ResourcesHandler {
 			// Otherwise, wrap the result as text content.
 			$content_dtos = $this->convert_contents_to_dtos( $contents, $uri );
 
-			return new ReadResourceResult( $content_dtos );
+			return ReadResourceResult::fromArray(
+				array(
+					'contents' => $content_dtos,
+				)
+			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->error_handler->log(
 				'Error reading resource',
@@ -197,7 +184,14 @@ class ResourcesHandler {
 		// Fallback: wrap as a single text content item.
 		$text = is_string( $contents ) ? $contents : wp_json_encode( $contents );
 
-		return array( new TextResourceContents( $uri, (string) $text ) );
+		return array(
+			TextResourceContents::fromArray(
+				array(
+					'uri'  => $uri,
+					'text' => (string) $text,
+				)
+			),
+		);
 	}
 
 	/**
@@ -214,16 +208,24 @@ class ResourcesHandler {
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {
-			return new \WP\McpSchema\Common\Protocol\BlobResourceContents(
-				$item_uri,
-				$item['blob'],
-				$mime_type
+			return BlobResourceContents::fromArray(
+				array(
+					'uri'      => $item_uri,
+					'blob'     => (string) $item['blob'],
+					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+				)
 			);
 		}
 
 		// Default to TextResourceContents.
 		$text = $item['text'] ?? '';
 
-		return new TextResourceContents( $item_uri, $text, $mime_type );
+		return TextResourceContents::fromArray(
+			array(
+				'uri'      => $item_uri,
+				'text'     => (string) $text,
+				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+			)
+		);
 	}
 }

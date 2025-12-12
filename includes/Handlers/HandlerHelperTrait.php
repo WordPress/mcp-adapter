@@ -35,13 +35,13 @@ trait HandlerHelperTrait {
 	 * This helper ensures all error responses follow the same format and
 	 * properly extract the error field from McpErrorFactory responses.
 	 *
-	 * @param int    $code       Error code.
-	 * @param string $message    Error message.
-	 * @param int    $request_id Optional. Request ID for JSON-RPC. Default 0.
+	 * @param int             $code       Error code.
+	 * @param string          $message    Error message.
+	 * @param string|int|null $request_id Optional. Request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Error response array with 'error' key.
 	 */
-	protected function create_error_response( int $code, string $message, int $request_id = 0 ): array {
+	protected function create_error_response( int $code, string $message, $request_id = 0 ): array {
 		return array(
 			'id'    => $request_id,
 			'error' => array(
@@ -75,11 +75,11 @@ trait HandlerHelperTrait {
 	 * Creates missing parameter error response.
 	 *
 	 * @param string $param_name Missing parameter name.
-	 * @param int    $request_id Optional. Request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. Request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Error response array.
 	 */
-	protected function missing_parameter_error( string $param_name, int $request_id = 0 ): array {
+	protected function missing_parameter_error( string $param_name, $request_id = 0 ): array {
 		return array( 'error' => McpErrorFactory::missing_parameter( $request_id, $param_name )->getError()->toArray() );
 	}
 
@@ -87,11 +87,11 @@ trait HandlerHelperTrait {
 	 * Creates permission denied error response.
 	 *
 	 * @param string $denied_resource Resource that was denied.
-	 * @param int    $request_id      Optional. Request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. Request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Error response array.
 	 */
-	protected function permission_denied_error( string $denied_resource, int $request_id = 0 ): array {
+	protected function permission_denied_error( string $denied_resource, $request_id = 0 ): array {
 		return array( 'error' => McpErrorFactory::permission_denied( $request_id, 'Access denied for: ' . $denied_resource )->getError()->toArray() );
 	}
 
@@ -99,11 +99,11 @@ trait HandlerHelperTrait {
 	 * Creates internal error response.
 	 *
 	 * @param string $message    Error message.
-	 * @param int    $request_id Optional. Request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. Request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Error response array.
 	 */
-	protected function internal_error( string $message, int $request_id = 0 ): array {
+	protected function internal_error( string $message, $request_id = 0 ): array {
 		return array( 'error' => McpErrorFactory::internal_error( $request_id, $message )->getError()->toArray() );
 	}
 

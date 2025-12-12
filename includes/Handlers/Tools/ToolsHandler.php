@@ -10,12 +10,10 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Domain\Tools\ToolMetadataHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-// phpcs:ignore SlevomatCodingStandard.Namespaces.UnusedUses.UnusedUse -- Used in @return PHPDoc
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
 
@@ -45,27 +43,21 @@ class ToolsHandler {
 	 * Handles the tools/list request.
 	 *
 	 * Returns a ListToolsResult DTO containing all registered tools.
-	 * The internal _metadata is no longer included as it's stripped by the RequestRouter
-	 * and DTOs handle MCP-spec _meta separately.
+	 * Internal adapter metadata is stored under `_meta['mcp_adapter']` and stripped at the
+	 * transport boundary (RequestRouter) before returning to MCP clients.
 	 *
-	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with tools list.
 	 */
-	public function list_tools( int $request_id = 0 ): ListToolsResult {
-		$tools = $this->mcp->get_tools();
+	public function list_tools( $request_id = 0 ): ListToolsResult {
+		$tools = array_values( $this->mcp->get_tools() );
 
-		// Convert each McpTool domain object to a php-mcp-schema Tool DTO.
-		// Use array_values() to ensure numeric keys for MCP protocol compliance.
-		// The internal tools array uses tool names as keys for fast lookup.
-		$tool_dtos = array_values(
-			array_map(
-				static fn( McpTool $tool ) => $tool->to_schema_dto(),
-				$tools
+		return ListToolsResult::fromArray(
+			array(
+				'tools' => $tools,
 			)
 		);
-
-		return new ListToolsResult( $tool_dtos );
 	}
 
 	/**
@@ -78,11 +70,11 @@ class ToolsHandler {
 	 * support arbitrary fields, this information would need to be communicated via
 	 * _meta if needed. For now, we return the standard ListToolsResult.
 	 *
-	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with all tools.
 	 */
-	public function list_all_tools( int $request_id = 0 ): ListToolsResult {
+	public function list_all_tools( $request_id = 0 ): ListToolsResult {
 		// Return all tools - availability checking can be done via _meta if needed.
 		return $this->list_tools( $request_id );
 	}
@@ -101,11 +93,11 @@ class ToolsHandler {
 	 * visible to the LLM, while protocol errors indicate infrastructure issues.
 	 *
 	 * @param array $message    Request message.
-	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Tools\CallToolResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
-	public function call_tool( array $message, int $request_id = 0 ) {
+	public function call_tool( array $message, $request_id = 0 ) {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $message );
 
@@ -119,7 +111,10 @@ class ToolsHandler {
 
 			// Check if the result contains an error.
 			if ( isset( $result['error'] ) ) {
-				$failure_reason = $result['_metadata']['failure_reason'] ?? '';
+				$failure_reason = '';
+				if ( isset( $result['_meta'] ) && is_array( $result['_meta'] ) && isset( $result['_meta']['mcp_adapter'] ) && is_array( $result['_meta']['mcp_adapter'] ) ) {
+					$failure_reason = (string) ( $result['_meta']['mcp_adapter']['failure_reason'] ?? '' );
+				}
 
 				// Protocol errors (return JSON-RPC error response):
 				// - not_found (tool doesn't exist)
@@ -143,40 +138,96 @@ class ToolsHandler {
 					$error_message = $result['error']['message'] ?? 'An error occurred while executing the tool.';
 				}
 
-				return new CallToolResult(
-					array( ContentBlockHelper::text( $error_message ) ),
-					null, // _meta
-					null, // structuredContent
-					true  // isError
+				return CallToolResult::fromArray(
+					array(
+						'content'           => array( ContentBlockHelper::text( $error_message ) ),
+						'structuredContent' => null,
+						'isError'           => true,
+					)
 				);
 			}
 
 			// Successful tool execution - build CallToolResult DTO.
-			// Remove internal metadata before building response.
-			unset( $result['_metadata'] );
+			// Remove internal adapter metadata before building response.
+			if ( isset( $result['_meta'] ) && is_array( $result['_meta'] ) && isset( $result['_meta']['mcp_adapter'] ) ) {
+				unset( $result['_meta']['mcp_adapter'] );
+				if ( empty( $result['_meta'] ) ) {
+					unset( $result['_meta'] );
+				}
+			}
+
+			// Handle embedded resource results (MCP ContentBlock type: "resource").
+			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
+			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
+				$resource_item = $result;
+				if ( isset( $result['resource'] ) && is_array( $result['resource'] ) ) {
+					$resource_item = $result['resource'];
+				}
+
+				$uri       = $resource_item['uri'] ?? null;
+				$mime_type = $resource_item['mimeType'] ?? null;
+
+				if ( is_string( $uri ) ) {
+					$uri = trim( $uri );
+				}
+
+				// Only return an EmbeddedResource if we have a valid URI and some content.
+				if ( is_string( $uri ) && '' !== $uri ) {
+					if ( isset( $resource_item['text'] ) && is_string( $resource_item['text'] ) ) {
+						return CallToolResult::fromArray(
+							array(
+								'content' => array(
+									ContentBlockHelper::embedded_text_resource(
+										$uri,
+										$resource_item['text'],
+										is_string( $mime_type ) ? $mime_type : null
+									),
+								),
+								'isError' => false,
+							)
+						);
+					}
+
+					if ( isset( $resource_item['blob'] ) && is_string( $resource_item['blob'] ) ) {
+						return CallToolResult::fromArray(
+							array(
+								'content' => array(
+									ContentBlockHelper::embedded_blob_resource(
+										$uri,
+										$resource_item['blob'],
+										is_string( $mime_type ) ? $mime_type : null
+									),
+								),
+								'isError' => false,
+							)
+						);
+					}
+				}
+			}
 
 			// Handle image results.
-			// @todo: add support for EmbeddedResource schema.ts:619.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? 'image/png';
 
-				return new CallToolResult(
-					array( ContentBlockHelper::image( $image_data, $mime_type ) ),
-					null, // _meta
-					null, // structuredContent - images don't have structured content
-					null  // isError
+				return CallToolResult::fromArray(
+					array(
+						'content'           => array( ContentBlockHelper::image( $image_data, $mime_type ) ),
+						'structuredContent' => null,
+						'isError'           => false,
+					)
 				);
 			}
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
 			$json_text = wp_json_encode( $result );
 
-			return new CallToolResult(
-				array( ContentBlockHelper::text( (string) $json_text ) ),
-				null,    // _meta
-				$result, // structuredContent
-				null     // isError
+			return CallToolResult::fromArray(
+				array(
+					'content'           => array( ContentBlockHelper::text( (string) $json_text ) ),
+					'structuredContent' => $result,
+					'isError'           => false,
+				)
 			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->error_handler->log(
@@ -195,11 +246,11 @@ class ToolsHandler {
 	 * Handles tool call request.
 	 *
 	 * @param array $params     The request parameters.
-	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Response with tool execution results or error.
 	 */
-	public function handle_tool_call( array $params, int $request_id = 0 ): array {
+	public function handle_tool_call( array $params, $request_id = 0 ): array {
 		$tool_name = $params['name'];
 		$args      = $params['arguments'] ?? array();
 
@@ -219,20 +270,43 @@ class ToolsHandler {
 			return array(
 				'error'           => $error_response->getError()->toArray(),
 				'_error_response' => $error_response,
-				'_metadata'       => array(
-					'component_type' => 'tool',
-					'tool_name'      => $tool_name,
-					'failure_reason' => 'not_found',
+				'_meta'           => array(
+					'mcp_adapter' => array(
+						'component_type' => 'tool',
+						'tool_name'      => $tool_name,
+						'failure_reason' => 'not_found',
+					),
 				),
 			);
 		}
 
-		/**
-		 * Get the ability
-		 *
-		 * @var \WP_Ability|\WP_Error $ability
-		 */
-		$ability = $tool->get_ability();
+		$ability_name = ToolMetadataHelper::get_ability_name( $tool );
+		if ( null === $ability_name ) {
+			$error_response = McpErrorFactory::internal_error( $request_id, 'Tool is missing ability metadata.' );
+			return array(
+				'error'           => $error_response->getError()->toArray(),
+				'_error_response' => $error_response,
+				'_meta'           => array(
+					'mcp_adapter' => array(
+						'component_type' => 'tool',
+						'tool_name'      => $tool_name,
+						'failure_reason' => 'missing_ability_metadata',
+					),
+				),
+			);
+		}
+
+		$ability = \wp_get_ability( $ability_name );
+		if ( ! $ability ) {
+			$ability = new \WP_Error(
+				'ability_not_found',
+				sprintf(
+					/* translators: %s: ability name */
+					esc_html__( "WordPress ability '%s' does not exist.", 'mcp-adapter' ),
+					esc_html( $ability_name )
+				)
+			);
+		}
 
 		// Check if getting the ability returned an error
 		if ( is_wp_error( $ability ) ) {
@@ -248,21 +322,22 @@ class ToolsHandler {
 			return array(
 				'error'           => $error_response->getError()->toArray(),
 				'_error_response' => $error_response,
-				'_metadata'       => array(
-					'component_type' => 'tool',
-					'tool_name'      => $tool_name,
-					'failure_reason' => 'ability_retrieval_failed',
-					'error_code'     => $ability->get_error_code(),
+				'_meta'           => array(
+					'mcp_adapter' => array(
+						'component_type' => 'tool',
+						'tool_name'      => $tool_name,
+						'failure_reason' => 'ability_retrieval_failed',
+						'error_code'     => $ability->get_error_code(),
+					),
 				),
 			);
 		}
 
 		// Unwrap arguments if schema was transformed from flattened to object format
-		$tool_metadata = $tool->get_metadata();
-		$input_wrapped = ! empty( $tool_metadata['_input_schema_transformed'] );
+		$input_wrapped = ToolMetadataHelper::is_input_transformed( $tool );
 		if ( $input_wrapped ) {
 			// Unwrap: {input: "value"} → "value"
-			$input_wrapper = $tool_metadata['_input_schema_wrapper'] ?? 'input';
+			$input_wrapper = ToolMetadataHelper::get_input_wrapper( $tool );
 			$args          = is_array( $args ) ? ( $args[ $input_wrapper ] ?? null ) : null;
 		}
 
@@ -286,12 +361,14 @@ class ToolsHandler {
 				}
 
 				return array(
-					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )->getError()->toArray(),
-					'_metadata' => array(
-						'component_type' => 'tool',
-						'tool_name'      => $tool_name,
-						'ability_name'   => $ability->get_name(),
-						'failure_reason' => $failure_reason,
+					'error' => McpErrorFactory::permission_denied( $request_id, $error_message )->getError()->toArray(),
+					'_meta' => array(
+						'mcp_adapter' => array(
+							'component_type' => 'tool',
+							'tool_name'      => $tool_name,
+							'ability_name'   => $ability->get_name(),
+							'failure_reason' => $failure_reason,
+						),
 					),
 				);
 			}
@@ -305,13 +382,15 @@ class ToolsHandler {
 			);
 
 			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Error running ability permission callback' )->getError()->toArray(),
-				'_metadata' => array(
-					'component_type' => 'tool',
-					'tool_name'      => $tool_name,
-					'ability_name'   => $ability->get_name(),
-					'failure_reason' => 'permission_check_failed',
-					'error_type'     => get_class( $e ),
+				'error' => McpErrorFactory::internal_error( $request_id, 'Error running ability permission callback' )->getError()->toArray(),
+				'_meta' => array(
+					'mcp_adapter' => array(
+						'component_type' => 'tool',
+						'tool_name'      => $tool_name,
+						'ability_name'   => $ability->get_name(),
+						'failure_reason' => 'permission_check_failed',
+						'error_type'     => get_class( $e ),
+					),
 				),
 			);
 		}
@@ -333,25 +412,27 @@ class ToolsHandler {
 
 				// Return error for conversion to isError format by call_tool().
 				return array(
-					'error'     => array(
+					'error' => array(
 						'message' => $result->get_error_message(),
 						'code'    => $result->get_error_code(),
 					),
-					'_metadata' => array(
-						'component_type' => 'tool',
-						'tool_name'      => $tool_name,
-						'ability_name'   => $ability->get_name(),
-						'failure_reason' => 'wp_error',
-						'error_code'     => $result->get_error_code(),
+					'_meta' => array(
+						'mcp_adapter' => array(
+							'component_type' => 'tool',
+							'tool_name'      => $tool_name,
+							'ability_name'   => $ability->get_name(),
+							'failure_reason' => 'wp_error',
+							'error_code'     => $result->get_error_code(),
+						),
 					),
 				);
 			}
 
 			// Wrap result if output schema was transformed from flattened to object format
-			$output_wrapped = ! empty( $tool_metadata['_output_schema_transformed'] );
+			$output_wrapped = ToolMetadataHelper::is_output_transformed( $tool );
 			if ( $output_wrapped ) {
 				// Wrap: "value" → {result: "value"}
-				$output_wrapper = $tool_metadata['_output_schema_wrapper'] ?? 'result';
+				$output_wrapper = ToolMetadataHelper::get_output_wrapper( $tool );
 				$result         = array( $output_wrapper => $result );
 			}
 
@@ -359,13 +440,6 @@ class ToolsHandler {
 			if ( ! is_array( $result ) ) {
 				$result = array( 'result' => $result );
 			}
-
-			// Successful execution - add metadata.
-			$result['_metadata'] = array(
-				'component_type' => 'tool',
-				'tool_name'      => $tool_name,
-				'ability_name'   => $ability->get_name(),
-			);
 
 			return $result;
 		} catch ( \Throwable $e ) {
@@ -379,15 +453,17 @@ class ToolsHandler {
 
 			// Return error for conversion to isError format by call_tool().
 			return array(
-				'error'     => array(
+				'error' => array(
 					'message' => $e->getMessage(),
 				),
-				'_metadata' => array(
-					'component_type' => 'tool',
-					'tool_name'      => $tool_name,
-					'ability_name'   => $ability->get_name(),
-					'failure_reason' => 'execution_failed',
-					'error_type'     => get_class( $e ),
+				'_meta' => array(
+					'mcp_adapter' => array(
+						'component_type' => 'tool',
+						'tool_name'      => $tool_name,
+						'ability_name'   => $ability->get_name(),
+						'failure_reason' => 'execution_failed',
+						'error_type'     => get_class( $e ),
+					),
 				),
 			);
 		}
