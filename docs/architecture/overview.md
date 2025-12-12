@@ -8,7 +8,7 @@ The MCP Adapter uses a layered architecture with clear separation of concerns:
 
 1. **Transport Layer**: Handles communication protocols (HTTP, STDIO)
 2. **Core Layer**: Manages servers, routing, and component registration  
-3. **Component Layer**: Tools, resources, and prompts
+3. **Component Layer**: Tools, resources, and prompts (as schema DTOs)
 4. **WordPress Layer**: Abilities API integration
 
 ## Core Components
@@ -76,13 +76,13 @@ WordPress abilities are converted to MCP components using factory classes:
 
 ```php
 // Tools
-$tool = RegisterAbilityAsMcpTool::make($ability, $server);
+$tool = RegisterAbilityAsMcpTool::make( $ability );
 
 // Resources (require 'uri' in ability meta)
-$resource = RegisterAbilityAsMcpResource::make($ability, $server);
+$resource = RegisterAbilityAsMcpResource::make( $ability );
 
 // Prompts (support 'arguments' and 'annotations' in ability meta)
-$prompt = RegisterAbilityAsMcpPrompt::make($ability, $server);
+$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 ```
 
 ### Component Registry
@@ -91,9 +91,9 @@ The `McpComponentRegistry` manages component registration:
 
 ```php
 class McpComponentRegistry {
-    public function register_ability_as_tool(string $ability_name): void;
-    public function register_ability_as_resource(string $ability_name): void;
-    public function register_ability_as_prompt(string $ability_name): void;
+    public function register_tools( array $tools ): void;
+    public function register_resources( array $resources ): void;
+    public function register_prompts( array $prompts ): void;
     
     // Automatic observability tracking for registration events
 }
@@ -205,9 +205,9 @@ class McpAdapter {
 
 ```php
 class RegisterAbilityAsMcpTool {
-    public static function make(WP_Ability $ability, McpServer $server): McpTool {
-        // Convert WordPress ability to MCP tool
-        return McpTool::from_array($tool_data, $server);
+    public static function make( WP_Ability $ability ) {
+        // Convert WordPress ability to MCP Tool DTO
+        return \WP\McpSchema\Server\Tools\Tool::fromArray( $tool_data );
     }
 }
 ```

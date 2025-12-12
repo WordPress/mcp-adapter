@@ -79,21 +79,18 @@ For detailed information about MCP components, see the [Model Context Protocol s
 ├── Domain/
 │   │   # MCP Tools implementation
 │   ├── Tools/
-│   │   ├── McpTool.php                   # Base tool class
 │   │   ├── RegisterAbilityAsMcpTool.php  # Ability-to-tool conversion
-│   │   └── McpToolValidator.php          # Tool validation
+│   │   └── ToolMetadataHelper.php        # Internal metadata helpers
 │   │   # MCP Resources implementation
 │   ├── Resources/
-│   │   ├── McpResource.php                   # Base resource class
 │   │   ├── RegisterAbilityAsMcpResource.php  # Ability-to-resource conversion
-│   │   └── McpResourceValidator.php          # Resource validation
+│   │   └── ResourceMetadataHelper.php        # Internal metadata helpers
 │   │   # MCP Prompts implementation
 │   └── Prompts/
 │       ├── Contracts/                         # Prompt interfaces
 │       │   └── McpPromptBuilderInterface.php  # Prompt builder interface
-│       ├── McpPrompt.php                      # Base prompt class
 │       ├── McpPromptBuilder.php               # Prompt builder implementation
-│       ├── McpPromptValidator.php             # Prompt validation
+│       ├── PromptMetadataHelper.php           # Internal metadata helpers
 │       └── RegisterAbilityAsMcpPrompt.php     # Ability-to-prompt conversion
 │
 │   # Request processing handlers
@@ -162,7 +159,7 @@ Individual server management with comprehensive configuration:
 - **Component Registration**: Tools, resources, and prompts management
 - **Transport Configuration**: Multiple transport method support
 - **Error Handling**: Server-specific error handling and logging
-- **Validation**: Built-in validation for all registered components
+- **Schema DTOs**: Uses `wordpress/php-mcp-schema` DTOs for all components returned to clients
 
 ## Dependencies
 
