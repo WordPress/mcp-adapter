@@ -13,6 +13,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 
 /**
@@ -114,18 +115,16 @@ class StdioServerBridge {
 				// Log errors to stderr
 				$this->log_to_stderr( 'Error processing request: ' . $e->getMessage() );
 
-				// Send error response
-				$error_response = wp_json_encode(
-					array(
-						'jsonrpc' => '2.0',
-						'error'   => array(
+				$error_response = $this->encode_response(
+					JsonRpcResponseBuilder::create_error_response(
+						null,
+						array(
 							'code'    => -32603,
 							'message' => 'Internal error',
 							'data'    => array(
 								'details' => $e->getMessage(),
 							),
-						),
-						'id'      => null,
+						)
 					)
 				);
 
@@ -243,43 +242,25 @@ class StdioServerBridge {
 	 * @return string The JSON-RPC response string.
 	 */
 	private function format_response( array $result, $id ): string {
-		$response = array(
-			'jsonrpc' => '2.0',
-			'id'      => $id,
-		);
-
 		// Check if result contains an error
 		if ( isset( $result['error'] ) ) {
 			$error = $result['error'];
 
 			// Ensure error has required fields
-			$response['error'] = array(
+			$error_payload = array(
 				'code'    => $error['code'] ?? -32603,
 				'message' => $error['message'] ?? 'Internal error',
 			);
 
 			// Add data field if present
 			if ( isset( $error['data'] ) ) {
-				$response['error']['data'] = $error['data'];
+				$error_payload['data'] = $error['data'];
 			}
-		} else {
-			// Success response
-			$response['result'] = (object) $result;
+
+			return $this->encode_response( JsonRpcResponseBuilder::create_error_response( $id, $error_payload ) );
 		}
 
-		$json = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-
-		if ( false === $json ) {
-			// Fallback for encoding errors
-			return $this->create_error_response(
-				$id,
-				-32603,
-				'Internal error',
-				'Failed to encode response as JSON.'
-			);
-		}
-
-		return $json;
+		return $this->encode_response( JsonRpcResponseBuilder::create_success_response( $id, $result ) );
 	}
 
 	/**
@@ -293,20 +274,33 @@ class StdioServerBridge {
 	 * @return string The JSON error response string.
 	 */
 	private function create_error_response( $id, int $code, string $message, string $data = '' ): string {
-		$response = array(
-			'jsonrpc' => '2.0',
-			'error'   => array(
-				'code'    => $code,
-				'message' => $message,
-			),
-			'id'      => $id,
+		$error = array(
+			'code'    => $code,
+			'message' => $message,
 		);
 
-		if ( ! empty( $data ) ) {
-			$response['error']['data'] = $data;
+		if ( '' !== $data ) {
+			$error['data'] = $data;
 		}
 
-		return wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ?: '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}';
+		return $this->encode_response( JsonRpcResponseBuilder::create_error_response( $id, $error ) );
+	}
+
+	/**
+	 * Encode a JSON-RPC response to a string.
+	 *
+	 * @param array $response JSON-RPC response structure.
+	 *
+	 * @return string JSON-encoded response string.
+	 */
+	private function encode_response( array $response ): string {
+		$json = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+
+		if ( false === $json ) {
+			return '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}';
+		}
+
+		return $json;
 	}
 
 	/**
