@@ -87,21 +87,30 @@ final class ResourcesHandlerTest extends TestCase {
 	public function test_read_resource_with_wp_error_from_get_ability(): void {
 		wp_set_current_user( 1 );
 
-		// Create a resource with a non-existent ability name
-		$server   = $this->makeServer( array(), array(), array() );
-		$resource = new \WP\MCP\Domain\Resources\McpResource(
-			'nonexistent/ability',
-			'WordPress://test/nonexistent-resource',
+		// Create a resource with a non-existent ability name stored in _meta.
+		$server = $this->makeServer( array(), array(), array() );
+
+		$resource = new Resource(
 			'Test Resource',
-			'Test description'
+			'WordPress://test/nonexistent-resource',
+			null,
+			'Test description',
+			null,
+			null,
+			null,
+			array(
+				'mcp_adapter' => array(
+					'ability' => 'nonexistent/ability',
+				),
+			)
 		);
-		$resource->set_mcp_server( $server );
-		// Manually add the invalid resource (bypassing normal registration)
+
+		// Manually add the invalid resource (bypassing normal registration).
 		$registry           = $server->get_component_registry();
 		$reflection         = new \ReflectionClass( $registry );
 		$resources_property = $reflection->getProperty( 'resources' );
 		$resources_property->setAccessible( true );
-		$resources                                               = $resources_property->getValue( $registry );
+		$resources = $resources_property->getValue( $registry );
 		$resources['WordPress://test/nonexistent-resource'] = $resource;
 		$resources_property->setValue( $registry, $resources );
 

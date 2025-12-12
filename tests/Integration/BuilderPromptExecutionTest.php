@@ -124,23 +124,20 @@ final class BuilderPromptExecutionTest extends TestCase {
 
 		// Should have the builder prompt even if ability registration failed
 		$this->assertArrayHasKey( 'open-test', $prompts );
-		$this->assertTrue( $prompts['open-test']->is_builder_based() );
+		$this->assertNotNull( $server->get_prompt_builder( 'open-test' ) );
 	}
 
 	public function test_builder_prompt_bypasses_abilities_completely(): void {
 		$server = $this->makeServer( array(), array(), array( OpenPrompt::class ) );
 
 		$prompt = $server->get_prompt( 'open-test' );
+		$this->assertNotNull( $prompt );
 
-		// Verify complete ability bypass
-		$this->assertTrue( $prompt->is_builder_based() );
-		$ability = $prompt->get_ability();
-		$this->assertWPError( $ability );
-		$this->assertEquals( 'builder_has_no_ability', $ability->get_error_code() );
+		$builder = $server->get_prompt_builder( 'open-test' );
+		$this->assertNotNull( $builder );
+		$this->assertTrue( $builder->has_permission( array() ) );
 
-		// Verify direct execution works
-		$this->assertTrue( $prompt->check_permission_direct( array() ) );
-		$result = $prompt->execute_direct( array() );
+		$result = $builder->handle( array() );
 		$this->assertSame( 'Hello from open prompt!', $result['message'] );
 	}
 }

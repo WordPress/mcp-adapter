@@ -5,27 +5,30 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Resources;
 
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
+use WP\MCP\Domain\Resources\ResourceMetadataHelper;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Resources\Resource;
 
 final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
 	public function test_make_builds_resource_from_ability(): void {
 		$ability  = wp_get_ability( 'test/resource' );
 		$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
-		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
-		$arr      = $resource->to_array();
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
+		$this->assertInstanceOf( Resource::class, $resource );
+		$arr = $resource->toArray();
 		$this->assertSame( 'WordPress://local/resource-1', $arr['uri'] );
-		$this->assertSame( $ability, $resource->get_ability() );
+		$this->assertSame( $ability->get_name(), ResourceMetadataHelper::get_ability_name( $resource ) );
 	}
 
 	public function test_annotations_are_mapped_to_mcp_format(): void {
 		$ability = wp_get_ability( 'test/resource-with-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/resource-with-annotations should be registered' );
 
-		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->to_array();
+		$arr = $resource->toArray();
 
 		// Verify MCP-format annotations.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -45,10 +48,10 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$ability = wp_get_ability( 'test/resource-partial-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/resource-partial-annotations should be registered' );
 
-		$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->to_array();
+		$arr = $resource->toArray();
 
 		// Verify only provided annotations are present.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -58,27 +61,27 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
 	}
 
-		public function test_empty_annotations_are_not_included(): void {
-			$ability = wp_get_ability( 'test/resource' );
-			$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
+	public function test_empty_annotations_are_not_included(): void {
+		$ability = wp_get_ability( 'test/resource' );
+		$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
 
-			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
-			$this->assertNotWPError( $resource );
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
+		$this->assertNotWPError( $resource );
 
-			$arr = $resource->to_array();
+		$arr = $resource->toArray();
 
-			// Verify annotations field is not present when empty.
-			$this->assertArrayNotHasKey( 'annotations', $arr );
-		}
+		// Verify annotations field is not present when empty.
+		$this->assertArrayNotHasKey( 'annotations', $arr );
+	}
 
-		public function test_get_uri_trims_whitespace_from_meta(): void {
-			$ability = wp_get_ability( 'test/resource-whitespace-uri' );
-			$this->assertNotNull( $ability, 'Ability test/resource-whitespace-uri should be registered' );
+	public function test_get_uri_trims_whitespace_from_meta(): void {
+		$ability = wp_get_ability( 'test/resource-whitespace-uri' );
+		$this->assertNotNull( $ability, 'Ability test/resource-whitespace-uri should be registered' );
 
-			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->makeServer() );
-			$this->assertNotWPError( $resource );
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
+		$this->assertNotWPError( $resource );
 
-			$arr = $resource->to_array();
-			$this->assertSame( 'WordPress://local/resource-whitespace', $arr['uri'] );
-		}
+		$arr = $resource->toArray();
+		$this->assertSame( 'WordPress://local/resource-whitespace', $arr['uri'] );
+	}
 }

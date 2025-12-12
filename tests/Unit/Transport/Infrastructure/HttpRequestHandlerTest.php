@@ -120,6 +120,34 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayHasKey( 'result', $data );
 	}
 
+	public function test_handle_request_post_initialize_preserves_string_id(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 'req-abc-123',
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'id', $data );
+		$this->assertSame( 'req-abc-123', $data['id'] );
+		$this->assertArrayHasKey( 'result', $data );
+	}
+
 	public function test_handle_request_post_invalid_session(): void {
 		$request = $this->createPostRequest(
 			array(

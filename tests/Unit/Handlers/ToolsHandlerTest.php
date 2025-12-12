@@ -16,6 +16,7 @@ use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
 use WP\McpSchema\Server\Tools\Tool;
+use WP\McpSchema\Server\Tools\ToolInputSchema;
 
 /**
  * Test ToolsHandler functionality.
@@ -102,15 +103,23 @@ final class ToolsHandlerTest extends TestCase {
 	public function test_call_tool_with_wp_error_from_get_ability(): void {
 		wp_set_current_user( 1 );
 
-		// Create a tool with a non-existent ability name
+		// Create a tool with a non-existent ability name stored in _meta.
 		$server = $this->makeServer( array(), array(), array() );
-		$tool   = new \WP\MCP\Domain\Tools\McpTool(
-			'nonexistent/ability',
+
+		$tool = new Tool(
 			'test-nonexistent-tool',
+			new ToolInputSchema(),
+			null,
 			'Test Tool',
-			array( 'type' => 'object' )
+			null,
+			null,
+			null,
+			array(
+				'mcp_adapter' => array(
+					'ability' => 'nonexistent/ability',
+				),
+			)
 		);
-		$tool->set_mcp_server( $server );
 		$server->get_component_registry()->add_tool( $tool );
 
 		$handler = new ToolsHandler( $server );
@@ -387,7 +396,7 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertSame( 'hello-world', $captured_input, 'Ability should receive unwrapped argument from metadata flag.' );
 		$structured_content = $result->getStructuredContent();
 		$this->assertNotNull( $structured_content );
-		$this->assertArrayNotHasKey( '_metadata', $structured_content );
+		$this->assertArrayNotHasKey( '_meta', $structured_content );
 		$this->assertSame( array( 'result' => 'hello-world' ), $structured_content );
 
 		wp_unregister_ability( 'test/flat-transform-call' );

@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
+use WP\MCP\Domain\Tools\ToolMetadataHelper;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Tools\Tool;
 
 final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 	public function test_make_builds_tool_from_ability(): void {
 		$ability = wp_get_ability( 'test/always-allowed' );
 		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
-		$arr  = $tool->to_array();
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertInstanceOf( Tool::class, $tool );
+		$arr  = $tool->toArray();
 		$this->assertSame( 'test-always-allowed', $arr['name'] );
 		$this->assertArrayHasKey( 'inputSchema', $arr );
 	}
@@ -22,10 +25,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/annotated-ability' );
 		$this->assertNotNull( $ability, 'Ability test/annotated-ability should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify MCP-format annotations.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -48,10 +51,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/null-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/null-annotations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify only non-null annotations are present.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -65,10 +68,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/with-instructions' );
 		$this->assertNotNull( $ability, 'Ability test/with-instructions should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify instructions field is not in the output.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -83,10 +86,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/mcp-native' );
 		$this->assertNotNull( $ability, 'Ability test/mcp-native should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify MCP-native fields are preserved.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -104,10 +107,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/no-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/no-annotations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify annotations field is not present.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
@@ -117,10 +120,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/all-null-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/all-null-annotations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify annotations field is not present when all values are null.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
@@ -130,10 +133,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/annotated-ability' );
 		$this->assertNotNull( $ability, 'Ability test/annotated-ability should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		// Verify annotations exist.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -158,10 +161,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 			$this->markTestSkipped( 'Built-in ability mcp-adapter/get-ability-info not found' );
 		}
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
 		$this->assertNotWPError( $tool );
 
-		$arr = $tool->to_array();
+		$arr = $tool->toArray();
 
 		if ( ! isset( $arr['annotations'] ) ) {
 			// If no annotations, test passes.
@@ -213,15 +216,13 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		$ability = wp_get_ability( 'test/flat-transformed-tool' );
 		$this->assertNotNull( $ability, 'Ability test/flat-transformed-tool should be registered' );
-		$tool = RegisterAbilityAsMcpTool::make( $ability, $this->makeServer() );
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertInstanceOf( Tool::class, $tool );
 
-		$this->assertInstanceOf( \WP\MCP\Domain\Tools\McpTool::class, $tool );
-
-		$metadata = $tool->get_metadata();
-		$this->assertTrue( $metadata['_input_schema_transformed'] ?? false );
-		$this->assertTrue( $metadata['_output_schema_transformed'] ?? false );
-		$this->assertSame( 'input', $metadata['_input_schema_wrapper'] ?? '' );
-		$this->assertSame( 'result', $metadata['_output_schema_wrapper'] ?? '' );
+		$this->assertTrue( ToolMetadataHelper::is_input_transformed( $tool ) );
+		$this->assertTrue( ToolMetadataHelper::is_output_transformed( $tool ) );
+		$this->assertSame( 'input', ToolMetadataHelper::get_input_wrapper( $tool ) );
+		$this->assertSame( 'result', ToolMetadataHelper::get_output_wrapper( $tool ) );
 
 		wp_unregister_ability( 'test/flat-transformed-tool' );
 	}

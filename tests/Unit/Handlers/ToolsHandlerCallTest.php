@@ -10,6 +10,9 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\Content\ImageContent;
 use WP\McpSchema\Common\Content\TextContent;
 use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\BlobResourceContents;
+use WP\McpSchema\Common\Protocol\EmbeddedResource;
+use WP\McpSchema\Common\Protocol\TextResourceContents;
 use WP\McpSchema\Server\Tools\CallToolResult;
 
 final class ToolsHandlerCallTest extends TestCase {
@@ -118,5 +121,51 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( 'image', $content[0]->getType() );
 		$this->assertNotEmpty( $content[0]->getData() );
 		$this->assertNotEmpty( $content[0]->getMimeType() );
+	}
+
+	public function test_embedded_text_resource_result_is_converted_to_embedded_resource_content_block(): void {
+		$server  = $this->makeServer( array( 'test/embedded-text-resource' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-embedded-text-resource' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertSame( 'resource', $content[0]->getType() );
+
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( TextResourceContents::class, $resource );
+		$this->assertSame( 'WordPress://local/tool-embedded-text', $resource->getUri() );
+		$this->assertSame( 'text/plain', $resource->getMimeType() );
+		$this->assertSame( 'hello from embedded resource', $resource->getText() );
+	}
+
+	public function test_embedded_blob_resource_result_is_converted_to_embedded_resource_content_block(): void {
+		$server  = $this->makeServer( array( 'test/embedded-blob-resource' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-embedded-blob-resource' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertSame( 'resource', $content[0]->getType() );
+
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( BlobResourceContents::class, $resource );
+		$this->assertSame( 'WordPress://local/tool-embedded-blob', $resource->getUri() );
+		$this->assertSame( 'application/octet-stream', $resource->getMimeType() );
+		$this->assertSame( base64_encode( 'blob-bytes' ), $resource->getBlob() ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 }

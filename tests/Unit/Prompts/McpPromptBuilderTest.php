@@ -6,6 +6,7 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Prompts\Prompt;
 
 // Test prompt class
 class TestPrompt extends McpPromptBuilder {
@@ -40,16 +41,17 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPrompt();
 		$prompt  = $builder->build();
 
-		$this->assertSame( 'test-prompt', $prompt->get_name() );
-		$this->assertSame( 'Test Prompt', $prompt->get_title() );
-		$this->assertSame( 'A test prompt for unit testing', $prompt->get_description() );
+		$this->assertInstanceOf( Prompt::class, $prompt );
+		$this->assertSame( 'test-prompt', $prompt->getName() );
+		$this->assertSame( 'Test Prompt', $prompt->getTitle() );
+		$this->assertSame( 'A test prompt for unit testing', $prompt->getDescription() );
 
-		$arguments = $prompt->get_arguments();
+		$arguments = $prompt->getArguments();
 		$this->assertCount( 2, $arguments );
-		$this->assertSame( 'input', $arguments[0]['name'] );
-		$this->assertTrue( $arguments[0]['required'] );
-		$this->assertSame( 'optional', $arguments[1]['name'] );
-		$this->assertArrayNotHasKey( 'required', $arguments[1] );
+		$this->assertSame( 'input', $arguments[0]->getName() );
+		$this->assertTrue( $arguments[0]->getRequired() );
+		$this->assertSame( 'optional', $arguments[1]->getName() );
+		$this->assertNull( $arguments[1]->getRequired() );
 	}
 
 	public function test_prompt_can_be_registered_with_server(): void {
@@ -61,27 +63,20 @@ final class McpPromptBuilderTest extends TestCase {
 
 		$prompt = $server->get_prompt( 'test-prompt' );
 		$this->assertNotNull( $prompt );
-		$this->assertSame( 'test-prompt', $prompt->get_name() );
+		$this->assertSame( 'test-prompt', $prompt->getName() );
 	}
 
 	public function test_prompt_execution_bypasses_abilities(): void {
 		$server = $this->makeServer( array(), array(), array( TestPrompt::class ) );
 
 		$prompt = $server->get_prompt( 'test-prompt' );
+		$this->assertNotNull( $prompt );
 
-		// Verify this is a builder-based prompt
-		$this->assertTrue( $prompt->is_builder_based() );
+		$builder = $server->get_prompt_builder( 'test-prompt' );
+		$this->assertNotNull( $builder );
+		$this->assertTrue( $builder->has_permission( array() ) );
 
-		// Verify abilities are bypassed (get_ability returns WP_Error)
-		$ability = $prompt->get_ability();
-		$this->assertWPError( $ability );
-		$this->assertEquals( 'builder_has_no_ability', $ability->get_error_code() );
-
-		// Test direct permission checking
-		$this->assertTrue( $prompt->check_permission_direct( array() ) );
-
-		// Test direct execution
-		$result = $prompt->execute_direct(
+		$result = $builder->handle(
 			array(
 				'input'    => 'test value',
 				'optional' => 'custom',

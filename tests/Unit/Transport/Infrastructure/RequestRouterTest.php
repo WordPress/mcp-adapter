@@ -141,6 +141,14 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'tools', $result );
 		$this->assertIsArray( $result['tools'] );
+		$this->assertNotEmpty( $result['tools'] );
+		foreach ( $result['tools'] as $tool ) {
+			$this->assertIsArray( $tool );
+			if ( isset( $tool['_meta'] ) ) {
+				$this->assertIsArray( $tool['_meta'] );
+				$this->assertArrayNotHasKey( 'mcp_adapter', $tool['_meta'] );
+			}
+		}
 	}
 
 	public function test_route_request_tools_call(): void {
@@ -164,6 +172,14 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'resources', $result );
 		$this->assertIsArray( $result['resources'] );
+		$this->assertNotEmpty( $result['resources'] );
+		foreach ( $result['resources'] as $resource ) {
+			$this->assertIsArray( $resource );
+			if ( isset( $resource['_meta'] ) ) {
+				$this->assertIsArray( $resource['_meta'] );
+				$this->assertArrayNotHasKey( 'mcp_adapter', $resource['_meta'] );
+			}
+		}
 	}
 
 	public function test_route_request_prompts_list(): void {
@@ -172,6 +188,14 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'prompts', $result );
 		$this->assertIsArray( $result['prompts'] );
+		$this->assertNotEmpty( $result['prompts'] );
+		foreach ( $result['prompts'] as $prompt ) {
+			$this->assertIsArray( $prompt );
+			if ( isset( $prompt['_meta'] ) ) {
+				$this->assertIsArray( $prompt['_meta'] );
+				$this->assertArrayNotHasKey( 'mcp_adapter', $prompt['_meta'] );
+			}
+		}
 	}
 
 	public function test_route_request_ping(): void {
