@@ -46,9 +46,11 @@ final class MetaStripper {
 		}
 
 		foreach ( $data as $key => $value ) {
-			if ( is_array( $value ) ) {
-				$data[ $key ] = self::strip_array( $value );
+			if ( ! is_array( $value ) ) {
+				continue;
 			}
+
+			$data[ $key ] = self::strip_array( $value );
 		}
 
 		return $data;
