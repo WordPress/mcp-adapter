@@ -37,8 +37,8 @@ final class ExecuteAbilityAbility {
 				'description'         => 'Execute a WordPress ability with the provided parameters. This is the primary execution layer that can run any registered ability.',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
-					'type'                 => 'object',
-					'properties'           => array(
+					'type'       => 'object',
+					'properties' => array(
 						'ability_name' => array(
 							'type'        => 'string',
 							'description' => 'The full name of the ability to execute',
@@ -48,7 +48,7 @@ final class ExecuteAbilityAbility {
 							'description' => 'Parameters to pass to the ability',
 						),
 					),
-					'required'             => array( 'ability_name', 'parameters' ),
+					'required'   => array( 'ability_name', 'parameters' ),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',

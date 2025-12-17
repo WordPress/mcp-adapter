@@ -36,14 +36,14 @@ final class GetAbilityInfoAbility {
 				'description'         => 'Get detailed information about a specific WordPress ability including its input/output schema, description, and usage examples.',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
-					'type'                 => 'object',
-					'properties'           => array(
+					'type'       => 'object',
+					'properties' => array(
 						'ability_name' => array(
 							'type'        => 'string',
 							'description' => 'The full name of the ability to get information about',
 						),
 					),
-					'required'             => array( 'ability_name' ),
+					'required'   => array( 'ability_name' ),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
