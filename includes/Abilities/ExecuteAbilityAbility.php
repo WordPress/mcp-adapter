@@ -114,8 +114,10 @@ final class ExecuteAbilityAbility {
 			return new \WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
 		}
 
-		// Check if the user has permission to execute the target ability
-		$parameters        = empty( $input['parameters'] ) ? null : $input['parameters'];
+		// Normalize parameters for ability's schema requirements
+		// Empty {} from MCP is treated as null for abilities without input schema
+		$parameters        = $input['parameters'] ?? null;
+		$parameters        = self::normalize_parameters_for_ability( $ability, $parameters );
 		$permission_result = $ability->check_permissions( $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
@@ -124,6 +126,26 @@ final class ExecuteAbilityAbility {
 		}
 
 		return (bool) $permission_result;
+	}
+
+	/**
+	 * Normalize parameters based on ability's input schema.
+	 *
+	 * If the ability has no input schema, empty arrays (from MCP {} arguments)
+	 * are normalized to null, as abilities without schemas don't accept input.
+	 *
+	 * @param \WP_Ability $ability    The ability to normalize parameters for.
+	 * @param mixed       $parameters The parameters to normalize.
+	 * @return mixed Normalized parameters (null if ability has no schema and params are empty).
+	 */
+	private static function normalize_parameters_for_ability( \WP_Ability $ability, $parameters ) {
+		// If ability has no input schema, treat empty array as null.
+		// This allows MCP clients to send {} for abilities that don't take arguments.
+		$input_schema = $ability->get_input_schema();
+		if ( empty( $input_schema ) && is_array( $parameters ) && empty( $parameters ) ) {
+			return null;
+		}
+		return $parameters;
 	}
 
 	/**
@@ -161,7 +183,8 @@ final class ExecuteAbilityAbility {
 	 */
 	public static function execute( $input = array() ): array {
 		$ability_name = $input['ability_name'] ?? '';
-		$parameters   = empty( $input['parameters'] ) ? null : $input['parameters'];
+		// Note: Use null coalescing instead of empty() to preserve empty arrays/objects ({} → [])
+		$parameters = $input['parameters'] ?? null;
 
 		if ( empty( $ability_name ) ) {
 			return array(
@@ -196,6 +219,10 @@ final class ExecuteAbilityAbility {
 				'error'   => "Ability '{$ability_name}' not found",
 			);
 		}
+
+		// Normalize parameters for ability's schema requirements
+		// Empty {} from MCP is treated as null for abilities without input schema
+		$parameters = self::normalize_parameters_for_ability( $ability, $parameters );
 
 		try {
 			// Execute the ability
