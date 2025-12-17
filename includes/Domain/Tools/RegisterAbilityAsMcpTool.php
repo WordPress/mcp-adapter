@@ -152,23 +152,25 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		// Store transformation metadata as internal metadata (stripped before responding to clients).
-		$tool_data['_meta'] = array(
-			'mcp_adapter' => array(
-				'ability'                   => $this->ability->get_name(),
-				'input_schema_transformed'  => (bool) ( $input_transform['was_transformed'] ?? false ),
-				'input_schema_wrapper'      => $input_transform['wrapper_property'] ?? 'input',
-				'output_schema_transformed' => (bool) ( $output_transform['was_transformed'] ?? false ),
-				'output_schema_wrapper'     => $output_transform['wrapper_property'] ?? 'result',
-			),
+		// Only record keys when semantically meaningful to keep _meta minimal and accurate.
+		$adapter_meta = array(
+			'ability' => $this->ability->get_name(),
 		);
 
-		// If no transformations happened, avoid storing unnecessary metadata.
-		if ( ! $tool_data['_meta']['mcp_adapter']['input_schema_transformed'] && ! $tool_data['_meta']['mcp_adapter']['output_schema_transformed'] ) {
-			unset( $tool_data['_meta']['mcp_adapter']['input_schema_transformed'] );
-			unset( $tool_data['_meta']['mcp_adapter']['input_schema_wrapper'] );
-			unset( $tool_data['_meta']['mcp_adapter']['output_schema_transformed'] );
-			unset( $tool_data['_meta']['mcp_adapter']['output_schema_wrapper'] );
+		// Only record input transformation metadata when a wrapper was actually applied.
+		if ( ! empty( $input_transform['was_transformed'] ) ) {
+			$adapter_meta['input_schema_transformed'] = true;
+			$adapter_meta['input_schema_wrapper']     = $input_transform['wrapper_property'];
 		}
+
+		// Only record output transformation metadata when outputSchema exists.
+		// Record wrapper only when transformation actually occurred.
+		if ( null !== $output_transform && ! empty( $output_transform['was_transformed'] ) ) {
+			$adapter_meta['output_schema_transformed'] = true;
+			$adapter_meta['output_schema_wrapper']     = $output_transform['wrapper_property'];
+		}
+
+		$tool_data['_meta'] = array( 'mcp_adapter' => $adapter_meta );
 
 		// Prepare schema arrays for php-mcp-schema DTO expectations (properties map values must be objects).
 		$tool_data['inputSchema'] = $this->prepare_schema_for_dto( $tool_data['inputSchema'] );
