@@ -511,22 +511,22 @@ wp_register_ability('my-plugin/analyze-data', [
     ]
 ]);
 
-// Resource with Resource-specific annotations
+// Resource with Resource-specific annotations (all params under mcp.*)
 wp_register_ability('my-plugin/user-data', [
     'label' => 'User Data Resource',
     'description' => 'Access to user profile data',
     'execute_callback' => 'get_user_data',
     'permission_callback' => function() { return current_user_can('read'); },
     'meta' => [
-        'uri' => 'wordpress://users/profile',
-        'annotations' => [
-            'audience' => ['assistant'],     // For AI use only
-            'priority' => 0.9,              // High importance
-            'lastModified' => date('c')      // ISO 8601 timestamp
-        ],
         'mcp' => [
             'public' => true,
-            'type' => 'resource'
+            'type'   => 'resource',
+            'uri'    => 'WordPress://users/profile',   // Required: RFC 3986 format
+            'annotations' => [
+                'audience' => ['assistant'],            // For AI use only
+                'priority' => 0.9,                     // High importance
+                'lastModified' => date('c')             // ISO 8601 timestamp
+            ],
         ]
     ]
 ]);
@@ -768,7 +768,11 @@ This produces:
 
 ## Creating Resources
 
-Resources provide access to data or content. They require a `uri` in the meta field and should set `type: 'resource'` in the MCP configuration:
+Resources provide access to data or content. They require a `uri` in the meta field and should set `type: 'resource'` in the MCP configuration.
+
+### Resource Meta Structure
+
+All MCP-specific metadata must be under the `mcp.*` namespace:
 
 ```php
 wp_register_ability('my-plugin/site-config', [
@@ -787,19 +791,167 @@ wp_register_ability('my-plugin/site-config', [
         return current_user_can('manage_options');
     },
     'meta' => [
-        'uri' => 'wordpress://site/config',
-        'annotations' => [
-            'audience' => ['user', 'assistant'], // For both users and AI
-            'priority' => 0.8,                  // High priority resource
-            'lastModified' => '2024-01-15T10:30:00Z' // Last update timestamp
-        ],
         'mcp' => [
-            'public' => true,      // Expose this ability via MCP
-            'type'   => 'resource' // Mark as resource for auto-discovery
+            'public' => true,                           // Expose via MCP (required)
+            'type'   => 'resource',                     // Mark as resource
+            'uri'    => 'WordPress://site/config',      // Required: RFC 3986 format
+            'mimeType' => 'application/json',           // Optional: content type
+            'size'   => 256,                            // Optional: bytes
+            'annotations' => [                          // Optional: MCP annotations
+                'audience' => ['user', 'assistant'],
+                'priority' => 0.8,
+                'lastModified' => '2024-01-15T10:30:00Z'
+            ],
         ]
     ]
 ]);
 ```
+
+### Resource Meta Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `mcp.public` | **Yes** | Must be `true` to expose via MCP |
+| `mcp.type` | **Yes** | Must be `'resource'` |
+| `mcp.uri` | **Yes** | Unique identifier (RFC 3986 format, e.g., `WordPress://...`) |
+| `mcp.mimeType` | No | MIME type of content (e.g., `text/plain`, `application/json`) |
+| `mcp.size` | No | Content size in bytes (for UI display) |
+| `mcp.annotations` | No | MCP annotations (`audience`, `priority`, `lastModified`) |
+| `mcp.icons` | No | Array of icon objects for UI display |
+| `mcp._meta` | No | Custom metadata to pass through to MCP clients |
+
+### Deprecation Notice
+
+Top-level meta keys (`meta.uri`, `meta.annotations`) are **deprecated**. They still work but trigger `_doing_it_wrong` notices:
+
+```php
+// ❌ DEPRECATED: Top-level keys
+'meta' => [
+    'uri' => 'WordPress://site/config',         // Deprecated
+    'annotations' => [...],                      // Deprecated
+    'mcp' => ['public' => true, 'type' => 'resource']
+]
+
+// ✅ RECOMMENDED: All params under mcp.* namespace
+'meta' => [
+    'mcp' => [
+        'public' => true,
+        'type' => 'resource',
+        'uri' => 'WordPress://site/config',     // New location
+        'annotations' => [...]                   // New location
+    ]
+]
+```
+
+### Resource URI Requirements
+
+URIs must be RFC 3986 compliant with a scheme:
+
+```php
+// ✅ Valid URIs:
+'WordPress://site/config'
+'file:///path/to/resource'
+'https://example.com/resource'
+'custom-scheme://authority/path'
+
+// ❌ Invalid URIs (will fail registration):
+'site/config'           // Missing scheme
+'/path/to/resource'     // Missing scheme
+''                      // Empty
+```
+
+### Resource Field Mapping
+
+Resources are mapped from ability properties:
+
+| MCP Field | Source | Notes |
+|-----------|--------|-------|
+| `name` | `ability->get_name()` | No sanitization (unlike tools) |
+| `title` | `ability->get_label()` | Human-readable display name |
+| `description` | `ability->get_description()` | Used as LLM hint |
+| `uri` | `meta.mcp.uri` | Required, RFC 3986 validated |
+| `mimeType` | `meta.mcp.mimeType` | Validated `type/subtype` format |
+
+> **Technical details:** See [Ability → Resource Conversion Contract](ability-resource-conversion.md) for complete mapping rules and validation behavior.
+
+### Resource Return Shapes
+
+When `resources/read` is called, your `execute_callback` is invoked. The adapter normalizes return values into MCP-compliant `ReadResourceResult`.
+
+#### Plain String (Simplest)
+
+```php
+'execute_callback' => function() {
+    return 'Simple text content';
+}
+// → TextResourceContents with text = 'Simple text content'
+```
+
+#### Structured Content
+
+```php
+'execute_callback' => function() {
+    return [
+        'text'     => '# Markdown Content\n\nWith formatting.',
+        'mimeType' => 'text/markdown',
+    ];
+}
+// → TextResourceContents with mimeType preserved
+```
+
+#### Binary Content (Blob)
+
+For binary data, return base64-encoded content with `blob` key:
+
+```php
+'execute_callback' => function() {
+    $image_data = file_get_contents('/path/to/image.png');
+    return [
+        'blob'     => base64_encode($image_data),
+        'mimeType' => 'image/png',
+    ];
+}
+// → BlobResourceContents with base64 data
+```
+
+#### Multiple Content Parts
+
+Return array of content items for multi-part resources:
+
+```php
+'execute_callback' => function() {
+    return [
+        ['uri' => 'WordPress://doc/part1', 'text' => 'Part 1 content'],
+        ['uri' => 'WordPress://doc/part2', 'text' => 'Part 2 content'],
+    ];
+}
+// → Array of TextResourceContents
+```
+
+#### Object/Array Results
+
+Associative arrays are automatically JSON-encoded:
+
+```php
+'execute_callback' => function() {
+    return ['status' => 'ok', 'count' => 42];
+}
+// → TextResourceContents with text = '{"status":"ok","count":42}'
+```
+
+### Performance Note
+
+**Important:** `resources/list` returns metadata only — your `execute_callback` is **NOT called** during listing. Content is only generated when `resources/read` is called.
+
+This means:
+- Resource discovery is fast (no content generation)
+- Expensive operations only run when content is requested
+- You can safely register many resources without performance impact
+
+For expensive `execute_callback` operations, consider:
+- Using WordPress transients for caching
+- Implementing lazy loading
+- Adding pagination for large datasets
 
 ## Creating Prompts
 

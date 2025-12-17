@@ -275,7 +275,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Resource ability with URI in meta
+		// Resource ability with URI in meta (using standardized mcp.* structure)
 		wp_register_ability(
 			'test/resource',
 			array(
@@ -289,11 +289,10 @@ final class DummyAbility {
 					return true;
 				},
 				'meta'                => array(
-					'uri'         => 'WordPress://local/resource-1',
-					'annotations' => array( 'group' => 'tests' ),
-					'mcp'         => array(
+					'mcp' => array(
 						'public' => true, // Expose via MCP for testing
 						'type'   => 'resource', // Explicitly mark as resource
+						'uri'    => 'WordPress://local/resource-1',
 					),
 				),
 			)
@@ -808,6 +807,366 @@ final class DummyAbility {
 				),
 			)
 		);
+
+		// Resource using standardized mcp.* meta structure (new pattern)
+		wp_register_ability(
+			'test/resource-new-meta',
+			array(
+				'label'               => 'Resource New Meta',
+				'description'         => 'A resource using standardized mcp.* meta structure',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'      => true,
+						'type'        => 'resource',
+						'uri'         => 'WordPress://local/resource-new-meta',
+						'mimeType'    => 'text/plain',
+						'size'        => 1024,
+						'annotations' => array(
+							'audience'     => array( 'user' ),
+							'priority'     => 0.7,
+							'lastModified' => '2025-01-15T10:30:00Z',
+						),
+						'icons'       => array(
+							array(
+								'src'      => 'https://example.com/resource-icon.png',
+								'mimeType' => 'image/png',
+								'sizes'    => array( '32x32' ),
+							),
+						),
+						'_meta'       => array(
+							'custom_field' => 'custom_value',
+						),
+					),
+				),
+			)
+		);
+
+		// Resource with invalid URI (no scheme) - should return WP_Error
+		wp_register_ability(
+			'test/resource-invalid-uri',
+			array(
+				'label'               => 'Resource Invalid URI',
+				'description'         => 'A resource with invalid URI for testing validation',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'no-scheme-invalid-uri',
+					),
+				),
+			)
+		);
+
+		// Resource with invalid mimeType - should silently skip mimeType
+		wp_register_ability(
+			'test/resource-invalid-mimetype',
+			array(
+				'label'               => 'Resource Invalid MimeType',
+				'description'         => 'A resource with invalid mimeType for testing validation',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'   => true,
+						'type'     => 'resource',
+						'uri'      => 'WordPress://local/resource-invalid-mimetype',
+						'mimeType' => 'not//valid',  // Invalid mime type.
+					),
+				),
+			)
+		);
+
+		// Resource with size field
+		wp_register_ability(
+			'test/resource-with-size',
+			array(
+				'label'               => 'Resource With Size',
+				'description'         => 'A resource with size field',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-with-size',
+						'size'   => 2048,
+					),
+				),
+			)
+		);
+
+		// Resource with INVALID annotations in new meta structure (for validation testing)
+		// All annotations should be dropped with _doing_it_wrong notice
+		wp_register_ability(
+			'test/resource-invalid-annotations-new-meta',
+			array(
+				'label'               => 'Resource Invalid Annotations New Meta',
+				'description'         => 'A resource with invalid annotations using new meta structure',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'      => true,
+						'type'        => 'resource',
+						'uri'         => 'WordPress://local/resource-invalid-annotations-new',
+						'annotations' => array(
+							'audience'     => array( 'admin', 'superuser' ), // Invalid roles (should be 'user' or 'assistant')
+							'lastModified' => 'yesterday',                   // Invalid ISO 8601 timestamp
+							'priority'     => 2.5,                           // Out of range (should be 0.0-1.0)
+						),
+					),
+				),
+			)
+		);
+
+		// Resource with MIXED valid/invalid annotations - should drop ALL because one is invalid
+		wp_register_ability(
+			'test/resource-mixed-annotations',
+			array(
+				'label'               => 'Resource Mixed Annotations',
+				'description'         => 'A resource with one valid and one invalid annotation',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'      => true,
+						'type'        => 'resource',
+						'uri'         => 'WordPress://local/resource-mixed-annotations',
+						'annotations' => array(
+							'priority'     => 0.5,                           // Valid
+							'lastModified' => 'not-valid-timestamp',         // Invalid - should cause ALL to be dropped
+						),
+					),
+				),
+			)
+		);
+
+		// Resource with icons (using new meta structure)
+		wp_register_ability(
+			'test/resource-with-icons',
+			array(
+				'label'               => 'Resource With Icons',
+				'description'         => 'A resource with icons using new meta structure',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-with-icons',
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/resource-icon.svg',
+								'mimeType' => 'image/svg+xml',
+								'sizes'    => array( 'any' ),
+								'theme'    => 'light',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Resource with missing URI in meta (should fail conversion).
+		wp_register_ability(
+			'test/resource-missing-uri',
+			array(
+				'label'               => 'Resource Missing URI',
+				'description'         => 'A resource with no URI defined',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						// No uri key - should fail
+					),
+				),
+			)
+		);
+
+		// Resource with valid mimeType (for acceptance testing).
+		wp_register_ability(
+			'test/resource-valid-mimetype',
+			array(
+				'label'               => 'Resource Valid MimeType',
+				'description'         => 'A resource with valid mimeType',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'   => true,
+						'type'     => 'resource',
+						'uri'      => 'WordPress://local/resource-valid-mimetype',
+						'mimeType' => 'application/json',
+					),
+				),
+			)
+		);
+
+		// Resource that returns blob content (for BlobResourceContents testing).
+		wp_register_ability(
+			'test/resource-blob-content',
+			array(
+				'label'               => 'Resource Blob Content',
+				'description'         => 'A resource returning blob data',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array(
+						array(
+							'uri'      => 'WordPress://local/resource-blob',
+							'blob'     => base64_encode( 'binary-data-here' ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+							'mimeType' => 'application/octet-stream',
+						),
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-blob-content',
+					),
+				),
+			)
+		);
+
+		// Resource that returns multiple content items.
+		wp_register_ability(
+			'test/resource-multiple-contents',
+			array(
+				'label'               => 'Resource Multiple Contents',
+				'description'         => 'A resource returning multiple content items',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array(
+						array(
+							'uri'      => 'WordPress://local/resource-multi/part1',
+							'text'     => 'First content part',
+							'mimeType' => 'text/plain',
+						),
+						array(
+							'uri'      => 'WordPress://local/resource-multi/part2',
+							'text'     => 'Second content part',
+							'mimeType' => 'text/plain',
+						),
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-multiple-contents',
+					),
+				),
+			)
+		);
+
+		// Resource returning text with custom mimeType.
+		wp_register_ability(
+			'test/resource-text-with-mimetype',
+			array(
+				'label'               => 'Resource Text With MimeType',
+				'description'         => 'A resource returning text with custom mimeType',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array(
+						array(
+							'uri'      => 'WordPress://local/resource-json',
+							'text'     => '{"key": "value"}',
+							'mimeType' => 'application/json',
+						),
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-text-with-mimetype',
+					),
+				),
+			)
+		);
+
+		// Resource returning plain string (non-array, for wrapping test).
+		wp_register_ability(
+			'test/resource-plain-string',
+			array(
+				'label'               => 'Resource Plain String',
+				'description'         => 'A resource returning a plain string',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'plain string content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-plain-string',
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -852,6 +1211,19 @@ final class DummyAbility {
 			'test/with-mixed-icons',
 			'test/with-custom-meta',
 			'test/with-icons-and-meta',
+			'test/resource-new-meta',
+			'test/resource-invalid-uri',
+			'test/resource-invalid-mimetype',
+			'test/resource-with-size',
+			'test/resource-invalid-annotations-new-meta',
+			'test/resource-mixed-annotations',
+			'test/resource-with-icons',
+			'test/resource-missing-uri',
+			'test/resource-valid-mimetype',
+			'test/resource-blob-content',
+			'test/resource-multiple-contents',
+			'test/resource-text-with-mimetype',
+			'test/resource-plain-string',
 		);
 
 		foreach ( $names as $name ) {

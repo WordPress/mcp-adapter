@@ -674,4 +674,249 @@ final class McpComponentRegistryTest extends TestCase {
 		wp_unregister_ability( 'test/will-be-invalid' );
 		wp_unregister_ability( 'test/second-valid-tool' );
 	}
+
+	/**
+	 * Test that duplicate resource URIs are detected and first registration wins.
+	 */
+	public function test_register_resources_duplicate_uri_first_wins(): void {
+		// Register two abilities with the same URI.
+		$same_uri = 'WordPress://test/duplicate-uri-resource';
+
+		$this->register_ability_in_hook(
+			'test/resource-first',
+			array(
+				'label'               => 'First Resource',
+				'description'         => 'First resource with this URI',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'first content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/resource-second',
+			array(
+				'label'               => 'Second Resource',
+				'description'         => 'Second resource with same URI',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'second content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		// Clear previous events and logs.
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register both resources (second will be duplicate).
+		$this->registry->register_resources( array( 'test/resource-first', 'test/resource-second' ) );
+
+		// Verify only one resource is registered.
+		$resources = $this->registry->get_resources();
+		$this->assertCount( 1, $resources, 'Only first resource should be registered (first-wins policy)' );
+		$this->assertArrayHasKey( $same_uri, $resources );
+
+		// Verify the registered resource is from the first ability.
+		$resource     = $resources[ $same_uri ];
+		$ability_name = \WP\MCP\Domain\Resources\ResourceMetadataHelper::get_ability_name( $resource );
+		$this->assertSame( 'test/resource-first', $ability_name, 'First ability should win' );
+
+		// Clean up.
+		wp_unregister_ability( 'test/resource-first' );
+		wp_unregister_ability( 'test/resource-second' );
+	}
+
+	/**
+	 * Test that duplicate resource URIs are logged via error handler.
+	 */
+	public function test_register_resources_duplicate_uri_logs_error(): void {
+		// Register two abilities with the same URI.
+		$same_uri = 'WordPress://test/duplicate-uri-logged';
+
+		$this->register_ability_in_hook(
+			'test/resource-alpha',
+			array(
+				'label'               => 'Alpha Resource',
+				'description'         => 'Alpha resource',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'alpha';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/resource-beta',
+			array(
+				'label'               => 'Beta Resource',
+				'description'         => 'Beta resource (duplicate)',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'beta';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		// Clear previous logs.
+		DummyErrorHandler::$logs = array();
+
+		// Register both resources.
+		$this->registry->register_resources( array( 'test/resource-alpha', 'test/resource-beta' ) );
+
+		// Verify error was logged for the duplicate.
+		$this->assertNotEmpty( DummyErrorHandler::$logs, 'Error should be logged for duplicate URI' );
+
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$combined     = implode( ' ', $log_messages );
+
+		// Verify the error message contains key information.
+		$this->assertStringContainsString( 'Duplicate resource URI', $combined );
+		$this->assertStringContainsString( $same_uri, $combined );
+		$this->assertStringContainsString( 'test/resource-beta', $combined, 'Log should mention the duplicate ability' );
+		$this->assertStringContainsString( 'test/resource-alpha', $combined, 'Log should mention the existing ability' );
+
+		// Clean up.
+		wp_unregister_ability( 'test/resource-alpha' );
+		wp_unregister_ability( 'test/resource-beta' );
+	}
+
+	/**
+	 * Test that duplicate resource URIs record observability event.
+	 */
+	public function test_register_resources_duplicate_uri_records_observability_event(): void {
+		// Register two abilities with the same URI.
+		$same_uri = 'WordPress://test/duplicate-uri-observed';
+
+		$this->register_ability_in_hook(
+			'test/resource-observer-first',
+			array(
+				'label'               => 'Observer First',
+				'description'         => 'First resource for observability test',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'first';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/resource-observer-second',
+			array(
+				'label'               => 'Observer Second',
+				'description'         => 'Second resource for observability test',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'second';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		// Clear previous events.
+		DummyObservabilityHandler::$events = array();
+
+		// Register both resources.
+		$this->registry->register_resources( array( 'test/resource-observer-first', 'test/resource-observer-second' ) );
+
+		// Verify observability events: 1 success + 1 failure.
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		// Find the duplicate failure event.
+		$duplicate_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['failure_reason'] )
+					&& 'duplicate_uri' === $event['tags']['failure_reason'];
+			}
+		);
+		$this->assertCount( 1, $duplicate_events, 'Should have one duplicate_uri failure event' );
+
+		// Verify the event contains expected data.
+		$duplicate_event = array_values( $duplicate_events )[0];
+		$this->assertSame( 'test/resource-observer-second', $duplicate_event['tags']['component_name'] );
+		$this->assertSame( $same_uri, $duplicate_event['tags']['duplicate_uri'] );
+		$this->assertSame( 'test/resource-observer-first', $duplicate_event['tags']['existing_ability_name'] );
+
+		// Verify success event for first resource.
+		$success_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'success' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'resource' === $event['tags']['component_type'];
+			}
+		);
+		$this->assertCount( 1, $success_events, 'Should have one success event for the first resource' );
+
+		// Clean up.
+		wp_unregister_ability( 'test/resource-observer-first' );
+		wp_unregister_ability( 'test/resource-observer-second' );
+	}
 }

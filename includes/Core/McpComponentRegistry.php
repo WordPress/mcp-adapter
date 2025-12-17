@@ -12,6 +12,7 @@ namespace WP\MCP\Core;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
+use WP\MCP\Domain\Resources\ResourceMetadataHelper;
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
@@ -238,7 +239,7 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			$resource = RegisterAbilityAsMcpResource::make( $ability );
+			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->error_handler );
 
 			// Check if resource creation returned an error
 			if ( is_wp_error( $resource ) ) {
@@ -260,8 +261,43 @@ class McpComponentRegistry {
 				continue;
 			}
 
+			// Check for duplicate URI (first-wins policy).
+			$resource_uri = $resource->getUri();
+			if ( isset( $this->resources[ $resource_uri ] ) ) {
+				// Get the ability name of the already-registered resource.
+				$existing_resource     = $this->resources[ $resource_uri ];
+				$existing_ability_name = ResourceMetadataHelper::get_ability_name( $existing_resource ) ?? '(unknown)';
+
+				$this->error_handler->log(
+					sprintf(
+						"Duplicate resource URI '%s': ability '%s' conflicts with already-registered ability '%s'. First registration wins.",
+						$resource_uri,
+						$ability_name,
+						$existing_ability_name
+					),
+					array( "RegisterAbilityAsMcpResource::{$ability_name}" )
+				);
+
+				// Track duplicate URI failure.
+				if ( $this->should_record_component_registration ) {
+					$this->observability_handler->record_event(
+						'mcp.component.registration',
+						array(
+							'status'                => 'failed',
+							'component_type'        => 'resource',
+							'component_name'        => $ability_name,
+							'failure_reason'        => 'duplicate_uri',
+							'duplicate_uri'         => $resource_uri,
+							'existing_ability_name' => $existing_ability_name,
+							'server_id'             => $this->mcp_server->get_server_id(),
+						)
+					);
+				}
+				continue;
+			}
+
 			// Add the processed resources to this server.
-			$this->resources[ $resource->getUri() ] = $resource;
+			$this->resources[ $resource_uri ] = $resource;
 
 			// Track successful resource registration.
 			if ( ! $this->should_record_component_registration ) {
