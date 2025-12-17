@@ -56,6 +56,71 @@ wp_register_ability('my-plugin/my-ability', [
 ]);
 ```
 
+## Tool Naming Rules
+
+When abilities are converted to MCP tools, the ability name is transformed to comply with [MCP 2025-11-25 naming rules](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#tool-names).
+
+### WordPress Ability Names
+
+WordPress abilities follow strict naming rules enforced by the Abilities API:
+
+```
+Pattern: namespace/ability-name
+Regex:   ^[a-z0-9-]+/[a-z0-9-]+$
+```
+
+- Must have a namespace prefix (e.g., `my-plugin/`)
+- Only lowercase alphanumeric characters and dashes
+- Forward slash separates namespace from ability name
+
+### MCP Tool Name Requirements
+
+| Rule | Value |
+|------|-------|
+| Length | 1–128 characters |
+| Allowed characters | `A-Za-z0-9_.-` (letters, digits, underscore, hyphen, dot) |
+| Case | Case-sensitive |
+
+### Automatic Transformation
+
+Since WordPress ability names are already well-formed, the main transformation is:
+
+```
+my-plugin/create-post → my-plugin-create-post
+```
+
+The forward slash (`/`) is replaced with a hyphen (`-`) because MCP doesn't allow forward slashes in tool names.
+
+### Collision Warning
+
+Be aware that different ability names can produce the same MCP tool name:
+
+```php
+// ❌ These abilities would collide as MCP tools:
+'my-plugin/create-post'  // → my-plugin-create-post
+'my-plugin-create-post'  // → my-plugin-create-post (if it existed)
+```
+
+The first-registered ability wins; subsequent collisions are logged as warnings.
+
+### Customizing Tool Names
+
+Use the `mcp_adapter_tool_name` filter to customize the final name:
+
+```php
+add_filter( 'mcp_adapter_tool_name', function( $name, $ability ) {
+    // Prefix all tools from your plugin
+    if ( str_starts_with( $ability->get_name(), 'my-plugin/' ) ) {
+        return 'acme-' . $name;
+    }
+    return $name;
+}, 10, 2 );
+```
+
+**Warning:** The filter runs after sanitization. If you return an invalid name (wrong characters or length > 128), the tool registration will fail.
+
+> **Technical details:** See [Ability → Tool Conversion Contract](ability-tool-conversion.md#tool-name-derivation) for the complete sanitization algorithm.
+
 ## Input and Output Schemas
 
 The MCP Adapter supports two schema formats for `input_schema` and `output_schema`:
@@ -243,6 +308,41 @@ For simple single-value outputs, you can use flattened schemas. These are automa
 
 **Note**: All schema metadata (descriptions, constraints, enums, etc.) is preserved during the automatic transformation from flattened to object format. Input schemas use `"input"` as the wrapper property, while output schemas use `"result"`.
 
+### MCP Schema Limitations
+
+MCP `ToolInputSchema` is a **restricted subset** of JSON Schema. Only these fields are supported:
+
+| Field | Description |
+|-------|-------------|
+| `$schema` | JSON Schema dialect (optional, defaults to 2020-12) |
+| `type` | Must be `"object"` |
+| `properties` | Map of property definitions |
+| `required` | Array of required property names |
+
+**Unsupported fields** like `additionalProperties`, `minProperties`, `patternProperties`, etc. are silently dropped. If you need strict "no extra properties" validation, implement it in your `execute_callback`.
+
+### Tools with No Arguments
+
+For tools that don't require arguments, omit `input_schema` or set it to an empty array. The adapter generates a minimal MCP-compliant schema:
+
+```php
+// Option 1: Omit input_schema entirely
+wp_register_ability('my-plugin/get-status', [
+    'label' => 'Get Status',
+    'description' => 'Returns current system status',
+    'execute_callback' => 'get_status_callback',
+    // No input_schema
+]);
+
+// Result: inputSchema = { "type": "object" }
+```
+
+### Internal Metadata (`_meta`)
+
+The adapter stores internal transformation metadata in `_meta['mcp_adapter']` for debugging purposes. This metadata is **automatically stripped** before responses are sent to MCP clients and is never visible externally.
+
+> **Technical details:** See [Ability → Tool Conversion Contract](ability-tool-conversion.md#internal-metadata-_meta) for the complete metadata structure.
+
 ## MCP Annotations
 
 Annotations provide behavior hints to MCP clients about how to handle your abilities. **Annotations are type-specific** - Tools use different annotations than Resources and Prompts.
@@ -336,6 +436,30 @@ Tools support these MCP specification annotations:
 - `readonly` → `readOnlyHint`
 - `destructive` → `destructiveHint`
 - `idempotent` → `idempotentHint`
+
+**Important:** Tools only support `ToolAnnotations` fields. Shared annotation fields (`audience`, `priority`, `lastModified`) are **not** valid for tools and will be ignored.
+
+### Annotation Value Validation
+
+Boolean annotation values use **strict parsing** to avoid PHP's loose type casting issues:
+
+```php
+// ✅ Accepted boolean values:
+true, false                    // PHP booleans
+1, 0                           // Integers
+'true', 'false', '1', '0'      // Strings (case-insensitive)
+
+// ❌ Rejected values (field is dropped):
+'yes', 'no', 'on', 'off'       // Not accepted
+'', null                       // Empty values
+2, -1                          // Other integers
+```
+
+**Why strict?** PHP's default `(bool)` cast incorrectly converts the string `'false'` to `true` (because it's a non-empty string). The adapter uses strict parsing to avoid this common pitfall.
+
+Invalid annotation values are silently dropped rather than causing registration failures. This ensures tools remain functional even with misconfigured annotations.
+
+> **Technical details:** See [Ability → Tool Conversion Contract](ability-tool-conversion.md#annotations-mapping) for the complete validation rules.
 
 ### Resource & Prompt Annotations (Annotations)
 
