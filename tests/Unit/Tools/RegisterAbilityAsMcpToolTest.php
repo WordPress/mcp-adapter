@@ -492,4 +492,229 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		wp_unregister_ability( 'test/no-transformations' );
 	}
+
+	// Icons and _meta Mapping Tests (MCP 2025-11-25).
+
+	public function test_icons_are_mapped_from_ability_meta(): void {
+		$ability = wp_get_ability( 'test/with-icons' );
+		$this->assertNotNull( $ability, 'Ability test/with-icons should be registered' );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+		$this->assertInstanceOf( Tool::class, $tool );
+
+		$arr = $tool->toArray();
+
+		// Verify icons field exists and has correct structure.
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertIsArray( $arr['icons'] );
+		$this->assertCount( 2, $arr['icons'] );
+
+		// Verify first icon (all fields).
+		$this->assertSame( 'https://example.com/icon.png', $arr['icons'][0]['src'] );
+		$this->assertSame( 'image/png', $arr['icons'][0]['mimeType'] );
+		$this->assertIsArray( $arr['icons'][0]['sizes'] );
+		$this->assertSame( array( '32x32' ), $arr['icons'][0]['sizes'] );
+		$this->assertSame( 'light', $arr['icons'][0]['theme'] );
+
+		// Verify second icon (no sizes).
+		$this->assertSame( 'https://example.com/icon-dark.svg', $arr['icons'][1]['src'] );
+		$this->assertSame( 'image/svg+xml', $arr['icons'][1]['mimeType'] );
+		$this->assertSame( 'dark', $arr['icons'][1]['theme'] );
+	}
+
+	public function test_invalid_icons_are_filtered_out(): void {
+		$ability = wp_get_ability( 'test/with-mixed-icons' );
+		$this->assertNotNull( $ability, 'Ability test/with-mixed-icons should be registered' );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+		$this->assertInstanceOf( Tool::class, $tool );
+
+		$arr = $tool->toArray();
+
+		// Verify icons field exists with only valid icons.
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertIsArray( $arr['icons'] );
+
+		// Should only have 2 valid icons (the one without src was filtered out).
+		$this->assertCount( 2, $arr['icons'] );
+
+		// Verify the valid icons are present.
+		$srcs = array_column( $arr['icons'], 'src' );
+		$this->assertContains( 'https://example.com/valid-icon.png', $srcs );
+		$this->assertContains( 'https://example.com/another-valid.svg', $srcs );
+	}
+
+	public function test_custom_meta_is_passed_through(): void {
+		$ability = wp_get_ability( 'test/with-custom-meta' );
+		$this->assertNotNull( $ability, 'Ability test/with-custom-meta should be registered' );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+		$this->assertInstanceOf( Tool::class, $tool );
+
+		$meta = $tool->get_meta();
+		$this->assertIsArray( $meta );
+
+		// Verify custom vendor keys are present.
+		$this->assertArrayHasKey( 'custom_vendor', $meta );
+		$this->assertSame( true, $meta['custom_vendor']['feature_flag'] );
+		$this->assertSame( '1.0', $meta['custom_vendor']['version'] );
+
+		$this->assertArrayHasKey( 'another_vendor', $meta );
+		$this->assertSame( 'some-value', $meta['another_vendor'] );
+
+		// Verify internal adapter metadata is also present.
+		$this->assertArrayHasKey( 'mcp_adapter', $meta );
+		$this->assertArrayHasKey( 'ability', $meta['mcp_adapter'] );
+		$this->assertSame( 'test/with-custom-meta', $meta['mcp_adapter']['ability'] );
+	}
+
+	public function test_icons_and_meta_can_coexist(): void {
+		$ability = wp_get_ability( 'test/with-icons-and-meta' );
+		$this->assertNotNull( $ability, 'Ability test/with-icons-and-meta should be registered' );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+		$this->assertInstanceOf( Tool::class, $tool );
+
+		$arr = $tool->toArray();
+
+		// Verify icons field exists.
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertCount( 1, $arr['icons'] );
+		$this->assertSame( 'https://example.com/combined-icon.png', $arr['icons'][0]['src'] );
+		$this->assertSame( array( '48x48' ), $arr['icons'][0]['sizes'] );
+
+		// Verify custom _meta exists alongside internal metadata.
+		$meta = $tool->get_meta();
+		$this->assertArrayHasKey( 'vendor_info', $meta );
+		$this->assertSame( 'test-value', $meta['vendor_info']['custom_data'] );
+		$this->assertArrayHasKey( 'mcp_adapter', $meta );
+	}
+
+	public function test_tool_without_icons_has_no_icons_field(): void {
+		// Use an existing ability that doesn't have icons defined.
+		$ability = wp_get_ability( 'test/always-allowed' );
+		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+
+		$arr = $tool->toArray();
+
+		// Verify icons field is not present.
+		$this->assertArrayNotHasKey( 'icons', $arr );
+	}
+
+	public function test_tool_without_custom_meta_only_has_adapter_meta(): void {
+		// Use an existing ability that doesn't have custom _meta defined.
+		$ability = wp_get_ability( 'test/always-allowed' );
+		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+
+		$meta = $tool->get_meta();
+		$this->assertIsArray( $meta );
+
+		// Verify only adapter metadata exists (no custom vendor keys).
+		$this->assertArrayHasKey( 'mcp_adapter', $meta );
+		$this->assertCount( 1, $meta, 'Only mcp_adapter key should be present' );
+	}
+
+	public function test_user_meta_mcp_adapter_collision_is_overwritten(): void {
+		// If user provides _meta.mcp_adapter, adapter's internal metadata should overwrite it.
+		// This prevents users from spoofing internal metadata.
+		$this->register_ability_in_hook(
+			'test/meta-collision',
+			array(
+				'label'               => 'Meta Collision Test',
+				'description'         => 'Tests _meta.mcp_adapter collision',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'_meta'  => array(
+							'mcp_adapter'   => array(
+								'spoofed' => 'should-be-overwritten',
+								'fake'    => 'data',
+							),
+							'legitimate_vendor' => 'preserved',
+						),
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/meta-collision' );
+		$this->assertNotNull( $ability );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+
+		$meta = $tool->get_meta();
+
+		// Adapter's mcp_adapter should have real data, not spoofed data.
+		$this->assertArrayHasKey( 'mcp_adapter', $meta );
+		$this->assertArrayHasKey( 'ability', $meta['mcp_adapter'] );
+		$this->assertSame( 'test/meta-collision', $meta['mcp_adapter']['ability'] );
+
+		// Spoofed keys should NOT be present.
+		$this->assertArrayNotHasKey( 'spoofed', $meta['mcp_adapter'] );
+		$this->assertArrayNotHasKey( 'fake', $meta['mcp_adapter'] );
+
+		// User's legitimate vendor key should be preserved.
+		$this->assertArrayHasKey( 'legitimate_vendor', $meta );
+		$this->assertSame( 'preserved', $meta['legitimate_vendor'] );
+
+		wp_unregister_ability( 'test/meta-collision' );
+	}
+
+	public function test_empty_user_meta_does_not_add_empty_keys(): void {
+		// If user provides empty _meta array, it should not affect the output.
+		$this->register_ability_in_hook(
+			'test/empty-meta',
+			array(
+				'label'               => 'Empty Meta Test',
+				'description'         => 'Tests empty _meta handling',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'_meta'  => array(), // Empty _meta array.
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/empty-meta' );
+		$this->assertNotNull( $ability );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+
+		$meta = $tool->get_meta();
+
+		// Only adapter metadata should exist.
+		$this->assertArrayHasKey( 'mcp_adapter', $meta );
+		$this->assertCount( 1, $meta, 'Only mcp_adapter key should be present with empty user _meta' );
+
+		wp_unregister_ability( 'test/empty-meta' );
+	}
 }

@@ -521,6 +521,199 @@ add_filter('mcp_adapter_tool_name', function($name, $ability) {
 
 **Warning:** If the filter returns an invalid name (wrong characters or length > 128), the tool registration will fail with `WP_Error`.
 
+### Example 6: Tool with Icons
+
+Icons allow MCP clients to display visual indicators for tools. Icons are provided via `ability.meta.mcp.icons`:
+
+```php
+// Ability registration with icons:
+wp_register_ability('my-plugin/upload-image', [
+    'label' => 'Upload Image',
+    'description' => 'Upload an image to the media library',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'url' => ['type' => 'string', 'description' => 'Image URL']
+        ],
+        'required' => ['url']
+    ],
+    'execute_callback' => 'upload_image_callback',
+    'permission_callback' => fn() => current_user_can('upload_files'),
+    'meta' => [
+        'mcp' => [
+            'public' => true,
+            'icons' => [
+                [
+                    'src' => 'https://example.com/icons/upload-48.png',
+                    'mimeType' => 'image/png',
+                    'sizes' => ['48x48'],
+                    'theme' => 'light'
+                ],
+                [
+                    'src' => 'https://example.com/icons/upload-dark-48.png',
+                    'mimeType' => 'image/png',
+                    'sizes' => ['48x48'],
+                    'theme' => 'dark'
+                ],
+                [
+                    'src' => 'https://example.com/icons/upload.svg',
+                    'mimeType' => 'image/svg+xml',
+                    'sizes' => ['any']
+                ]
+            ]
+        ]
+    ]
+]);
+
+// Resulting MCP Tool:
+{
+    "name": "my-plugin-upload-image",
+    "title": "Upload Image",
+    "description": "Upload an image to the media library",
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "url": {"type": "string", "description": "Image URL"}
+        },
+        "required": ["url"]
+    },
+    "icons": [
+        {
+            "src": "https://example.com/icons/upload-48.png",
+            "mimeType": "image/png",
+            "sizes": ["48x48"],
+            "theme": "light"
+        },
+        {
+            "src": "https://example.com/icons/upload-dark-48.png",
+            "mimeType": "image/png",
+            "sizes": ["48x48"],
+            "theme": "dark"
+        },
+        {
+            "src": "https://example.com/icons/upload.svg",
+            "mimeType": "image/svg+xml",
+            "sizes": ["any"]
+        }
+    ]
+}
+```
+
+#### Icon Validation
+
+Icons are validated per MCP 2025-11-25 specification:
+
+| Field | Required | Validation |
+|-------|----------|------------|
+| `src` | Yes | Valid URL (http/https) or data: URI |
+| `mimeType` | No | Must be: `image/png`, `image/jpeg`, `image/jpg`, `image/svg+xml`, or `image/webp` |
+| `sizes` | No | Array of size strings in WxH format (e.g., `"48x48"`) or `"any"` |
+| `theme` | No | Must be `"light"` or `"dark"` |
+
+**Graceful degradation:** Invalid icons are logged as warnings and skipped (not rejected). Valid icons in the same array are still included.
+
+### Example 7: Tool with Custom _meta
+
+Ability authors can pass custom metadata through to MCP clients via `ability.meta.mcp._meta`:
+
+```php
+// Ability registration with custom _meta:
+wp_register_ability('my-plugin/process-data', [
+    'label' => 'Process Data',
+    'description' => 'Process data with custom metadata',
+    'execute_callback' => 'process_data_callback',
+    'permission_callback' => '__return_true',
+    'meta' => [
+        'mcp' => [
+            'public' => true,
+            '_meta' => [
+                'vendor' => 'my-plugin',
+                'version' => '2.0.0',
+                'custom_capability' => 'my_custom_capability'
+            ]
+        ]
+    ]
+]);
+
+// Resulting MCP Tool response to clients:
+{
+    "name": "my-plugin-process-data",
+    "title": "Process Data",
+    "description": "Process data with custom metadata",
+    "inputSchema": {"type": "object"},
+    "_meta": {
+        "vendor": "my-plugin",
+        "version": "2.0.0",
+        "custom_capability": "my_custom_capability"
+    }
+}
+```
+
+**Note:** The adapter's internal metadata (`_meta.mcp_adapter`) is stripped before sending to clients, but user-provided `_meta` keys are preserved. This allows ability authors to pass arbitrary metadata to MCP clients for custom integrations.
+
+---
+
+## Icons and _meta Mapping
+
+### Icons (`ability.meta.mcp.icons`)
+
+The adapter reads icons from `ability.meta.mcp.icons` and validates them before including in the Tool DTO.
+
+**Icon object structure:**
+
+```php
+[
+    'src' => 'https://example.com/icon.png',  // Required: URL or data: URI
+    'mimeType' => 'image/png',                // Optional: MIME type
+    'sizes' => ['48x48', '96x96'],            // Optional: Size strings
+    'theme' => 'light'                        // Optional: 'light' or 'dark'
+]
+```
+
+**Allowed MIME types:**
+- `image/png` (MUST support)
+- `image/jpeg` / `image/jpg` (MUST support)
+- `image/svg+xml` (SHOULD support)
+- `image/webp` (SHOULD support)
+
+**Data URIs** are also supported for embedding icons directly:
+
+```php
+'src' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+```
+
+### User _meta (`ability.meta.mcp._meta`)
+
+User-provided metadata is merged with the adapter's internal metadata:
+
+```php
+// Ability registration:
+'meta' => [
+    'mcp' => [
+        '_meta' => ['vendor' => 'acme', 'env' => 'production']
+    ]
+]
+
+// Internal tool _meta (before stripping):
+[
+    '_meta' => [
+        'vendor' => 'acme',           // User-provided (preserved)
+        'env' => 'production',        // User-provided (preserved)
+        'mcp_adapter' => [...]        // Adapter internal (stripped)
+    ]
+]
+
+// Response to clients (after MetaStripper):
+[
+    '_meta' => [
+        'vendor' => 'acme',
+        'env' => 'production'
+    ]
+]
+```
+
+**Merge order:** User _meta is merged first, then adapter metadata. If there's a key collision, adapter keys win (to preserve internal functionality).
+
 ---
 
 ## Error Handling
@@ -555,9 +748,9 @@ The converter returns `WP_Error` in these cases:
 | `inputSchema` | ✅ Supported | Transformed to object type |
 | `outputSchema` | ✅ Supported | Optional, transformed if present |
 | `annotations` | ✅ Supported | ToolAnnotations fields only |
-| `_meta` | ✅ Supported | Internal, stripped before response |
-| `execution` | ❌ Not supported | Added in 2025-11-25, not mapped |
-| `icons` | ❌ Not supported | Added in 2025-11-25, not mapped |
+| `icons` | ✅ Supported | From `ability.meta.mcp.icons` (2025-11-25) |
+| `_meta` | ✅ Supported | User passthrough via `ability.meta.mcp._meta`; adapter keys stripped |
+| `execution` | ❌ Not supported | Added in 2025-11-25, will be implemented in future versions |
 
 ### Specification References
 

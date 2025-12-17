@@ -674,6 +674,140 @@ final class DummyAbility {
 				),
 			)
 		);
+
+		// Tool with valid icons (MCP 2025-11-25)
+		wp_register_ability(
+			'test/with-icons',
+			array(
+				'label'               => 'Tool With Icons',
+				'description'         => 'A tool with MCP icons',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/icon.png',
+								'mimeType' => 'image/png',
+								'sizes'    => array( '32x32' ), // sizes is an array per MCP spec.
+								'theme'    => 'light',
+							),
+							array(
+								'src'      => 'https://example.com/icon-dark.svg',
+								'mimeType' => 'image/svg+xml',
+								'theme'    => 'dark',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Tool with some invalid icons (should filter out invalid, keep valid)
+		wp_register_ability(
+			'test/with-mixed-icons',
+			array(
+				'label'               => 'Tool With Mixed Icons',
+				'description'         => 'A tool with some valid and some invalid icons',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/valid-icon.png',
+								'mimeType' => 'image/png',
+							),
+							array(
+								// Missing src - invalid
+								'mimeType' => 'image/png',
+							),
+							array(
+								'src'      => 'https://example.com/another-valid.svg',
+								'mimeType' => 'image/svg+xml',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Tool with custom _meta passthrough
+		wp_register_ability(
+			'test/with-custom-meta',
+			array(
+				'label'               => 'Tool With Custom Meta',
+				'description'         => 'A tool with custom _meta passed through',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'_meta'  => array(
+							'custom_vendor'   => array(
+								'feature_flag' => true,
+								'version'      => '1.0',
+							),
+							'another_vendor'  => 'some-value',
+						),
+					),
+				),
+			)
+		);
+
+		// Tool with both icons and custom _meta
+		wp_register_ability(
+			'test/with-icons-and-meta',
+			array(
+				'label'               => 'Tool With Icons And Meta',
+				'description'         => 'A tool with both icons and custom _meta',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'success';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/combined-icon.png',
+								'mimeType' => 'image/png',
+								'sizes'    => array( '48x48' ), // sizes is an array per MCP spec.
+							),
+						),
+						'_meta'  => array(
+							'vendor_info' => array(
+								'custom_data' => 'test-value',
+							),
+						),
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -711,6 +845,13 @@ final class DummyAbility {
 			'test/prompt-partial-annotations',
 			'test/prompt-invalid-annotations',
 			'test/resource-whitespace-uri',
+			'test/embedded-text-resource',
+			'test/embedded-blob-resource',
+			'test/meta-leak',
+			'test/with-icons',
+			'test/with-mixed-icons',
+			'test/with-custom-meta',
+			'test/with-icons-and-meta',
 		);
 
 		foreach ( $names as $name ) {

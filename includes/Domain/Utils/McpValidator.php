@@ -311,6 +311,248 @@ class McpValidator {
 	}
 
 	/**
+	 * Allowed MIME types for MCP icons per specification.
+	 *
+	 * MUST support: image/png, image/jpeg, image/jpg
+	 * SHOULD support: image/svg+xml, image/webp
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var array<string>
+	 */
+	private static array $allowed_icon_mime_types = array(
+		'image/png',
+		'image/jpeg',
+		'image/jpg',
+		'image/svg+xml',
+		'image/webp',
+	);
+
+	/**
+	 * Validate an icon source (src) value.
+	 *
+	 * Icon src must be a valid URL (http/https) or a data: URI with base64-encoded image data.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $src The icon source to validate.
+	 *
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_icon_src( string $src ): bool {
+		$src = trim( $src );
+
+		if ( empty( $src ) ) {
+			return false;
+		}
+
+		// Check for data: URI.
+		if ( str_starts_with( $src, 'data:' ) ) {
+			// data:[<mediatype>][;base64],<data>
+			// Simplified validation: must have data: prefix and contain comma.
+			return str_contains( $src, ',' );
+		}
+
+		// Check for http/https URL.
+		if ( str_starts_with( $src, 'http://' ) || str_starts_with( $src, 'https://' ) ) {
+			return filter_var( $src, FILTER_VALIDATE_URL ) !== false;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Validate an icon MIME type.
+	 *
+	 * Per MCP spec, clients MUST support image/png, image/jpeg (and image/jpg).
+	 * Clients SHOULD support image/svg+xml, image/webp.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $mime_type The MIME type to validate.
+	 *
+	 * @return bool True if valid icon MIME type, false otherwise.
+	 */
+	public static function validate_icon_mime_type( string $mime_type ): bool {
+		return in_array( strtolower( trim( $mime_type ) ), self::$allowed_icon_mime_types, true );
+	}
+
+	/**
+	 * Validate an icon size string.
+	 *
+	 * Icon sizes must be in WxH format (e.g., "48x48", "96x96") or "any" for scalable formats.
+	 * Both width and height must be positive integers (no zero dimensions, no leading zeros).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $size The size string to validate.
+	 *
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_icon_size( string $size ): bool {
+		$size = trim( $size );
+
+		if ( empty( $size ) ) {
+			return false;
+		}
+
+		// "any" is valid for scalable formats like SVG.
+		if ( 'any' === strtolower( $size ) ) {
+			return true;
+		}
+
+		// Must match WxH format with positive integers (no zero dimensions, no leading zeros).
+		// [1-9]\d* matches: 1, 2, ..., 9, 10, 11, ..., 99, 100, etc.
+		return (bool) preg_match( '/^[1-9]\d*x[1-9]\d*$/', $size );
+	}
+
+	/**
+	 * Validate an icon theme value.
+	 *
+	 * Valid themes are "light" or "dark".
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $theme The theme to validate.
+	 *
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_icon_theme( string $theme ): bool {
+		return in_array( strtolower( trim( $theme ) ), array( 'light', 'dark' ), true );
+	}
+
+	/**
+	 * Get validation errors for an MCP icon object.
+	 *
+	 * Validates icon fields per MCP 2025-11-25 specification:
+	 * - src (required): Valid URL or data: URI
+	 * - mimeType (optional): One of allowed image MIME types
+	 * - sizes (optional): Array of size strings in WxH format or "any"
+	 * - theme (optional): "light" or "dark"
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array $icon The icon data to validate.
+	 *
+	 * @return array Array of validation errors, empty if valid.
+	 */
+	public static function get_icon_validation_errors( array $icon ): array {
+		$errors = array();
+
+		// src is required.
+		if ( ! isset( $icon['src'] ) ) {
+			$errors[] = __( 'Icon must have a src field', 'mcp-adapter' );
+		} elseif ( ! is_string( $icon['src'] ) ) {
+			$errors[] = __( 'Icon src must be a string', 'mcp-adapter' );
+		} elseif ( ! self::validate_icon_src( $icon['src'] ) ) {
+			$errors[] = __( 'Icon src must be a valid URL (http/https) or data: URI', 'mcp-adapter' );
+		}
+
+		// mimeType is optional but must be valid if present.
+		if ( isset( $icon['mimeType'] ) ) {
+			if ( ! is_string( $icon['mimeType'] ) ) {
+				$errors[] = __( 'Icon mimeType must be a string', 'mcp-adapter' );
+			} elseif ( ! self::validate_icon_mime_type( $icon['mimeType'] ) ) {
+				$errors[] = sprintf(
+					/* translators: %s: comma-separated list of allowed MIME types */
+					__( 'Icon mimeType must be one of: %s', 'mcp-adapter' ),
+					implode( ', ', self::$allowed_icon_mime_types )
+				);
+			}
+		}
+
+		// sizes is optional but must be valid if present.
+		if ( isset( $icon['sizes'] ) ) {
+			if ( ! is_array( $icon['sizes'] ) ) {
+				$errors[] = __( 'Icon sizes must be an array', 'mcp-adapter' );
+			} else {
+				foreach ( $icon['sizes'] as $index => $size ) {
+					if ( ! is_string( $size ) ) {
+						$errors[] = sprintf(
+							/* translators: %d: array index */
+							__( 'Icon size at index %d must be a string', 'mcp-adapter' ),
+							$index
+						);
+					} elseif ( ! self::validate_icon_size( $size ) ) {
+						$errors[] = sprintf(
+							/* translators: 1: size value, 2: array index */
+							__( 'Icon size "%1$s" at index %2$d must be in WxH format (e.g., "48x48") or "any"', 'mcp-adapter' ),
+							$size,
+							$index
+						);
+					}
+				}
+			}
+		}
+
+		// theme is optional but must be valid if present.
+		if ( isset( $icon['theme'] ) ) {
+			if ( ! is_string( $icon['theme'] ) ) {
+				$errors[] = __( 'Icon theme must be a string', 'mcp-adapter' );
+			} elseif ( ! self::validate_icon_theme( $icon['theme'] ) ) {
+				$errors[] = __( 'Icon theme must be "light" or "dark"', 'mcp-adapter' );
+			}
+		}
+
+		return $errors;
+	}
+
+	/**
+	 * Validate an array of icons.
+	 *
+	 * Returns valid icons and logs warnings for invalid ones.
+	 * Invalid icons are filtered out (graceful degradation).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array $icons    Array of icon data.
+	 * @param bool  $log_warnings Whether to log warnings for invalid icons. Default true.
+	 *
+	 * @return array{valid: array, errors: array} Array with 'valid' icons and 'errors' details.
+	 */
+	public static function validate_icons_array( array $icons, bool $log_warnings = true ): array {
+		$valid_icons = array();
+		$all_errors  = array();
+
+		foreach ( $icons as $index => $icon ) {
+			if ( ! is_array( $icon ) ) {
+				$all_errors[] = array(
+					'index'  => $index,
+					'errors' => array( __( 'Icon must be an array', 'mcp-adapter' ) ),
+				);
+				continue;
+			}
+
+			$errors = self::get_icon_validation_errors( $icon );
+
+			if ( empty( $errors ) ) {
+				$valid_icons[] = $icon;
+			} else {
+				$all_errors[] = array(
+					'index'  => $index,
+					'errors' => $errors,
+				);
+
+				if ( $log_warnings ) {
+					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					error_log(
+						sprintf(
+							'MCP Adapter: Invalid icon at index %d skipped: %s',
+							$index,
+							implode( '; ', $errors )
+						)
+					);
+				}
+			}
+		}
+
+		return array(
+			'valid'  => $valid_icons,
+			'errors' => $all_errors,
+		);
+	}
+
+	/**
 	 * Get validation errors for shared MCP annotations.
 	 *
 	 * Validates shared annotation fields per MCP 2025-11-25 specification:

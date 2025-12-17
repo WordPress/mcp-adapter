@@ -172,6 +172,22 @@ class RegisterAbilityAsMcpTool {
 
 		$tool_data['_meta'] = array( 'mcp_adapter' => $adapter_meta );
 
+		// Map icons from ability.meta.mcp.icons if present.
+		$mcp_meta = $ability_meta['mcp'] ?? array();
+		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$tool_data['icons'] = $icons_result['valid'];
+			}
+		}
+
+		// Merge user-provided _meta from ability.meta.mcp._meta.
+		// User _meta keys are preserved alongside adapter's internal 'mcp_adapter' key.
+		// MetaStripper will strip 'mcp_adapter' but preserve user keys when responding to clients.
+		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
+			$tool_data['_meta'] = array_merge( $mcp_meta['_meta'], $tool_data['_meta'] );
+		}
+
 		// Prepare schema arrays for php-mcp-schema DTO expectations (properties map values must be objects).
 		$tool_data['inputSchema'] = $this->prepare_schema_for_dto( $tool_data['inputSchema'] );
 		if ( isset( $tool_data['outputSchema'] ) && is_array( $tool_data['outputSchema'] ) ) {
