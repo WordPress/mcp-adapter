@@ -49,7 +49,6 @@ final class ExecuteAbilityAbility {
 						),
 					),
 					'required'             => array( 'ability_name', 'parameters' ),
-					'additionalProperties' => false,
 				),
 				'output_schema'       => array(
 					'type'       => 'object',

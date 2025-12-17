@@ -44,7 +44,6 @@ final class GetAbilityInfoAbility {
 						),
 					),
 					'required'             => array( 'ability_name' ),
-					'additionalProperties' => false,
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
