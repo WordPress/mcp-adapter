@@ -91,12 +91,14 @@ final class McpValidatorTest extends TestCase {
 	}
 
 	public function test_validate_name_rejects_too_long(): void {
-		$long_name = str_repeat( 'a', 256 );
+		// Default max length is 128 per MCP spec.
+		$long_name = str_repeat( 'a', 129 );
 		$this->assertFalse( McpValidator::validate_name( $long_name ) );
 	}
 
 	public function test_validate_name_accepts_max_length(): void {
-		$max_length_name = str_repeat( 'a', 255 );
+		// Default max length is 128 per MCP spec.
+		$max_length_name = str_repeat( 'a', 128 );
 		$this->assertTrue( McpValidator::validate_name( $max_length_name ) );
 	}
 
@@ -104,15 +106,22 @@ final class McpValidatorTest extends TestCase {
 		$invalid_names = array(
 			'name with spaces',
 			'name@invalid',
-			'name.invalid',
 			'name#invalid',
 			'name$invalid',
 			'name%invalid',
+			'name/invalid',
 		);
 
 		foreach ( $invalid_names as $name ) {
 			$this->assertFalse( McpValidator::validate_name( $name ), "Name '{$name}' should be invalid" );
 		}
+	}
+
+	public function test_validate_name_accepts_dot(): void {
+		// Dots are allowed per MCP 2025-11-25 spec: [A-Za-z0-9_.-]
+		$this->assertTrue( McpValidator::validate_name( 'name.with.dots' ) );
+		$this->assertTrue( McpValidator::validate_name( 'foo.bar' ) );
+		$this->assertTrue( McpValidator::validate_name( 'api.v2.endpoint' ) );
 	}
 
 	public function test_validate_name_with_custom_max_length(): void {
@@ -142,12 +151,33 @@ final class McpValidatorTest extends TestCase {
 			'',
 			'tool with spaces',
 			'tool@invalid',
-			str_repeat( 'a', 256 ),
+			'tool/invalid',
 		);
 
 		foreach ( $invalid_names as $name ) {
 			$this->assertFalse( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be invalid" );
 		}
+	}
+
+	public function test_validate_tool_or_prompt_name_max_length_128(): void {
+		// MCP 2025-11-25 spec: tool/prompt names max 128 characters.
+		$name_128_chars = str_repeat( 'a', 128 );
+		$name_129_chars = str_repeat( 'a', 129 );
+
+		$this->assertTrue( McpValidator::validate_tool_or_prompt_name( $name_128_chars ), '128 chars should be valid' );
+		$this->assertFalse( McpValidator::validate_tool_or_prompt_name( $name_129_chars ), '129 chars should be invalid' );
+	}
+
+	public function test_validate_tool_or_prompt_name_allows_dot(): void {
+		// MCP 2025-11-25 spec allows dots in tool/prompt names.
+		$this->assertTrue( McpValidator::validate_tool_or_prompt_name( 'foo.bar' ) );
+		$this->assertTrue( McpValidator::validate_tool_or_prompt_name( 'namespace.tool.action' ) );
+	}
+
+	public function test_validate_tool_or_prompt_name_rejects_slash(): void {
+		// Forward slash is NOT allowed in MCP tool/prompt names.
+		$this->assertFalse( McpValidator::validate_tool_or_prompt_name( 'foo/bar' ) );
+		$this->assertFalse( McpValidator::validate_tool_or_prompt_name( 'namespace/tool' ) );
 	}
 
 	// Argument Name Validation Tests

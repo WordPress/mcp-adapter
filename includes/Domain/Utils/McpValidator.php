@@ -55,17 +55,19 @@ class McpValidator {
 	/**
 	 * Validate an MCP component name.
 	 *
-	 * Validates that a name follows MCP naming conventions:
+	 * Validates that a name follows MCP naming conventions per MCP 2025-11-25 spec:
 	 * - Must not be empty
 	 * - Must not exceed the maximum length
-	 * - Must only contain letters, numbers, hyphens (-), and underscores (_)
+	 * - Must only contain letters, numbers, hyphens (-), underscores (_), and dots (.)
+	 *
+	 * @since n.e.x.t
 	 *
 	 * @param string $name The name to validate.
-	 * @param int    $max_length Maximum allowed length. Default is 255.
+	 * @param int    $max_length Maximum allowed length. Default is 128 per MCP spec.
 	 *
 	 * @return bool True if valid, false otherwise.
 	 */
-	public static function validate_name( string $name, int $max_length = 255 ): bool {
+	public static function validate_name( string $name, int $max_length = 128 ): bool {
 		// Names should not be empty.
 		if ( empty( $name ) ) {
 			return false;
@@ -76,19 +78,23 @@ class McpValidator {
 			return false;
 		}
 
-		// Only allow letters, numbers, hyphens, and underscores.
-		return (bool) preg_match( '/^[a-zA-Z0-9_-]+$/', $name );
+		// Only allow letters, numbers, hyphens, underscores, and dots per MCP spec.
+		return (bool) preg_match( '/^[a-zA-Z0-9_.-]+$/', $name );
 	}
 
 	/**
-	 * Validate a tool or prompt name (max 255 characters).
+	 * Validate a tool or prompt name per MCP 2025-11-25 spec.
+	 *
+	 * Tool and prompt names must be 1-128 characters using charset [A-Za-z0-9_.-].
+	 *
+	 * @since n.e.x.t
 	 *
 	 * @param string $name The name to validate.
 	 *
 	 * @return bool True if valid, false otherwise.
 	 */
 	public static function validate_tool_or_prompt_name( string $name ): bool {
-		return self::validate_name( $name, 255 );
+		return self::validate_name( $name, 128 );
 	}
 
 	/**

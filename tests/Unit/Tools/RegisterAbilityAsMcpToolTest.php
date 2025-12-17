@@ -226,4 +226,110 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		wp_unregister_ability( 'test/flat-transformed-tool' );
 	}
+
+	// Tool Name Filter and Validation Tests
+
+	public function test_tool_name_filter_applied(): void {
+		$this->register_ability_in_hook(
+			'test/filter-name-ability',
+			array(
+				'label'               => 'Filter Test',
+				'description'         => 'Tests filter hook',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array( 'mcp' => array( 'public' => true ) ),
+			)
+		);
+
+		// Add filter to modify tool name.
+		$filter_callback = static function ( string $name ) {
+			return 'custom-filtered-name';
+		};
+		add_filter( 'mcp_adapter_tool_name', $filter_callback );
+
+		$ability = wp_get_ability( 'test/filter-name-ability' );
+		$this->assertNotNull( $ability );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+		$this->assertInstanceOf( Tool::class, $tool );
+
+		$arr = $tool->toArray();
+		$this->assertSame( 'custom-filtered-name', $arr['name'] );
+
+		remove_filter( 'mcp_adapter_tool_name', $filter_callback );
+		wp_unregister_ability( 'test/filter-name-ability' );
+	}
+
+	public function test_tool_name_filter_validation_rejects_invalid(): void {
+		$this->register_ability_in_hook(
+			'test/filter-invalid-ability',
+			array(
+				'label'               => 'Filter Invalid Test',
+				'description'         => 'Tests filter validation',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array( 'mcp' => array( 'public' => true ) ),
+			)
+		);
+
+		// Add filter that returns invalid name (with spaces).
+		$filter_callback = static function () {
+			return 'invalid name with spaces';
+		};
+		add_filter( 'mcp_adapter_tool_name', $filter_callback );
+
+		$ability = wp_get_ability( 'test/filter-invalid-ability' );
+		$this->assertNotNull( $ability );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertWPError( $tool );
+		$this->assertSame( 'mcp_tool_name_filter_invalid', $tool->get_error_code() );
+
+		remove_filter( 'mcp_adapter_tool_name', $filter_callback );
+		wp_unregister_ability( 'test/filter-invalid-ability' );
+	}
+
+	public function test_tool_name_sanitizes_slash_to_hyphen(): void {
+		// Verify basic slash-to-hyphen sanitization works.
+		$this->register_ability_in_hook(
+			'test/slash-ability',
+			array(
+				'label'               => 'Slash Test',
+				'description'         => 'Tests slash to hyphen conversion',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array( 'mcp' => array( 'public' => true ) ),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/slash-ability' );
+		$this->assertNotNull( $ability );
+
+		$tool = RegisterAbilityAsMcpTool::make( $ability );
+		$this->assertNotWPError( $tool );
+
+		$arr = $tool->toArray();
+		$this->assertSame( 'test-slash-ability', $arr['name'] );
+
+		wp_unregister_ability( 'test/slash-ability' );
+	}
 }

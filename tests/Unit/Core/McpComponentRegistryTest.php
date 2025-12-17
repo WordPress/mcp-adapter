@@ -541,4 +541,137 @@ final class McpComponentRegistryTest extends TestCase {
 		// Re-enable the filter for subsequent tests
 		add_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
 	}
+
+	/**
+	 * Test that registry continues processing other tools when one tool name is invalid.
+	 *
+	 * This verifies that:
+	 * 1. Invalid tool names don't break MCP functionality
+	 * 2. Invalid tool names don't break the WordPress site
+	 * 3. Errors are logged for invalid tools
+	 * 4. Other valid tools are still registered
+	 */
+	public function test_register_tools_continues_after_invalid_tool_name(): void {
+		// Register two test abilities.
+		$this->register_ability_in_hook(
+			'test/first-valid-tool',
+			array(
+				'label'               => 'First Valid Tool',
+				'description'         => 'First tool for continue test',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/will-be-invalid',
+			array(
+				'label'               => 'Will Be Invalid Tool',
+				'description'         => 'This tool name will be invalidated by filter',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/second-valid-tool',
+			array(
+				'label'               => 'Second Valid Tool',
+				'description'         => 'Second tool for continue test',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		// Filter that invalidates the middle tool's name by returning invalid characters.
+		$filter_callback = static function ( $name ) {
+			if ( 'test-will-be-invalid' === $name ) {
+				return 'invalid name with spaces!!!'; // Invalid: contains spaces and special chars
+			}
+			return $name;
+		};
+		add_filter( 'mcp_adapter_tool_name', $filter_callback );
+
+		// Clear previous logs and events.
+		DummyErrorHandler::$logs           = array();
+		DummyObservabilityHandler::$events = array();
+
+		// Register all three tools - the middle one will fail.
+		$this->registry->register_tools(
+			array(
+				'test/first-valid-tool',
+				'test/will-be-invalid',
+				'test/second-valid-tool',
+			)
+		);
+
+		// Verify both valid tools were registered (invalid one was skipped).
+		$tools = $this->registry->get_tools();
+		$this->assertCount( 2, $tools, 'Both valid tools should be registered despite one invalid tool' );
+		$this->assertArrayHasKey( 'test-first-valid-tool', $tools );
+		$this->assertArrayHasKey( 'test-second-valid-tool', $tools );
+		$this->assertArrayNotHasKey( 'test-will-be-invalid', $tools );
+
+		// Verify error was logged for the invalid tool.
+		$this->assertNotEmpty( DummyErrorHandler::$logs, 'Error should be logged for invalid tool' );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'invalid', implode( ' ', $log_messages ) );
+
+		// Verify observability events: 2 successes and 1 failure.
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		$success_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'success' === $event['tags']['status'];
+			}
+		);
+		$this->assertCount( 2, $success_events, 'Two tools should have successful registration events' );
+
+		$failure_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status'];
+			}
+		);
+		$this->assertCount( 1, $failure_events, 'One tool should have a failed registration event' );
+
+		// Clean up.
+		remove_filter( 'mcp_adapter_tool_name', $filter_callback );
+		wp_unregister_ability( 'test/first-valid-tool' );
+		wp_unregister_ability( 'test/will-be-invalid' );
+		wp_unregister_ability( 'test/second-valid-tool' );
+	}
 }
