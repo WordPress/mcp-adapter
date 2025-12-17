@@ -474,8 +474,13 @@ wp_register_ability('my-plugin/create-post', [
             'post_title' => $input['title'],
             'post_content' => $input['content'],
             'post_status' => $input['status'] ?? 'draft'
-        ]);
-        
+        ], true); // Pass true to return WP_Error on failure
+
+        // Return WP_Error directly - adapter converts to isError: true
+        if (is_wp_error($post_id)) {
+            return $post_id;
+        }
+
         return [
             'post_id' => $post_id,
             'url' => get_permalink($post_id),
@@ -603,14 +608,34 @@ This produces:
 
 **Error Results**
 
-When a tool returns an error (via `['error' => 'message']`), the response uses `isError: true`:
+When a tool encounters an error, return a `WP_Error` object. The MCP Adapter automatically converts it to a proper MCP error response with `isError: true`:
+
+```php
+// In your execute_callback - return WP_Error for errors
+'execute_callback' => function($input) {
+    $post_id = wp_insert_post($postarr, true);
+
+    if (is_wp_error($post_id)) {
+        return $post_id; // Return the WP_Error directly
+    }
+
+    // Or create your own WP_Error:
+    if (empty($input['title'])) {
+        return new WP_Error('empty_title', 'Post title cannot be empty.');
+    }
+
+    return ['post_id' => $post_id, ...];
+}
+```
+
+This produces:
 
 ```json
 {
   "content": [
     {
       "type": "text",
-      "text": "Failed to create post: Invalid title"
+      "text": "Post title cannot be empty."
     }
   ],
   "isError": true
@@ -847,9 +872,46 @@ wp_register_ability('my-plugin/analysis-prompt', [
 - Mark required fields explicitly
 
 ### Error Handling
-- Return meaningful error messages
-- Use appropriate HTTP status codes
-- Include context information for debugging
+
+**Always use `WP_Error` for errors in your `execute_callback`:**
+
+```php
+'execute_callback' => function($input) {
+    // ✅ CORRECT: Return WP_Error objects
+    if (!$input['title']) {
+        return new WP_Error('empty_title', 'Title is required.');
+    }
+
+    $result = wp_insert_post($postarr, true);
+    if (is_wp_error($result)) {
+        return $result; // Pass through WP_Error from WordPress functions
+    }
+
+    // ❌ WRONG: Don't manually construct error arrays
+    // return ['error' => ['code' => 'x', 'message' => 'y']];
+    // This bypasses MCP error handling and returns success: true with nested error!
+
+    return ['post_id' => $result];
+}
+```
+
+**Why `WP_Error` matters for MCP:**
+
+The MCP specification distinguishes between:
+- **Protocol errors** (tool not found, server error) → JSON-RPC error response
+- **Tool execution errors** (validation failed, permission denied) → `CallToolResult` with `isError: true`
+
+When you return a `WP_Error`, the MCP Adapter:
+1. Detects it via `is_wp_error()`
+2. Extracts the error code and message
+3. Returns a proper MCP `CallToolResult` with `isError: true`
+4. Allows LLM clients to understand and self-correct based on the error
+
+**Best practices:**
+- Return meaningful error messages that help users understand what went wrong
+- Use descriptive error codes (e.g., `'invalid_post_type'`, `'permission_denied'`)
+- Pass through `WP_Error` objects from WordPress functions directly
+- Include context in error messages when helpful
 
 ### Performance
 - Keep tool execution lightweight
