@@ -50,13 +50,6 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	protected array $arguments = array();
 
 	/**
-	 * The prompt annotations.
-	 *
-	 * @var array
-	 */
-	protected array $annotations = array();
-
-	/**
 	 * Build and return the Prompt DTO instance.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\Prompt The built prompt DTO.
@@ -149,19 +142,6 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		}
 
 		return $this->arguments;
-	}
-
-	/**
-	 * Get the prompt annotations.
-	 *
-	 * @return array The prompt annotations.
-	 */
-	public function get_annotations(): array {
-		if ( empty( $this->name ) ) {
-			$this->configure();
-		}
-
-		return $this->annotations;
 	}
 
 	/**

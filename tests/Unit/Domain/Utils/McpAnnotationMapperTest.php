@@ -54,7 +54,12 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertCount( 3, $result );
 	}
 
-	public function test_map_includes_valid_fields_for_prompt(): void {
+	/**
+	 * Per MCP 2025-11-25 spec, Prompt templates do NOT support annotations.
+	 * Only content blocks inside prompt messages support annotations.
+	 * The mapper returns empty for 'prompt' feature type.
+	 */
+	public function test_map_returns_empty_for_prompt_feature_type(): void {
 		$annotations = array(
 			'audience'     => array( 'user' ),
 			'lastModified' => '2024-01-15T10:30:00Z',
@@ -63,10 +68,7 @@ final class McpAnnotationMapperTest extends TestCase {
 
 		$result = McpAnnotationMapper::map( $annotations, 'prompt' );
 
-		$this->assertArrayHasKey( 'audience', $result );
-		$this->assertArrayHasKey( 'lastModified', $result );
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertCount( 3, $result );
+		$this->assertEmpty( $result, 'Prompt templates do not support annotations per MCP spec' );
 	}
 
 	public function test_map_includes_tool_specific_fields(): void {
@@ -168,22 +170,22 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertCount( 1, $result );
 	}
 
-	public function test_map_excludes_tool_fields_for_prompt(): void {
+	/**
+	 * Per MCP 2025-11-25 spec, Prompt templates do NOT support any annotations.
+	 * Neither tool-specific nor shared annotations are mapped.
+	 */
+	public function test_map_excludes_all_fields_for_prompt(): void {
 		$annotations = array(
 			'readonly'    => true,
 			'title'       => 'Some Title',
 			'priority'    => 0.5,
+			'audience'    => array( 'user' ),
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'prompt' );
 
-		// Tool-specific fields should NOT be included for prompts
-		$this->assertArrayNotHasKey( 'readOnlyHint', $result );
-		$this->assertArrayNotHasKey( 'title', $result );
-
-		// But shared fields should be included
-		$this->assertArrayHasKey( 'priority', $result );
-		$this->assertCount( 1, $result );
+		// No annotations should be included for prompts
+		$this->assertEmpty( $result, 'Prompt templates do not support any annotations per MCP spec' );
 	}
 
 	public function test_map_filters_out_null_values(): void {

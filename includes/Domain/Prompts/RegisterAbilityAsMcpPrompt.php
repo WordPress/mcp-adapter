@@ -7,7 +7,6 @@
 
 namespace WP\MCP\Domain\Prompts;
 
-use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptArgument;
 use WP_Ability;
@@ -74,6 +73,10 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt data array.
 	 *
+	 * Per MCP 2025-11-25 specification, Prompt objects do NOT support annotations at the
+	 * template level. Annotations are only supported on content blocks inside prompt messages
+	 * (messages[].content.annotations).
+	 *
 	 * @return array<string,mixed>
 	 */
 	private function get_data(): array {
@@ -99,15 +102,6 @@ class RegisterAbilityAsMcpPrompt {
 			$arguments = $this->convert_input_schema_to_arguments( $input_schema );
 			if ( ! empty( $arguments ) ) {
 				$prompt_data['arguments'] = $arguments;
-			}
-		}
-
-		// Map annotations from ability meta to MCP format using unified mapper.
-		$ability_meta = $this->ability->get_meta();
-		if ( ! empty( $ability_meta['annotations'] ) && is_array( $ability_meta['annotations'] ) ) {
-			$mcp_annotations = McpAnnotationMapper::map( $ability_meta['annotations'], 'prompt' );
-			if ( ! empty( $mcp_annotations ) ) {
-				$prompt_data['annotations'] = $mcp_annotations;
 			}
 		}
 

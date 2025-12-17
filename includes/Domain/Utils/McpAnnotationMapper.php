@@ -26,31 +26,33 @@ class McpAnnotationMapper {
 	 *
 	 * Structure:
 	 * - type: The data type (boolean, string, array, number)
-	 * - features: Array of MCP features where this annotation is used (tool, resource, prompt)
+	 * - features: Array of MCP features where this annotation is used (tool, resource)
 	 * - ability_property: The WordPress Ability API property name (may differ from MCP field name), or null if mapping 1:1
 	 *
-	 * Note: Per MCP 2025-11-25 spec, Tools use ToolAnnotations (title, *Hint fields only),
-	 * while Resources/Prompts/Content use shared Annotations (audience, priority, lastModified).
-	 * These are distinct types in the protocol schema.
+	 * Note: Per MCP 2025-11-25 spec:
+	 * - Tools use ToolAnnotations (title, *Hint fields only)
+	 * - Resources use shared Annotations (audience, priority, lastModified)
+	 * - Prompts do NOT support annotations at template level (only on message content blocks)
 	 *
 	 * @var array<string, array{type: string, features: array<string>, ability_property: string|null}>
 	 */
 	private static array $mcp_annotations = array(
-		// Shared annotations - Resources and Prompts only (NOT Tools per MCP spec).
+		// Shared annotations - Resources only (NOT Tools or Prompt templates per MCP spec).
 		// ToolAnnotations is a separate type that does not include these fields.
+		// Prompt templates do not support annotations; only content blocks inside messages do.
 		'audience'        => array(
 			'type'             => 'array',
-			'features'         => array( 'resource', 'prompt' ),
+			'features'         => array( 'resource' ),
 			'ability_property' => null,
 		),
 		'lastModified'    => array(
 			'type'             => 'string',
-			'features'         => array( 'resource', 'prompt' ),
+			'features'         => array( 'resource' ),
 			'ability_property' => null,
 		),
 		'priority'        => array(
 			'type'             => 'number',
-			'features'         => array( 'resource', 'prompt' ),
+			'features'         => array( 'resource' ),
 			'ability_property' => null,
 		),
 		// Tool-specific annotations (ToolAnnotations type per MCP 2025-11-25 spec).
