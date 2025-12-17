@@ -51,11 +51,17 @@ class InitializeHandler {
 		);
 
 		// Capabilities should only be advertised if they are implemented end-to-end.
+		// IMPORTANT: We set explicit boolean values (not empty arrays) to ensure proper JSON serialization.
+		// Empty arrays `[]` serialize as JSON arrays `[]`, but MCP spec requires JSON objects `{}`.
+		// Setting explicit values like `listChanged: false` produces associative arrays that serialize correctly.
 		$capabilities = ServerCapabilities::fromArray(
 			array(
-				'prompts'   => array(),
-				'resources' => array(),
-				'tools'     => array(),
+				'prompts'   => array( 'listChanged' => false ),
+				'resources' => array(
+					'subscribe'   => false,
+					'listChanged' => false,
+				),
+				'tools'     => array( 'listChanged' => false ),
 			)
 		);
 
