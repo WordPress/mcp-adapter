@@ -171,26 +171,29 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 			return;
 		}
 
-		// Verify ONLY MCP-spec fields are present.
-		// Includes tool-specific hints and shared annotations (audience, lastModified, priority).
-		$valid_mcp_fields = array(
+		// Verify ONLY MCP ToolAnnotations fields are present.
+		// Per MCP 2025-11-25 spec, ToolAnnotations contains only these fields.
+		// Shared Annotations (audience, lastModified, priority) are for Resources/Prompts, NOT Tools.
+		$valid_tool_annotation_fields = array(
 			'readOnlyHint',
 			'destructiveHint',
 			'idempotentHint',
 			'openWorldHint',
 			'title',
-			'audience',
-			'lastModified',
-			'priority',
 		);
 		foreach ( array_keys( $arr['annotations'] ) as $field ) {
-			$this->assertContains( $field, $valid_mcp_fields, "Non-MCP field '{$field}' should be filtered out" );
+			$this->assertContains( $field, $valid_tool_annotation_fields, "Field '{$field}' is not a valid ToolAnnotations field per MCP spec" );
 		}
 
 		// Verify no WordPress-format fields.
 		$this->assertArrayNotHasKey( 'readonly', $arr['annotations'] );
 		$this->assertArrayNotHasKey( 'destructive', $arr['annotations'] );
 		$this->assertArrayNotHasKey( 'idempotent', $arr['annotations'] );
+
+		// Verify shared Annotations fields are NOT present (they're for Resources, not Tools).
+		$this->assertArrayNotHasKey( 'audience', $arr['annotations'], 'Shared annotation audience should not be mapped for tools' );
+		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'], 'Shared annotation lastModified should not be mapped for tools' );
+		$this->assertArrayNotHasKey( 'priority', $arr['annotations'], 'Shared annotation priority should not be mapped for tools' );
 	}
 
 	public function test_transformation_flags_are_stored_in_metadata(): void {

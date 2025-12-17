@@ -29,25 +29,31 @@ class McpAnnotationMapper {
 	 * - features: Array of MCP features where this annotation is used (tool, resource, prompt)
 	 * - ability_property: The WordPress Ability API property name (may differ from MCP field name), or null if mapping 1:1
 	 *
+	 * Note: Per MCP 2025-11-25 spec, Tools use ToolAnnotations (title, *Hint fields only),
+	 * while Resources/Prompts/Content use shared Annotations (audience, priority, lastModified).
+	 * These are distinct types in the protocol schema.
+	 *
 	 * @var array<string, array{type: string, features: array<string>, ability_property: string|null}>
 	 */
 	private static array $mcp_annotations = array(
-		// Shared annotations (all features) - in annotations object.
+		// Shared annotations - Resources and Prompts only (NOT Tools per MCP spec).
+		// ToolAnnotations is a separate type that does not include these fields.
 		'audience'        => array(
 			'type'             => 'array',
-			'features'         => array( 'tool', 'resource', 'prompt' ),
+			'features'         => array( 'resource', 'prompt' ),
 			'ability_property' => null,
 		),
 		'lastModified'    => array(
 			'type'             => 'string',
-			'features'         => array( 'tool', 'resource', 'prompt' ),
+			'features'         => array( 'resource', 'prompt' ),
 			'ability_property' => null,
 		),
 		'priority'        => array(
 			'type'             => 'number',
-			'features'         => array( 'tool', 'resource', 'prompt' ),
+			'features'         => array( 'resource', 'prompt' ),
 			'ability_property' => null,
 		),
+		// Tool-specific annotations (ToolAnnotations type per MCP 2025-11-25 spec).
 		'readOnlyHint'    => array(
 			'type'             => 'boolean',
 			'features'         => array( 'tool' ),
@@ -149,7 +155,7 @@ class McpAnnotationMapper {
 	private static function normalize_annotation_value( string $field_type, $value ) {
 		switch ( $field_type ) {
 			case 'boolean':
-				return (bool) $value;
+				return self::normalize_boolean( $value );
 
 			case 'string':
 				if ( ! is_scalar( $value ) ) {
@@ -167,5 +173,55 @@ class McpAnnotationMapper {
 			default:
 				return $value;
 		}
+	}
+
+	/**
+	 * Normalize a value to a strict boolean.
+	 *
+	 * Accepts only well-defined boolean representations to avoid ambiguous conversions.
+	 * PHP's default (bool) cast incorrectly converts 'false' string to true.
+	 *
+	 * Accepted values:
+	 * - true, false (PHP booleans)
+	 * - 1, 0 (integers)
+	 * - '1', '0', 'true', 'false' (case-insensitive strings)
+	 *
+	 * @param mixed $value The value to normalize.
+	 *
+	 * @return bool|null The normalized boolean, or null if value cannot be safely converted.
+	 */
+	private static function normalize_boolean( $value ): ?bool {
+		// Already a boolean - return as-is.
+		if ( is_bool( $value ) ) {
+			return $value;
+		}
+
+		// Integer 1 or 0.
+		if ( is_int( $value ) ) {
+			if ( 1 === $value ) {
+				return true;
+			}
+			if ( 0 === $value ) {
+				return false;
+			}
+			// Other integers are invalid (e.g., 2, -1).
+			return null;
+		}
+
+		// String representations (case-insensitive).
+		if ( is_string( $value ) ) {
+			$lower = strtolower( trim( $value ) );
+			if ( 'true' === $lower || '1' === $lower ) {
+				return true;
+			}
+			if ( 'false' === $lower || '0' === $lower ) {
+				return false;
+			}
+			// Other strings are invalid (e.g., 'yes', 'no', empty string).
+			return null;
+		}
+
+		// All other types (arrays, objects, floats, null) are invalid.
+		return null;
 	}
 }
