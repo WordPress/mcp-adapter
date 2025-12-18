@@ -10,7 +10,7 @@ The MCP Adapter converts WordPress abilities registered via `wp_register_ability
 
 **Key files:**
 - `includes/Domain/Resources/RegisterAbilityAsMcpResource.php` — Main converter
-- `includes/Domain/Resources/ResourceMetadataHelper.php` — Metadata access
+- `includes/Domain/Resources/McpResource.php` — Wrapper (execution + adapter metadata)
 - `includes/Domain/Utils/McpAnnotationMapper.php` — Annotations mapping
 - `includes/Domain/Utils/McpValidator.php` — Field validation
 - `includes/Handlers/Resources/ResourcesHandler.php` — Request handling
@@ -522,52 +522,11 @@ The `resources/read` method calls the ability's `execute_callback` to generate c
 
 ---
 
-## Internal Metadata (`_meta`)
+## Adapter Metadata
 
-### Purpose
+The adapter keeps ability linkage and other internal wiring on wrapper objects, not on Resource DTO `_meta`.
 
-The adapter stores internal metadata in `_meta['mcp_adapter']` for:
-- Linking resources back to their source abilities
-- Debugging and introspection
-- Content resolution during `resources/read`
-
-### Structure
-
-```php
-$resource_data['_meta'] = [
-    'mcp_adapter' => [
-        'ability' => 'my-plugin/resource',  // Always present
-    ],
-    // User-provided keys are preserved:
-    'custom_key' => 'custom_value',
-];
-```
-
-### MetaStripper Behavior
-
-Before sending responses to clients:
-
-1. `_meta['mcp_adapter']` is **removed** (adapter internal data)
-2. User-provided `_meta` keys are **preserved**
-3. If `_meta` becomes empty, the key is removed entirely
-
-```php
-// Before stripping:
-['uri' => '...', '_meta' => ['mcp_adapter' => [...], 'vendor' => 'acme']]
-
-// After stripping:
-['uri' => '...', '_meta' => ['vendor' => 'acme']]
-```
-
-### ResourceMetadataHelper API
-
-```php
-use WP\MCP\Domain\Resources\ResourceMetadataHelper;
-
-// Get the source ability name from a Resource DTO:
-$ability_name = ResourceMetadataHelper::get_ability_name( $resource );
-// Returns: 'my-plugin/resource' or null if missing
-```
+`_meta` on the Resource DTO is treated as user-provided metadata (from `ability.meta.mcp._meta`) and is passed through unchanged.
 
 ---
 

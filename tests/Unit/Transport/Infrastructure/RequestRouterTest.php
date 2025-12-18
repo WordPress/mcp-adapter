@@ -142,13 +142,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertArrayHasKey( 'tools', $result );
 		$this->assertIsArray( $result['tools'] );
 		$this->assertNotEmpty( $result['tools'] );
-		foreach ( $result['tools'] as $tool ) {
-			$this->assertIsArray( $tool );
-			if ( isset( $tool['_meta'] ) ) {
-				$this->assertIsArray( $tool['_meta'] );
-				$this->assertArrayNotHasKey( 'mcp_adapter', $tool['_meta'] );
-			}
-		}
+		$this->assertContainsOnly( 'array', $result['tools'] );
 	}
 
 	public function test_route_request_tools_call(): void {
@@ -166,7 +160,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertTrue( isset( $result['content'] ) || isset( $result['error'] ) );
 	}
 
-	public function test_route_request_tools_call_does_not_leak_internal_meta_in_text_content(): void {
+	public function test_route_request_tools_call_preserves_meta_in_text_content(): void {
 		$result = $this->router->route_request(
 			'tools/call',
 			array(
@@ -179,10 +173,10 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'content', $result );
 		$this->assertIsArray( $result['content'] );
-		$this->assertNotEmpty( $result['content'] );
-		$this->assertSame( 'text', $result['content'][0]['type'] );
-		$this->assertIsString( $result['content'][0]['text'] );
-		$this->assertStringNotContainsString( 'mcp_adapter', $result['content'][0]['text'] );
+			$this->assertNotEmpty( $result['content'] );
+			$this->assertSame( 'text', $result['content'][0]['type'] );
+			$this->assertIsString( $result['content'][0]['text'] );
+			$this->assertStringContainsString( 'mcp_adapter', $result['content'][0]['text'] );
 	}
 
 	public function test_route_request_resources_list(): void {
@@ -192,13 +186,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertArrayHasKey( 'resources', $result );
 		$this->assertIsArray( $result['resources'] );
 		$this->assertNotEmpty( $result['resources'] );
-		foreach ( $result['resources'] as $resource ) {
-			$this->assertIsArray( $resource );
-			if ( isset( $resource['_meta'] ) ) {
-				$this->assertIsArray( $resource['_meta'] );
-				$this->assertArrayNotHasKey( 'mcp_adapter', $resource['_meta'] );
-			}
-		}
+		$this->assertContainsOnly( 'array', $result['resources'] );
 	}
 
 	public function test_route_request_prompts_list(): void {
@@ -208,13 +196,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertArrayHasKey( 'prompts', $result );
 		$this->assertIsArray( $result['prompts'] );
 		$this->assertNotEmpty( $result['prompts'] );
-		foreach ( $result['prompts'] as $prompt ) {
-			$this->assertIsArray( $prompt );
-			if ( isset( $prompt['_meta'] ) ) {
-				$this->assertIsArray( $prompt['_meta'] );
-				$this->assertArrayNotHasKey( 'mcp_adapter', $prompt['_meta'] );
-			}
-		}
+		$this->assertContainsOnly( 'array', $result['prompts'] );
 	}
 
 	public function test_route_request_ping(): void {

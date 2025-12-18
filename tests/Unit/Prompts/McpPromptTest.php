@@ -29,7 +29,7 @@ final class McpPromptTest extends TestCase {
 				}
 			);
 
-		$dto = $prompt->build();
+		$dto = $prompt->get_component();
 
 		$this->assertInstanceOf( Prompt::class, $dto );
 		$this->assertSame( 'test-fluent', $dto->getName() );
@@ -55,7 +55,7 @@ final class McpPromptTest extends TestCase {
 				}
 			);
 
-		$result = $prompt->handle( array( 'value' => 21 ) );
+		$result = $prompt->execute( array( 'value' => 21 ) );
 
 		$this->assertSame( 21, $result['received']['value'] );
 		$this->assertSame( 42, $result['computed'] );
@@ -70,26 +70,26 @@ final class McpPromptTest extends TestCase {
 				}
 			);
 
-		$this->assertTrue( $prompt->has_permission( array( 'allowed' => true ) ) );
-		$this->assertFalse( $prompt->has_permission( array( 'allowed' => false ) ) );
-		$this->assertFalse( $prompt->has_permission( array() ) );
+		$this->assertTrue( $prompt->check_permission( array( 'allowed' => true ) ) );
+		$this->assertFalse( $prompt->check_permission( array( 'allowed' => false ) ) );
+		$this->assertFalse( $prompt->check_permission( array() ) );
 	}
 
 	public function test_fluent_api_default_permission_allows_all(): void {
 		$prompt = McpPrompt::create( 'no-permission-test' )
 			->handler( fn( $args ) => array() );
 
-		$this->assertTrue( $prompt->has_permission( array() ) );
-		$this->assertTrue( $prompt->has_permission( array( 'any' => 'value' ) ) );
+		$this->assertTrue( $prompt->check_permission( array() ) );
+		$this->assertTrue( $prompt->check_permission( array( 'any' => 'value' ) ) );
 	}
 
 	public function test_fluent_api_required_argument_shorthand(): void {
 		$prompt = McpPrompt::create( 'required-arg-test' )
-			->requiredArgument( 'input', 'Required input' )
+			->argument( 'input', 'Required input', true )
 			->argument( 'optional', 'Optional input' )
 			->handler( fn( $args ) => array() );
 
-		$dto       = $prompt->build();
+		$dto       = $prompt->get_component();
 		$arguments = $dto->getArguments();
 
 		$this->assertCount( 2, $arguments );
@@ -109,7 +109,7 @@ final class McpPromptTest extends TestCase {
 				)
 			);
 
-		$dto = $prompt->build();
+		$dto = $prompt->get_component();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -123,18 +123,18 @@ final class McpPromptTest extends TestCase {
 			->meta(
 				array(
 					'custom_key' => 'custom_value',
+					'mcp_adapter' => array( 'allowed' => true ),
 					'nested'     => array( 'a' => 1 ),
 				)
 			);
 
-		$dto = $prompt->build();
+		$dto = $prompt->get_component();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertSame( 'custom_value', $arr['_meta']['custom_key'] );
 		$this->assertSame( array( 'a' => 1 ), $arr['_meta']['nested'] );
-		// Internal adapter key should also be present.
-		$this->assertTrue( $arr['_meta']['mcp_adapter']['fluent'] );
+		$this->assertSame( array( 'allowed' => true ), $arr['_meta']['mcp_adapter'] );
 	}
 
 	// =========================================================================
@@ -160,7 +160,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->build();
+		$dto = $prompt->get_component();
 
 		$this->assertSame( 'test-array', $dto->getName() );
 		$this->assertSame( 'Test Array Prompt', $dto->getTitle() );
@@ -182,7 +182,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$result = $prompt->handle( array( 'n' => 10 ) );
+		$result = $prompt->execute( array( 'n' => 10 ) );
 
 		$this->assertSame( 20, $result['doubled'] );
 	}
@@ -198,8 +198,8 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$this->assertTrue( $prompt->has_permission( array( 'secret' => 'password' ) ) );
-		$this->assertFalse( $prompt->has_permission( array( 'secret' => 'wrong' ) ) );
+		$this->assertTrue( $prompt->check_permission( array( 'secret' => 'password' ) ) );
+		$this->assertFalse( $prompt->check_permission( array( 'secret' => 'wrong' ) ) );
 	}
 
 	public function test_array_config_throws_without_name(): void {
@@ -241,7 +241,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->build();
+		$dto = $prompt->get_component();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -263,10 +263,10 @@ final class McpPromptTest extends TestCase {
 		$prompts = $server->get_prompts();
 		$this->assertArrayHasKey( 'fluent-server-test', $prompts );
 
-		$builder = $server->get_prompt_builder( 'fluent-server-test' );
-		$this->assertNotNull( $builder );
+		$wrapper = $server->get_prompt_wrapper( 'fluent-server-test' );
+		$this->assertNotNull( $wrapper );
 
-		$result = $builder->handle( array() );
+		$result = $wrapper->execute( array() );
 		$this->assertSame( 'fluent', $result['source'] );
 	}
 
@@ -282,10 +282,10 @@ final class McpPromptTest extends TestCase {
 		$prompts = $server->get_prompts();
 		$this->assertArrayHasKey( 'array-server-test', $prompts );
 
-		$builder = $server->get_prompt_builder( 'array-server-test' );
-		$this->assertNotNull( $builder );
+		$wrapper = $server->get_prompt_wrapper( 'array-server-test' );
+		$this->assertNotNull( $wrapper );
 
-		$result = $builder->handle( array() );
+		$result = $wrapper->execute( array() );
 		$this->assertSame( 'array', $result['source'] );
 	}
 
@@ -336,13 +336,20 @@ final class McpPromptTest extends TestCase {
 			->meta( array( 'key' => 'value' ) )
 			->handler( fn( $args ) => array() );
 
-		$this->assertSame( 'getter-test', $prompt->get_name() );
-		$this->assertSame( 'Getter Title', $prompt->get_title() );
-		$this->assertSame( 'Getter Description', $prompt->get_description() );
-		$this->assertCount( 1, $prompt->get_arguments() );
-		$this->assertSame( 'arg1', $prompt->get_arguments()[0]['name'] );
-		$this->assertCount( 1, $prompt->get_icons() );
-		$this->assertSame( 'value', $prompt->get_meta()['key'] );
+		$this->assertSame( 'Getter Title', $prompt->get_name() );
+
+		$dto = $prompt->get_component();
+		$this->assertSame( 'getter-test', $dto->getName() );
+		$this->assertSame( 'Getter Title', $dto->getTitle() );
+		$this->assertSame( 'Getter Description', $dto->getDescription() );
+		$this->assertCount( 1, $dto->getArguments() );
+		$this->assertSame( 'arg1', $dto->getArguments()[0]->getName() );
+
+		$arr = $dto->toArray();
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertCount( 1, $arr['icons'] );
+		$this->assertArrayHasKey( '_meta', $arr );
+		$this->assertSame( 'value', $arr['_meta']['key'] );
 	}
 
 	public function test_defaults_for_optional_fields(): void {
@@ -350,10 +357,13 @@ final class McpPromptTest extends TestCase {
 			->handler( fn( $args ) => array() );
 
 		$this->assertSame( 'minimal-test', $prompt->get_name() );
-		$this->assertNull( $prompt->get_title() );
-		$this->assertNull( $prompt->get_description() );
-		$this->assertEmpty( $prompt->get_arguments() );
-		$this->assertEmpty( $prompt->get_icons() );
-		$this->assertEmpty( $prompt->get_meta() );
+
+		$dto = $prompt->get_component();
+		$this->assertSame( 'minimal-test', $dto->getName() );
+		$this->assertNull( $dto->getTitle() );
+		$this->assertNull( $dto->getDescription() );
+		$this->assertNull( $dto->getArguments() );
+		$this->assertNull( $dto->getIcons() );
+		$this->assertNull( $dto->get_meta() );
 	}
 }

@@ -13,7 +13,7 @@ The MCP Adapter converts WordPress abilities registered via `wp_register_ability
 - `includes/Domain/Utils/McpNameSanitizer.php` — Name sanitization
 - `includes/Domain/Utils/SchemaTransformer.php` — Schema normalization
 - `includes/Domain/Utils/McpAnnotationMapper.php` — Annotations mapping
-- `includes/Domain/Tools/ToolMetadataHelper.php` — Metadata access
+- `includes/Domain/Tools/McpTool.php` — Wrapper (execution + adapter metadata)
 
 ---
 
@@ -262,70 +262,11 @@ After mapping, annotations can optionally be validated via `McpValidator::get_to
 
 ---
 
-## Internal Metadata (`_meta`)
+## Adapter Metadata
 
-### Purpose
+The adapter keeps conversion/debug metadata (e.g. schema transformation details) on internal wrapper objects.
 
-The adapter stores debug/transformation metadata in `_meta['mcp_adapter']`. This metadata is:
-- **Internal only** — stripped before sending responses to clients
-- **Useful for debugging** — tracks transformation decisions
-- **Accessible via `ToolMetadataHelper`** — for adapter-internal use
-
-### Structure
-
-```php
-$tool_data['_meta'] = [
-    'mcp_adapter' => [
-        'ability' => 'my-plugin/create-post',  // Always present
-
-        // Only present when input schema was transformed (wrapped):
-        'input_schema_transformed' => true,
-        'input_schema_wrapper' => 'input',
-
-        // Only present when output schema exists AND was transformed:
-        'output_schema_transformed' => true,
-        'output_schema_wrapper' => 'result',
-    ]
-];
-```
-
-### MetaStripper Behavior
-
-The `MetaStripper::strip_array()` method removes adapter metadata before client responses:
-
-1. Removes `_meta['mcp_adapter']` key (the adapter's internal data)
-2. If `_meta` becomes empty after removal, removes `_meta` entirely
-3. Recursively processes nested structures
-
-```php
-// Before stripping:
-['name' => 'my-tool', 'inputSchema' => [...], '_meta' => ['mcp_adapter' => [...]]]
-
-// After stripping (mcp_adapter was only key):
-['name' => 'my-tool', 'inputSchema' => [...]]
-
-// If _meta had other keys, they would remain:
-['name' => 'my-tool', '_meta' => ['other_source' => [...]]]
-```
-
-### ToolMetadataHelper API
-
-```php
-use WP\MCP\Domain\Tools\ToolMetadataHelper;
-
-// Get the source ability name
-$ability_name = ToolMetadataHelper::get_ability_name($tool);  // 'my-plugin/create-post'
-
-// Check if input schema was wrapped
-$was_wrapped = ToolMetadataHelper::is_input_transformed($tool);  // true/false
-
-// Get wrapper property name
-$wrapper = ToolMetadataHelper::get_input_wrapper($tool);  // 'input' (default)
-
-// Same for output schema
-$output_wrapped = ToolMetadataHelper::is_output_transformed($tool);
-$output_wrapper = ToolMetadataHelper::get_output_wrapper($tool);  // 'result' (default)
-```
+`_meta` on the Tool DTO is treated as **user-provided metadata** (from `ability.meta.mcp._meta`) and is passed through unchanged.
 
 ---
 
@@ -649,7 +590,7 @@ wp_register_ability('my-plugin/process-data', [
 }
 ```
 
-**Note:** The adapter's internal metadata (`_meta.mcp_adapter`) is stripped before sending to clients, but user-provided `_meta` keys are preserved. This allows ability authors to pass arbitrary metadata to MCP clients for custom integrations.
+**Note:** `_meta` keys from `ability.meta.mcp._meta` are passed through to clients unchanged, allowing ability authors to attach arbitrary metadata to Tool DTOs.
 
 ---
 
@@ -684,7 +625,7 @@ The adapter reads icons from `ability.meta.mcp.icons` and validates them before 
 
 ### User _meta (`ability.meta.mcp._meta`)
 
-User-provided metadata is merged with the adapter's internal metadata:
+User-provided metadata is passed through unchanged:
 
 ```php
 // Ability registration:
@@ -694,16 +635,7 @@ User-provided metadata is merged with the adapter's internal metadata:
     ]
 ]
 
-// Internal tool _meta (before stripping):
-[
-    '_meta' => [
-        'vendor' => 'acme',           // User-provided (preserved)
-        'env' => 'production',        // User-provided (preserved)
-        'mcp_adapter' => [...]        // Adapter internal (stripped)
-    ]
-]
-
-// Response to clients (after MetaStripper):
+// Tool DTO _meta:
 [
     '_meta' => [
         'vendor' => 'acme',
@@ -711,8 +643,6 @@ User-provided metadata is merged with the adapter's internal metadata:
     ]
 ]
 ```
-
-**Merge order:** User _meta is merged first, then adapter metadata. If there's a key collision, adapter keys win (to preserve internal functionality).
 
 ---
 

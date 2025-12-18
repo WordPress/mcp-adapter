@@ -2,8 +2,8 @@
 /**
  * Regression tests for DTO serialization at the transport boundary.
  *
- * These tests ensure schema DTOs round-trip to arrays and JSON without leaking internal
- * adapter metadata (`_meta.mcp_adapter`) or producing placeholder `{}` objects for nested DTOs.
+ * These tests ensure schema DTOs round-trip to arrays and JSON without producing placeholder `{}` objects
+ * for nested DTOs.
  *
  * @package McpAdapter
  */
@@ -13,7 +13,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
 use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
-use WP\MCP\Infrastructure\Dto\MetaStripper;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\McpSchema\Common\Protocol\BlobResourceContents;
@@ -30,7 +29,6 @@ final class DtoSerializationRegressionTest extends TestCase {
 			'text/plain',
 			null,
 			array(
-				'mcp_adapter' => array( 'internal' => true ),
 				'keep'        => array( 'public' => true ),
 			)
 		);
@@ -42,13 +40,12 @@ final class DtoSerializationRegressionTest extends TestCase {
 			)
 		);
 
-		$result = MetaStripper::strip_array( $dto->toArray() );
+		$result = $dto->toArray();
 
 		$response = JsonRpcResponseBuilder::create_success_response( 1, $result );
 		$json     = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		$this->assertNotFalse( $json );
 
-		$this->assertStringNotContainsString( 'mcp_adapter', $json );
 		$this->assertStringNotContainsString( '"resource":{}', $json );
 
 		/** @var array<string, mixed> $decoded */
@@ -76,7 +73,6 @@ final class DtoSerializationRegressionTest extends TestCase {
 				'text'     => 'content',
 				'mimeType' => 'text/plain',
 				'_meta'    => array(
-					'mcp_adapter' => array( 'internal' => true ),
 					'keep'        => 'value',
 				),
 			)
@@ -88,28 +84,27 @@ final class DtoSerializationRegressionTest extends TestCase {
 				'blob'     => 'YmFzZTY0', // "base64" - not important for this test.
 				'mimeType' => 'application/octet-stream',
 				'_meta'    => array(
-					'mcp_adapter' => null,
+					'keep' => 'blob-meta',
 				),
 			)
 		);
 
-		$dto = ReadResourceResult::fromArray(
-			array(
-				'contents' => array( $text, $blob ),
-				'_meta'    => array(
-					'mcp_adapter' => array( 'internal' => true ),
-				),
-			)
-		);
+			$dto = ReadResourceResult::fromArray(
+				array(
+					'contents' => array( $text, $blob ),
+					'_meta'    => array(
+						'keep' => 'top-meta',
+					),
+				)
+			);
 
-		$result = MetaStripper::strip_array( $dto->toArray() );
+			$result = $dto->toArray();
 
 		$response = JsonRpcResponseBuilder::create_success_response( 1, $result );
 		$json     = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		$this->assertNotFalse( $json );
 
-		$this->assertStringNotContainsString( 'mcp_adapter', $json );
-		$this->assertStringNotContainsString( '"contents":[{}', $json );
+			$this->assertStringNotContainsString( '"contents":[{}', $json );
 
 		/** @var array<string, mixed> $decoded */
 		$decoded = json_decode( (string) $json, true );
@@ -119,15 +114,14 @@ final class DtoSerializationRegressionTest extends TestCase {
 		$this->assertIsArray( $decoded['result']['contents'] );
 		$this->assertCount( 2, $decoded['result']['contents'] );
 
-		$this->assertSame( 'WordPress://local/resource-1', $decoded['result']['contents'][0]['uri'] );
-		$this->assertSame( 'content', $decoded['result']['contents'][0]['text'] );
-		$this->assertSame( 'text/plain', $decoded['result']['contents'][0]['mimeType'] );
-		$this->assertSame( 'value', $decoded['result']['contents'][0]['_meta']['keep'] );
+			$this->assertSame( 'WordPress://local/resource-1', $decoded['result']['contents'][0]['uri'] );
+			$this->assertSame( 'content', $decoded['result']['contents'][0]['text'] );
+			$this->assertSame( 'text/plain', $decoded['result']['contents'][0]['mimeType'] );
+			$this->assertSame( 'value', $decoded['result']['contents'][0]['_meta']['keep'] );
 
-		$this->assertSame( 'WordPress://local/resource-2', $decoded['result']['contents'][1]['uri'] );
-		$this->assertSame( 'YmFzZTY0', $decoded['result']['contents'][1]['blob'] );
-		$this->assertSame( 'application/octet-stream', $decoded['result']['contents'][1]['mimeType'] );
-		$this->assertArrayNotHasKey( '_meta', $decoded['result']['contents'][1] );
+			$this->assertSame( 'WordPress://local/resource-2', $decoded['result']['contents'][1]['uri'] );
+			$this->assertSame( 'YmFzZTY0', $decoded['result']['contents'][1]['blob'] );
+			$this->assertSame( 'application/octet-stream', $decoded['result']['contents'][1]['mimeType'] );
+			$this->assertSame( 'blob-meta', $decoded['result']['contents'][1]['_meta']['keep'] );
 	}
 }
-

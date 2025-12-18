@@ -7,12 +7,11 @@
 
 declare( strict_types=1 );
 
-namespace WP\MCP\Transport\Infrastructure;
+	namespace WP\MCP\Transport\Infrastructure;
 
-use WP\MCP\Infrastructure\Dto\MetaStripper;
-use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+	use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+	use WP\McpSchema\Common\AbstractDataTransferObject;
+	use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -56,6 +55,7 @@ class RequestRouter {
 		$start_time = microtime( true );
 
 		$new_session_id = null;
+		$component_tags = $this->resolve_component_observability_context( $method, $params );
 
 		// Common tags for all metrics.
 		$common_tags = array(
@@ -93,7 +93,7 @@ class RequestRouter {
 				// Normalize to transport-level shape: only the JSON-RPC error object.
 				// The JSON-RPC envelope is created by the transport boundary.
 				$result             = array( 'error' => $handler_result->getError()->toArray() );
-				$tags               = array_merge( $common_tags, array( 'status' => 'error' ) );
+				$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
 				$tags['error_code'] = $handler_result->getError()->getCode();
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 				return $result;
@@ -102,26 +102,20 @@ class RequestRouter {
 			if ( $handler_result instanceof AbstractDataTransferObject ) {
 				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
 				// Note: If a future schema version ever returns nested DTO objects inside `toArray()`,
-				// we may need to add a deep normalizer at this boundary (before MetaStripper and
-				// JSON serialization) to prevent placeholder `{}` objects in client output.
+				// we may need to add a deep normalizer at this boundary (before JSON serialization)
+				// to prevent placeholder `{}` objects in client output.
 				$raw_result = $handler_result->toArray();
 
-				// Extract internal adapter metadata from MCP-spec _meta (if present) for observability.
-				$metadata = array();
-				if ( isset( $raw_result['_meta'] ) && is_array( $raw_result['_meta'] ) && isset( $raw_result['_meta']['mcp_adapter'] ) && is_array( $raw_result['_meta']['mcp_adapter'] ) ) {
-					$metadata = $raw_result['_meta']['mcp_adapter'];
-				}
-
 				if ( null !== $new_session_id ) {
-					$metadata['new_session_id'] = $new_session_id;
+					$component_tags['new_session_id'] = $new_session_id;
 				}
 
-				$result = MetaStripper::strip_array( $raw_result );
+				$result = $raw_result;
 				if ( null !== $new_session_id ) {
 					$result['_session_id'] = $new_session_id;
 				}
 
-				$tags = array_merge( $common_tags, $metadata, array( 'status' => 'success' ) );
+				$tags = array_merge( $common_tags, $component_tags, array( 'status' => 'success' ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 				return $result;
 			}
@@ -129,7 +123,7 @@ class RequestRouter {
 			// Handlers should only return schema DTOs.
 			$unexpected_error   = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
 			$result             = array( 'error' => $unexpected_error->getError()->toArray() );
-			$tags               = array_merge( $common_tags, array( 'status' => 'error' ) );
+			$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
 			$tags['error_code'] = $unexpected_error->getError()->getCode();
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
@@ -141,6 +135,7 @@ class RequestRouter {
 			// Track exception with categorization.
 			$tags = array_merge(
 				$common_tags,
+				$component_tags,
 				array(
 					'status'         => 'error',
 					'error_type'     => get_class( $exception ),
@@ -223,6 +218,82 @@ class RequestRouter {
 		);
 
 		return $error_categories[ get_class( $exception ) ] ?? 'unknown';
+	}
+
+		/**
+		 * Resolve per-component observability tags for a request.
+		 *
+		 * This replaces legacy approaches that derived tags from DTO `_meta`.
+		 *
+		 * @param string $method MCP method name.
+		 * @param array  $params Request parameters (root or nested under `params`).
+		 *
+	 * @return array<string, mixed>
+	 */
+	private function resolve_component_observability_context( string $method, array $params ): array {
+		$request_params = $params['params'] ?? $params;
+
+		if ( ! is_array( $request_params ) ) {
+			$request_params = array();
+		}
+
+		switch ( $method ) {
+			case 'tools/call':
+				$tool_name = $request_params['name'] ?? null;
+				$tool_name = is_string( $tool_name ) ? trim( $tool_name ) : null;
+
+				if ( null === $tool_name || '' === $tool_name ) {
+					return array();
+				}
+
+				$tool = $this->context->mcp_server->get_tool_wrapper( $tool_name );
+				if ( $tool ) {
+					return $tool->get_observability_context();
+				}
+
+				return array(
+					'component_type' => 'tool',
+					'tool_name'      => $tool_name,
+				);
+
+			case 'prompts/get':
+				$prompt_name = $request_params['name'] ?? null;
+				$prompt_name = is_string( $prompt_name ) ? trim( $prompt_name ) : null;
+
+				if ( null === $prompt_name || '' === $prompt_name ) {
+					return array();
+				}
+
+				$prompt = $this->context->mcp_server->get_prompt_wrapper( $prompt_name );
+				if ( $prompt ) {
+					return $prompt->get_observability_context();
+				}
+
+				return array(
+					'component_type' => 'prompt',
+					'prompt_name'    => $prompt_name,
+				);
+
+			case 'resources/read':
+				$resource_uri = $request_params['uri'] ?? null;
+				$resource_uri = is_string( $resource_uri ) ? trim( $resource_uri ) : null;
+
+				if ( null === $resource_uri || '' === $resource_uri ) {
+					return array();
+				}
+
+				$resource = $this->context->mcp_server->get_resource_wrapper( $resource_uri );
+				if ( $resource ) {
+					return $resource->get_observability_context();
+				}
+
+				return array(
+					'component_type' => 'resource',
+					'resource_uri'   => $resource_uri,
+				);
+		}
+
+		return array();
 	}
 
 	/**

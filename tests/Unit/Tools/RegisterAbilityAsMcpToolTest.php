@@ -5,18 +5,29 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
-use WP\MCP\Domain\Tools\ToolMetadataHelper;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Tools\Tool;
 
 final class RegisterAbilityAsMcpToolTest extends TestCase {
 
-	public function test_make_builds_tool_from_ability(): void {
+	/**
+	 * @param \WP_Ability $ability The ability to build into a Tool DTO.
+	 */
+	private function build_tool_from_ability( \WP_Ability $ability ): Tool {
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertIsArray( $built );
+		$this->assertArrayHasKey( 'tool', $built );
+		$this->assertInstanceOf( Tool::class, $built['tool'] );
+
+		return $built['tool'];
+	}
+
+	public function test_build_builds_tool_from_ability(): void {
 		$ability = wp_get_ability( 'test/always-allowed' );
 		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertInstanceOf( Tool::class, $tool );
-		$arr = $tool->toArray();
+		$tool = $this->build_tool_from_ability( $ability );
+		$arr  = $tool->toArray();
 		$this->assertSame( 'test-always-allowed', $arr['name'] );
 		$this->assertArrayHasKey( 'inputSchema', $arr );
 	}
@@ -25,8 +36,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/annotated-ability' );
 		$this->assertNotNull( $ability, 'Ability test/annotated-ability should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -51,8 +61,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/null-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/null-annotations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -68,8 +77,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/with-instructions' );
 		$this->assertNotNull( $ability, 'Ability test/with-instructions should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -86,8 +94,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/mcp-native' );
 		$this->assertNotNull( $ability, 'Ability test/mcp-native should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -107,8 +114,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/no-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/no-annotations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -120,8 +126,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/all-null-annotations' );
 		$this->assertNotNull( $ability, 'Ability test/all-null-annotations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -133,8 +138,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/annotated-ability' );
 		$this->assertNotNull( $ability, 'Ability test/annotated-ability should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -161,10 +165,9 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 			$this->markTestSkipped( 'Built-in ability mcp-adapter/get-ability-info not found' );
 		}
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+			$tool = $this->build_tool_from_ability( $ability );
 
-		$arr = $tool->toArray();
+			$arr = $tool->toArray();
 
 		if ( ! isset( $arr['annotations'] ) ) {
 			// If no annotations, test passes.
@@ -219,15 +222,62 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		$ability = wp_get_ability( 'test/flat-transformed-tool' );
 		$this->assertNotNull( $ability, 'Ability test/flat-transformed-tool should be registered' );
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertInstanceOf( Tool::class, $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertInstanceOf( Tool::class, $built['tool'] );
 
-		$this->assertTrue( ToolMetadataHelper::is_input_transformed( $tool ) );
-		$this->assertTrue( ToolMetadataHelper::is_output_transformed( $tool ) );
-		$this->assertSame( 'input', ToolMetadataHelper::get_input_wrapper( $tool ) );
-		$this->assertSame( 'result', ToolMetadataHelper::get_output_wrapper( $tool ) );
+		$adapter_meta = $built['adapter_meta'];
+		$this->assertSame( 'test/flat-transformed-tool', $adapter_meta['ability'] );
+		$this->assertTrue( $adapter_meta['input_schema_transformed'] );
+		$this->assertTrue( $adapter_meta['output_schema_transformed'] );
+		$this->assertSame( 'input', $adapter_meta['input_schema_wrapper'] );
+		$this->assertSame( 'result', $adapter_meta['output_schema_wrapper'] );
 
 		wp_unregister_ability( 'test/flat-transformed-tool' );
+	}
+
+	public function test_build_preserves_user_mcp_adapter_meta_key(): void {
+		$this->register_ability_in_hook(
+			'test/tool-user-meta-mcp-adapter',
+			array(
+				'label'               => 'Tool User Meta MCP Adapter',
+				'description'         => 'Test reserved _meta key stripping',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'ok' => true );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'_meta' => array(
+							'mcp_adapter'       => array( 'spoofed' => true ),
+							'public_meta_key'   => 'public_meta_value',
+							'public_meta_other' => 'public_meta_other_value',
+						),
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/tool-user-meta-mcp-adapter' );
+		$this->assertNotNull( $ability );
+
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+
+		$tool = $built['tool'];
+		$this->assertInstanceOf( Tool::class, $tool );
+
+			$data = $tool->toArray();
+			$this->assertArrayHasKey( '_meta', $data );
+			$this->assertSame( 'public_meta_value', $data['_meta']['public_meta_key'] );
+			$this->assertSame( 'public_meta_other_value', $data['_meta']['public_meta_other'] );
+			$this->assertSame( array( 'spoofed' => true ), $data['_meta']['mcp_adapter'] );
+
+		wp_unregister_ability( 'test/tool-user-meta-mcp-adapter' );
 	}
 
 	// Tool Name Filter and Validation Tests
@@ -256,15 +306,13 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		};
 		add_filter( 'mcp_adapter_tool_name', $filter_callback );
 
-		$ability = wp_get_ability( 'test/filter-name-ability' );
-		$this->assertNotNull( $ability );
+			$ability = wp_get_ability( 'test/filter-name-ability' );
+			$this->assertNotNull( $ability );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
-		$this->assertInstanceOf( Tool::class, $tool );
+			$tool = $this->build_tool_from_ability( $ability );
 
-		$arr = $tool->toArray();
-		$this->assertSame( 'custom-filtered-name', $arr['name'] );
+			$arr = $tool->toArray();
+			$this->assertSame( 'custom-filtered-name', $arr['name'] );
 
 		remove_filter( 'mcp_adapter_tool_name', $filter_callback );
 		wp_unregister_ability( 'test/filter-name-ability' );
@@ -294,15 +342,15 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		};
 		add_filter( 'mcp_adapter_tool_name', $filter_callback );
 
-		$ability = wp_get_ability( 'test/filter-invalid-ability' );
-		$this->assertNotNull( $ability );
+			$ability = wp_get_ability( 'test/filter-invalid-ability' );
+			$this->assertNotNull( $ability );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertWPError( $tool );
-		$this->assertSame( 'mcp_tool_name_filter_invalid', $tool->get_error_code() );
+			$built = RegisterAbilityAsMcpTool::build( $ability );
+			$this->assertWPError( $built );
+			$this->assertSame( 'mcp_tool_name_filter_invalid', $built->get_error_code() );
 
-		remove_filter( 'mcp_adapter_tool_name', $filter_callback );
-		wp_unregister_ability( 'test/filter-invalid-ability' );
+			remove_filter( 'mcp_adapter_tool_name', $filter_callback );
+			wp_unregister_ability( 'test/filter-invalid-ability' );
 	}
 
 	public function test_tool_name_sanitizes_slash_to_hyphen(): void {
@@ -324,19 +372,18 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 			)
 		);
 
-		$ability = wp_get_ability( 'test/slash-ability' );
-		$this->assertNotNull( $ability );
+			$ability = wp_get_ability( 'test/slash-ability' );
+			$this->assertNotNull( $ability );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+			$tool = $this->build_tool_from_ability( $ability );
 
-		$arr = $tool->toArray();
-		$this->assertSame( 'test-slash-ability', $arr['name'] );
+			$arr = $tool->toArray();
+			$this->assertSame( 'test-slash-ability', $arr['name'] );
 
 		wp_unregister_ability( 'test/slash-ability' );
 	}
 
-	// Metadata correctness tests (semantic accuracy of _meta['mcp_adapter']).
+		// Adapter metadata correctness tests (semantic accuracy of adapter_meta).
 
 	public function test_metadata_omits_output_keys_when_output_schema_absent(): void {
 		// Scenario: input transformed (flat string), NO output schema.
@@ -362,23 +409,19 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/input-only-transformed' );
 		$this->assertNotNull( $ability, 'Ability test/input-only-transformed should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertInstanceOf( Tool::class, $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertInstanceOf( Tool::class, $built['tool'] );
 
 		// Verify input transformation metadata is present.
-		$this->assertTrue( ToolMetadataHelper::is_input_transformed( $tool ) );
-		$this->assertSame( 'input', ToolMetadataHelper::get_input_wrapper( $tool ) );
+		$adapter_meta = $built['adapter_meta'];
+		$this->assertSame( 'test/input-only-transformed', $adapter_meta['ability'] );
+		$this->assertTrue( $adapter_meta['input_schema_transformed'] );
+		$this->assertSame( 'input', $adapter_meta['input_schema_wrapper'] );
 
 		// Verify output transformation metadata is NOT present (no outputSchema).
-		$meta         = $tool->get_meta();
-		$adapter_meta = $meta['mcp_adapter'] ?? array();
-
 		$this->assertArrayNotHasKey( 'output_schema_transformed', $adapter_meta, 'output_schema_transformed should be omitted when no output schema exists' );
 		$this->assertArrayNotHasKey( 'output_schema_wrapper', $adapter_meta, 'output_schema_wrapper should be omitted when no output schema exists' );
-
-		// Verify helper returns stable defaults even without metadata.
-		$this->assertFalse( ToolMetadataHelper::is_output_transformed( $tool ) );
-		$this->assertSame( 'result', ToolMetadataHelper::get_output_wrapper( $tool ) );
 
 		wp_unregister_ability( 'test/input-only-transformed' );
 	}
@@ -407,11 +450,12 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/output-only-transformed' );
 		$this->assertNotNull( $ability, 'Ability test/output-only-transformed should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertInstanceOf( Tool::class, $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertInstanceOf( Tool::class, $built['tool'] );
 
-		$meta         = $tool->get_meta();
-		$adapter_meta = $meta['mcp_adapter'] ?? array();
+		$adapter_meta = $built['adapter_meta'];
+		$this->assertSame( 'test/output-only-transformed', $adapter_meta['ability'] );
 
 		// Verify input transformation metadata is NOT present (not transformed).
 		$this->assertArrayNotHasKey( 'input_schema_transformed', $adapter_meta, 'input_schema_transformed should be omitted when input was not transformed' );
@@ -422,14 +466,6 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertTrue( $adapter_meta['output_schema_transformed'] );
 		$this->assertArrayHasKey( 'output_schema_wrapper', $adapter_meta, 'output_schema_wrapper should be present when output was transformed' );
 		$this->assertSame( 'result', $adapter_meta['output_schema_wrapper'] );
-
-		// Verify helper returns stable defaults for input even without metadata.
-		$this->assertFalse( ToolMetadataHelper::is_input_transformed( $tool ) );
-		$this->assertSame( 'input', ToolMetadataHelper::get_input_wrapper( $tool ) );
-
-		// Verify helper returns correct values for output.
-		$this->assertTrue( ToolMetadataHelper::is_output_transformed( $tool ) );
-		$this->assertSame( 'result', ToolMetadataHelper::get_output_wrapper( $tool ) );
 
 		wp_unregister_ability( 'test/output-only-transformed' );
 	}
@@ -468,11 +504,11 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/no-transformations' );
 		$this->assertNotNull( $ability, 'Ability test/no-transformations should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertInstanceOf( Tool::class, $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertInstanceOf( Tool::class, $built['tool'] );
 
-		$meta         = $tool->get_meta();
-		$adapter_meta = $meta['mcp_adapter'] ?? array();
+		$adapter_meta = $built['adapter_meta'];
 
 		// Verify only 'ability' key is present.
 		$this->assertArrayHasKey( 'ability', $adapter_meta );
@@ -484,12 +520,6 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertArrayNotHasKey( 'output_schema_transformed', $adapter_meta );
 		$this->assertArrayNotHasKey( 'output_schema_wrapper', $adapter_meta );
 
-		// Verify helpers return stable defaults.
-		$this->assertFalse( ToolMetadataHelper::is_input_transformed( $tool ) );
-		$this->assertFalse( ToolMetadataHelper::is_output_transformed( $tool ) );
-		$this->assertSame( 'input', ToolMetadataHelper::get_input_wrapper( $tool ) );
-		$this->assertSame( 'result', ToolMetadataHelper::get_output_wrapper( $tool ) );
-
 		wp_unregister_ability( 'test/no-transformations' );
 	}
 
@@ -499,9 +529,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/with-icons' );
 		$this->assertNotNull( $ability, 'Ability test/with-icons should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
-		$this->assertInstanceOf( Tool::class, $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -527,9 +555,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/with-mixed-icons' );
 		$this->assertNotNull( $ability, 'Ability test/with-mixed-icons should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
-		$this->assertInstanceOf( Tool::class, $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -546,12 +572,14 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertContains( 'https://example.com/another-valid.svg', $srcs );
 	}
 
-	public function test_custom_meta_is_passed_through(): void {
+		public function test_custom_meta_is_passed_through(): void {
 		$ability = wp_get_ability( 'test/with-custom-meta' );
 		$this->assertNotNull( $ability, 'Ability test/with-custom-meta should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+
+		$tool = $built['tool'];
 		$this->assertInstanceOf( Tool::class, $tool );
 
 		$meta = $tool->get_meta();
@@ -565,18 +593,17 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertArrayHasKey( 'another_vendor', $meta );
 		$this->assertSame( 'some-value', $meta['another_vendor'] );
 
-		// Verify internal adapter metadata is also present.
-		$this->assertArrayHasKey( 'mcp_adapter', $meta );
-		$this->assertArrayHasKey( 'ability', $meta['mcp_adapter'] );
-		$this->assertSame( 'test/with-custom-meta', $meta['mcp_adapter']['ability'] );
-	}
+			$this->assertSame( 'test/with-custom-meta', $built['adapter_meta']['ability'] );
+		}
 
-	public function test_icons_and_meta_can_coexist(): void {
+		public function test_icons_and_meta_can_coexist(): void {
 		$ability = wp_get_ability( 'test/with-icons-and-meta' );
 		$this->assertNotNull( $ability, 'Ability test/with-icons-and-meta should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
+
+		$tool = $built['tool'];
 		$this->assertInstanceOf( Tool::class, $tool );
 
 		$arr = $tool->toArray();
@@ -587,20 +614,19 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertSame( 'https://example.com/combined-icon.png', $arr['icons'][0]['src'] );
 		$this->assertSame( array( '48x48' ), $arr['icons'][0]['sizes'] );
 
-		// Verify custom _meta exists alongside internal metadata.
-		$meta = $tool->get_meta();
-		$this->assertArrayHasKey( 'vendor_info', $meta );
-		$this->assertSame( 'test-value', $meta['vendor_info']['custom_data'] );
-		$this->assertArrayHasKey( 'mcp_adapter', $meta );
-	}
+			// Verify custom _meta exists (internal adapter metadata is not exposed here).
+			$meta = $tool->get_meta();
+			$this->assertArrayHasKey( 'vendor_info', $meta );
+			$this->assertSame( 'test-value', $meta['vendor_info']['custom_data'] );
+			$this->assertSame( 'test/with-icons-and-meta', $built['adapter_meta']['ability'] );
+		}
 
 	public function test_tool_without_icons_has_no_icons_field(): void {
 		// Use an existing ability that doesn't have icons defined.
 		$ability = wp_get_ability( 'test/always-allowed' );
 		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$tool = $this->build_tool_from_ability( $ability );
 
 		$arr = $tool->toArray();
 
@@ -608,30 +634,28 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertArrayNotHasKey( 'icons', $arr );
 	}
 
-	public function test_tool_without_custom_meta_only_has_adapter_meta(): void {
+	public function test_tool_without_custom_meta_has_no_meta_field(): void {
 		// Use an existing ability that doesn't have custom _meta defined.
 		$ability = wp_get_ability( 'test/always-allowed' );
 		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
 
-		$meta = $tool->get_meta();
-		$this->assertIsArray( $meta );
+		$tool = $built['tool'];
+		$this->assertInstanceOf( Tool::class, $tool );
 
-		// Verify only adapter metadata exists (no custom vendor keys).
-		$this->assertArrayHasKey( 'mcp_adapter', $meta );
-		$this->assertCount( 1, $meta, 'Only mcp_adapter key should be present' );
+		$data = $tool->toArray();
+		$this->assertArrayNotHasKey( '_meta', $data );
+		$this->assertSame( 'test/always-allowed', $built['adapter_meta']['ability'] );
 	}
 
-	public function test_user_meta_mcp_adapter_collision_is_overwritten(): void {
-		// If user provides _meta.mcp_adapter, adapter's internal metadata should overwrite it.
-		// This prevents users from spoofing internal metadata.
+	public function test_user_meta_mcp_adapter_collision_is_preserved(): void {
 		$this->register_ability_in_hook(
 			'test/meta-collision',
 			array(
 				'label'               => 'Meta Collision Test',
-				'description'         => 'Tests _meta.mcp_adapter collision',
+				'description'         => 'Tests _meta collision',
 				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function () {
@@ -644,7 +668,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 					'mcp' => array(
 						'public' => true,
 						'_meta'  => array(
-							'mcp_adapter'   => array(
+							'mcp_adapter'       => array(
 								'spoofed' => 'should-be-overwritten',
 								'fake'    => 'data',
 							),
@@ -658,23 +682,25 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/meta-collision' );
 		$this->assertNotNull( $ability );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
 
-		$meta = $tool->get_meta();
+		$tool = $built['tool'];
+		$this->assertInstanceOf( Tool::class, $tool );
 
-		// Adapter's mcp_adapter should have real data, not spoofed data.
-		$this->assertArrayHasKey( 'mcp_adapter', $meta );
-		$this->assertArrayHasKey( 'ability', $meta['mcp_adapter'] );
-		$this->assertSame( 'test/meta-collision', $meta['mcp_adapter']['ability'] );
-
-		// Spoofed keys should NOT be present.
-		$this->assertArrayNotHasKey( 'spoofed', $meta['mcp_adapter'] );
-		$this->assertArrayNotHasKey( 'fake', $meta['mcp_adapter'] );
-
-		// User's legitimate vendor key should be preserved.
-		$this->assertArrayHasKey( 'legitimate_vendor', $meta );
-		$this->assertSame( 'preserved', $meta['legitimate_vendor'] );
+		$data = $tool->toArray();
+		$this->assertArrayHasKey( '_meta', $data );
+		$this->assertArrayHasKey( 'mcp_adapter', $data['_meta'] );
+		$this->assertSame(
+			array(
+				'spoofed' => 'should-be-overwritten',
+				'fake'    => 'data',
+			),
+			$data['_meta']['mcp_adapter']
+		);
+		$this->assertArrayHasKey( 'legitimate_vendor', $data['_meta'] );
+		$this->assertSame( 'preserved', $data['_meta']['legitimate_vendor'] );
+		$this->assertSame( 'test/meta-collision', $built['adapter_meta']['ability'] );
 
 		wp_unregister_ability( 'test/meta-collision' );
 	}
@@ -703,17 +729,18 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 			)
 		);
 
-		$ability = wp_get_ability( 'test/empty-meta' );
-		$this->assertNotNull( $ability );
+			$ability = wp_get_ability( 'test/empty-meta' );
+			$this->assertNotNull( $ability );
 
-		$tool = RegisterAbilityAsMcpTool::make( $ability );
-		$this->assertNotWPError( $tool );
+		$built = RegisterAbilityAsMcpTool::build( $ability );
+		$this->assertNotWPError( $built );
 
-		$meta = $tool->get_meta();
+		$tool = $built['tool'];
+		$this->assertInstanceOf( Tool::class, $tool );
 
-		// Only adapter metadata should exist.
-		$this->assertArrayHasKey( 'mcp_adapter', $meta );
-		$this->assertCount( 1, $meta, 'Only mcp_adapter key should be present with empty user _meta' );
+		$data = $tool->toArray();
+		$this->assertArrayNotHasKey( '_meta', $data );
+		$this->assertSame( 'test/empty-meta', $built['adapter_meta']['ability'] );
 
 		wp_unregister_ability( 'test/empty-meta' );
 	}

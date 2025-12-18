@@ -4,23 +4,22 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Prompts;
 
-use WP\MCP\Domain\Prompts\PromptMetadataHelper;
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Prompts\Prompt;
 
-final class RegisterAbilityAsMcpPromptTest extends TestCase {
+	final class RegisterAbilityAsMcpPromptTest extends TestCase {
 
-	public function test_make_builds_prompt_from_ability(): void {
-		$ability = wp_get_ability( 'test/prompt' );
-		$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertInstanceOf( Prompt::class, $prompt );
-		$arr = $prompt->toArray();
-		$this->assertSame( 'test-prompt', $arr['name'] );
-		$this->assertArrayHasKey( 'arguments', $arr );
-		$this->assertSame( $ability->get_name(), PromptMetadataHelper::get_ability_name( $prompt ) );
-	}
+		public function test_make_builds_prompt_from_ability(): void {
+			$ability = wp_get_ability( 'test/prompt' );
+			$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
+			$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+			$this->assertInstanceOf( Prompt::class, $prompt );
+			$arr = $prompt->toArray();
+			$this->assertSame( 'test-prompt', $arr['name'] );
+			$this->assertArrayHasKey( 'arguments', $arr );
+			$this->assertNull( $prompt->get_meta() );
+		}
 
 	public function test_annotations_are_mapped_to_mcp_format(): void {
 		$ability = wp_get_ability( 'test/prompt-with-annotations' );
@@ -65,48 +64,51 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 	// Flattened Schema Tests
 	// =========================================================================
 
-	public function test_flattened_string_schema_creates_single_input_argument(): void {
-		$ability = wp_get_ability( 'test/prompt-flattened-string' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-flattened-string should be registered' );
+		public function test_flattened_string_schema_creates_single_input_argument(): void {
+			$ability = wp_get_ability( 'test/prompt-flattened-string' );
+			$this->assertNotNull( $ability, 'Ability test/prompt-flattened-string should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
-
-		// Should have exactly one argument named 'input'.
-		$this->assertArrayHasKey( 'arguments', $arr );
-		$this->assertCount( 1, $arr['arguments'] );
-		$this->assertSame( 'input', $arr['arguments'][0]['name'] );
-		$this->assertSame( 'The code to review', $arr['arguments'][0]['description'] );
-		$this->assertTrue( $arr['arguments'][0]['required'] );
-
-		// Should track transformation in _meta.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertTrue( $arr['_meta']['mcp_adapter']['input_schema_transformed'] );
-		$this->assertSame( 'input', $arr['_meta']['mcp_adapter']['input_schema_wrapper'] );
-	}
-
-	public function test_flattened_array_schema_creates_single_input_argument(): void {
-		$ability = wp_get_ability( 'test/prompt-flattened-array' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-flattened-array should be registered' );
-
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->toArray();
+			$arr = $prompt->toArray();
 
 		// Should have exactly one argument named 'input'.
 		$this->assertArrayHasKey( 'arguments', $arr );
 		$this->assertCount( 1, $arr['arguments'] );
 		$this->assertSame( 'input', $arr['arguments'][0]['name'] );
-		$this->assertSame( 'List of items to process', $arr['arguments'][0]['description'] );
-		$this->assertTrue( $arr['arguments'][0]['required'] );
+			$this->assertSame( 'The code to review', $arr['arguments'][0]['description'] );
+			$this->assertTrue( $arr['arguments'][0]['required'] );
 
-		// Should track transformation in _meta.
-		$this->assertTrue( $arr['_meta']['mcp_adapter']['input_schema_transformed'] );
-	}
+			$adapter_meta = $built['adapter_meta'];
+			$this->assertTrue( $adapter_meta['input_schema_transformed'] );
+			$this->assertSame( 'input', $adapter_meta['input_schema_wrapper'] );
+		}
+
+		public function test_flattened_array_schema_creates_single_input_argument(): void {
+			$ability = wp_get_ability( 'test/prompt-flattened-array' );
+			$this->assertNotNull( $ability, 'Ability test/prompt-flattened-array should be registered' );
+
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$prompt = $built['prompt'];
+
+			$arr = $prompt->toArray();
+
+		// Should have exactly one argument named 'input'.
+		$this->assertArrayHasKey( 'arguments', $arr );
+		$this->assertCount( 1, $arr['arguments'] );
+		$this->assertSame( 'input', $arr['arguments'][0]['name'] );
+			$this->assertSame( 'List of items to process', $arr['arguments'][0]['description'] );
+			$this->assertTrue( $arr['arguments'][0]['required'] );
+
+			$this->assertTrue( $built['adapter_meta']['input_schema_transformed'] );
+		}
 
 	// =========================================================================
 	// Property Title Mapping Tests
@@ -206,8 +208,11 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$ability = wp_get_ability( 'test/prompt-empty-object' );
 		$this->assertNotNull( $ability, 'Ability test/prompt-empty-object should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+		$built = RegisterAbilityAsMcpPrompt::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertIsArray( $built );
+		$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+		$prompt = $built['prompt'];
 
 		$arr = $prompt->toArray();
 
@@ -215,7 +220,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertArrayNotHasKey( 'arguments', $arr );
 
 		// Should NOT track transformation (no wrapping occurred).
-		$this->assertArrayNotHasKey( 'input_schema_transformed', $arr['_meta']['mcp_adapter'] );
+		$this->assertArrayNotHasKey( 'input_schema_transformed', $built['adapter_meta'] );
 	}
 
 	public function test_no_schema_has_no_arguments(): void {
@@ -235,8 +240,11 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$ability = wp_get_ability( 'test/prompt' );
 		$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+		$built = RegisterAbilityAsMcpPrompt::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertIsArray( $built );
+		$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+		$prompt = $built['prompt'];
 
 		$arr = $prompt->toArray();
 
@@ -245,7 +253,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertNotEmpty( $arr['arguments'] );
 
 		// Should NOT track transformation (already an object schema).
-		$this->assertArrayNotHasKey( 'input_schema_transformed', $arr['_meta']['mcp_adapter'] );
+		$this->assertArrayNotHasKey( 'input_schema_transformed', $built['adapter_meta'] );
 	}
 
 	// =========================================================================
@@ -256,28 +264,21 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$ability = wp_get_ability( 'test/prompt' );
 		$this->assertNotNull( $ability );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->toArray();
-
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertSame( 'test/prompt', $arr['_meta']['mcp_adapter']['ability'] );
+		$built = RegisterAbilityAsMcpPrompt::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertIsArray( $built );
+		$this->assertSame( 'test/prompt', $built['adapter_meta']['ability'] );
 	}
 
 	public function test_meta_tracks_transformation_for_flattened_schema(): void {
 		$ability = wp_get_ability( 'test/prompt-flattened-string' );
 		$this->assertNotNull( $ability );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+		$built = RegisterAbilityAsMcpPrompt::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertIsArray( $built );
 
-		$arr = $prompt->toArray();
-
-		$this->assertArrayHasKey( '_meta', $arr );
-		$adapter_meta = $arr['_meta']['mcp_adapter'];
-
+		$adapter_meta = $built['adapter_meta'];
 		$this->assertSame( 'test/prompt-flattened-string', $adapter_meta['ability'] );
 		$this->assertTrue( $adapter_meta['input_schema_transformed'] );
 		$this->assertSame( 'input', $adapter_meta['input_schema_wrapper'] );
@@ -291,8 +292,11 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$ability = wp_get_ability( 'test/prompt-explicit-args' );
 		$this->assertNotNull( $ability, 'Ability test/prompt-explicit-args should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+		$built = RegisterAbilityAsMcpPrompt::build( $ability );
+		$this->assertNotWPError( $built );
+		$this->assertIsArray( $built );
+		$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+		$prompt = $built['prompt'];
 
 		$arr = $prompt->toArray();
 
@@ -314,19 +318,21 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertArrayNotHasKey( 'required', $language_arg ); // Optional - no required field.
 		$this->assertArrayNotHasKey( 'title', $language_arg );    // No title defined.
 
-		// Verify arguments_source is 'explicit'.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertSame( 'explicit', $arr['_meta']['mcp_adapter']['arguments_source'] );
-	}
+			// Verify arguments_source is 'explicit'.
+			$this->assertSame( 'explicit', $built['adapter_meta']['arguments_source'] );
+		}
 
-	public function test_explicit_arguments_override_input_schema(): void {
-		$ability = wp_get_ability( 'test/prompt-explicit-args-override' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-explicit-args-override should be registered' );
+		public function test_explicit_arguments_override_input_schema(): void {
+			$ability = wp_get_ability( 'test/prompt-explicit-args-override' );
+			$this->assertNotNull( $ability, 'Ability test/prompt-explicit-args-override should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+			$arr = $prompt->toArray();
 
 		// Should have exactly 1 argument from explicit override, NOT from input_schema.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -340,25 +346,28 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertTrue( $arg['required'] );
 
 		// Verify NO schema_field (from input_schema).
-		foreach ( $arr['arguments'] as $argument ) {
-			$this->assertNotSame( 'schema_field', $argument['name'] );
+			foreach ( $arr['arguments'] as $argument ) {
+				$this->assertNotSame( 'schema_field', $argument['name'] );
+			}
+
+			// Verify arguments_source is 'explicit'.
+			$this->assertSame( 'explicit', $built['adapter_meta']['arguments_source'] );
+
+			// Verify NO transformation metadata (explicit args bypass schema transform).
+			$this->assertArrayNotHasKey( 'input_schema_transformed', $built['adapter_meta'] );
 		}
 
-		// Verify arguments_source is 'explicit'.
-		$this->assertSame( 'explicit', $arr['_meta']['mcp_adapter']['arguments_source'] );
+		public function test_empty_explicit_arguments_falls_back_to_schema(): void {
+			$ability = wp_get_ability( 'test/prompt-empty-explicit-args' );
+			$this->assertNotNull( $ability, 'Ability test/prompt-empty-explicit-args should be registered' );
 
-		// Verify NO transformation metadata (explicit args bypass schema transform).
-		$this->assertArrayNotHasKey( 'input_schema_transformed', $arr['_meta']['mcp_adapter'] );
-	}
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$prompt = $built['prompt'];
 
-	public function test_empty_explicit_arguments_falls_back_to_schema(): void {
-		$ability = wp_get_ability( 'test/prompt-empty-explicit-args' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-empty-explicit-args should be registered' );
-
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->toArray();
+			$arr = $prompt->toArray();
 
 		// Should fall back to input_schema since mcp.arguments is empty.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -368,11 +377,11 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$arg = $arr['arguments'][0];
 		$this->assertSame( 'fallback_field', $arg['name'] );
 		$this->assertSame( 'This should appear because mcp.arguments is empty', $arg['description'] );
-		$this->assertTrue( $arg['required'] );
+			$this->assertTrue( $arg['required'] );
 
-		// Verify arguments_source is 'schema' (fell back).
-		$this->assertSame( 'schema', $arr['_meta']['mcp_adapter']['arguments_source'] );
-	}
+			// Verify arguments_source is 'schema' (fell back).
+			$this->assertSame( 'schema', $built['adapter_meta']['arguments_source'] );
+		}
 
 	public function test_invalid_explicit_arguments_missing_name_returns_wp_error(): void {
 		$ability = wp_get_ability( 'test/prompt-invalid-explicit-args-no-name' );
@@ -396,14 +405,17 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertStringContainsString( 'must be an array', $result->get_error_message() );
 	}
 
-	public function test_explicit_arguments_with_all_fields(): void {
-		$ability = wp_get_ability( 'test/prompt-explicit-args-all-fields' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-explicit-args-all-fields should be registered' );
+		public function test_explicit_arguments_with_all_fields(): void {
+			$ability = wp_get_ability( 'test/prompt-explicit-args-all-fields' );
+			$this->assertNotNull( $ability, 'Ability test/prompt-explicit-args-all-fields should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+			$arr = $prompt->toArray();
 
 		// Should have 2 arguments.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -423,38 +435,36 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertArrayNotHasKey( 'description', $minimal_arg );
 		$this->assertArrayNotHasKey( 'required', $minimal_arg );
 
-		// Verify arguments_source.
-		$this->assertSame( 'explicit', $arr['_meta']['mcp_adapter']['arguments_source'] );
-	}
+			// Verify arguments_source.
+			$this->assertSame( 'explicit', $built['adapter_meta']['arguments_source'] );
+		}
 
-	public function test_arguments_source_tracks_schema_source(): void {
-		$ability = wp_get_ability( 'test/prompt' );
-		$this->assertNotNull( $ability );
+		public function test_arguments_source_tracks_schema_source(): void {
+			$ability = wp_get_ability( 'test/prompt' );
+			$this->assertNotNull( $ability );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+			$arr = $prompt->toArray();
 
-		// Verify arguments_source is 'schema' for auto-converted arguments.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'arguments_source', $arr['_meta']['mcp_adapter'] );
-		$this->assertSame( 'schema', $arr['_meta']['mcp_adapter']['arguments_source'] );
-	}
+			// Verify arguments_source is 'schema' for auto-converted arguments.
+			$this->assertSame( 'schema', $built['adapter_meta']['arguments_source'] );
+		}
 
-	public function test_no_arguments_has_no_arguments_source(): void {
-		$ability = wp_get_ability( 'test/prompt-no-schema' );
-		$this->assertNotNull( $ability );
+		public function test_no_arguments_has_no_arguments_source(): void {
+			$ability = wp_get_ability( 'test/prompt-no-schema' );
+			$this->assertNotNull( $ability );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->toArray();
-
-		// Verify arguments_source is NOT present when there are no arguments.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayNotHasKey( 'arguments_source', $arr['_meta']['mcp_adapter'] );
-	}
+			// Verify arguments_source is NOT present when there are no arguments.
+			$built = RegisterAbilityAsMcpPrompt::build( $ability );
+			$this->assertNotWPError( $built );
+			$this->assertIsArray( $built );
+			$this->assertArrayNotHasKey( 'arguments_source', $built['adapter_meta'] );
+		}
 
 	// =========================================================================
 	// Icons Tests (MCP 2025-11-25)
@@ -521,17 +531,17 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 	// User _meta Passthrough Tests (MCP 2025-11-25)
 	// =========================================================================
 
-	public function test_user_meta_is_passed_through(): void {
-		$ability = wp_get_ability( 'test/prompt-with-custom-meta' );
-		$this->assertNotNull( $ability, 'Ability test/prompt-with-custom-meta should be registered' );
+		public function test_user_meta_is_passed_through(): void {
+			$ability = wp_get_ability( 'test/prompt-with-custom-meta' );
+			$this->assertNotNull( $ability, 'Ability test/prompt-with-custom-meta should be registered' );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+			$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+			$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+			$arr = $prompt->toArray();
 
-		// Verify _meta is present with user-defined keys.
-		$this->assertArrayHasKey( '_meta', $arr );
+			// Verify _meta is present with user-defined keys.
+			$this->assertArrayHasKey( '_meta', $arr );
 
 		// Verify custom_vendor key is preserved.
 		$this->assertArrayHasKey( 'custom_vendor', $arr['_meta'] );
@@ -539,43 +549,22 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertTrue( $arr['_meta']['custom_vendor']['feature_flag'] );
 		$this->assertSame( '1.0', $arr['_meta']['custom_vendor']['version'] );
 
-		// Verify another_vendor key is preserved.
-		$this->assertArrayHasKey( 'another_vendor', $arr['_meta'] );
-		$this->assertSame( 'some-value', $arr['_meta']['another_vendor'] );
+			// Verify another_vendor key is preserved.
+			$this->assertArrayHasKey( 'another_vendor', $arr['_meta'] );
+			$this->assertSame( 'some-value', $arr['_meta']['another_vendor'] );
+		}
 
-		// Verify internal mcp_adapter key is still present.
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertArrayHasKey( 'ability', $arr['_meta']['mcp_adapter'] );
-	}
+		public function test_prompt_without_user_meta_has_no_meta_field(): void {
+			$ability = wp_get_ability( 'test/prompt' );
+			$this->assertNotNull( $ability );
 
-	public function test_user_meta_does_not_override_mcp_adapter_key(): void {
-		// Even if user tries to set mcp_adapter, the adapter's internal key should win.
-		$ability = wp_get_ability( 'test/prompt-with-custom-meta' );
-		$this->assertNotNull( $ability );
+			$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+			$this->assertNotWPError( $prompt );
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
+			$arr = $prompt->toArray();
 
-		$arr = $prompt->toArray();
-
-		// The mcp_adapter key should always contain our internal metadata.
-		$this->assertSame( 'test/prompt-with-custom-meta', $arr['_meta']['mcp_adapter']['ability'] );
-	}
-
-	public function test_prompt_without_user_meta_has_only_adapter_meta(): void {
-		$ability = wp_get_ability( 'test/prompt' );
-		$this->assertNotNull( $ability );
-
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertNotWPError( $prompt );
-
-		$arr = $prompt->toArray();
-
-		// Should only have mcp_adapter in _meta.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertCount( 1, $arr['_meta'] ); // Only mcp_adapter key.
-	}
+			$this->assertArrayNotHasKey( '_meta', $arr );
+		}
 
 	// =========================================================================
 	// Combined Icons and _meta Tests
@@ -597,13 +586,9 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertSame( 'image/png', $arr['icons'][0]['mimeType'] );
 		$this->assertSame( array( '48x48' ), $arr['icons'][0]['sizes'] );
 
-		// Verify user _meta is present.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'vendor_info', $arr['_meta'] );
-		$this->assertSame( 'test-value', $arr['_meta']['vendor_info']['custom_data'] );
-
-		// Verify adapter _meta is also present.
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertSame( 'test/prompt-with-icons-and-meta', $arr['_meta']['mcp_adapter']['ability'] );
+			// Verify user _meta is present.
+			$this->assertArrayHasKey( '_meta', $arr );
+			$this->assertArrayHasKey( 'vendor_info', $arr['_meta'] );
+			$this->assertSame( 'test-value', $arr['_meta']['vendor_info']['custom_data'] );
+		}
 	}
-}

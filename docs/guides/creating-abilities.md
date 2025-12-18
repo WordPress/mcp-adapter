@@ -337,11 +337,11 @@ wp_register_ability('my-plugin/get-status', [
 // Result: inputSchema = { "type": "object" }
 ```
 
-### Internal Metadata (`_meta`)
+### Adapter Metadata
 
-The adapter stores internal transformation metadata in `_meta['mcp_adapter']` for debugging purposes. This metadata is **automatically stripped** before responses are sent to MCP clients and is never visible externally.
+The adapter keeps internal transformation metadata (e.g. schema wrapping details) on internal wrapper objects.
 
-> **Technical details:** See [Ability → Tool Conversion Contract](ability-tool-conversion.md#internal-metadata-_meta) for the complete metadata structure.
+`_meta` on schema DTOs is treated as user-provided metadata (from `ability.meta.mcp._meta`) and is passed through unchanged.
 
 ## MCP Annotations
 

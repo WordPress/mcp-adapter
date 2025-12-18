@@ -9,12 +9,10 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
-use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
-use WP\MCP\Domain\Prompts\McpPrompt;
-use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
-use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
-use WP\MCP\Domain\Resources\ResourceMetadataHelper;
-use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
+	use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
+	use WP\MCP\Domain\Prompts\McpPrompt;
+	use WP\MCP\Domain\Resources\McpResource;
+	use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\McpSchema\Server\Prompts\Prompt;
@@ -33,11 +31,27 @@ class McpComponentRegistry {
 	private array $tools = array();
 
 	/**
+	 * Tool wrappers keyed by tool name (internal execution/permission wiring).
+	 *
+	 * @var array<string, \WP\MCP\Domain\Tools\McpTool>
+	 */
+	private array $tool_wrappers = array();
+
+	/**
 	 * Resources registered to the server.
 	 *
 	 * @var array<string, \WP\McpSchema\Server\Resources\Resource>
 	 */
 	private array $resources = array();
+
+	/**
+	 * Resource wrappers keyed by resource URI (internal execution/permission wiring).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var array<string, \WP\MCP\Domain\Resources\McpResource>
+	 */
+	private array $resource_wrappers = array();
 
 	/**
 	 * Prompts registered to the server.
@@ -52,6 +66,13 @@ class McpComponentRegistry {
 	 * @var array<string, \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface>
 	 */
 	private array $prompt_builders = array();
+
+	/**
+	 * Prompt wrappers keyed by prompt name (internal execution/permission wiring).
+	 *
+	 * @var array<string, \WP\MCP\Domain\Prompts\McpPrompt>
+	 */
+	private array $prompt_wrappers = array();
 
 	/**
 	 * MCP Server instance.
@@ -105,12 +126,17 @@ class McpComponentRegistry {
 	/**
 	 * Register tools to the server.
 	 *
-	 * @param array $tools Array of ability names (strings) to convert to MCP tools.
+	 * @param array<int, string|\WP\MCP\Domain\Tools\McpTool> $tools Array of ability names (strings) or tool wrappers.
 	 *
 	 * @return void
 	 */
 	public function register_tools( array $tools ): void {
 		foreach ( $tools as $tool_item ) {
+			if ( $tool_item instanceof McpTool ) {
+				$this->add_tool_wrapper( $tool_item );
+				continue;
+			}
+
 			if ( ! is_string( $tool_item ) ) {
 				continue;
 			}
@@ -137,11 +163,11 @@ class McpComponentRegistry {
 				continue;
 			}
 
-			$tool = RegisterAbilityAsMcpTool::make( $ability );
+			$mcp_tool = McpTool::fromAbility( $ability );
 
-			// Check if tool creation returned an error
-			if ( is_wp_error( $tool ) ) {
-				$this->error_handler->log( $tool->get_error_message(), array( "RegisterAbilityAsMcpTool::{$tool_item}" ) );
+			// Check if tool creation returned an error.
+			if ( is_wp_error( $mcp_tool ) ) {
+				$this->error_handler->log( $mcp_tool->get_error_message(), array( "McpTool::fromAbility::{$tool_item}" ) );
 
 				// Track ability tool registration failure.
 				if ( $this->should_record_component_registration ) {
@@ -151,7 +177,7 @@ class McpComponentRegistry {
 							'status'         => 'failed',
 							'component_type' => 'ability_tool',
 							'component_name' => $tool_item,
-							'error_code'     => $tool->get_error_code(),
+							'error_code'     => $mcp_tool->get_error_code(),
 							'server_id'      => $this->mcp_server->get_server_id(),
 						)
 					);
@@ -160,7 +186,10 @@ class McpComponentRegistry {
 			}
 
 			// Add the processed tools to this server.
-			$this->tools[ $tool->getName() ] = $tool;
+			/** @var \WP\McpSchema\Server\Tools\Tool $tool */
+			$tool                                    = $mcp_tool->get_component();
+			$this->tools[ $tool->getName() ]         = $tool;
+			$this->tool_wrappers[ $tool->getName() ] = $mcp_tool;
 
 			// Track successful ability tool registration.
 			if ( ! $this->should_record_component_registration ) {
@@ -207,143 +236,215 @@ class McpComponentRegistry {
 	}
 
 	/**
-	 * Register resources to the server.
+	 * Register a tool wrapper directly (internal use).
 	 *
-	 * @param array $abilities Array of ability names to convert to MCP resources.
+	 * @since n.e.x.t
+	 *
+	 * @param \WP\MCP\Domain\Tools\McpTool $wrapper Tool wrapper.
 	 *
 	 * @return void
 	 */
-	public function register_resources( array $abilities ): void {
-		foreach ( $abilities as $ability_name ) {
-			if ( ! is_string( $ability_name ) ) {
+	public function add_tool_wrapper( McpTool $wrapper ): void {
+		/** @var \WP\McpSchema\Server\Tools\Tool $tool_dto */
+		$tool_dto = $wrapper->get_component();
+
+		$this->tools[ $tool_dto->getName() ]         = $tool_dto;
+		$this->tool_wrappers[ $tool_dto->getName() ] = $wrapper;
+	}
+
+		/**
+		 * Register resources to the server.
+		 *
+		 * @param array<int, string|\WP\MCP\Domain\Resources\McpResource> $resources Array of ability names or resource wrappers.
+		 *
+		 * @return void
+		 */
+	public function register_resources( array $resources ): void {
+		foreach ( $resources as $resource_item ) {
+			// Case 0: Resource wrapper instance.
+			if ( $resource_item instanceof McpResource ) {
+				$this->add_resource_wrapper( $resource_item );
 				continue;
 			}
 
-			$ability = \wp_get_ability( $ability_name );
-
-			if ( ! $ability ) {
-				$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
-
-				// Track resource registration failure.
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'failed',
-							'component_type' => 'resource',
-							'component_name' => $ability_name,
-							'failure_reason' => 'ability_not_found',
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
+			// Case 1: Ability name string (legacy behavior).
+			if ( ! is_string( $resource_item ) ) {
 				continue;
 			}
 
-			$resource = RegisterAbilityAsMcpResource::make( $ability, $this->error_handler );
-
-			// Check if resource creation returned an error
-			if ( is_wp_error( $resource ) ) {
-				$this->error_handler->log( $resource->get_error_message(), array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
-
-				// Track resource registration failure.
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'failed',
-							'component_type' => 'resource',
-							'component_name' => $ability_name,
-							'error_code'     => $resource->get_error_code(),
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
-				continue;
-			}
-
-			// Check for duplicate URI (first-wins policy).
-			$resource_uri = $resource->getUri();
-			if ( isset( $this->resources[ $resource_uri ] ) ) {
-				// Get the ability name of the already-registered resource.
-				$existing_resource     = $this->resources[ $resource_uri ];
-				$existing_ability_name = ResourceMetadataHelper::get_ability_name( $existing_resource ) ?? '(unknown)';
-
-				$this->error_handler->log(
-					sprintf(
-						"Duplicate resource URI '%s': ability '%s' conflicts with already-registered ability '%s'. First registration wins.",
-						$resource_uri,
-						$ability_name,
-						$existing_ability_name
-					),
-					array( "RegisterAbilityAsMcpResource::{$ability_name}" )
-				);
-
-				// Track duplicate URI failure.
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'                => 'failed',
-							'component_type'        => 'resource',
-							'component_name'        => $ability_name,
-							'failure_reason'        => 'duplicate_uri',
-							'duplicate_uri'         => $resource_uri,
-							'existing_ability_name' => $existing_ability_name,
-							'server_id'             => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
-				continue;
-			}
-
-			// Add the processed resources to this server.
-			$this->resources[ $resource_uri ] = $resource;
-
-			// Track successful resource registration.
-			if ( ! $this->should_record_component_registration ) {
-				continue;
-			}
-
-			$this->observability_handler->record_event(
-				'mcp.component.registration',
-				array(
-					'status'         => 'success',
-					'component_type' => 'resource',
-					'component_name' => $ability_name,
-					'server_id'      => $this->mcp_server->get_server_id(),
-				)
-			);
+			$this->register_ability_resource( $resource_item );
 		}
 	}
 
-	/**
-	 * Register prompts to the server.
-	 *
-	 * Accepts multiple formats:
-	 * - Class name string implementing McpPromptBuilderInterface (instantiated automatically)
-	 * - Ability name string (converted via RegisterAbilityAsMcpPrompt)
-	 * - McpPromptBuilderInterface instance (fluent API or custom builders)
-	 * - Array configuration (converted via McpPrompt::fromArray())
-	 *
-	 * @param array<int, string|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|array<string, mixed>> $prompts Array of prompts to register.
-	 *
-	 * @return void
-	 */
+		/**
+		 * Register a resource wrapper directly (internal use).
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param \WP\MCP\Domain\Resources\McpResource $wrapper Resource wrapper.
+		 *
+		 * @return void
+		 */
+	public function add_resource_wrapper( McpResource $wrapper ): void {
+		/** @var \WP\McpSchema\Server\Resources\Resource $resource_dto */
+		$resource_dto = $wrapper->get_component();
+		$uri          = $resource_dto->getUri();
+
+		if ( isset( $this->resources[ $uri ] ) ) {
+			return;
+		}
+
+		$this->resources[ $uri ]         = $resource_dto;
+		$this->resource_wrappers[ $uri ] = $wrapper;
+	}
+
+		/**
+		 * Register an ability-backed resource by ability name.
+		 *
+		 * @param string $ability_name Ability name.
+		 *
+		 * @return void
+		 */
+	private function register_ability_resource( string $ability_name ): void {
+		$ability = \wp_get_ability( $ability_name );
+
+		if ( ! $ability ) {
+			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
+
+			// Track resource registration failure.
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'resource',
+						'component_name' => $ability_name,
+						'failure_reason' => 'ability_not_found',
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
+			return;
+		}
+
+		$wrapper = McpResource::fromAbility( $ability, $this->error_handler );
+
+		// Check if wrapper creation returned an error.
+		if ( is_wp_error( $wrapper ) ) {
+			$this->error_handler->log( $wrapper->get_error_message(), array( "McpResource::fromAbility::{$ability_name}" ) );
+
+			// Track resource registration failure.
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'resource',
+						'component_name' => $ability_name,
+						'error_code'     => $wrapper->get_error_code(),
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
+			return;
+		}
+
+		/** @var \WP\McpSchema\Server\Resources\Resource $resource */
+		$resource = $wrapper->get_component();
+
+		$resource_uri = $resource->getUri();
+		if ( isset( $this->resources[ $resource_uri ] ) ) {
+			$existing_wrapper      = $this->resource_wrappers[ $resource_uri ] ?? null;
+			$existing_ability_name = '(unknown)';
+
+			if ( $existing_wrapper instanceof McpResource ) {
+				$existing_meta = $existing_wrapper->get_adapter_meta();
+				$ability_key   = $existing_meta['ability'] ?? null;
+				if ( is_string( $ability_key ) && '' !== trim( $ability_key ) ) {
+					$existing_ability_name = $ability_key;
+				}
+			}
+
+			$this->error_handler->log(
+				sprintf(
+					"Duplicate resource URI '%s': ability '%s' conflicts with already-registered ability '%s'. First registration wins.",
+					$resource_uri,
+					$ability_name,
+					$existing_ability_name
+				),
+				array( "RegisterAbilityAsMcpResource::{$ability_name}" )
+			);
+
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'                => 'failed',
+						'component_type'        => 'resource',
+						'component_name'        => $ability_name,
+						'failure_reason'        => 'duplicate_uri',
+						'duplicate_uri'         => $resource_uri,
+						'existing_ability_name' => $existing_ability_name,
+						'server_id'             => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
+
+			return;
+		}
+
+		$this->resources[ $resource_uri ]         = $resource;
+		$this->resource_wrappers[ $resource_uri ] = $wrapper;
+
+		if ( ! $this->should_record_component_registration ) {
+			return;
+		}
+
+		$this->observability_handler->record_event(
+			'mcp.component.registration',
+			array(
+				'status'         => 'success',
+				'component_type' => 'resource',
+				'component_name' => $ability_name,
+				'server_id'      => $this->mcp_server->get_server_id(),
+			)
+		);
+	}
+
+		/**
+		 * Register prompts to the server.
+		 *
+		 * Accepts multiple formats:
+		 * - McpPrompt instances (wrapper objects)
+		 * - Class name string implementing McpPromptBuilderInterface (instantiated automatically)
+		 * - Ability name string (converted via RegisterAbilityAsMcpPrompt)
+		 * - McpPromptBuilderInterface instance (fluent API or custom builders)
+		 * - Array configuration (converted via McpPrompt::fromArray())
+		 *
+		 * @param array<int, string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|array<string, mixed>> $prompts Array of prompts to register.
+		 *
+		 * @return void
+		 */
 	public function register_prompts( array $prompts ): void {
 		foreach ( $prompts as $prompt_item ) {
 			$this->register_single_prompt( $prompt_item );
 		}
 	}
 
-	/**
-	 * Register a single prompt to the server.
-	 *
-	 * @param string|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|array<string, mixed> $prompt_item The prompt to register.
-	 *
-	 * @return void
-	 */
+		/**
+		 * Register a single prompt to the server.
+		 *
+		 * @param string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|array<string, mixed> $prompt_item The prompt to register.
+		 *
+		 * @return void
+		 */
 	private function register_single_prompt( $prompt_item ): void {
+		// Case 0: McpPrompt wrapper instance.
+		if ( $prompt_item instanceof McpPrompt ) {
+			$this->add_prompt_wrapper( $prompt_item );
+			return;
+		}
+
 		// Case 1: McpPromptBuilderInterface instance (fluent API or custom builder).
 		if ( $prompt_item instanceof McpPromptBuilderInterface ) {
 			$this->register_builder_instance( $prompt_item );
@@ -381,10 +482,9 @@ class McpComponentRegistry {
 	private function register_builder_instance( McpPromptBuilderInterface $builder ): void {
 		$prompt_name = $builder->get_name();
 
-		try {
-			$prompt = $builder->build();
-		} catch ( \Throwable $e ) {
-			$this->error_handler->log( "Failed to build prompt '{$prompt_name}': {$e->getMessage()}", array( "McpPrompt::{$prompt_name}" ) );
+		$wrapper = McpPrompt::fromBuilder( $builder );
+		if ( $wrapper instanceof \WP_Error ) {
+			$this->error_handler->log( $wrapper->get_error_message(), array( "McpPrompt::fromBuilder::{$prompt_name}" ) );
 
 			if ( $this->should_record_component_registration ) {
 				$this->observability_handler->record_event(
@@ -393,7 +493,7 @@ class McpComponentRegistry {
 						'status'         => 'failed',
 						'component_type' => 'prompt',
 						'component_name' => $prompt_name,
-						'failure_reason' => 'builder_exception',
+						'error_code'     => $wrapper->get_error_code(),
 						'server_id'      => $this->mcp_server->get_server_id(),
 					)
 				);
@@ -401,8 +501,7 @@ class McpComponentRegistry {
 			return;
 		}
 
-		$this->prompts[ $prompt->getName() ]         = $prompt;
-		$this->prompt_builders[ $prompt->getName() ] = $builder;
+		$this->add_prompt_wrapper( $wrapper );
 
 		if ( ! $this->should_record_component_registration ) {
 			return;
@@ -431,8 +530,8 @@ class McpComponentRegistry {
 
 		try {
 			/** @var array{name: string, title?: string, description?: string, arguments?: array<int, array{name: string, title?: string, description?: string, required?: bool}>, icons?: array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>, meta?: array<string, mixed>, handler: callable(array<string, mixed>): array<string, mixed>, permission?: callable(array<string, mixed>): bool} $config */
-			$builder = McpPrompt::fromArray( $config );
-			$this->register_builder_instance( $builder );
+			$wrapper = McpPrompt::fromArray( $config );
+			$this->add_prompt_wrapper( $wrapper );
 		} catch ( \Throwable $e ) {
 			$this->error_handler->log( "Failed to create prompt from array config '{$prompt_name}': {$e->getMessage()}", array( "McpPrompt::fromArray::{$prompt_name}" ) );
 
@@ -509,10 +608,10 @@ class McpComponentRegistry {
 			return;
 		}
 
-		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$wrapper = McpPrompt::fromAbility( $ability );
 
-		if ( is_wp_error( $prompt ) ) {
-			$this->error_handler->log( $prompt->get_error_message(), array( "RegisterAbilityAsMcpPrompt::{$ability_name}" ) );
+		if ( is_wp_error( $wrapper ) ) {
+			$this->error_handler->log( $wrapper->get_error_message(), array( "McpPrompt::fromAbility::{$ability_name}" ) );
 
 			if ( $this->should_record_component_registration ) {
 				$this->observability_handler->record_event(
@@ -521,7 +620,7 @@ class McpComponentRegistry {
 						'status'         => 'failed',
 						'component_type' => 'prompt',
 						'component_name' => $ability_name,
-						'error_code'     => $prompt->get_error_code(),
+						'error_code'     => $wrapper->get_error_code(),
 						'server_id'      => $this->mcp_server->get_server_id(),
 					)
 				);
@@ -529,7 +628,7 @@ class McpComponentRegistry {
 			return;
 		}
 
-		$this->prompts[ $prompt->getName() ] = $prompt;
+		$this->add_prompt_wrapper( $wrapper );
 
 		if ( ! $this->should_record_component_registration ) {
 			return;
@@ -585,6 +684,30 @@ class McpComponentRegistry {
 	}
 
 	/**
+	 * Get a specific tool wrapper by tool name.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $tool_name Tool name.
+	 *
+	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 */
+	public function get_tool_wrapper( string $tool_name ): ?McpTool {
+		return $this->tool_wrappers[ $tool_name ] ?? null;
+	}
+
+	/**
+	 * Get all tool wrappers.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, \WP\MCP\Domain\Tools\McpTool>
+	 */
+	public function get_tool_wrappers(): array {
+		return $this->tool_wrappers;
+	}
+
+	/**
 	 * Get a specific resource by URI.
 	 *
 	 * @param string $resource_uri Resource URI.
@@ -593,6 +716,30 @@ class McpComponentRegistry {
 	 */
 	public function get_resource( string $resource_uri ): ?Resource {
 		return $this->resources[ $resource_uri ] ?? null;
+	}
+
+	/**
+	 * Get a specific resource wrapper by URI (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $resource_uri Resource URI.
+	 *
+	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 */
+	public function get_resource_wrapper( string $resource_uri ): ?McpResource {
+		return $this->resource_wrappers[ $resource_uri ] ?? null;
+	}
+
+	/**
+	 * Get all resource wrappers (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, \WP\MCP\Domain\Resources\McpResource>
+	 */
+	public function get_resource_wrappers(): array {
+		return $this->resource_wrappers;
 	}
 
 	/**
@@ -606,6 +753,19 @@ class McpComponentRegistry {
 		return $this->prompts[ $prompt_name ] ?? null;
 	}
 
+		/**
+		 * Get a prompt wrapper instance by prompt name (internal use).
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param string $prompt_name Prompt name.
+		 *
+		 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+		 */
+	public function get_prompt_wrapper( string $prompt_name ): ?McpPrompt {
+		return $this->prompt_wrappers[ $prompt_name ] ?? null;
+	}
+
 	/**
 	 * Get a prompt builder instance by prompt name (builder-based prompts).
 	 *
@@ -614,6 +774,38 @@ class McpComponentRegistry {
 	 * @return \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|null
 	 */
 	public function get_prompt_builder( string $prompt_name ): ?McpPromptBuilderInterface {
+		$wrapper = $this->prompt_wrappers[ $prompt_name ] ?? null;
+		if ( $wrapper instanceof McpPrompt ) {
+			$builder = $wrapper->get_builder();
+			if ( $builder instanceof McpPromptBuilderInterface ) {
+				return $builder;
+			}
+		}
+
 		return $this->prompt_builders[ $prompt_name ] ?? null;
+	}
+
+		/**
+		 * Add a prompt wrapper to the registry, storing both wrapper and protocol DTO.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param \WP\MCP\Domain\Prompts\McpPrompt $wrapper Prompt wrapper.
+		 *
+		 * @return void
+		 */
+	private function add_prompt_wrapper( McpPrompt $wrapper ): void {
+		/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt */
+		$prompt = $wrapper->get_component();
+
+		$this->prompts[ $prompt->getName() ]         = $prompt;
+		$this->prompt_wrappers[ $prompt->getName() ] = $wrapper;
+
+		$builder = $wrapper->get_builder();
+		if ( ! ( $builder instanceof McpPromptBuilderInterface ) ) {
+			return;
+		}
+
+		$this->prompt_builders[ $prompt->getName() ] = $builder;
 	}
 }

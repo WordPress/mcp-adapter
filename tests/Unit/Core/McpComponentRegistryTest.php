@@ -19,6 +19,7 @@ use WP\McpSchema\Server\Tools\Tool;
 use WP\McpSchema\Server\Tools\ToolInputSchema;
 
 // Test prompt builder for registry testing
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 class TestRegistryPrompt extends McpPromptBuilder {
 
 	protected function configure(): void {
@@ -43,6 +44,7 @@ class TestRegistryPrompt extends McpPromptBuilder {
 }
 
 // Test prompt builder that throws exception during build
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 class ExceptionPromptBuilder extends McpPromptBuilder {
 
 	protected function configure(): void {
@@ -161,6 +163,22 @@ final class McpComponentRegistryTest extends TestCase {
 		$tools = $this->registry->get_tools();
 		$this->assertCount( 1, $tools ); // Only the valid string should be processed
 		$this->assertArrayHasKey( 'test-always-allowed', $tools );
+	}
+
+	public function test_register_tools_accepts_tool_wrappers(): void {
+		$wrapper = \WP\MCP\Domain\Tools\McpTool::create( 'direct-tool-wrapper' )
+			->description( 'Direct tool wrapper' )
+			->handler( static function () {
+				return array( 'ok' => true );
+			} )
+			->permission( static function () {
+				return true;
+			} );
+
+		$this->registry->register_tools( array( $wrapper ) );
+
+		$this->assertSame( $wrapper, $this->registry->get_tool_wrapper( 'direct-tool-wrapper' ) );
+		$this->assertArrayHasKey( 'direct-tool-wrapper', $this->registry->get_tools() );
 	}
 
 	public function test_add_tool_direct(): void {
@@ -736,12 +754,13 @@ final class McpComponentRegistryTest extends TestCase {
 		// Verify only one resource is registered.
 		$resources = $this->registry->get_resources();
 		$this->assertCount( 1, $resources, 'Only first resource should be registered (first-wins policy)' );
-		$this->assertArrayHasKey( $same_uri, $resources );
+			$this->assertArrayHasKey( $same_uri, $resources );
 
-		// Verify the registered resource is from the first ability.
-		$resource     = $resources[ $same_uri ];
-		$ability_name = \WP\MCP\Domain\Resources\ResourceMetadataHelper::get_ability_name( $resource );
-		$this->assertSame( 'test/resource-first', $ability_name, 'First ability should win' );
+			// Verify the registered resource is from the first ability.
+			$wrapper = $this->registry->get_resource_wrapper( $same_uri );
+			$this->assertNotNull( $wrapper );
+			$meta = $wrapper->get_adapter_meta();
+			$this->assertSame( 'test/resource-first', $meta['ability'] ?? null, 'First ability should win' );
 
 		// Clean up.
 		wp_unregister_ability( 'test/resource-first' );

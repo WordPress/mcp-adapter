@@ -70,6 +70,41 @@ class RegisterAbilityAsMcpResource {
 	}
 
 	/**
+	 * Build a clean Resource DTO and adapter metadata for internal wiring.
+	 *
+	 * This method returns a protocol-only Resource DTO and provides the adapter metadata
+	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
+	 * wiring to protocol surfaces.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param \WP_Ability                                                              $ability The ability.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
+	 *
+	 * @return array{resource: \WP\McpSchema\Server\Resources\Resource, adapter_meta: array<string, mixed>}|\WP_Error
+	 */
+	public static function build( WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
+		$resource = new self( $ability, $error_handler );
+		$data     = $resource->build_resource_data();
+
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+
+		try {
+			return array(
+				'resource'     => Resource::fromArray( $data['resource_data'] ),
+				'adapter_meta' => $data['adapter_meta'],
+			);
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_resource_schema_invalid',
+				$e->getMessage()
+			);
+		}
+	}
+
+	/**
 	 * Constructor.
 	 *
 	 * @param \WP_Ability                                                              $ability       The ability.
@@ -94,7 +129,7 @@ class RegisterAbilityAsMcpResource {
 	 */
 	private function log_deprecation( string $method, string $message, array $context = array() ): void {
 		// WordPress standard deprecation notice (appears as X-WP-DoingItWrong header in REST API).
-		_doing_it_wrong( $method, esc_html( $message ), 'n.e.x.t' );
+		_doing_it_wrong( esc_html( $method ), esc_html( $message ), 'n.e.x.t' );
 
 		// Also log via McpErrorHandler for debug.log visibility.
 		if ( ! $this->error_handler ) {
@@ -287,6 +322,22 @@ class RegisterAbilityAsMcpResource {
 	 * @return array<string,mixed>|\WP_Error Resource data array or WP_Error if validation fails.
 	 */
 	private function get_data() {
+		$built = $this->build_resource_data();
+		if ( is_wp_error( $built ) ) {
+			return $built;
+		}
+
+		return $built['resource_data'];
+	}
+
+	/**
+	 * Build Resource DTO data and adapter metadata.
+	 *
+	 * @return array{resource_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @since n.e.x.t
+	 *
+	 */
+	private function build_resource_data() {
 		$uri = $this->get_uri();
 		if ( is_wp_error( $uri ) ) {
 			return $uri;
@@ -338,7 +389,7 @@ class RegisterAbilityAsMcpResource {
 				if ( ! empty( $validation_errors ) ) {
 					// Log the issue but don't fail registration - drop invalid annotations.
 					$this->log_deprecation(
-						__METHOD__,
+						self::class . '::get_data',
 						sprintf(
 							/* translators: 1: ability name, 2: validation errors */
 							__( 'Invalid annotations for resource ability "%1$s" will be dropped: %2$s', 'mcp-adapter' ),
@@ -361,21 +412,25 @@ class RegisterAbilityAsMcpResource {
 			}
 		}
 
-		// Internal: _meta with adapter info for resources/read resolution.
-		$resource_data['_meta'] = array(
-			'mcp_adapter' => array(
-				'ability' => $this->ability->get_name(),
-			),
-		);
-
-		// Merge user-provided _meta from mcp._meta.
-		// User _meta keys are preserved alongside adapter's internal 'mcp_adapter' key.
-		// MetaStripper will strip 'mcp_adapter' but preserve user keys when responding to clients.
+		// Build Resource `_meta`:
+		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
+		// - Adapter metadata is NEVER included in protocol DTO meta; it is returned separately in adapter_meta.
+		$resource_meta = array();
 		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$resource_data['_meta'] = array_merge( $mcp_meta['_meta'], $resource_data['_meta'] );
+			$resource_meta = $mcp_meta['_meta'];
+		}
+		if ( ! empty( $resource_meta ) ) {
+			$resource_data['_meta'] = $resource_meta;
 		}
 
-		return $resource_data;
+		$adapter_meta = array(
+			'ability' => $this->ability->get_name(),
+		);
+
+		return array(
+			'resource_data' => $resource_data,
+			'adapter_meta'  => $adapter_meta,
+		);
 	}
 
 	/**

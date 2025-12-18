@@ -7,15 +7,14 @@
 
 declare( strict_types=1 );
 
-namespace WP\MCP\Handlers\Prompts;
+	namespace WP\MCP\Handlers\Prompts;
 
-use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Prompts\PromptMetadataHelper;
-use WP\MCP\Handlers\HandlerHelperTrait;
-use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Server\Prompts\GetPromptResult;
-use WP\McpSchema\Server\Prompts\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\Prompt;
+	use WP\MCP\Core\McpServer;
+	use WP\MCP\Handlers\HandlerHelperTrait;
+	use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+	use WP\McpSchema\Server\Prompts\GetPromptResult;
+	use WP\McpSchema\Server\Prompts\ListPromptsResult;
+	use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptMessage;
 
 /**
@@ -74,76 +73,38 @@ class PromptsHandler {
 			return McpErrorFactory::missing_parameter( $request_id, 'name' );
 		}
 
-		// Get the prompt by name.
-		$prompt_name = $request_params['name'];
-		$prompt      = $this->mcp->get_prompt( $prompt_name );
+		$prompt_name = (string) $request_params['name'];
+		$prompt_name = trim( $prompt_name );
 
-		if ( ! $prompt ) {
+		$prompt_wrapper = $this->mcp->get_prompt_wrapper( $prompt_name );
+
+		if ( ! $prompt_wrapper ) {
 			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
 		}
+
+		/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt */
+		$prompt = $prompt_wrapper->get_component();
 
 		// Get the arguments for the prompt.
 		$arguments = $request_params['arguments'] ?? array();
 
 		try {
-			$ability_name = PromptMetadataHelper::get_ability_name( $prompt );
-
-			// Builder-based prompts: execute via registry builder instance.
-			if ( null === $ability_name ) {
-				$builder = $this->mcp->get_prompt_builder( $prompt_name );
-				if ( ! $builder ) {
-					return McpErrorFactory::internal_error( $request_id, 'Prompt is missing ability metadata and no builder is registered.' );
-				}
-
-				if ( true !== $builder->has_permission( $arguments ) ) {
-					return McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name );
-				}
-
-				$result = $builder->handle( $arguments );
-
-				return $this->convert_result_to_dto( $result, $prompt );
-			}
-
-			// Ability-based execution.
-			$ability = \wp_get_ability( $ability_name );
-			if ( ! $ability ) {
-				$this->mcp->error_handler->log(
-					'Failed to get ability for prompt',
-					array(
-						'prompt_name'   => $prompt_name,
-						'error_message' => "Ability '{$ability_name}' not found.",
-					)
-				);
-
-				return McpErrorFactory::internal_error( $request_id, "Ability '{$ability_name}' not found." );
-			}
-
-			// If ability has no input schema and arguments is empty, pass null
-			// This is required by WP_Ability::validate_input() which expects null when no schema
-			$ability_input_schema = $ability->get_input_schema();
-			if ( empty( $ability_input_schema ) && empty( $arguments ) ) {
-				$arguments = null;
-			}
-			$has_permission = $ability->check_permissions( $arguments );
-			if ( true !== $has_permission ) {
-				// Extract detailed error message and code if WP_Error was returned
+			$permission = $prompt_wrapper->check_permission( $arguments );
+			if ( true !== $permission ) {
 				$error_message = 'Access denied for prompt: ' . $prompt_name;
-
-				if ( is_wp_error( $has_permission ) ) {
-					$error_message = $has_permission->get_error_message();
+				if ( is_wp_error( $permission ) ) {
+					$error_message = $permission->get_error_message();
 				}
 
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
-			$result = $ability->execute( $arguments );
-
-			// Handle WP_Error objects that weren't converted by the ability.
+			$result = $prompt_wrapper->execute( $arguments );
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(
-					'Ability returned WP_Error object',
+					'Prompt execution returned WP_Error',
 					array(
-						'ability'       => $ability->get_name(),
+						'prompt_name'   => $prompt_name,
 						'error_code'    => $result->get_error_code(),
 						'error_message' => $result->get_error_message(),
 					)

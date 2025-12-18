@@ -20,6 +20,8 @@ use WP\McpSchema\Server\Tools\Tool;
  *
  * This class registers a WordPress ability as an MCP tool.
  *
+ * @internal
+ *
  * @package McpAdapter
  */
 class RegisterAbilityAsMcpTool {
@@ -31,25 +33,46 @@ class RegisterAbilityAsMcpTool {
 	private \WP_Ability $ability;
 
 	/**
-	 * Make a new instance of the class.
-	 *
-	 * @param \WP_Ability $ability The ability.
-	 *
-	 * @return \WP\McpSchema\Server\Tools\Tool|\WP_Error Returns a Tool DTO or WP_Error if validation fails.
-	 */
-	public static function make( \WP_Ability $ability ) {
-		$tool = new self( $ability );
-
-		return $tool->get_tool();
-	}
-
-	/**
 	 * Constructor.
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 */
 	private function __construct( \WP_Ability $ability ) {
 		$this->ability = $ability;
+	}
+
+	/**
+	 * Build a clean Tool DTO and adapter metadata for internal wiring.
+	 *
+	 * This method returns a protocol-only Tool DTO and provides the adapter metadata
+	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
+	 * wiring to protocol surfaces.
+	 *
+	 * @param \WP_Ability $ability The ability.
+	 *
+	 * @return array{tool: \WP\McpSchema\Server\Tools\Tool, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @since n.e.x.t
+	 *
+	 */
+	public static function build( \WP_Ability $ability ) {
+		$tool = new self( $ability );
+		$data = $tool->build_tool_data();
+
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+
+		try {
+			return array(
+				'tool'         => Tool::fromArray( $data['tool_data'] ),
+				'adapter_meta' => $data['adapter_meta'],
+			);
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_tool_schema_invalid',
+				$e->getMessage()
+			);
+		}
 	}
 
 	/**
@@ -95,13 +118,13 @@ class RegisterAbilityAsMcpTool {
 	}
 
 	/**
-	 * Get the MCP tool data array.
+	 * Build Tool DTO data and adapter metadata.
 	 *
+	 * @return array{tool_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
-	 * @return array<string,mixed>|\WP_Error Tool data array or error if name resolution fails.
 	 */
-	private function get_data() {
+	private function build_tool_data() {
 		// Resolve tool name first (can fail).
 		$tool_name = $this->resolve_tool_name();
 		if ( is_wp_error( $tool_name ) ) {
@@ -152,7 +175,7 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		// Store transformation metadata as internal metadata (stripped before responding to clients).
-		// Only record keys when semantically meaningful to keep _meta minimal and accurate.
+		// Only record keys when semantically meaningful to keep metadata minimal and accurate.
 		$adapter_meta = array(
 			'ability' => $this->ability->get_name(),
 		);
@@ -170,8 +193,6 @@ class RegisterAbilityAsMcpTool {
 			$adapter_meta['output_schema_wrapper']     = $output_transform['wrapper_property'];
 		}
 
-		$tool_data['_meta'] = array( 'mcp_adapter' => $adapter_meta );
-
 		// Map icons from ability.meta.mcp.icons if present.
 		$mcp_meta = $ability_meta['mcp'] ?? array();
 		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
@@ -181,67 +202,20 @@ class RegisterAbilityAsMcpTool {
 			}
 		}
 
-		// Merge user-provided _meta from ability.meta.mcp._meta.
-		// User _meta keys are preserved alongside adapter's internal 'mcp_adapter' key.
-		// MetaStripper will strip 'mcp_adapter' but preserve user keys when responding to clients.
+		// Build Tool `_meta`:
+		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
+		// - Adapter metadata is NEVER included in protocol DTO meta; it is returned separately in adapter_meta.
+		$tool_meta = array();
 		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$tool_data['_meta'] = array_merge( $mcp_meta['_meta'], $tool_data['_meta'] );
+			$tool_meta = $mcp_meta['_meta'];
+		}
+		if ( ! empty( $tool_meta ) ) {
+			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Prepare schema arrays for php-mcp-schema DTO expectations (properties map values must be objects).
-		$tool_data['inputSchema'] = $this->prepare_schema_for_dto( $tool_data['inputSchema'] );
-		if ( isset( $tool_data['outputSchema'] ) && is_array( $tool_data['outputSchema'] ) ) {
-			$tool_data['outputSchema'] = $this->prepare_schema_for_dto( $tool_data['outputSchema'] );
-		}
-
-		return $tool_data;
-	}
-
-	/**
-	 * Get the MCP Tool DTO instance.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @return \WP\McpSchema\Server\Tools\Tool|\WP_Error The Tool DTO instance or WP_Error if validation fails.
-	 */
-	private function get_tool() {
-		$data = $this->get_data();
-		if ( is_wp_error( $data ) ) {
-			return $data;
-		}
-
-		try {
-			return Tool::fromArray( $data );
-		} catch ( \Throwable $e ) {
-			return new \WP_Error(
-				'mcp_tool_schema_invalid',
-				$e->getMessage()
-			);
-		}
-	}
-
-	/**
-	 * Prepare a JSON Schema array for DTO conversion.
-	 *
-	 * The php-mcp-schema library expects JSON Schema `properties` values to be objects, not arrays.
-	 * This method recursively converts nested schema arrays into stdClass objects where needed.
-	 *
-	 * @param array $schema The JSON schema array.
-	 *
-	 * @return array The schema with properties values converted to objects.
-	 */
-	private function prepare_schema_for_dto( array $schema ): array {
-		if ( isset( $schema['properties'] ) && is_array( $schema['properties'] ) ) {
-			$converted_properties = array();
-			foreach ( $schema['properties'] as $prop_name => $prop_schema ) {
-				if ( is_array( $prop_schema ) ) {
-					$prop_schema = $this->prepare_schema_for_dto( $prop_schema );
-				}
-				$converted_properties[ $prop_name ] = (object) $prop_schema;
-			}
-			$schema['properties'] = $converted_properties;
-		}
-
-		return $schema;
+		return array(
+			'tool_data'    => $tool_data,
+			'adapter_meta' => $adapter_meta,
+		);
 	}
 }

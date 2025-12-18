@@ -101,6 +101,40 @@ class RegisterAbilityAsMcpPrompt {
 	}
 
 	/**
+	 * Build a clean Prompt DTO and adapter metadata for internal wiring.
+	 *
+	 * This method returns a protocol-only Prompt DTO and provides the adapter metadata
+	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
+	 * wiring to protocol surfaces.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param \WP_Ability $ability The ability.
+	 *
+	 * @return array{prompt: \WP\McpSchema\Server\Prompts\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
+	 */
+	public static function build( WP_Ability $ability ) {
+		$prompt = new self( $ability );
+		$data   = $prompt->build_prompt_data();
+
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+
+		try {
+			return array(
+				'prompt'       => Prompt::fromArray( $data['prompt_data'] ),
+				'adapter_meta' => $data['adapter_meta'],
+			);
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_prompt_schema_invalid',
+				$e->getMessage()
+			);
+		}
+	}
+
+	/**
 	 * Constructor.
 	 *
 	 * @param \WP_Ability $ability The ability.
@@ -348,6 +382,28 @@ class RegisterAbilityAsMcpPrompt {
 	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 */
 	private function get_prompt() {
+		$built = $this->build_prompt_data();
+
+		// Propagate WP_Error from argument validation.
+		if ( is_wp_error( $built ) ) {
+			return $built;
+		}
+
+		try {
+			return Prompt::fromArray( $built['prompt_data'] );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Build Prompt DTO data and adapter metadata.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
+	 */
+	private function build_prompt_data() {
 		$data = $this->get_data();
 
 		// Propagate WP_Error from argument validation.
@@ -385,24 +441,18 @@ class RegisterAbilityAsMcpPrompt {
 			$adapter_meta['input_schema_wrapper']     = $this->schema_wrapper_property;
 		}
 
-		$data['_meta'] = array(
-			'mcp_adapter' => $adapter_meta,
-		);
-
-		// Merge user-provided _meta from ability.meta.mcp._meta.
-		// User _meta keys are preserved alongside adapter's internal 'mcp_adapter' key.
-		// MetaStripper will strip 'mcp_adapter' but preserve user keys when responding to clients.
+		// Preserve user-provided _meta from ability.meta.mcp._meta.
+		$prompt_meta = array();
 		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$data['_meta'] = array_merge( $mcp_meta['_meta'], $data['_meta'] );
+			$prompt_meta = $mcp_meta['_meta'];
+		}
+		if ( ! empty( $prompt_meta ) ) {
+			$data['_meta'] = $prompt_meta;
 		}
 
-		try {
-			return Prompt::fromArray( $data );
-		} catch ( \Throwable $e ) {
-			return new \WP_Error(
-				'mcp_prompt_schema_invalid',
-				$e->getMessage()
-			);
-		}
+		return array(
+			'prompt_data'  => $data,
+			'adapter_meta' => $adapter_meta,
+		);
 	}
 }

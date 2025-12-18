@@ -354,6 +354,30 @@ class McpServer {
 	}
 
 	/**
+	 * Get a specific tool wrapper by name (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $tool_name Tool name.
+	 *
+	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 */
+	public function get_tool_wrapper( string $tool_name ): ?\WP\MCP\Domain\Tools\McpTool {
+		return $this->component_registry->get_tool_wrapper( $tool_name );
+	}
+
+	/**
+	 * Get all tool wrappers (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, \WP\MCP\Domain\Tools\McpTool>
+	 */
+	public function get_tool_wrappers(): array {
+		return $this->component_registry->get_tool_wrappers();
+	}
+
+	/**
 	 * Get a specific resource by URI.
 	 *
 	 * @param string $resource_uri Resource URI.
@@ -365,6 +389,30 @@ class McpServer {
 	}
 
 	/**
+	 * Get a specific resource wrapper by URI (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $resource_uri Resource URI.
+	 *
+	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 */
+	public function get_resource_wrapper( string $resource_uri ): ?\WP\MCP\Domain\Resources\McpResource {
+		return $this->component_registry->get_resource_wrapper( $resource_uri );
+	}
+
+	/**
+	 * Get all resource wrappers (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, \WP\MCP\Domain\Resources\McpResource>
+	 */
+	public function get_resource_wrappers(): array {
+		return $this->component_registry->get_resource_wrappers();
+	}
+
+	/**
 	 * Get a specific prompt by name.
 	 *
 	 * @param string $prompt_name Prompt name.
@@ -373,6 +421,19 @@ class McpServer {
 	 */
 	public function get_prompt( string $prompt_name ): ?Prompt {
 		return $this->component_registry->get_prompt( $prompt_name );
+	}
+
+	/**
+	 * Get a prompt wrapper by name (internal use).
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $prompt_name Prompt name.
+	 *
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 */
+	public function get_prompt_wrapper( string $prompt_name ): ?\WP\MCP\Domain\Prompts\McpPrompt {
+		return $this->component_registry->get_prompt_wrapper( $prompt_name );
 	}
 
 	/**

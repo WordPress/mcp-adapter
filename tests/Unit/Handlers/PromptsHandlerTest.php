@@ -70,10 +70,11 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertContainsOnlyInstancesOf( PromptMessage::class, $messages );
 	}
 
-	public function test_get_prompt_with_wp_error_from_get_ability(): void {
+	public function test_get_prompt_does_not_require_ability_lookup_at_runtime(): void {
 		wp_set_current_user( 1 );
 
-		// Register a prompt first, then unregister the ability to simulate get_ability() returning WP_Error.
+		// Register a prompt ability, then unregister it after the server is created.
+		// Wrapper-backed execution keeps the ability instance, so runtime lookup is not required.
 		$this->register_ability_in_hook(
 			'test/prompt-to-remove',
 			array(
@@ -86,10 +87,10 @@ final class PromptsHandlerTest extends TestCase {
 						'input' => array( 'type' => 'string' ),
 					),
 				),
-				'execute_callback'    => static function () {
+				'execute_callback'    => static function (): array {
 					return array();
 				},
-				'permission_callback' => static function () {
+				'permission_callback' => static function (): bool {
 					return true;
 				},
 				'meta'                => array(
@@ -104,7 +105,7 @@ final class PromptsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt-to-remove' ) );
 		$handler = new PromptsHandler( $server );
 
-		// Now unregister the ability to simulate get_ability() returning WP_Error.
+		// Now unregister the ability after the wrapper was created.
 		wp_unregister_ability( 'test/prompt-to-remove' );
 
 		$result = $handler->get_prompt(
@@ -116,11 +117,8 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Ability retrieval failure is a protocol error - returns JSONRPCErrorResponse.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertNotEmpty( $result->getMessages() );
 	}
 
 	public function test_get_prompt_with_wp_error_from_execute(): void {

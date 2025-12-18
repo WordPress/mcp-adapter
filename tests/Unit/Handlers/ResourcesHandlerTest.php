@@ -87,48 +87,49 @@ final class ResourcesHandlerTest extends TestCase {
 	public function test_read_resource_with_wp_error_from_get_ability(): void {
 		wp_set_current_user( 1 );
 
-		// Create a resource with a non-existent ability name stored in _meta.
-		$server = $this->makeServer( array(), array(), array() );
-
-		$resource = new Resource(
-			'Test Resource',
-			'WordPress://test/nonexistent-resource',
-			null,
-			'Test description',
-			null,
-			null,
-			null,
+		// Register a resource ability, then unregister it after the server is created.
+		// Wrapper-backed execution keeps the ability instance, so runtime lookup is not required.
+		$this->register_ability_in_hook(
+			'test/resource-to-remove',
 			array(
-				'mcp_adapter' => array(
-					'ability' => 'nonexistent/ability',
+				'label'               => 'Resource To Remove',
+				'description'         => 'A resource whose ability will be removed',
+				'category'            => 'test',
+				'execute_callback'    => static function (): string {
+					return 'ok';
+				},
+				'permission_callback' => static function (): bool {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://test/resource-to-remove',
+					),
 				),
 			)
 		);
 
-		// Manually add the invalid resource (bypassing normal registration).
-		$registry           = $server->get_component_registry();
-		$reflection         = new \ReflectionClass( $registry );
-		$resources_property = $reflection->getProperty( 'resources' );
-		$resources_property->setAccessible( true );
-		$resources = $resources_property->getValue( $registry );
-		$resources['WordPress://test/nonexistent-resource'] = $resource;
-		$resources_property->setValue( $registry, $resources );
-
+		$server  = $this->makeServer( array(), array( 'test/resource-to-remove' ), array() );
 		$handler = new ResourcesHandler( $server );
+
+		// Now unregister the ability after the wrapper was created.
+		wp_unregister_ability( 'test/resource-to-remove' );
 
 		$result = $handler->read_resource(
 			array(
 				'params' => array(
-					'uri' => 'WordPress://test/nonexistent-resource',
+					'uri' => 'WordPress://test/resource-to-remove',
 				),
 			)
 		);
 
-		// Ability retrieval failure is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+		$contents = $result->getContents();
+		$this->assertNotEmpty( $contents );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( 'ok', $contents[0]->getText() );
 	}
 
 	public function test_read_resource_with_wp_error_from_execute(): void {

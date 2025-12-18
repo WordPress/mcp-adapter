@@ -312,9 +312,9 @@ final class McpPromptBuilderTest extends TestCase {
 	// User _meta Tests (MCP 2025-11-25)
 	// =========================================================================
 
-	public function test_builder_with_meta_includes_meta_in_prompt(): void {
-		$builder = new TestPromptWithMeta();
-		$prompt  = $builder->build();
+		public function test_builder_with_meta_includes_meta_in_prompt(): void {
+			$builder = new TestPromptWithMeta();
+			$prompt  = $builder->build();
 
 		$arr = $prompt->toArray();
 
@@ -327,37 +327,19 @@ final class McpPromptBuilderTest extends TestCase {
 		$this->assertTrue( $arr['_meta']['custom_vendor']['feature_flag'] );
 		$this->assertSame( '2.0', $arr['_meta']['custom_vendor']['version'] );
 
-		// Verify another_key is preserved.
-		$this->assertArrayHasKey( 'another_key', $arr['_meta'] );
-		$this->assertSame( 'some-value', $arr['_meta']['another_key'] );
+			// Verify another_key is preserved.
+			$this->assertArrayHasKey( 'another_key', $arr['_meta'] );
+			$this->assertSame( 'some-value', $arr['_meta']['another_key'] );
+		}
 
-		// Verify internal mcp_adapter key is still present.
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertTrue( $arr['_meta']['mcp_adapter']['builder'] );
-	}
+		public function test_builder_without_user_meta_has_no_meta_field(): void {
+			$builder = new TestPrompt();
+			$prompt  = $builder->build();
 
-	public function test_builder_meta_does_not_override_adapter_key(): void {
-		$builder = new TestPromptWithMeta();
-		$prompt  = $builder->build();
+			$arr = $prompt->toArray();
 
-		$arr = $prompt->toArray();
-
-		// The mcp_adapter key should always contain our internal metadata.
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertTrue( $arr['_meta']['mcp_adapter']['builder'] );
-	}
-
-	public function test_builder_without_user_meta_has_only_adapter_meta(): void {
-		$builder = new TestPrompt();
-		$prompt  = $builder->build();
-
-		$arr = $prompt->toArray();
-
-		// Should only have mcp_adapter in _meta.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertCount( 1, $arr['_meta'] ); // Only mcp_adapter key.
-	}
+			$this->assertArrayNotHasKey( '_meta', $arr );
+		}
 
 	public function test_get_meta_returns_configured_meta(): void {
 		$builder = new TestPromptWithMeta();
@@ -395,15 +377,11 @@ final class McpPromptBuilderTest extends TestCase {
 		$this->assertSame( 'image/png', $arr['icons'][0]['mimeType'] );
 		$this->assertSame( array( '48x48' ), $arr['icons'][0]['sizes'] );
 
-		// Verify user _meta is present.
-		$this->assertArrayHasKey( '_meta', $arr );
-		$this->assertArrayHasKey( 'vendor_data', $arr['_meta'] );
-		$this->assertSame( 'value', $arr['_meta']['vendor_data']['key'] );
-
-		// Verify adapter _meta is also present.
-		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
-		$this->assertTrue( $arr['_meta']['mcp_adapter']['builder'] );
-	}
+			// Verify user _meta is present.
+			$this->assertArrayHasKey( '_meta', $arr );
+			$this->assertArrayHasKey( 'vendor_data', $arr['_meta'] );
+			$this->assertSame( 'value', $arr['_meta']['vendor_data']['key'] );
+		}
 
 	public function test_builder_with_icons_can_be_registered_with_server(): void {
 		$server = $this->makeServer( array(), array(), array( TestPromptWithIcons::class ) );

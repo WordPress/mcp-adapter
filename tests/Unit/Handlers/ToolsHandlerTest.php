@@ -100,10 +100,10 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertNotEmpty( $error->getMessage() );
 	}
 
-	public function test_call_tool_with_wp_error_from_get_ability(): void {
+	public function test_call_tool_returns_not_found_when_tool_has_no_wrapper(): void {
 		wp_set_current_user( 1 );
 
-		// Create a tool with a non-existent ability name stored in _meta.
+		// Register a Tool DTO directly (no wrapper). This tool will be listable but not callable.
 		$server = $this->makeServer( array(), array(), array() );
 
 		$tool = new Tool(
@@ -114,11 +114,7 @@ final class ToolsHandlerTest extends TestCase {
 			null,
 			null,
 			null,
-			array(
-				'mcp_adapter' => array(
-					'ability' => 'nonexistent/ability',
-				),
-			)
+			null
 		);
 		$server->get_component_registry()->add_tool( $tool );
 
@@ -132,7 +128,7 @@ final class ToolsHandlerTest extends TestCase {
 			)
 		);
 
-		// Ability retrieval failure is a protocol error - returns JSONRPCErrorResponse
+		// Not callable without a wrapper - treat as not found.
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
 		// Use DTO getter methods instead of toArray()
 		$error = $result->getError();

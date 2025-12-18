@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Resources\ResourceMetadataHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\Protocol\BlobResourceContents;
@@ -41,17 +40,16 @@ class ResourcesHandler {
 	}
 
 
-	/**
-	 * Handles the resources/list request.
-	 *
-	 * Returns a ListResourcesResult DTO containing all registered resources.
-	 * Internal adapter metadata is stored under `_meta['mcp_adapter']` and stripped at the
-	 * transport boundary (RequestRouter) before returning to MCP clients.
-	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
-	 * @return \WP\McpSchema\Server\Resources\ListResourcesResult Response with resources list.
-	 */
+		/**
+		 * Handles the resources/list request.
+		 *
+		 * Returns a ListResourcesResult DTO containing all registered resources.
+		 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
+		 *
+		 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+		 *
+		 * @return \WP\McpSchema\Server\Resources\ListResourcesResult Response with resources list.
+		 */
 	public function list_resources( $request_id = 0 ): ListResourcesResult {
 		$resources = array_values( $this->mcp->get_resources() );
 
@@ -84,26 +82,19 @@ class ResourcesHandler {
 			return McpErrorFactory::missing_parameter( $request_id, 'uri' );
 		}
 
-		// Implement resource reading logic here.
-		$uri      = $request_params['uri'];
-		$resource = $this->mcp->get_resource( $uri );
+		$uri = $request_params['uri'];
+		$uri = is_string( $uri ) ? trim( $uri ) : '';
 
-		if ( ! $resource ) {
+		$resource_wrapper = $this->mcp->get_resource_wrapper( $uri );
+		if ( ! $resource_wrapper ) {
 			return McpErrorFactory::resource_not_found( $request_id, $uri );
 		}
 
-		$ability_name = ResourceMetadataHelper::get_ability_name( $resource );
-		if ( null === $ability_name ) {
-			return McpErrorFactory::internal_error( $request_id, 'Resource is missing ability metadata.' );
-		}
-
-		$ability = \wp_get_ability( $ability_name );
-		if ( ! $ability ) {
-			return McpErrorFactory::internal_error( $request_id, "Ability '{$ability_name}' not found for resource." );
-		}
+		/** @var \WP\McpSchema\Server\Resources\Resource $resource */
+		$resource = $resource_wrapper->get_component();
 
 		try {
-			$has_permission = $ability->check_permissions();
+			$has_permission = $resource_wrapper->check_permission( $request_params );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message if WP_Error was returned.
 				$error_message = 'Access denied for resource: ' . $resource->getName();
@@ -115,14 +106,14 @@ class ResourcesHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
-			$contents = $ability->execute();
+			$contents = $resource_wrapper->execute( $request_params );
 
-			// Handle WP_Error objects that weren't converted by the ability.
+			// Handle WP_Error objects returned by wrapper execution.
 			if ( is_wp_error( $contents ) ) {
 				$this->mcp->error_handler->log(
-					'Ability returned WP_Error object',
+					'Resource execution returned WP_Error object',
 					array(
-						'ability'       => $ability->get_name(),
+						'uri'           => $uri,
 						'error_code'    => $contents->get_error_code(),
 						'error_message' => $contents->get_error_message(),
 					)

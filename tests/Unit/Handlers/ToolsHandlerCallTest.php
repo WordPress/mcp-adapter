@@ -169,7 +169,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( base64_encode( 'blob-bytes' ), $resource->getBlob() ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
-	public function test_tool_call_does_not_leak_internal_meta_in_text_or_structured_content(): void {
+	public function test_tool_call_preserves_meta_in_text_and_structured_content(): void {
 		$server  = $this->makeServer( array( 'test/meta-leak' ) );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool(
@@ -189,21 +189,21 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertNotEmpty( $content );
 		$this->assertInstanceOf( TextContent::class, $content[0] );
 
-		$text = $content[0]->getText();
-		$this->assertStringNotContainsString( 'mcp_adapter', $text );
+			$text = $content[0]->getText();
+			$this->assertStringContainsString( 'mcp_adapter', $text );
 
-		$decoded = json_decode( $text, true );
-		$this->assertIsArray( $decoded );
-		$this->assertArrayHasKey( '_meta', $decoded );
-		$this->assertArrayNotHasKey( 'mcp_adapter', $decoded['_meta'] );
-		$this->assertSame( 'top', $decoded['_meta']['keep'] );
-		$this->assertSame( 'nested', $decoded['nested']['_meta']['keep'] );
-		$this->assertArrayNotHasKey( 'mcp_adapter', $decoded['nested']['_meta'] );
+			$decoded = json_decode( $text, true );
+			$this->assertIsArray( $decoded );
+			$this->assertArrayHasKey( '_meta', $decoded );
+			$this->assertArrayHasKey( 'mcp_adapter', $decoded['_meta'] );
+			$this->assertSame( 'top', $decoded['_meta']['keep'] );
+			$this->assertSame( 'nested', $decoded['nested']['_meta']['keep'] );
+			$this->assertArrayHasKey( 'mcp_adapter', $decoded['nested']['_meta'] );
 
-		$structured = $result->getStructuredContent();
-		$this->assertIsArray( $structured );
-		$this->assertArrayHasKey( '_meta', $structured );
-		$this->assertArrayNotHasKey( 'mcp_adapter', $structured['_meta'] );
-		$this->assertArrayNotHasKey( 'mcp_adapter', $structured['nested']['_meta'] );
-	}
+			$structured = $result->getStructuredContent();
+			$this->assertIsArray( $structured );
+			$this->assertArrayHasKey( '_meta', $structured );
+			$this->assertArrayHasKey( 'mcp_adapter', $structured['_meta'] );
+			$this->assertArrayHasKey( 'mcp_adapter', $structured['nested']['_meta'] );
+		}
 }

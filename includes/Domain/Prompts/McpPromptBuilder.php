@@ -84,16 +84,15 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 */
 	protected ?array $icons = null;
 
-	/**
-	 * Additional metadata passed through to MCP clients.
-	 *
-	 * Use this to attach purpose-specific metadata that MCP clients can consume.
-	 * The internal 'mcp_adapter' key is stripped by MetaStripper before responding
-	 * to clients, but your keys are preserved.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @var array<string, mixed>
+		/**
+		 * Additional metadata passed through to MCP clients.
+		 *
+		 * Use this to attach purpose-specific metadata that MCP clients can consume.
+		 * Keys are passed through unchanged.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @var array<string, mixed>
 	 */
 	protected array $meta = array();
 
@@ -146,33 +145,23 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			}
 		}
 
-		// Builder prompts intentionally have no ability; they are executed via registry builder mapping.
-		$_meta = array(
-			'mcp_adapter' => array(
-				'builder' => true,
-			),
-		);
+			$prompt_data = array(
+				'name'        => $this->name,
+				'title'       => $this->title,
+				'description' => $this->description,
+				'arguments'   => $argument_dtos,
+			);
 
-		// Merge additional _meta with internal adapter metadata.
-		// User keys are preserved alongside 'mcp_adapter'; MetaStripper strips 'mcp_adapter' for clients.
-		if ( ! empty( $this->meta ) ) {
-			$_meta = array_merge( $this->meta, $_meta );
-		}
+			if ( ! empty( $this->meta ) ) {
+				$prompt_data['_meta'] = $this->meta;
+			}
 
-		$prompt_data = array(
-			'name'        => $this->name,
-			'title'       => $this->title,
-			'description' => $this->description,
-			'arguments'   => $argument_dtos,
-			'_meta'       => $_meta,
-		);
+			// Only include icons if valid ones exist.
+			if ( null !== $valid_icons ) {
+				$prompt_data['icons'] = $valid_icons;
+			}
 
-		// Only include icons if valid ones exist.
-		if ( null !== $valid_icons ) {
-			$prompt_data['icons'] = $valid_icons;
-		}
-
-		return Prompt::fromArray( $prompt_data );
+			return Prompt::fromArray( $prompt_data );
 	}
 
 	/**
@@ -333,16 +322,14 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		return $this;
 	}
 
-	/**
-	 * Set additional metadata.
-	 *
-	 * This metadata is passed through to MCP clients alongside the adapter's internal metadata.
-	 * The internal 'mcp_adapter' key is stripped by MetaStripper before responding to clients,
-	 * but your keys are preserved.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
+		/**
+		 * Set additional metadata.
+		 *
+		 * This metadata is passed through to MCP clients unchanged.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<string, mixed> $meta Additional metadata key-value pairs.
 	 *
 	 * @return self
 	 */
