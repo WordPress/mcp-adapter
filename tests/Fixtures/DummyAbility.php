@@ -674,6 +674,182 @@ final class DummyAbility {
 			)
 		);
 
+		// Prompt with flattened string schema (should wrap as single 'input' argument).
+		wp_register_ability(
+			'test/prompt-flattened-string',
+			array(
+				'label'               => 'Prompt Flattened String',
+				'description'         => 'A prompt with flattened string schema',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'        => 'string',
+					'description' => 'The code to review',
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with flattened array schema (should wrap as single 'input' argument).
+		wp_register_ability(
+			'test/prompt-flattened-array',
+			array(
+				'label'               => 'Prompt Flattened Array',
+				'description'         => 'A prompt with flattened array schema',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'        => 'array',
+					'items'       => array( 'type' => 'string' ),
+					'description' => 'List of items to process',
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with property titles (should map title to PromptArgument.title).
+		wp_register_ability(
+			'test/prompt-with-titles',
+			array(
+				'label'               => 'Prompt With Titles',
+				'description'         => 'A prompt with JSON Schema property titles',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'code'     => array(
+							'type'        => 'string',
+							'title'       => 'Source Code',
+							'description' => 'The code to review',
+						),
+						'language' => array(
+							'type'        => 'string',
+							'title'       => 'Programming Language',
+							'description' => 'The programming language',
+						),
+					),
+					'required'   => array( 'code' ),
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with mixed required/optional arguments.
+		wp_register_ability(
+			'test/prompt-mixed-required',
+			array(
+				'label'               => 'Prompt Mixed Required',
+				'description'         => 'A prompt with mixed required and optional arguments',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'topic'  => array(
+							'type'        => 'string',
+							'description' => 'The topic (required)',
+						),
+						'tone'   => array(
+							'type'        => 'string',
+							'description' => 'The tone (optional)',
+						),
+						'length' => array(
+							'type'        => 'integer',
+							'description' => 'The length (optional)',
+						),
+					),
+					'required'   => array( 'topic' ),
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with empty object schema (no properties).
+		wp_register_ability(
+			'test/prompt-empty-object',
+			array(
+				'label'               => 'Prompt Empty Object',
+				'description'         => 'A prompt with empty object schema',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		// Prompt with no input_schema.
+		wp_register_ability(
+			'test/prompt-no-schema',
+			array(
+				'label'               => 'Prompt No Schema',
+				'description'         => 'A prompt with no input schema',
+				'category'            => 'test',
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
 		// Tool with valid icons (MCP 2025-11-25)
 		wp_register_ability(
 			'test/with-icons',
@@ -763,11 +939,11 @@ final class DummyAbility {
 					'mcp' => array(
 						'public' => true,
 						'_meta'  => array(
-							'custom_vendor'   => array(
+							'custom_vendor'  => array(
 								'feature_flag' => true,
 								'version'      => '1.0',
 							),
-							'another_vendor'  => 'some-value',
+							'another_vendor' => 'some-value',
 						),
 					),
 				),
@@ -1167,6 +1343,205 @@ final class DummyAbility {
 				),
 			)
 		);
+
+		// =========================================================================
+		// Explicit mcp.arguments Test Abilities
+		// =========================================================================
+
+		// Prompt with explicit mcp.arguments (no input_schema).
+		wp_register_ability(
+			'test/prompt-explicit-args',
+			array(
+				'label'               => 'Prompt Explicit Args',
+				'description'         => 'A prompt with explicit mcp.arguments and no input_schema',
+				'category'            => 'test',
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'    => true,
+						'type'      => 'prompt',
+						'arguments' => array(
+							array(
+								'name'        => 'code',
+								'title'       => 'Source Code',
+								'description' => 'The code to review',
+								'required'    => true,
+							),
+							array(
+								'name'        => 'language',
+								'description' => 'Programming language (optional)',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with explicit mcp.arguments that OVERRIDE input_schema.
+		wp_register_ability(
+			'test/prompt-explicit-args-override',
+			array(
+				'label'               => 'Prompt Explicit Args Override',
+				'description'         => 'A prompt where mcp.arguments override input_schema',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'schema_field' => array(
+							'type'        => 'string',
+							'description' => 'This should NOT appear in arguments',
+						),
+					),
+					'required'   => array( 'schema_field' ),
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'    => true,
+						'type'      => 'prompt',
+						'arguments' => array(
+							array(
+								'name'        => 'explicit_field',
+								'title'       => 'Explicit Field',
+								'description' => 'This should appear instead of schema_field',
+								'required'    => true,
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with empty mcp.arguments array (should fall back to input_schema).
+		wp_register_ability(
+			'test/prompt-empty-explicit-args',
+			array(
+				'label'               => 'Prompt Empty Explicit Args',
+				'description'         => 'A prompt with empty mcp.arguments, should use input_schema',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'fallback_field' => array(
+							'type'        => 'string',
+							'description' => 'This should appear because mcp.arguments is empty',
+						),
+					),
+					'required'   => array( 'fallback_field' ),
+				),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'    => true,
+						'type'      => 'prompt',
+						'arguments' => array(), // Empty array - should fall back to input_schema.
+					),
+				),
+			)
+		);
+
+		// Prompt with invalid mcp.arguments (missing name) - should return WP_Error.
+		wp_register_ability(
+			'test/prompt-invalid-explicit-args-no-name',
+			array(
+				'label'               => 'Prompt Invalid Args No Name',
+				'description'         => 'A prompt with invalid mcp.arguments (missing name)',
+				'category'            => 'test',
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'    => true,
+						'type'      => 'prompt',
+						'arguments' => array(
+							array(
+								// Missing 'name' field - should fail validation.
+								'description' => 'This argument has no name',
+								'required'    => true,
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with invalid mcp.arguments (non-array argument) - should return WP_Error.
+		wp_register_ability(
+			'test/prompt-invalid-explicit-args-not-array',
+			array(
+				'label'               => 'Prompt Invalid Args Not Array',
+				'description'         => 'A prompt with invalid mcp.arguments (argument is not an array)',
+				'category'            => 'test',
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'    => true,
+						'type'      => 'prompt',
+						'arguments' => array(
+							'not-an-array', // Invalid - should be an array.
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with explicit args containing all optional fields.
+		wp_register_ability(
+			'test/prompt-explicit-args-all-fields',
+			array(
+				'label'               => 'Prompt Explicit Args All Fields',
+				'description'         => 'A prompt with explicit arguments including all optional fields',
+				'category'            => 'test',
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'    => true,
+						'type'      => 'prompt',
+						'arguments' => array(
+							array(
+								'name'        => 'full_arg',
+								'title'       => 'Full Argument',
+								'description' => 'An argument with all fields populated',
+								'required'    => true,
+							),
+							array(
+								'name' => 'minimal_arg',
+								// Only name - all optional fields omitted.
+							),
+						),
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -1203,6 +1578,12 @@ final class DummyAbility {
 			'test/prompt-with-annotations',
 			'test/prompt-partial-annotations',
 			'test/prompt-invalid-annotations',
+			'test/prompt-flattened-string',
+			'test/prompt-flattened-array',
+			'test/prompt-with-titles',
+			'test/prompt-mixed-required',
+			'test/prompt-empty-object',
+			'test/prompt-no-schema',
 			'test/resource-whitespace-uri',
 			'test/embedded-text-resource',
 			'test/embedded-blob-resource',
@@ -1224,6 +1605,12 @@ final class DummyAbility {
 			'test/resource-multiple-contents',
 			'test/resource-text-with-mimetype',
 			'test/resource-plain-string',
+			'test/prompt-explicit-args',
+			'test/prompt-explicit-args-override',
+			'test/prompt-empty-explicit-args',
+			'test/prompt-invalid-explicit-args-no-name',
+			'test/prompt-invalid-explicit-args-not-array',
+			'test/prompt-explicit-args-all-fields',
 		);
 
 		foreach ( $names as $name ) {

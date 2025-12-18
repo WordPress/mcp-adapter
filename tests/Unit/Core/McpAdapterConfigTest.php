@@ -275,6 +275,18 @@ final class McpAdapterConfigTest extends TestCase {
 				'test/prompt-with-annotations',
 				'test/prompt-partial-annotations',
 				'test/prompt-invalid-annotations',
+				'test/prompt-flattened-string',
+				'test/prompt-flattened-array',
+				'test/prompt-with-titles',
+				'test/prompt-mixed-required',
+				'test/prompt-empty-object',
+				'test/prompt-no-schema',
+				'test/prompt-explicit-args',
+				'test/prompt-explicit-args-override',
+				'test/prompt-empty-explicit-args',
+				'test/prompt-invalid-explicit-args-no-name',
+				'test/prompt-invalid-explicit-args-not-array',
+				'test/prompt-explicit-args-all-fields',
 			),
 			$received_config['prompts']
 		);
