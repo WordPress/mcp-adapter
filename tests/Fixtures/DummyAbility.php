@@ -1345,6 +1345,148 @@ final class DummyAbility {
 		);
 
 		// =========================================================================
+		// Prompt Icons and _meta Test Abilities (MCP 2025-11-25)
+		// =========================================================================
+
+		// Prompt with valid icons.
+		wp_register_ability(
+			'test/prompt-with-icons',
+			array(
+				'label'               => 'Prompt With Icons',
+				'description'         => 'A prompt with MCP icons',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/prompt-icon.png',
+								'mimeType' => 'image/png',
+								'sizes'    => array( '32x32' ),
+								'theme'    => 'light',
+							),
+							array(
+								'src'      => 'https://example.com/prompt-icon-dark.svg',
+								'mimeType' => 'image/svg+xml',
+								'theme'    => 'dark',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with some invalid icons (should filter out invalid, keep valid).
+		wp_register_ability(
+			'test/prompt-with-mixed-icons',
+			array(
+				'label'               => 'Prompt With Mixed Icons',
+				'description'         => 'A prompt with some valid and some invalid icons',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/valid-prompt-icon.png',
+								'mimeType' => 'image/png',
+							),
+							array(
+								// Missing src - invalid.
+								'mimeType' => 'image/png',
+							),
+							array(
+								'src'      => 'https://example.com/another-valid-prompt.svg',
+								'mimeType' => 'image/svg+xml',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with custom _meta passthrough.
+		wp_register_ability(
+			'test/prompt-with-custom-meta',
+			array(
+				'label'               => 'Prompt With Custom Meta',
+				'description'         => 'A prompt with custom _meta passed through',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+						'_meta'  => array(
+							'custom_vendor'  => array(
+								'feature_flag' => true,
+								'version'      => '1.0',
+							),
+							'another_vendor' => 'some-value',
+						),
+					),
+				),
+			)
+		);
+
+		// Prompt with both icons and custom _meta.
+		wp_register_ability(
+			'test/prompt-with-icons-and-meta',
+			array(
+				'label'               => 'Prompt With Icons And Meta',
+				'description'         => 'A prompt with both icons and custom _meta',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+						'icons'  => array(
+							array(
+								'src'      => 'https://example.com/combined-prompt-icon.png',
+								'mimeType' => 'image/png',
+								'sizes'    => array( '48x48' ),
+							),
+						),
+						'_meta'  => array(
+							'vendor_info' => array(
+								'custom_data' => 'test-value',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		// =========================================================================
 		// Explicit mcp.arguments Test Abilities
 		// =========================================================================
 
@@ -1611,6 +1753,10 @@ final class DummyAbility {
 			'test/prompt-invalid-explicit-args-no-name',
 			'test/prompt-invalid-explicit-args-not-array',
 			'test/prompt-explicit-args-all-fields',
+			'test/prompt-with-icons',
+			'test/prompt-with-mixed-icons',
+			'test/prompt-with-custom-meta',
+			'test/prompt-with-icons-and-meta',
 		);
 
 		foreach ( $names as $name ) {

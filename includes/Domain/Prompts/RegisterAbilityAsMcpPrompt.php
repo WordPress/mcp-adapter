@@ -7,6 +7,7 @@
 
 namespace WP\MCP\Domain\Prompts;
 
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptArgument;
@@ -354,6 +355,19 @@ class RegisterAbilityAsMcpPrompt {
 			return $data;
 		}
 
+		// Get ability meta for icons and user _meta extraction.
+		$ability_meta = $this->ability->get_meta();
+		$mcp_meta     = $ability_meta['mcp'] ?? array();
+
+		// Map icons from ability.meta.mcp.icons if present.
+		// Uses same pattern as tools/resources for consistency.
+		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$data['icons'] = $icons_result['valid'];
+			}
+		}
+
 		// Build adapter metadata, tracking transformation when it occurred.
 		$adapter_meta = array(
 			'ability' => $this->ability->get_name(),
@@ -374,6 +388,13 @@ class RegisterAbilityAsMcpPrompt {
 		$data['_meta'] = array(
 			'mcp_adapter' => $adapter_meta,
 		);
+
+		// Merge user-provided _meta from ability.meta.mcp._meta.
+		// User _meta keys are preserved alongside adapter's internal 'mcp_adapter' key.
+		// MetaStripper will strip 'mcp_adapter' but preserve user keys when responding to clients.
+		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
+			$data['_meta'] = array_merge( $mcp_meta['_meta'], $data['_meta'] );
+		}
 
 		try {
 			return Prompt::fromArray( $data );

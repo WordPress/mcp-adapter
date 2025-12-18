@@ -55,6 +55,24 @@ interface McpPromptBuilderInterface {
 	public function get_arguments(): array;
 
 	/**
+	 * Get the prompt icons for UI display.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
+	 */
+	public function get_icons(): array;
+
+	/**
+	 * Get the additional metadata.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, mixed> The additional metadata.
+	 */
+	public function get_meta(): array;
+
+	/**
 	 * Handle the prompt execution when called.
 	 *
 	 * @param array $arguments The arguments passed to the prompt.

@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptArgument;
 
@@ -50,6 +51,28 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	protected array $arguments = array();
 
 	/**
+	 * The prompt icons for UI display.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
+	 */
+	protected ?array $icons = null;
+
+	/**
+	 * Additional metadata passed through to MCP clients.
+	 *
+	 * Use this to attach purpose-specific metadata that MCP clients can consume.
+	 * The internal 'mcp_adapter' key is stripped by MetaStripper before responding
+	 * to clients, but your keys are preserved.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var array<string, mixed>
+	 */
+	protected array $meta = array();
+
+	/**
 	 * Build and return the Prompt DTO instance.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\Prompt The built prompt DTO.
@@ -74,6 +97,15 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			);
 		}
 
+		// Validate and prepare icons if set.
+		$valid_icons = null;
+		if ( ! empty( $this->icons ) ) {
+			$icons_result = McpValidator::validate_icons_array( $this->icons );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$valid_icons = $icons_result['valid'];
+			}
+		}
+
 		// Builder prompts intentionally have no ability; they are executed via registry builder mapping.
 		$_meta = array(
 			'mcp_adapter' => array(
@@ -81,15 +113,26 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			),
 		);
 
-		return Prompt::fromArray(
-			array(
-				'name'        => $this->name,
-				'title'       => $this->title,
-				'description' => $this->description,
-				'arguments'   => $argument_dtos,
-				'_meta'       => $_meta,
-			)
+		// Merge additional _meta with internal adapter metadata.
+		// User keys are preserved alongside 'mcp_adapter'; MetaStripper strips 'mcp_adapter' for clients.
+		if ( ! empty( $this->meta ) ) {
+			$_meta = array_merge( $this->meta, $_meta );
+		}
+
+		$prompt_data = array(
+			'name'        => $this->name,
+			'title'       => $this->title,
+			'description' => $this->description,
+			'arguments'   => $argument_dtos,
+			'_meta'       => $_meta,
 		);
+
+		// Only include icons if valid ones exist.
+		if ( null !== $valid_icons ) {
+			$prompt_data['icons'] = $valid_icons;
+		}
+
+		return Prompt::fromArray( $prompt_data );
 	}
 
 	/**
@@ -142,6 +185,36 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		}
 
 		return $this->arguments;
+	}
+
+	/**
+	 * Get the prompt icons.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
+	 */
+	public function get_icons(): array {
+		if ( empty( $this->name ) ) {
+			$this->configure();
+		}
+
+		return $this->icons ?? array();
+	}
+
+	/**
+	 * Get the additional metadata.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, mixed> The additional metadata.
+	 */
+	public function get_meta(): array {
+		if ( empty( $this->name ) ) {
+			$this->configure();
+		}
+
+		return $this->meta;
 	}
 
 	/**
@@ -217,6 +290,47 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 */
 	protected function add_argument( string $name, ?string $description = null, bool $required = false ): self {
 		$this->arguments[] = $this->create_argument( $name, $description, $required );
+
+		return $this;
+	}
+
+	/**
+	 * Set the prompt icons for UI display.
+	 *
+	 * Icons are validated during build() using McpValidator::validate_icons_array().
+	 * Invalid icons are filtered out with warnings (graceful degradation).
+	 *
+	 * Per MCP 2025-11-25:
+	 * - MUST support: image/png, image/jpeg, image/jpg
+	 * - SHOULD support: image/svg+xml, image/webp
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
+	 *
+	 * @return self
+	 */
+	protected function set_icons( array $icons ): self {
+		$this->icons = $icons;
+
+		return $this;
+	}
+
+	/**
+	 * Set additional metadata.
+	 *
+	 * This metadata is passed through to MCP clients alongside the adapter's internal metadata.
+	 * The internal 'mcp_adapter' key is stripped by MetaStripper before responding to clients,
+	 * but your keys are preserved.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
+	 *
+	 * @return self
+	 */
+	protected function set_meta( array $meta ): self {
+		$this->meta = $meta;
 
 		return $this;
 	}

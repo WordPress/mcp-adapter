@@ -455,4 +455,155 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayNotHasKey( 'arguments_source', $arr['_meta']['mcp_adapter'] );
 	}
+
+	// =========================================================================
+	// Icons Tests (MCP 2025-11-25)
+	// =========================================================================
+
+	public function test_icons_are_mapped_from_mcp_meta(): void {
+		$ability = wp_get_ability( 'test/prompt-with-icons' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-with-icons should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// Verify icons array is present.
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertIsArray( $arr['icons'] );
+		$this->assertCount( 2, $arr['icons'] );
+
+		// Verify first icon (PNG with all fields).
+		$this->assertSame( 'https://example.com/prompt-icon.png', $arr['icons'][0]['src'] );
+		$this->assertSame( 'image/png', $arr['icons'][0]['mimeType'] );
+		$this->assertSame( array( '32x32' ), $arr['icons'][0]['sizes'] );
+		$this->assertSame( 'light', $arr['icons'][0]['theme'] );
+
+		// Verify second icon (SVG).
+		$this->assertSame( 'https://example.com/prompt-icon-dark.svg', $arr['icons'][1]['src'] );
+		$this->assertSame( 'image/svg+xml', $arr['icons'][1]['mimeType'] );
+		$this->assertSame( 'dark', $arr['icons'][1]['theme'] );
+	}
+
+	public function test_invalid_icons_are_filtered_out(): void {
+		$ability = wp_get_ability( 'test/prompt-with-mixed-icons' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-with-mixed-icons should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// Should have only 2 valid icons (the one missing src was filtered out).
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertCount( 2, $arr['icons'] );
+
+		// Verify valid icons are present.
+		$this->assertSame( 'https://example.com/valid-prompt-icon.png', $arr['icons'][0]['src'] );
+		$this->assertSame( 'https://example.com/another-valid-prompt.svg', $arr['icons'][1]['src'] );
+	}
+
+	public function test_prompt_without_icons_has_no_icons_key(): void {
+		$ability = wp_get_ability( 'test/prompt' );
+		$this->assertNotNull( $ability );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// Verify icons key is not present when ability has no icons.
+		$this->assertArrayNotHasKey( 'icons', $arr );
+	}
+
+	// =========================================================================
+	// User _meta Passthrough Tests (MCP 2025-11-25)
+	// =========================================================================
+
+	public function test_user_meta_is_passed_through(): void {
+		$ability = wp_get_ability( 'test/prompt-with-custom-meta' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-with-custom-meta should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// Verify _meta is present with user-defined keys.
+		$this->assertArrayHasKey( '_meta', $arr );
+
+		// Verify custom_vendor key is preserved.
+		$this->assertArrayHasKey( 'custom_vendor', $arr['_meta'] );
+		$this->assertIsArray( $arr['_meta']['custom_vendor'] );
+		$this->assertTrue( $arr['_meta']['custom_vendor']['feature_flag'] );
+		$this->assertSame( '1.0', $arr['_meta']['custom_vendor']['version'] );
+
+		// Verify another_vendor key is preserved.
+		$this->assertArrayHasKey( 'another_vendor', $arr['_meta'] );
+		$this->assertSame( 'some-value', $arr['_meta']['another_vendor'] );
+
+		// Verify internal mcp_adapter key is still present.
+		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
+		$this->assertArrayHasKey( 'ability', $arr['_meta']['mcp_adapter'] );
+	}
+
+	public function test_user_meta_does_not_override_mcp_adapter_key(): void {
+		// Even if user tries to set mcp_adapter, the adapter's internal key should win.
+		$ability = wp_get_ability( 'test/prompt-with-custom-meta' );
+		$this->assertNotNull( $ability );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// The mcp_adapter key should always contain our internal metadata.
+		$this->assertSame( 'test/prompt-with-custom-meta', $arr['_meta']['mcp_adapter']['ability'] );
+	}
+
+	public function test_prompt_without_user_meta_has_only_adapter_meta(): void {
+		$ability = wp_get_ability( 'test/prompt' );
+		$this->assertNotNull( $ability );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// Should only have mcp_adapter in _meta.
+		$this->assertArrayHasKey( '_meta', $arr );
+		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
+		$this->assertCount( 1, $arr['_meta'] ); // Only mcp_adapter key.
+	}
+
+	// =========================================================================
+	// Combined Icons and _meta Tests
+	// =========================================================================
+
+	public function test_prompt_with_both_icons_and_meta(): void {
+		$ability = wp_get_ability( 'test/prompt-with-icons-and-meta' );
+		$this->assertNotNull( $ability, 'Ability test/prompt-with-icons-and-meta should be registered' );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+
+		// Verify icons are present.
+		$this->assertArrayHasKey( 'icons', $arr );
+		$this->assertCount( 1, $arr['icons'] );
+		$this->assertSame( 'https://example.com/combined-prompt-icon.png', $arr['icons'][0]['src'] );
+		$this->assertSame( 'image/png', $arr['icons'][0]['mimeType'] );
+		$this->assertSame( array( '48x48' ), $arr['icons'][0]['sizes'] );
+
+		// Verify user _meta is present.
+		$this->assertArrayHasKey( '_meta', $arr );
+		$this->assertArrayHasKey( 'vendor_info', $arr['_meta'] );
+		$this->assertSame( 'test-value', $arr['_meta']['vendor_info']['custom_data'] );
+
+		// Verify adapter _meta is also present.
+		$this->assertArrayHasKey( 'mcp_adapter', $arr['_meta'] );
+		$this->assertSame( 'test/prompt-with-icons-and-meta', $arr['_meta']['mcp_adapter']['ability'] );
+	}
 }
