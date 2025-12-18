@@ -97,16 +97,18 @@ class RegisterAbilityAsMcpResource {
 		_doing_it_wrong( $method, esc_html( $message ), 'n.e.x.t' );
 
 		// Also log via McpErrorHandler for debug.log visibility.
-		if ( $this->error_handler ) {
-			$this->error_handler->log(
-				$message,
-				array_merge(
-					array( 'ability' => $this->ability->get_name() ),
-					$context
-				),
-				'warning'
-			);
+		if ( ! $this->error_handler ) {
+			return;
 		}
+
+		$this->error_handler->log(
+			$message,
+			array_merge(
+				array( 'ability' => $this->ability->get_name() ),
+				$context
+			),
+			'warning'
+		);
 	}
 
 	/**
