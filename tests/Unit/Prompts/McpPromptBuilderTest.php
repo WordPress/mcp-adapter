@@ -145,6 +145,28 @@ class TestPromptWithMixedIcons extends McpPromptBuilder {
 	}
 }
 
+// Test prompt using add_argument() in configure() - simulates real-world usage
+// like CodeReviewPrompt. This is the pattern that was vulnerable to argument
+// accumulation when configure() was called multiple times.
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
+class TestPromptWithAddArgument extends McpPromptBuilder {
+
+	protected function configure(): void {
+		$this->name        = 'add-argument-test';
+		$this->title       = 'Add Argument Test';
+		$this->description = 'Tests add_argument() idempotence';
+
+		// Using add_argument() - this pattern was the original source of the bug.
+		$this->add_argument( 'code', 'The code to review', true );
+		$this->add_argument( 'language', 'Programming language', false );
+		$this->add_argument( 'focus', 'Review focus area', false );
+	}
+
+	public function handle( array $arguments ): array {
+		return array( 'result' => 'success' );
+	}
+}
+
 final class McpPromptBuilderTest extends TestCase {
 
 	public function test_builder_creates_prompt(): void {
@@ -411,5 +433,71 @@ final class McpPromptBuilderTest extends TestCase {
 		$arr = $prompt->toArray();
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayHasKey( 'custom_vendor', $arr['_meta'] );
+	}
+
+	// =========================================================================
+	// Configuration Idempotence Tests
+	// =========================================================================
+
+	public function test_multiple_build_calls_do_not_accumulate_arguments(): void {
+		$builder = new TestPromptWithAddArgument();
+
+		// Call build() multiple times.
+		$prompt1 = $builder->build();
+		$prompt2 = $builder->build();
+		$prompt3 = $builder->build();
+
+		// All should have exactly 3 arguments (not accumulating).
+		$this->assertCount( 3, $prompt1->getArguments() );
+		$this->assertCount( 3, $prompt2->getArguments() );
+		$this->assertCount( 3, $prompt3->getArguments() );
+	}
+
+	public function test_getters_do_not_accumulate_arguments(): void {
+		$builder = new TestPromptWithAddArgument();
+
+		// Call various getters multiple times.
+		$builder->get_name();
+		$builder->get_title();
+		$builder->get_description();
+		$builder->get_arguments();
+		$builder->get_name();
+		$builder->get_arguments();
+
+		// Build should still have exactly 3 arguments.
+		$prompt = $builder->build();
+		$this->assertCount( 3, $prompt->getArguments() );
+	}
+
+	public function test_mixed_getter_and_build_calls_do_not_accumulate(): void {
+		$builder = new TestPromptWithAddArgument();
+
+		// Mix of getter and build calls (this was the original bug scenario).
+		$builder->get_name();
+		$builder->build();
+		$builder->get_arguments();
+		$builder->build();
+		$builder->get_title();
+
+		// Final build should still have exactly 3 arguments.
+		$prompt = $builder->build();
+		$this->assertCount( 3, $prompt->getArguments() );
+
+		// Verify argument names are correct (no duplicates).
+		$args      = $prompt->getArguments();
+		$arg_names = array_map( fn( $arg ) => $arg->getName(), $args );
+		$this->assertSame( array( 'code', 'language', 'focus' ), $arg_names );
+	}
+
+	public function test_constructor_calls_configure_exactly_once(): void {
+		// This test verifies the structural guarantee: configure() is called
+		// during construction, not lazily.
+		$builder = new TestPromptWithAddArgument();
+
+		// Immediately after construction, arguments should be populated.
+		$this->assertCount( 3, $builder->get_arguments() );
+
+		// Name should be set without triggering any additional configure() call.
+		$this->assertSame( 'add-argument-test', $builder->get_name() );
 	}
 }

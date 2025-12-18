@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Core;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
+use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Domain\Resources\ResourceMetadataHelper;
@@ -319,120 +320,230 @@ class McpComponentRegistry {
 	/**
 	 * Register prompts to the server.
 	 *
-	 * @param array $prompts Array of prompts to register. Can be ability names (strings) or prompt builder class names.
+	 * Accepts multiple formats:
+	 * - Class name string implementing McpPromptBuilderInterface (instantiated automatically)
+	 * - Ability name string (converted via RegisterAbilityAsMcpPrompt)
+	 * - McpPromptBuilderInterface instance (fluent API or custom builders)
+	 * - Array configuration (converted via McpPrompt::fromArray())
+	 *
+	 * @param array<int, string|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|array<string, mixed>> $prompts Array of prompts to register.
 	 *
 	 * @return void
 	 */
 	public function register_prompts( array $prompts ): void {
 		foreach ( $prompts as $prompt_item ) {
-			if ( ! is_string( $prompt_item ) ) {
-				continue;
+			$this->register_single_prompt( $prompt_item );
+		}
+	}
+
+	/**
+	 * Register a single prompt to the server.
+	 *
+	 * @param string|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|array<string, mixed> $prompt_item The prompt to register.
+	 *
+	 * @return void
+	 */
+	private function register_single_prompt( $prompt_item ): void {
+		// Case 1: McpPromptBuilderInterface instance (fluent API or custom builder).
+		if ( $prompt_item instanceof McpPromptBuilderInterface ) {
+			$this->register_builder_instance( $prompt_item );
+			return;
+		}
+
+		// Case 2: Array configuration - convert to McpPrompt.
+		if ( is_array( $prompt_item ) ) {
+			$this->register_array_config( $prompt_item );
+			return;
+		}
+
+		// Case 3: String - either a class name or ability name.
+		if ( ! is_string( $prompt_item ) ) {
+			return;
+		}
+
+		// Check if it's a class that implements McpPromptBuilderInterface.
+		if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
+			$this->register_builder_class( $prompt_item );
+			return;
+		}
+
+		// Treat as ability name (legacy behavior).
+		$this->register_ability_prompt( $prompt_item );
+	}
+
+	/**
+	 * Register a McpPromptBuilderInterface instance.
+	 *
+	 * @param \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder The builder instance.
+	 *
+	 * @return void
+	 */
+	private function register_builder_instance( McpPromptBuilderInterface $builder ): void {
+		$prompt_name = $builder->get_name();
+
+		try {
+			$prompt = $builder->build();
+		} catch ( \Throwable $e ) {
+			$this->error_handler->log( "Failed to build prompt '{$prompt_name}': {$e->getMessage()}", array( "McpPrompt::{$prompt_name}" ) );
+
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'prompt',
+						'component_name' => $prompt_name,
+						'failure_reason' => 'builder_exception',
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
 			}
+			return;
+		}
 
-			// Check if it's a class that implements McpPromptBuilderInterface
-			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
-				// Create instance of the prompt builder class
-				try {
-					/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
-					$builder = new $prompt_item();
-					$prompt  = $builder->build();
-				} catch ( \Throwable $e ) {
-					$this->error_handler->log( "Failed to build prompt from class '{$prompt_item}': {$e->getMessage()}", array( "McpPromptBuilder::{$prompt_item}" ) );
+		$this->prompts[ $prompt->getName() ]         = $prompt;
+		$this->prompt_builders[ $prompt->getName() ] = $builder;
 
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'failed',
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'failure_reason' => 'builder_exception',
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
-					continue;
-				}
+		if ( ! $this->should_record_component_registration ) {
+			return;
+		}
 
-				// Add the prompt DTO to this server and keep the builder for execution.
-				$this->prompts[ $prompt->getName() ]         = $prompt;
-				$this->prompt_builders[ $prompt->getName() ] = $builder;
+		$this->observability_handler->record_event(
+			'mcp.component.registration',
+			array(
+				'status'         => 'success',
+				'component_type' => 'prompt',
+				'component_name' => $prompt_name,
+				'server_id'      => $this->mcp_server->get_server_id(),
+			)
+		);
+	}
 
-				// Track successful prompt registration
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'success',
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
-			} else {
-				// Treat as ability name (legacy behavior)
-				$ability = \wp_get_ability( $prompt_item );
+	/**
+	 * Register a prompt from array configuration.
+	 *
+	 * @param array<string, mixed> $config The prompt configuration array.
+	 *
+	 * @return void
+	 */
+	private function register_array_config( array $config ): void {
+		$prompt_name = $config['name'] ?? 'unknown';
 
-				if ( ! $ability ) {
-					$this->error_handler->log( "WordPress ability '{$prompt_item}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
+		try {
+			/** @var array{name: string, title?: string, description?: string, arguments?: array<int, array{name: string, title?: string, description?: string, required?: bool}>, icons?: array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>, meta?: array<string, mixed>, handler: callable(array<string, mixed>): array<string, mixed>, permission?: callable(array<string, mixed>): bool} $config */
+			$builder = McpPrompt::fromArray( $config );
+			$this->register_builder_instance( $builder );
+		} catch ( \Throwable $e ) {
+			$this->error_handler->log( "Failed to create prompt from array config '{$prompt_name}': {$e->getMessage()}", array( "McpPrompt::fromArray::{$prompt_name}" ) );
 
-					// Track prompt registration failure.
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'failed',
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'failure_reason' => 'ability_not_found',
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
-					continue;
-				}
-
-				// Use RegisterMcpPrompt to handle all validation and processing.
-				$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-
-				// Check if prompt creation returned an error
-				if ( is_wp_error( $prompt ) ) {
-					$this->error_handler->log( $prompt->get_error_message(), array( "RegisterAbilityAsMcpPrompt::{$prompt_item}" ) );
-
-					// Track prompt registration failure.
-					if ( $this->should_record_component_registration ) {
-						$this->observability_handler->record_event(
-							'mcp.component.registration',
-							array(
-								'status'         => 'failed',
-								'component_type' => 'prompt',
-								'component_name' => $prompt_item,
-								'error_code'     => $prompt->get_error_code(),
-								'server_id'      => $this->mcp_server->get_server_id(),
-							)
-						);
-					}
-					continue;
-				}
-
-				// Add the processed prompts to this server.
-				$this->prompts[ $prompt->getName() ] = $prompt;
-
-				// Track successful prompt registration.
-				if ( $this->should_record_component_registration ) {
-					$this->observability_handler->record_event(
-						'mcp.component.registration',
-						array(
-							'status'         => 'success',
-							'component_type' => 'prompt',
-							'component_name' => $prompt_item,
-							'server_id'      => $this->mcp_server->get_server_id(),
-						)
-					);
-				}
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'prompt',
+						'component_name' => $prompt_name,
+						'failure_reason' => 'array_config_exception',
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
 			}
 		}
+	}
+
+	/**
+	 * Register a prompt from a builder class name.
+	 *
+	 * @param string $class_name The fully-qualified class name.
+	 *
+	 * @return void
+	 */
+	private function register_builder_class( string $class_name ): void {
+		try {
+			/** @var \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder */
+			$builder = new $class_name();
+			$this->register_builder_instance( $builder );
+		} catch ( \Throwable $e ) {
+			$this->error_handler->log( "Failed to build prompt from class '{$class_name}': {$e->getMessage()}", array( "McpPromptBuilder::{$class_name}" ) );
+
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'prompt',
+						'component_name' => $class_name,
+						'failure_reason' => 'builder_exception',
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
+		}
+	}
+
+	/**
+	 * Register a prompt from an ability name.
+	 *
+	 * @param string $ability_name The ability name.
+	 *
+	 * @return void
+	 */
+	private function register_ability_prompt( string $ability_name ): void {
+		$ability = \wp_get_ability( $ability_name );
+
+		if ( ! $ability ) {
+			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$ability_name}" ) );
+
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'prompt',
+						'component_name' => $ability_name,
+						'failure_reason' => 'ability_not_found',
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
+			return;
+		}
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+
+		if ( is_wp_error( $prompt ) ) {
+			$this->error_handler->log( $prompt->get_error_message(), array( "RegisterAbilityAsMcpPrompt::{$ability_name}" ) );
+
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'failed',
+						'component_type' => 'prompt',
+						'component_name' => $ability_name,
+						'error_code'     => $prompt->get_error_code(),
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
+			return;
+		}
+
+		$this->prompts[ $prompt->getName() ] = $prompt;
+
+		if ( ! $this->should_record_component_registration ) {
+			return;
+		}
+
+		$this->observability_handler->record_event(
+			'mcp.component.registration',
+			array(
+				'status'         => 'success',
+				'component_type' => 'prompt',
+				'component_name' => $ability_name,
+				'server_id'      => $this->mcp_server->get_server_id(),
+			)
+		);
 	}
 
 	/**
