@@ -178,14 +178,8 @@ final class McpTool implements McpComponentInterface {
 	 * Private constructor - use factory methods.
 	 */
 	private function __construct() {
-		// Default handler returns empty result.
-		$this->handler = static function ( $args ): array {
-			return array( 'result' => null );
-		};
-		// Default permission allows all.
-		$this->permission_callback = static function ( $args = null ): bool {
-			return true;
-		};
+		// Properties remain null - explicit configuration required.
+		// Null handler/permission triggers proper error responses.
 	}
 
 	// =========================================================================

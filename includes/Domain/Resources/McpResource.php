@@ -178,13 +178,8 @@ final class McpResource implements McpComponentInterface {
 	 * Private constructor - use factory methods.
 	 */
 	private function __construct() {
-		$this->handler = static function ( $args = null ) {
-			return '';
-		};
-
-		$this->permission_callback = static function ( $args = null ): bool {
-			return true;
-		};
+		// Properties remain null - explicit configuration required.
+		// Null handler/permission triggers proper error responses.
 	}
 
 	// =========================================================================

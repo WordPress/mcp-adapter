@@ -173,13 +173,8 @@ final class McpPrompt implements McpComponentInterface {
 	 * Private constructor - use factory methods.
 	 */
 	private function __construct() {
-		$this->handler = static function ( array $args ): array {
-			return array( 'messages' => array() );
-		};
-
-		$this->permission_callback = static function ( $args = null ): bool {
-			return true;
-		};
+		// Properties remain null - explicit configuration required.
+		// Null handler/permission triggers proper error responses.
 	}
 
 	// =========================================================================
@@ -710,7 +705,7 @@ final class McpPrompt implements McpComponentInterface {
 	 *
 	 * @param array<string, mixed> $args Arguments after unwrapping.
 	 *
-	 * @return mixed
+	 * @return array<string, mixed>|null The normalized arguments, or null if ability has no schema and no args provided.
 	 */
 	private function normalize_ability_args( array $args ) {
 		if ( null === $this->ability ) {
