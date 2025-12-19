@@ -24,46 +24,25 @@ use WP\McpSchema\Server\Tools\Tool;
  */
 class McpComponentRegistry {
 	/**
-	 * MCP tools keyed by tool name (single source of truth for tools).
+	 * MCP tools keyed by tool name.
 	 *
 	 * @var array<string, \WP\MCP\Domain\Tools\McpTool>
 	 */
 	private array $mcp_tools = array();
 
 	/**
-	 * Cached Tool DTOs derived from MCP tools (invalidated on registration).
-	 *
-	 * @var array<string, \WP\McpSchema\Server\Tools\Tool>|null
-	 */
-	private ?array $tools_cache = null;
-
-	/**
-	 * MCP resources keyed by resource URI (single source of truth for resources).
+	 * MCP resources keyed by resource URI.
 	 *
 	 * @var array<string, \WP\MCP\Domain\Resources\McpResource>
 	 */
 	private array $mcp_resources = array();
 
 	/**
-	 * Cached Resource DTOs derived from MCP resources (invalidated on registration).
-	 *
-	 * @var array<string, \WP\McpSchema\Server\Resources\Resource>|null
-	 */
-	private ?array $resources_cache = null;
-
-	/**
-	 * MCP prompts keyed by prompt name (single source of truth for prompts).
+	 * MCP prompts keyed by prompt name.
 	 *
 	 * @var array<string, \WP\MCP\Domain\Prompts\McpPrompt>
 	 */
 	private array $mcp_prompts = array();
-
-	/**
-	 * Cached Prompt DTOs derived from MCP prompts (invalidated on registration).
-	 *
-	 * @var array<string, \WP\McpSchema\Server\Prompts\Prompt>|null
-	 */
-	private ?array $prompts_cache = null;
 
 	/**
 	 * MCP Server instance.
@@ -178,9 +157,8 @@ class McpComponentRegistry {
 
 			// Add the processed McpTool to this server.
 			/** @var \WP\McpSchema\Server\Tools\Tool $tool */
-			$tool                                    = $mcp_tool->get_component();
+			$tool                                = $mcp_tool->get_component();
 			$this->mcp_tools[ $tool->getName() ] = $mcp_tool;
-			$this->tools_cache                       = null; // Invalidate cache.
 
 			// Track successful ability tool registration.
 			if ( ! $this->should_record_component_registration ) {
@@ -213,7 +191,6 @@ class McpComponentRegistry {
 		$tool_dto = $mcp_tool->get_component();
 
 		$this->mcp_tools[ $tool_dto->getName() ] = $mcp_tool;
-		$this->tools_cache                           = null; // Invalidate cache.
 	}
 
 		/**
@@ -264,7 +241,6 @@ class McpComponentRegistry {
 		}
 
 		$this->mcp_resources[ $uri ] = $mcp_resource;
-		$this->resources_cache           = null; // Invalidate cache.
 	}
 
 		/**
@@ -363,7 +339,6 @@ class McpComponentRegistry {
 		}
 
 		$this->mcp_resources[ $resource_uri ] = $mcp_resource;
-		$this->resources_cache                = null; // Invalidate cache.
 
 		if ( ! $this->should_record_component_registration ) {
 			return;
@@ -629,52 +604,37 @@ class McpComponentRegistry {
 	/**
 	 * Get all tools registered to the server.
 	 *
-	 * Returns cached DTOs derived from MCP components.
-	 *
 	 * @return array<string, \WP\McpSchema\Server\Tools\Tool>
 	 */
 	public function get_tools(): array {
-		if ( null === $this->tools_cache ) {
-			$this->tools_cache = array_map(
-				static fn( McpTool $mcp_tool ): Tool => $mcp_tool->get_component(),
-				$this->mcp_tools
-			);
-		}
-		return $this->tools_cache;
+		return array_map(
+			static fn( McpTool $mcp_tool ): Tool => $mcp_tool->get_component(),
+			$this->mcp_tools
+		);
 	}
 
 	/**
 	 * Get all resources registered to the server.
 	 *
-	 * Returns cached DTOs derived from MCP components.
-	 *
 	 * @return array<string, \WP\McpSchema\Server\Resources\Resource>
 	 */
 	public function get_resources(): array {
-		if ( null === $this->resources_cache ) {
-			$this->resources_cache = array_map(
-				static fn( McpResource $mcp_resource ): Resource => $mcp_resource->get_component(),
-				$this->mcp_resources
-			);
-		}
-		return $this->resources_cache;
+		return array_map(
+			static fn( McpResource $mcp_resource ): Resource => $mcp_resource->get_component(),
+			$this->mcp_resources
+		);
 	}
 
 	/**
 	 * Get all prompts registered to the server.
 	 *
-	 * Returns cached DTOs derived from MCP components.
-	 *
 	 * @return array<string, \WP\McpSchema\Server\Prompts\Prompt>
 	 */
 	public function get_prompts(): array {
-		if ( null === $this->prompts_cache ) {
-			$this->prompts_cache = array_map(
-				static fn( McpPrompt $mcp_prompt ): Prompt => $mcp_prompt->get_component(),
-				$this->mcp_prompts
-			);
-		}
-		return $this->prompts_cache;
+		return array_map(
+			static fn( McpPrompt $mcp_prompt ): Prompt => $mcp_prompt->get_component(),
+			$this->mcp_prompts
+		);
 	}
 
 	/**
@@ -803,6 +763,5 @@ class McpComponentRegistry {
 		$prompt = $mcp_prompt->get_component();
 
 		$this->mcp_prompts[ $prompt->getName() ] = $mcp_prompt;
-		$this->prompts_cache                         = null; // Invalidate cache.
 	}
 }
