@@ -204,8 +204,10 @@ Size must be a positive integer representing bytes:
 ```php
 // Valid:
 1024                      // 1 KB
-0                         // Empty resource (valid but skipped)
 1000000                   // ~1 MB
+
+// Valid format but skipped (zero bytes not useful):
+0                         // Empty resource
 
 // Invalid (silently skipped):
 -1                        // Negative
@@ -213,7 +215,7 @@ Size must be a positive integer representing bytes:
 1.5                       // Float
 ```
 
-**Error behavior:** Invalid or zero size is silently skipped.
+**Error behavior:** Zero or invalid size is silently skipped (zero-byte resources are not useful).
 
 ### Annotations Validation (Drop All + Notice)
 
