@@ -359,8 +359,8 @@ class RegisterAbilityAsMcpPrompt {
 			}
 
 			// Map JSON Schema description to PromptArgument.description when present.
-			if ( ! empty( $property_schema['description'] ) ) {
-				$argument_data['description'] = (string) $property_schema['description'];
+			if ( ! empty( $property_schema['description'] ) && is_string( $property_schema['description'] ) ) {
+				$argument_data['description'] = $property_schema['description'];
 			}
 
 			// Only emit required when true; omit for optional arguments.

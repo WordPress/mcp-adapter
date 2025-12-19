@@ -204,8 +204,11 @@ final class ContentBlockHelper {
 	 */
 	public static function json_text( $data, int $flags = 0, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
 		$json = wp_json_encode( $data, $flags );
+		if ( false === $json ) {
+			$json = '{}';
+		}
 
-		return self::text( (string) $json, $annotations, $_meta );
+		return self::text( $json, $annotations, $_meta );
 	}
 
 	/**

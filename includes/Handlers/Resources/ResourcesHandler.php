@@ -173,13 +173,20 @@ class ResourcesHandler {
 		}
 
 		// Fallback: wrap as a single text content item.
-		$text = is_string( $contents ) ? $contents : wp_json_encode( $contents );
+		if ( is_string( $contents ) ) {
+			$text = $contents;
+		} else {
+			$text = wp_json_encode( $contents );
+			if ( false === $text ) {
+				$text = '{}';
+			}
+		}
 
 		return array(
 			TextResourceContents::fromArray(
 				array(
 					'uri'  => $uri,
-					'text' => (string) $text,
+					'text' => $text,
 				)
 			),
 		);

@@ -253,10 +253,13 @@ class ToolsHandler {
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
 			$json_text = wp_json_encode( $result );
+			if ( false === $json_text ) {
+				$json_text = '{}';
+			}
 
 			return CallToolResult::fromArray(
 				array(
-					'content'           => array( ContentBlockHelper::text( (string) $json_text ) ),
+					'content'           => array( ContentBlockHelper::text( $json_text ) ),
 					'structuredContent' => $result,
 					'isError'           => false,
 				)
