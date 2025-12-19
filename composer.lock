@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/WordPress/php-mcp-schema.git",
-                "reference": "d6642fe1f1570d37c27e2ac599be56e2f296d120"
+                "reference": "cf7071b75e365d423ea45f0e1e450fdedc30e239"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/d6642fe1f1570d37c27e2ac599be56e2f296d120",
-                "reference": "d6642fe1f1570d37c27e2ac599be56e2f296d120",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/cf7071b75e365d423ea45f0e1e450fdedc30e239",
+                "reference": "cf7071b75e365d423ea45f0e1e450fdedc30e239",
                 "shasum": ""
             },
             "require": {
@@ -62,7 +62,7 @@
                 "source": "https://github.com/WordPress/php-mcp-schema/tree/feat/mcp-schema-2025-11-25",
                 "issues": "https://github.com/WordPress/php-mcp-schema/issues"
             },
-            "time": "2025-12-18T16:34:28+00:00"
+            "time": "2025-12-18T22:45:08+00:00"
         }
     ],
     "packages-dev": [
