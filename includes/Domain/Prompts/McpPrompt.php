@@ -391,7 +391,8 @@ final class McpPrompt implements McpComponentInterface {
 
 		if ( null !== $this->permission_callback ) {
 			try {
-				return $this->invoke_permission_callback( $args );
+				$result = call_user_func( $this->permission_callback, $args );
+				return $result instanceof \WP_Error ? $result : (bool) $result;
 			} catch ( \Throwable $throwable ) {
 				return new \WP_Error(
 					'mcp_permission_check_failed',
@@ -457,72 +458,5 @@ final class McpPrompt implements McpComponentInterface {
 		$wrapper = is_string( $wrapper ) && '' !== trim( $wrapper ) ? $wrapper : 'input';
 
 		return is_array( $arguments ) ? ( $arguments[ $wrapper ] ?? null ) : null;
-	}
-
-	/**
-	 * Invoke the permission callback, supporting both 0-arg and 1-arg callables.
-	 *
-	 * @param array<string, mixed> $args Prompt arguments after unwrapping.
-	 *
-	 * @return bool|\WP_Error
-	 */
-	private function invoke_permission_callback( array $args ) {
-		if ( null === $this->permission_callback ) {
-			return false;
-		}
-
-		$reflection = $this->reflect_callable( $this->permission_callback );
-
-		if (
-			null !== $reflection
-			&& ! $reflection->isVariadic()
-			&& 0 === $reflection->getNumberOfParameters()
-		) {
-			$result = call_user_func( $this->permission_callback );
-		} else {
-			$result = call_user_func( $this->permission_callback, $args );
-		}
-
-		if ( $result instanceof \WP_Error ) {
-			return $result;
-		}
-
-		return (bool) $result;
-	}
-
-	/**
-	 * Reflect a callable into a function/method reflector when possible.
-	 *
-	 * @param callable $callback Callable to reflect.
-	 *
-	 * @return \ReflectionFunctionAbstract|null
-	 */
-	private function reflect_callable( $callback ): ?\ReflectionFunctionAbstract {
-		try {
-			if ( $callback instanceof \Closure ) {
-				return new \ReflectionFunction( $callback );
-			}
-
-			if ( is_string( $callback ) ) {
-				if ( false !== strpos( $callback, '::' ) ) {
-					[ $class, $method ] = explode( '::', $callback, 2 );
-					return new \ReflectionMethod( $class, $method );
-				}
-
-				return new \ReflectionFunction( $callback );
-			}
-
-			if ( is_array( $callback ) && 2 === count( $callback ) ) {
-				return new \ReflectionMethod( $callback[0], $callback[1] );
-			}
-
-			if ( is_object( $callback ) && method_exists( $callback, '__invoke' ) ) {
-				return new \ReflectionMethod( $callback, '__invoke' );
-			}
-		} catch ( \ReflectionException $reflection_exception ) {
-			return null;
-		}
-
-		return null;
 	}
 }
