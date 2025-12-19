@@ -291,6 +291,11 @@ class McpComponentRegistry {
 		$uri          = $resource_dto->getUri();
 
 		if ( isset( $this->resources[ $uri ] ) ) {
+			$this->error_handler->log(
+				"Resource with URI '{$uri}' already registered, skipping duplicate.",
+				array( 'McpComponentRegistry::add_resource_wrapper' ),
+				'warning'
+			);
 			return;
 		}
 
@@ -532,6 +537,18 @@ class McpComponentRegistry {
 			/** @var array{name: string, title?: string, description?: string, arguments?: array<int, array{name: string, title?: string, description?: string, required?: bool}>, icons?: array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>, meta?: array<string, mixed>, handler: callable(array<string, mixed>): array<string, mixed>, permission?: callable(array<string, mixed>): bool} $config */
 			$wrapper = McpPrompt::fromArray( $config );
 			$this->add_prompt_wrapper( $wrapper );
+
+			if ( $this->should_record_component_registration ) {
+				$this->observability_handler->record_event(
+					'mcp.component.registration',
+					array(
+						'status'         => 'success',
+						'component_type' => 'prompt',
+						'component_name' => $prompt_name,
+						'server_id'      => $this->mcp_server->get_server_id(),
+					)
+				);
+			}
 		} catch ( \Throwable $e ) {
 			$this->error_handler->log( "Failed to create prompt from array config '{$prompt_name}': {$e->getMessage()}", array( "McpPrompt::fromArray::{$prompt_name}" ) );
 
