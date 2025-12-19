@@ -202,9 +202,12 @@ class McpAdapter {
 
 ```php
 class RegisterAbilityAsMcpTool {
-    public static function make( WP_Ability $ability ) {
+    public static function build( WP_Ability $ability ) {
+        $tool = new self( $ability );
+        $data = $tool->build_tool_data();
+
         // Convert WordPress ability to MCP Tool DTO
-        return \WP\McpSchema\Server\Tools\Tool::fromArray( $tool_data );
+        return \WP\McpSchema\Server\Tools\Tool::fromArray( $data['tool_data'] );
     }
 }
 ```
