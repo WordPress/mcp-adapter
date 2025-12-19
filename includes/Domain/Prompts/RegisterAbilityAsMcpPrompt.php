@@ -1,4 +1,5 @@
 <?php
+
 /**
  * RegisterAbilityAsMcpPrompt class for converting WordPress abilities to MCP prompts.
  *
@@ -48,6 +49,7 @@ use WP_Ability;
  * @since n.e.x.t
  */
 class RegisterAbilityAsMcpPrompt {
+
 	/**
 	 * The WordPress ability instance.
 	 *
@@ -122,16 +124,33 @@ class RegisterAbilityAsMcpPrompt {
 		}
 
 		try {
-			return array(
-				'prompt'       => Prompt::fromArray( $data['prompt_data'] ),
-				'adapter_meta' => $data['adapter_meta'],
-			);
+			$prompt_dto = Prompt::fromArray( $data['prompt_data'] );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
-				'mcp_prompt_schema_invalid',
-				$e->getMessage()
+				'mcp_prompt_dto_creation_failed',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'Failed to create Prompt DTO for ability %1$s: %2$s', 'mcp-adapter' ),
+					$ability->get_name(),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
 			);
 		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_prompt_dto( $prompt_dto );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
+		}
+
+		return array(
+			'prompt'       => $prompt_dto,
+			'adapter_meta' => $data['adapter_meta'],
+		);
 	}
 
 	/**

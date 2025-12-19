@@ -1,11 +1,12 @@
 <?php
+
 /**
  * MCP Resource component.
  *
  * @package McpAdapter
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Domain\Resources;
 
@@ -39,6 +40,7 @@ use WP\McpSchema\Server\Resources\Resource;
  * @since n.e.x.t
  */
 final class McpResource implements McpComponentInterface {
+
 
 	// =========================================================================
 	// Runtime Properties
@@ -104,44 +106,28 @@ final class McpResource implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Create a resource definition from an array configuration.
+	 * @param array $config The resource configuration array.
 	 *
-	 * @param array{
-	 *     uri: string,
-	 *     name?: string,
-	 *     title?: string,
-	 *     description?: string,
-	 *     mimeType?: string,
-	 *     size?: int,
-	 *     annotations?: array{audience?: array<int, string>, priority?: float, lastModified?: string},
-	 *     icons?: array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>,
-	 *     meta?: array<string, mixed>,
-	 *     handler: callable(mixed): mixed,
-	 *     permission?: callable(mixed): bool
-	 * } $config The resource configuration array.
-	 *
-	 * @return self
-	 *
-	 * @throws \InvalidArgumentException If required fields are missing or invalid.
+	 * @return self|\WP_Error
 	 */
-	public static function fromArray( array $config ): self {
+	public static function fromArray( array $config ) {
 		if ( empty( $config['uri'] ) ) {
-			throw new \InvalidArgumentException( 'Resource configuration must include a "uri" field.' );
+			return new \WP_Error( 'mcp_resource_missing_uri', 'Resource configuration must include a "uri" field.' );
 		}
 
 		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
-			throw new \InvalidArgumentException( 'Resource configuration must include a callable "handler" field.' );
+			return new \WP_Error( 'mcp_resource_missing_handler', 'Resource configuration must include a callable "handler" field.' );
 		}
 
 		$uri = trim( $config['uri'] );
 
 		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
-			throw new \InvalidArgumentException( 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
+			return new \WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
 		}
 
 		$name = isset( $config['name'] ) ? trim( $config['name'] ) : $uri;
 		if ( '' === $name ) {
-			throw new \InvalidArgumentException( 'Resource "name" cannot be empty.' );
+			return new \WP_Error( 'mcp_resource_missing_name', 'Resource "name" cannot be empty.' );
 		}
 
 		$resource_data = array(
@@ -170,11 +156,6 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['size'] = $config['size'];
 		}
 
-		// Include annotations only when meaningful.
-		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-			$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
-		}
-
 		// Validate and include icons if set.
 		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
 			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
@@ -187,7 +168,34 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $config['meta'];
 		}
 
-		$resource = Resource::fromArray( $resource_data );
+		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and Resource::fromArray() can throw.
+		try {
+			// Process annotations inside try-catch since Annotations::fromArray() can throw.
+			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
+			}
+
+			$resource = Resource::fromArray( $resource_data );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_resource_dto_creation_failed',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'Failed to create Resource DTO: %s', 'mcp-adapter' ),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
+			);
+		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_resource_dto( $resource );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
+		}
 
 		$instance          = new self( $resource );
 		$instance->handler = $config['handler'];

@@ -10,6 +10,7 @@ use WP\McpSchema\Server\Resources\Resource;
 
 final class McpResourceTest extends TestCase {
 
+
 	public function test_from_ability_builds_clean_resource_dto_and_adapter_meta(): void {
 		$ability = wp_get_ability( 'test/resource-new-meta' );
 		$this->assertNotNull( $ability, 'Ability test/resource-new-meta should be registered' );
@@ -21,15 +22,15 @@ final class McpResourceTest extends TestCase {
 		$dto = $mcp_resource->get_component();
 		$this->assertInstanceOf( Resource::class, $dto );
 
-			$arr = $dto->toArray();
-			$this->assertArrayHasKey( '_meta', $arr );
-			$this->assertArrayHasKey( 'custom_field', $arr['_meta'] );
-			$this->assertSame( 'custom_value', $arr['_meta']['custom_field'] );
+		$arr = $dto->toArray();
+		$this->assertArrayHasKey( '_meta', $arr );
+		$this->assertArrayHasKey( 'custom_field', $arr['_meta'] );
+		$this->assertSame( 'custom_value', $arr['_meta']['custom_field'] );
 
-			$adapter_meta = $mcp_resource->get_adapter_meta();
-			$this->assertArrayHasKey( 'ability', $adapter_meta );
-			$this->assertSame( $ability->get_name(), $adapter_meta['ability'] );
-		}
+		$adapter_meta = $mcp_resource->get_adapter_meta();
+		$this->assertArrayHasKey( 'ability', $adapter_meta );
+		$this->assertSame( $ability->get_name(), $adapter_meta['ability'] );
+	}
 
 	public function test_ability_backed_execute_and_permission_match_legacy_no_args_behavior(): void {
 		$ability = wp_get_ability( 'test/resource-plain-string' );
@@ -46,50 +47,56 @@ final class McpResourceTest extends TestCase {
 	}
 
 	public function test_permission_callback_supports_zero_arg_callable(): void {
-		$mcp_resource = McpResource::fromArray( array(
-			'uri'        => 'WordPress://local/custom',
-			'title'      => 'Custom',
-			'handler'    => static function ( $args ) {
-				return $args;
-			},
-			'permission' => static function (): bool {
-				return true;
-			},
-		) );
+		$mcp_resource = McpResource::fromArray(
+			array(
+				'uri'        => 'WordPress://local/custom',
+				'title'      => 'Custom',
+				'handler'    => static function ( $args ) {
+					return $args;
+				},
+				'permission' => static function (): bool {
+					return true;
+				},
+			)
+		);
 
 		$this->assertTrue( $mcp_resource->check_permission( array( 'anything' => true ) ) );
 	}
 
 	public function test_fromArray_meta_preserves_all_keys(): void {
-		$mcp_resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/meta-test',
-			'meta'    => array(
-				'mcp_adapter' => array( 'should_not' => 'leak' ),
-				'foo'         => 'bar',
-			),
-			'handler' => static function ( $args ) {
-				return $args;
-			},
-		) );
+		$mcp_resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/meta-test',
+				'meta'    => array(
+					'mcp_adapter' => array( 'should_not' => 'leak' ),
+					'foo'         => 'bar',
+				),
+				'handler' => static function ( $args ) {
+					return $args;
+				},
+			)
+		);
 
 		$dto = $mcp_resource->get_component();
-			$arr = $dto->toArray();
+		$arr = $dto->toArray();
 
-			$this->assertArrayHasKey( '_meta', $arr );
-			$this->assertArrayHasKey( 'foo', $arr['_meta'] );
-			$this->assertSame( 'bar', $arr['_meta']['foo'] );
-			$this->assertSame( array( 'should_not' => 'leak' ), $arr['_meta']['mcp_adapter'] );
-		}
+		$this->assertArrayHasKey( '_meta', $arr );
+		$this->assertArrayHasKey( 'foo', $arr['_meta'] );
+		$this->assertSame( 'bar', $arr['_meta']['foo'] );
+		$this->assertSame( array( 'should_not' => 'leak' ), $arr['_meta']['mcp_adapter'] );
+	}
 
 	// =========================================================================
 	// fromArray Tests
 	// =========================================================================
 
 	public function test_fromArray_builds_minimal_resource(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/minimal',
-			'handler' => fn() => 'content',
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/minimal',
+				'handler' => static fn() => 'content',
+			)
+		);
 
 		$dto = $resource->get_component();
 
@@ -100,21 +107,23 @@ final class McpResourceTest extends TestCase {
 	}
 
 	public function test_fromArray_with_all_options(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'         => 'WordPress://local/full',
-			'name'        => 'full-resource',
-			'title'       => 'Full Resource',
-			'description' => 'A comprehensive test resource',
-			'mimeType'    => 'text/plain',
-			'size'        => 1024,
-			'annotations' => array(
-				'audience' => array( 'user' ),
-				'priority' => 0.8,
-			),
-			'meta'        => array( 'version' => '1.0' ),
-			'handler'     => fn() => 'full content',
-			'permission'  => fn() => true,
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'         => 'WordPress://local/full',
+				'name'        => 'full-resource',
+				'title'       => 'Full Resource',
+				'description' => 'A comprehensive test resource',
+				'mimeType'    => 'text/plain',
+				'size'        => 1024,
+				'annotations' => array(
+					'audience' => array( 'user' ),
+					'priority' => 0.8,
+				),
+				'meta'        => array( 'version' => '1.0' ),
+				'handler'     => static fn() => 'full content',
+				'permission'  => static fn() => true,
+			)
+		);
 
 		$dto  = $resource->get_component();
 		$data = $dto->toArray();
@@ -131,38 +140,46 @@ final class McpResourceTest extends TestCase {
 	}
 
 	public function test_fromArray_requires_uri(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'uri' );
+		$result = McpResource::fromArray(
+			array(
+				'handler' => static fn() => 'content',
+			)
+		);
 
-		McpResource::fromArray( array(
-			'handler' => fn() => 'content',
-		) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_resource_missing_uri', $result->get_error_code() );
 	}
 
 	public function test_fromArray_requires_handler(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'handler' );
+		$result = McpResource::fromArray(
+			array(
+				'uri' => 'WordPress://local/no-handler',
+			)
+		);
 
-		McpResource::fromArray( array(
-			'uri' => 'WordPress://local/no-handler',
-		) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_resource_missing_handler', $result->get_error_code() );
 	}
 
 	public function test_fromArray_validates_uri(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'RFC 3986' );
+		$result = McpResource::fromArray(
+			array(
+				'uri'     => 'invalid-no-scheme',
+				'handler' => static fn() => 'content',
+			)
+		);
 
-		McpResource::fromArray( array(
-			'uri'     => 'invalid-no-scheme',
-			'handler' => fn() => 'content',
-		) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_resource_invalid_uri', $result->get_error_code() );
 	}
 
 	public function test_fromArray_executes_handler(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/executable',
-			'handler' => fn( $args ) => 'Hello, ' . ( $args['name'] ?? 'World' ),
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/executable',
+				'handler' => static fn( $args ) => 'Hello, ' . ( $args['name'] ?? 'World' ),
+			)
+		);
 
 		$result = $resource->execute( array( 'name' => 'Claude' ) );
 
@@ -170,11 +187,13 @@ final class McpResourceTest extends TestCase {
 	}
 
 	public function test_fromArray_checks_permission(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'        => 'WordPress://local/permission-test',
-			'handler'    => fn() => 'content',
-			'permission' => fn( $args ) => ( $args['token'] ?? '' ) === 'secret',
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'WordPress://local/permission-test',
+				'handler'    => static fn() => 'content',
+				'permission' => static fn( $args ) => ( $args['token'] ?? '' ) === 'secret',
+			)
+		);
 
 		$this->assertTrue( $resource->check_permission( array( 'token' => 'secret' ) ) );
 		$this->assertFalse( $resource->check_permission( array( 'token' => 'wrong' ) ) );
@@ -182,10 +201,12 @@ final class McpResourceTest extends TestCase {
 	}
 
 	public function test_fromArray_observability_context(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/observable',
-			'handler' => fn() => 'content',
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/observable',
+				'handler' => static fn() => 'content',
+			)
+		);
 
 		$context = $resource->get_observability_context();
 
@@ -199,10 +220,12 @@ final class McpResourceTest extends TestCase {
 	// =========================================================================
 
 	public function test_execute_catches_handler_exceptions(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/throwing',
-			'handler' => fn() => throw new \RuntimeException( 'Handler exploded' ),
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/throwing',
+				'handler' => static fn() => throw new \RuntimeException( 'Handler exploded' ),
+			)
+		);
 
 		$result = $resource->execute( array() );
 
@@ -212,17 +235,37 @@ final class McpResourceTest extends TestCase {
 	}
 
 	public function test_check_permission_catches_exceptions(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'        => 'WordPress://local/throwing-permission',
-			'handler'    => fn() => 'content',
-			'permission' => fn() => throw new \RuntimeException( 'Permission check exploded' ),
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'WordPress://local/throwing-permission',
+				'handler'    => static fn() => 'content',
+				'permission' => static fn() => throw new \RuntimeException( 'Permission check exploded' ),
+			)
+		);
 
 		$result = $resource->check_permission( array() );
 
 		$this->assertWPError( $result );
 		$this->assertSame( 'mcp_permission_check_failed', $result->get_error_code() );
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
+	}
+
+	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
+		// Pass invalid annotations data that causes Annotations::fromArray() to throw.
+		// The 'priority' field expects a float, not a string.
+		$result = McpResource::fromArray(
+			array(
+				'uri'         => 'WordPress://local/invalid-annotations',
+				'handler'     => static fn() => 'content',
+				'annotations' => array(
+					'priority' => 'not-a-float', // This will cause Annotations::fromArray() to throw.
+				),
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_resource_dto_creation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Expected float', $result->get_error_message() );
 	}
 
 	// =========================================================================
@@ -234,10 +277,12 @@ final class McpResourceTest extends TestCase {
 	 * Resources must explicitly configure permissions for security.
 	 */
 	public function test_no_default_permission_returns_error(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/no-permission',
-			'handler' => fn( $args ) => 'content',
-		) );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/no-permission',
+				'handler' => static fn( $args ) => 'content',
+			)
+		);
 
 		$result = $resource->check_permission( array() );
 

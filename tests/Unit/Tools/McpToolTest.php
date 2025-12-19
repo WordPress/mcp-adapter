@@ -10,6 +10,7 @@ use WP\McpSchema\Server\Tools\Tool;
 
 final class McpToolTest extends TestCase {
 
+
 	// =========================================================================
 	// fromAbility Tests
 	// =========================================================================
@@ -49,13 +50,13 @@ final class McpToolTest extends TestCase {
 
 		$data = $dto->toArray();
 
-			// User-provided _meta is preserved.
-			$this->assertArrayHasKey( '_meta', $data );
-			$this->assertSame( 'public_meta_value', $data['_meta']['public_meta_key'] );
+		// User-provided _meta is preserved.
+		$this->assertArrayHasKey( '_meta', $data );
+		$this->assertSame( 'public_meta_value', $data['_meta']['public_meta_key'] );
 
-			// McpTool keeps adapter meta internally.
-			$adapter_meta = $mcp_tool->get_adapter_meta();
-			$this->assertSame( 'test/mcptool-from-ability', $adapter_meta['ability'] );
+		// McpTool keeps adapter meta internally.
+		$adapter_meta = $mcp_tool->get_adapter_meta();
+		$this->assertSame( 'test/mcptool-from-ability', $adapter_meta['ability'] );
 
 		wp_unregister_ability( 'test/mcptool-from-ability' );
 	}
@@ -121,20 +122,22 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_executes_handler_and_checks_permission(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'mcptool-direct',
-			'description' => 'Direct callable tool',
-			'inputSchema' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'value' => array( 'type' => 'string' ),
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'mcptool-direct',
+				'description' => 'Direct callable tool',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'value' => array( 'type' => 'string' ),
+					),
 				),
-			),
-			'handler'     => static function ( $args ) {
-				return array( 'uppercased' => strtoupper( $args['value'] ?? '' ) );
-			},
-			'permission'  => fn() => true,
-		) );
+				'handler'     => static function ( $args ) {
+					return array( 'uppercased' => strtoupper( $args['value'] ?? '' ) );
+				},
+				'permission'  => static fn() => true,
+			)
+		);
 
 		$this->assertTrue( $tool->check_permission( array( 'value' => 'hello' ) ) );
 
@@ -144,16 +147,18 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_uses_permission_callback(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'mcptool-direct-permission',
-			'description' => 'Direct callable tool with permission callback',
-			'handler'     => static function () {
-				return array( 'ok' => true );
-			},
-			'permission'  => static function ( $args ) {
-				return isset( $args['allowed'] ) && true === $args['allowed'];
-			},
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'mcptool-direct-permission',
+				'description' => 'Direct callable tool with permission callback',
+				'handler'     => static function () {
+					return array( 'ok' => true );
+				},
+				'permission'  => static function ( $args ) {
+					return isset( $args['allowed'] ) && true === $args['allowed'];
+				},
+			)
+		);
 
 		$this->assertTrue( $tool->check_permission( array( 'allowed' => true ) ) );
 		$this->assertFalse( $tool->check_permission( array( 'allowed' => false ) ) );
@@ -165,10 +170,12 @@ final class McpToolTest extends TestCase {
 	// =========================================================================
 
 	public function test_fromArray_builds_minimal_tool(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'minimal-tool',
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'minimal-tool',
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
 		$dto = $tool->get_component();
 
@@ -183,27 +190,29 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_with_all_options(): void {
-		$tool = McpTool::fromArray( array(
-			'name'         => 'full-featured-tool',
-			'title'        => 'Full Featured Tool',
-			'description'  => 'A comprehensive test tool',
-			'inputSchema'  => array(
-				'type'       => 'object',
-				'properties' => array(
-					'text' => array( 'type' => 'string' ),
+		$tool = McpTool::fromArray(
+			array(
+				'name'         => 'full-featured-tool',
+				'title'        => 'Full Featured Tool',
+				'description'  => 'A comprehensive test tool',
+				'inputSchema'  => array(
+					'type'       => 'object',
+					'properties' => array(
+						'text' => array( 'type' => 'string' ),
+					),
+					'required'   => array( 'text' ),
 				),
-				'required'   => array( 'text' ),
-			),
-			'outputSchema' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'result' => array( 'type' => 'string' ),
+				'outputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'result' => array( 'type' => 'string' ),
+					),
 				),
-			),
-			'meta'         => array( 'custom_key' => 'custom_value' ),
-			'handler'      => fn( $args ) => array( 'result' => strtoupper( $args['text'] ) ),
-			'permission'   => fn( $args ) => true,
-		) );
+				'meta'         => array( 'custom_key' => 'custom_value' ),
+				'handler'      => static fn( $args ) => array( 'result' => strtoupper( $args['text'] ) ),
+				'permission'   => static fn( $args ) => true,
+			)
+		);
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -221,21 +230,23 @@ final class McpToolTest extends TestCase {
 		// Check output schema
 		$this->assertArrayHasKey( 'outputSchema', $data );
 
-			// Check custom meta preserved
-			$this->assertArrayHasKey( '_meta', $data );
-			$this->assertSame( 'custom_value', $data['_meta']['custom_key'] );
+		// Check custom meta preserved
+		$this->assertArrayHasKey( '_meta', $data );
+		$this->assertSame( 'custom_value', $data['_meta']['custom_key'] );
 	}
 
 	public function test_fromArray_with_annotations(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'annotated-tool',
-			'description' => 'A tool with annotations',
-			'annotations' => array(
-				'readOnlyHint'   => true,
-				'idempotentHint' => true,
-			),
-			'handler'     => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'annotated-tool',
+				'description' => 'A tool with annotations',
+				'annotations' => array(
+					'readOnlyHint'   => true,
+					'idempotentHint' => true,
+				),
+				'handler'     => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -246,15 +257,17 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_with_destructive_annotations(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'destructive-tool',
-			'description' => 'Deletes data',
-			'annotations' => array(
-				'destructiveHint' => true,
-				'openWorldHint'   => true,
-			),
-			'handler'     => fn( $args ) => array( 'deleted' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'destructive-tool',
+				'description' => 'Deletes data',
+				'annotations' => array(
+					'destructiveHint' => true,
+					'openWorldHint'   => true,
+				),
+				'handler'     => static fn( $args ) => array( 'deleted' => true ),
+			)
+		);
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -265,17 +278,19 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_with_all_annotations(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'all-annotations-tool',
-			'annotations' => array(
-				'title'           => 'Custom Annotation Title',
-				'readOnlyHint'    => false,
-				'destructiveHint' => true,
-				'idempotentHint'  => true,
-				'openWorldHint'   => false,
-			),
-			'handler'     => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'all-annotations-tool',
+				'annotations' => array(
+					'title'           => 'Custom Annotation Title',
+					'readOnlyHint'    => false,
+					'destructiveHint' => true,
+					'idempotentHint'  => true,
+					'openWorldHint'   => false,
+				),
+				'handler'     => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -288,16 +303,18 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_executes_handler(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'executable-tool',
-			'inputSchema' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'name' => array( 'type' => 'string' ),
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'executable-tool',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'name' => array( 'type' => 'string' ),
+					),
 				),
-			),
-			'handler'     => fn( $args ) => array( 'greeting' => 'Hello, ' . ( $args['name'] ?? 'World' ) ),
-		) );
+				'handler'     => static fn( $args ) => array( 'greeting' => 'Hello, ' . ( $args['name'] ?? 'World' ) ),
+			)
+		);
 
 		$result = $tool->execute( array( 'name' => 'Claude' ) );
 
@@ -306,11 +323,13 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_checks_permission(): void {
-		$tool = McpTool::fromArray( array(
-			'name'       => 'permission-tool',
-			'handler'    => fn( $args ) => array( 'ok' => true ),
-			'permission' => fn( $args ) => ( $args['secret'] ?? '' ) === 'password123',
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'permission-tool',
+				'handler'    => static fn( $args ) => array( 'ok' => true ),
+				'permission' => static fn( $args ) => ( $args['secret'] ?? '' ) === 'password123',
+			)
+		);
 
 		$this->assertTrue( $tool->check_permission( array( 'secret' => 'password123' ) ) );
 		$this->assertFalse( $tool->check_permission( array( 'secret' => 'wrong' ) ) );
@@ -318,10 +337,12 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_no_permission_callback_denies_access(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'no-permission-tool',
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'no-permission-tool',
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
 		// Without explicit permission callback, access should be denied.
 		$result = $tool->check_permission( array() );
@@ -330,11 +351,13 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_explicit_permission_allows_access(): void {
-		$tool = McpTool::fromArray( array(
-			'name'       => 'public-tool',
-			'handler'    => fn( $args ) => array( 'ok' => true ),
-			'permission' => fn() => true,
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'public-tool',
+				'handler'    => static fn( $args ) => array( 'ok' => true ),
+				'permission' => static fn() => true,
+			)
+		);
 
 		// Explicit permission callback allowing access.
 		$this->assertTrue( $tool->check_permission( array() ) );
@@ -342,10 +365,12 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_observability_context(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'observable-tool',
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'observable-tool',
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
 		$context = $tool->get_observability_context();
 
@@ -355,20 +380,22 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_creates_tool(): void {
-		$tool = McpTool::fromArray( array(
-			'name'        => 'array-tool',
-			'title'       => 'Array Tool',
-			'description' => 'Created from array',
-			'inputSchema' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'value' => array( 'type' => 'string' ),
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'array-tool',
+				'title'       => 'Array Tool',
+				'description' => 'Created from array',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'value' => array( 'type' => 'string' ),
+					),
 				),
-			),
-			'handler'     => fn( $args ) => array( 'uppercased' => strtoupper( $args['value'] ?? '' ) ),
-			'permission'  => fn( $args ) => true,
-			'annotations' => array( 'readOnlyHint' => true ),
-		) );
+				'handler'     => static fn( $args ) => array( 'uppercased' => strtoupper( $args['value'] ?? '' ) ),
+				'permission'  => static fn( $args ) => true,
+				'annotations' => array( 'readOnlyHint' => true ),
+			)
+		);
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -384,35 +411,41 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_fromArray_requires_name(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'name' );
+		$result = McpTool::fromArray(
+			array(
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
-		McpTool::fromArray( array(
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_tool_missing_name', $result->get_error_code() );
 	}
 
 	public function test_fromArray_requires_handler(): void {
-		$this->expectException( \InvalidArgumentException::class );
-		$this->expectExceptionMessage( 'handler' );
+		$result = McpTool::fromArray(
+			array(
+				'name' => 'missing-handler-tool',
+			)
+		);
 
-		McpTool::fromArray( array(
-			'name' => 'missing-handler-tool',
-		) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_tool_missing_handler', $result->get_error_code() );
 	}
 
 	public function test_fromArray_with_meta(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'meta-tool',
-			'meta'    => array( 'version' => '1.0.0' ),
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'meta-tool',
+				'meta'    => array( 'version' => '1.0.0' ),
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
-			$dto  = $tool->get_component();
-			$data = $dto->toArray();
+		$dto  = $tool->get_component();
+		$data = $dto->toArray();
 
-			$this->assertArrayHasKey( '_meta', $data );
-			$this->assertSame( '1.0.0', $data['_meta']['version'] );
+		$this->assertArrayHasKey( '_meta', $data );
+		$this->assertSame( '1.0.0', $data['_meta']['version'] );
 	}
 
 	// =========================================================================
@@ -420,10 +453,12 @@ final class McpToolTest extends TestCase {
 	// =========================================================================
 
 	public function test_execute_catches_handler_exceptions(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'throwing-tool',
-			'handler' => fn( $args ) => throw new \RuntimeException( 'Handler exploded' ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'throwing-tool',
+				'handler' => static fn( $args ) => throw new \RuntimeException( 'Handler exploded' ),
+			)
+		);
 
 		$result = $tool->execute( array() );
 
@@ -433,11 +468,13 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_check_permission_catches_exceptions(): void {
-		$tool = McpTool::fromArray( array(
-			'name'       => 'throwing-permission-tool',
-			'handler'    => fn( $args ) => array( 'ok' => true ),
-			'permission' => fn( $args ) => throw new \RuntimeException( 'Permission check exploded' ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'throwing-permission-tool',
+				'handler'    => static fn( $args ) => array( 'ok' => true ),
+				'permission' => static fn( $args ) => throw new \RuntimeException( 'Permission check exploded' ),
+			)
+		);
 
 		$result = $tool->check_permission( array() );
 
@@ -446,15 +483,35 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
+	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
+		// Pass invalid annotations data that causes ToolAnnotations::fromArray() to throw.
+		// The 'readOnlyHint' field expects a bool, not a string.
+		$result = McpTool::fromArray(
+			array(
+				'name'        => 'invalid-annotations-tool',
+				'handler'     => static fn( $args ) => array( 'ok' => true ),
+				'annotations' => array(
+					'readOnlyHint' => 'not-a-boolean', // This will cause ToolAnnotations::fromArray() to throw.
+				),
+			)
+		);
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_tool_dto_creation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Expected bool', $result->get_error_message() );
+	}
+
 	// =========================================================================
 	// Result Normalization Tests
 	// =========================================================================
 
 	public function test_execute_wraps_scalar_results(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'scalar-result-tool',
-			'handler' => fn( $args ) => 'just a string',
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'scalar-result-tool',
+				'handler' => static fn( $args ) => 'just a string',
+			)
+		);
 
 		$result = $tool->execute( array() );
 
@@ -463,14 +520,25 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_execute_preserves_array_results(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'array-result-tool',
-			'handler' => fn( $args ) => array( 'custom' => 'response', 'items' => array( 1, 2, 3 ) ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'array-result-tool',
+				'handler' => static fn( $args ) => array(
+					'custom' => 'response',
+					'items'  => array( 1, 2, 3 ),
+				),
+			)
+		);
 
 		$result = $tool->execute( array() );
 
-		$this->assertSame( array( 'custom' => 'response', 'items' => array( 1, 2, 3 ) ), $result );
+		$this->assertSame(
+			array(
+				'custom' => 'response',
+				'items'  => array( 1, 2, 3 ),
+			),
+			$result
+		);
 	}
 
 	// =========================================================================
@@ -482,10 +550,12 @@ final class McpToolTest extends TestCase {
 	 * Tools must explicitly configure permissions for security.
 	 */
 	public function test_no_default_permission_returns_error(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'no-permission-tool',
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'no-permission-tool',
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+			)
+		);
 
 		$result = $tool->check_permission( array() );
 

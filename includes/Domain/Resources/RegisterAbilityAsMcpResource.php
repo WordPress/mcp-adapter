@@ -1,11 +1,12 @@
 <?php
+
 /**
  * RegisterAbilityAsMcpResource class for converting WordPress abilities to MCP resources.
  *
  * @package McpAdapter
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Domain\Resources;
 
@@ -41,6 +42,7 @@ use WP_Ability;
  * @since n.e.x.t
  */
 class RegisterAbilityAsMcpResource {
+
 	/**
 	 * The WordPress ability instance.
 	 *
@@ -92,16 +94,33 @@ class RegisterAbilityAsMcpResource {
 		}
 
 		try {
-			return array(
-				'resource'     => Resource::fromArray( $data['resource_data'] ),
-				'adapter_meta' => $data['adapter_meta'],
-			);
+			$resource_dto = Resource::fromArray( $data['resource_data'] );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
-				'mcp_resource_schema_invalid',
-				$e->getMessage()
+				'mcp_resource_dto_creation_failed',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'Failed to create Resource DTO for ability %1$s: %2$s', 'mcp-adapter' ),
+					$ability->get_name(),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
 			);
 		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_resource_dto( $resource_dto );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
+		}
+
+		return array(
+			'resource'     => $resource_dto,
+			'adapter_meta' => $data['adapter_meta'],
+		);
 	}
 
 	/**

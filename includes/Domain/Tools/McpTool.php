@@ -1,11 +1,12 @@
 <?php
+
 /**
  * MCP Tool component.
  *
  * @package McpAdapter
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Domain\Tools;
 
@@ -41,6 +42,7 @@ use WP\McpSchema\Server\Tools\ToolAnnotations;
  * @since n.e.x.t
  */
 final class McpTool implements McpComponentInterface {
+
 
 	// =========================================================================
 	// Runtime Properties
@@ -108,30 +110,17 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Create a tool definition from an array configuration.
 	 *
-	 * @param array{
-	 *     name: string,
-	 *     title?: string,
-	 *     description?: string,
-	 *     inputSchema?: array<string, mixed>,
-	 *     outputSchema?: array<string, mixed>,
-	 *     icons?: array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>,
-	 *     meta?: array<string, mixed>,
-	 *     annotations?: array{title?: string, readOnlyHint?: bool, destructiveHint?: bool, idempotentHint?: bool, openWorldHint?: bool},
-	 *     handler: callable(array<string, mixed>): array<string, mixed>,
-	 *     permission?: callable(array<string, mixed>): bool
-	 * } $config The tool configuration array.
+	 * @param array $config The tool configuration array.
 	 *
-	 * @return self
-	 *
-	 * @throws \InvalidArgumentException If required fields are missing.
+	 * @return self|\WP_Error
 	 */
-	public static function fromArray( array $config ): self {
+	public static function fromArray( array $config ) {
 		if ( empty( $config['name'] ) ) {
-			throw new \InvalidArgumentException( 'Tool configuration must include a "name" field.' );
+			return new \WP_Error( 'mcp_tool_missing_name', 'Tool configuration must include a "name" field.' );
 		}
 
 		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
-			throw new \InvalidArgumentException( 'Tool configuration must include a callable "handler" field.' );
+			return new \WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
 		}
 
 		// Prepare input schema - ensure it's an object type for MCP compliance.
@@ -159,11 +148,6 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		// Process annotations.
-		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-			$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
-		}
-
 		// Validate and prepare icons if set.
 		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
 			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
@@ -177,8 +161,34 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $config['meta'];
 		}
 
-		// Create the Tool DTO.
-		$tool = Tool::fromArray( $tool_data );
+		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and Tool::fromArray() can throw.
+		try {
+			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
+			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
+			}
+
+			$tool = Tool::fromArray( $tool_data );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_tool_dto_creation_failed',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
+			);
+		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_tool_dto( $tool );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
+		}
 
 		$instance          = new self( $tool );
 		$instance->handler = $config['handler'];

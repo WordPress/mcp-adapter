@@ -1,21 +1,26 @@
 <?php
+
 /**
  * Tests for McpValidator class.
  *
  * @package WP\MCP\Tests
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Domain\Utils;
 
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * Test McpValidator functionality.
  */
 final class McpValidatorTest extends TestCase {
+
 
 	// ISO 8601 Timestamp Validation Tests
 
@@ -441,7 +446,7 @@ final class McpValidatorTest extends TestCase {
 
 	public function test_validate_resource_uri_accepts_max_length(): void {
 		// Build a URI that's exactly 2048 characters
-		$path         = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
+		$path           = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
 		$max_length_uri = 'http://a.com/' . $path;
 		$this->assertTrue( McpValidator::validate_resource_uri( $max_length_uri ) );
 	}
@@ -750,10 +755,12 @@ final class McpValidatorTest extends TestCase {
 
 	public function test_validate_icon_size_rejects_zero_dimensions(): void {
 		// Zero dimensions are invalid - an icon can't have zero width or height.
+		// phpcs:disable PHPCompatibility.Numbers.RemovedHexadecimalNumericStrings.Found -- These are size strings, not hex numbers.
 		$this->assertFalse( McpValidator::validate_icon_size( '0x0' ) );
 		$this->assertFalse( McpValidator::validate_icon_size( '0x48' ) );
 		$this->assertFalse( McpValidator::validate_icon_size( '48x0' ) );
 		$this->assertFalse( McpValidator::validate_icon_size( '00x00' ) );
+		// phpcs:enable PHPCompatibility.Numbers.RemovedHexadecimalNumericStrings.Found
 	}
 
 	public function test_validate_icon_size_rejects_leading_zeros(): void {
@@ -967,5 +974,111 @@ final class McpValidatorTest extends TestCase {
 		$this->assertEquals( 'image/png', $result['valid'][0]['mimeType'] );
 		$this->assertEquals( array( '48x48' ), $result['valid'][0]['sizes'] );
 		$this->assertEquals( 'light', $result['valid'][0]['theme'] );
+	}
+
+	// DTO Validation Tests
+
+	public function test_validate_tool_dto_with_valid_tool(): void {
+		$tool = Tool::fromArray(
+			array(
+				'name'        => 'test-tool',
+				'inputSchema' => array( 'type' => 'object' ),
+			)
+		);
+
+		$result = McpValidator::validate_tool_dto( $tool );
+		$this->assertTrue( $result );
+	}
+
+	public function test_validate_tool_dto_rejects_invalid_name(): void {
+		$tool = Tool::fromArray(
+			array(
+				'name'        => 'invalid/name',
+				'inputSchema' => array( 'type' => 'object' ),
+			)
+		);
+
+		$result = McpValidator::validate_tool_dto( $tool );
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'Tool name', $result->get_error_message() );
+	}
+
+	public function test_validate_tool_dto_rejects_invalid_icons(): void {
+		// We have to bypass DTO level validation to test our deep validation if it overlaps,
+		// but Tool::fromArray already validates required fields.
+		// However, validate_icons_array in McpValidator handles deeper icon validation.
+		$tool = Tool::fromArray(
+			array(
+				'name'        => 'test-tool',
+				'inputSchema' => array( 'type' => 'object' ),
+				'icons'       => array(
+					array(
+						'src'      => 'https://example.com/icon.png',
+						'mimeType' => 'image/png',
+					),
+					array( 'src' => 'invalid-url' ), // Invalid src
+				),
+			)
+		);
+
+		$result = McpValidator::validate_tool_dto( $tool );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'Icon at index 1', $result->get_error_message() );
+	}
+
+	public function test_validate_prompt_dto_with_valid_prompt(): void {
+		$prompt = Prompt::fromArray(
+			array(
+				'name'      => 'test-prompt',
+				'arguments' => array(
+					array(
+						'name'     => 'arg1',
+						'required' => true,
+					),
+				),
+			)
+		);
+
+		$result = McpValidator::validate_prompt_dto( $prompt );
+		$this->assertTrue( $result );
+	}
+
+	public function test_validate_prompt_dto_rejects_invalid_name(): void {
+		$prompt = Prompt::fromArray(
+			array(
+				'name' => 'invalid name with spaces',
+			)
+		);
+
+		$result = McpValidator::validate_prompt_dto( $prompt );
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_prompt_validation_failed', $result->get_error_code() );
+	}
+
+	public function test_validate_resource_dto_with_valid_resource(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'  => 'https://example.com/resource',
+				'name' => 'test-resource',
+			)
+		);
+
+		$result = McpValidator::validate_resource_dto( $resource );
+		$this->assertTrue( $result );
+	}
+
+	public function test_validate_resource_dto_with_valid_uri(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'  => 'https://example.com/valid',
+				'name' => 'test-resource',
+			)
+		);
+
+		// Since we cannot easily mutate the DTO's protected URI property,
+		// we verify that the deep validation correctly accepts a valid DTO.
+		$result = McpValidator::validate_resource_dto( $resource );
+		$this->assertTrue( $result );
 	}
 }

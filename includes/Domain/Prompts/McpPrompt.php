@@ -1,11 +1,12 @@
 <?php
+
 /**
  * MCP Prompt component.
  *
  * @package McpAdapter
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Domain\Prompts;
 
@@ -48,6 +49,7 @@ use WP\McpSchema\Server\Prompts\PromptArgument;
  * @since n.e.x.t
  */
 final class McpPrompt implements McpComponentInterface {
+
 
 	// =========================================================================
 	// Runtime Properties
@@ -122,45 +124,17 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Create a prompt definition from an array configuration.
 	 *
-	 * @param array{
-	 *     name: string,
-	 *     title?: string,
-	 *     description?: string,
-	 *     arguments?: array<int, array{name: string, title?: string, description?: string, required?: bool}>,
-	 *     icons?: array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>,
-	 *     meta?: array<string, mixed>,
-	 *     handler: callable(array<string, mixed>): array<string, mixed>,
-	 *     permission?: callable(array<string, mixed>): bool
-	 * } $config The prompt configuration array.
+	 * @param array $config The prompt configuration array.
 	 *
-	 * @return self
-	 *
-	 * @throws \InvalidArgumentException If required fields are missing.
+	 * @return self|\WP_Error
 	 */
-	public static function fromArray( array $config ): self {
+	public static function fromArray( array $config ) {
 		if ( empty( $config['name'] ) ) {
-			throw new \InvalidArgumentException( 'Prompt configuration must include a "name" field.' );
+			return new \WP_Error( 'mcp_prompt_missing_name', 'Prompt configuration must include a "name" field.' );
 		}
 
 		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
-			throw new \InvalidArgumentException( 'Prompt configuration must include a callable "handler" field.' );
-		}
-
-		$argument_dtos = null;
-		if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
-			$argument_dtos = array_map(
-				static function ( array $arg ): PromptArgument {
-					return PromptArgument::fromArray(
-						array(
-							'name'        => $arg['name'],
-							'title'       => $arg['title'] ?? null,
-							'description' => $arg['description'] ?? null,
-							'required'    => $arg['required'] ?? null,
-						)
-					);
-				},
-				$config['arguments']
-			);
+			return new \WP_Error( 'mcp_prompt_missing_handler', 'Prompt configuration must include a callable "handler" field.' );
 		}
 
 		// Validate and prepare icons if set.
@@ -175,7 +149,6 @@ final class McpPrompt implements McpComponentInterface {
 		$prompt_data = array(
 			'name'        => $config['name'],
 			'description' => $config['description'] ?? null,
-			'arguments'   => $argument_dtos,
 		);
 
 		if ( isset( $config['title'] ) ) {
@@ -190,7 +163,46 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		$prompt = Prompt::fromArray( $prompt_data );
+		// Create the Prompt DTO - wrap in try-catch since PromptArgument::fromArray() and Prompt::fromArray() can throw.
+		try {
+			// Process arguments inside try-catch since PromptArgument::fromArray() can throw.
+			if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
+				$prompt_data['arguments'] = array_map(
+					static function ( array $arg ): PromptArgument {
+						return PromptArgument::fromArray(
+							array(
+								'name'        => $arg['name'],
+								'title'       => $arg['title'] ?? null,
+								'description' => $arg['description'] ?? null,
+								'required'    => $arg['required'] ?? null,
+							)
+						);
+					},
+					$config['arguments']
+				);
+			}
+
+			$prompt = Prompt::fromArray( $prompt_data );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_prompt_dto_creation_failed',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'Failed to create Prompt DTO: %s', 'mcp-adapter' ),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
+			);
+		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_prompt_dto( $prompt );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
+		}
 
 		$instance          = new self( $prompt );
 		$instance->handler = $config['handler'];
@@ -251,6 +263,15 @@ final class McpPrompt implements McpComponentInterface {
 				$throwable->getMessage(),
 				array( 'error_type' => get_class( $throwable ) )
 			);
+		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_prompt_dto( $prompt );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
 		}
 
 		$instance          = new self( $prompt );

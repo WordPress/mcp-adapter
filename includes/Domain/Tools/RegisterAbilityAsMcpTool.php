@@ -1,11 +1,12 @@
 <?php
+
 /**
  * RegisterAbilityAsMcpTool class for converting WordPress abilities to MCP tools.
  *
  * @package McpAdapter
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Domain\Tools;
 
@@ -25,6 +26,7 @@ use WP\McpSchema\Server\Tools\Tool;
  * @package McpAdapter
  */
 class RegisterAbilityAsMcpTool {
+
 	/**
 	 * The WordPress ability instance.
 	 *
@@ -63,16 +65,33 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		try {
-			return array(
-				'tool'         => Tool::fromArray( $data['tool_data'] ),
-				'adapter_meta' => $data['adapter_meta'],
-			);
+			$tool_dto = Tool::fromArray( $data['tool_data'] );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
-				'mcp_tool_schema_invalid',
-				$e->getMessage()
+				'mcp_tool_dto_creation_failed',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'Failed to create Tool DTO for ability %1$s: %2$s', 'mcp-adapter' ),
+					$ability->get_name(),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
 			);
 		}
+
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_tool_dto( $tool_dto );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
+		}
+
+		return array(
+			'tool'         => $tool_dto,
+			'adapter_meta' => $data['adapter_meta'],
+		);
 	}
 
 	/**
