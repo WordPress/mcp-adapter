@@ -237,17 +237,6 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	/**
-	 * Get the human-readable name for this tool.
-	 *
-	 * @return string
-	 */
-	public function get_name(): string {
-		$title = $this->tool->getTitle();
-
-		return null !== $title && '' !== trim( $title ) ? $title : $this->tool->getName();
-	}
-
-	/**
 	 * Execute the tool.
 	 *
 	 * @param mixed $arguments Tool arguments.

@@ -416,29 +416,6 @@ final class McpToolTest extends TestCase {
 	}
 
 	// =========================================================================
-	// get_name Tests
-	// =========================================================================
-
-	public function test_get_name_returns_title_when_set(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'tool-id',
-			'title'   => 'Human Readable Title',
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
-
-		$this->assertSame( 'Human Readable Title', $tool->get_name() );
-	}
-
-	public function test_get_name_returns_name_when_no_title(): void {
-		$tool = McpTool::fromArray( array(
-			'name'    => 'tool-id',
-			'handler' => fn( $args ) => array( 'ok' => true ),
-		) );
-
-		$this->assertSame( 'tool-id', $tool->get_name() );
-	}
-
-	// =========================================================================
 	// Error Handling Tests
 	// =========================================================================
 

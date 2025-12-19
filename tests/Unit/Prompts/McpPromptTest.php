@@ -285,8 +285,6 @@ final class McpPromptTest extends TestCase {
 			'handler'     => fn( $args ) => array(),
 		) );
 
-		$this->assertSame( 'Getter Title', $prompt->get_name() );
-
 		$dto = $prompt->get_component();
 		$this->assertSame( 'getter-test', $dto->getName() );
 		$this->assertSame( 'Getter Title', $dto->getTitle() );
@@ -306,8 +304,6 @@ final class McpPromptTest extends TestCase {
 			'name'    => 'minimal-test',
 			'handler' => fn( $args ) => array(),
 		) );
-
-		$this->assertSame( 'minimal-test', $prompt->get_name() );
 
 		$dto = $prompt->get_component();
 		$this->assertSame( 'minimal-test', $dto->getName() );
@@ -384,22 +380,4 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 'array', $context['source'] );
 	}
 
-	public function test_get_name_returns_title_when_set(): void {
-		$prompt = McpPrompt::fromArray( array(
-			'name'    => 'prompt-id',
-			'title'   => 'Human Readable Title',
-			'handler' => fn( $args ) => array(),
-		) );
-
-		$this->assertSame( 'Human Readable Title', $prompt->get_name() );
-	}
-
-	public function test_get_name_returns_name_when_no_title(): void {
-		$prompt = McpPrompt::fromArray( array(
-			'name'    => 'prompt-id',
-			'handler' => fn( $args ) => array(),
-		) );
-
-		$this->assertSame( 'prompt-id', $prompt->get_name() );
-	}
 }

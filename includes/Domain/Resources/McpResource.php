@@ -247,17 +247,6 @@ final class McpResource implements McpComponentInterface {
 	}
 
 	/**
-	 * Get the human-readable name for this resource.
-	 *
-	 * @return string
-	 */
-	public function get_name(): string {
-		$title = $this->resource->getTitle();
-
-		return null !== $title && '' !== trim( $title ) ? $title : $this->resource->getName();
-	}
-
-	/**
 	 * Execute the resource read.
 	 *
 	 * @param mixed $arguments Read arguments (may be empty).

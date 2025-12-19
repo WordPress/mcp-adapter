@@ -37,15 +37,6 @@ interface McpComponentInterface {
 	public function get_component(): AbstractDataTransferObject;
 
 	/**
-	 * Get the human-readable component name.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @return string Display name.
-	 */
-	public function get_name(): string;
-
-	/**
 	 * Execute the component using the configured strategy.
 	 *
 	 * Implementations MUST execute via either:

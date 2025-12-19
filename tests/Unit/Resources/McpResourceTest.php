@@ -194,26 +194,6 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( 'array', $context['source'] );
 	}
 
-	public function test_get_name_returns_title_when_set(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/named',
-			'title'   => 'Human Readable Title',
-			'handler' => fn() => 'content',
-		) );
-
-		$this->assertSame( 'Human Readable Title', $resource->get_name() );
-	}
-
-	public function test_get_name_returns_name_when_no_title(): void {
-		$resource = McpResource::fromArray( array(
-			'uri'     => 'WordPress://local/named',
-			'name'    => 'resource-name',
-			'handler' => fn() => 'content',
-		) );
-
-		$this->assertSame( 'resource-name', $resource->get_name() );
-	}
-
 	// =========================================================================
 	// Error Handling Tests
 	// =========================================================================

@@ -284,17 +284,6 @@ final class McpPrompt implements McpComponentInterface {
 	}
 
 	/**
-	 * Get the human-readable name for this prompt.
-	 *
-	 * @return string
-	 */
-	public function get_name(): string {
-		$title = $this->prompt->getTitle();
-
-		return null !== $title && '' !== trim( $title ) ? $title : $this->prompt->getName();
-	}
-
-	/**
 	 * Execute the prompt.
 	 *
 	 * @param mixed $arguments Prompt arguments.
