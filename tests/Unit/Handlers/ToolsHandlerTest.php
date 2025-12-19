@@ -16,7 +16,6 @@ use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
 use WP\McpSchema\Server\Tools\Tool;
-use WP\McpSchema\Server\Tools\ToolInputSchema;
 
 /**
  * Test ToolsHandler functionality.
@@ -93,42 +92,6 @@ final class ToolsHandlerTest extends TestCase {
 		);
 
 		// Tool not found is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
-	}
-
-	public function test_call_tool_returns_not_found_when_tool_has_no_wrapper(): void {
-		wp_set_current_user( 1 );
-
-		// Register a Tool DTO directly (no wrapper). This tool will be listable but not callable.
-		$server = $this->makeServer( array(), array(), array() );
-
-		$tool = new Tool(
-			'test-nonexistent-tool',
-			new ToolInputSchema(),
-			null,
-			'Test Tool',
-			null,
-			null,
-			null,
-			null
-		);
-		$server->get_component_registry()->add_tool( $tool );
-
-		$handler = new ToolsHandler( $server );
-
-		$result = $handler->call_tool(
-			array(
-				'params' => array(
-					'name' => 'test-nonexistent-tool',
-				),
-			)
-		);
-
-		// Not callable without a wrapper - treat as not found.
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
 		// Use DTO getter methods instead of toArray()
 		$error = $result->getError();

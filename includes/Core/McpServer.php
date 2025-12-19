@@ -354,27 +354,29 @@ class McpServer {
 	}
 
 	/**
-	 * Get a specific tool wrapper by name (internal use).
+	 * Get a specific McpTool by name.
 	 *
+	 * @internal
 	 * @since n.e.x.t
 	 *
 	 * @param string $tool_name Tool name.
 	 *
 	 * @return \WP\MCP\Domain\Tools\McpTool|null
 	 */
-	public function get_tool_wrapper( string $tool_name ): ?\WP\MCP\Domain\Tools\McpTool {
-		return $this->component_registry->get_tool_wrapper( $tool_name );
+	public function get_mcp_tool( string $tool_name ): ?\WP\MCP\Domain\Tools\McpTool {
+		return $this->component_registry->get_mcp_tool( $tool_name );
 	}
 
 	/**
-	 * Get all tool wrappers (internal use).
+	 * Get all MCP tools.
 	 *
+	 * @internal
 	 * @since n.e.x.t
 	 *
 	 * @return array<string, \WP\MCP\Domain\Tools\McpTool>
 	 */
-	public function get_tool_wrappers(): array {
-		return $this->component_registry->get_tool_wrappers();
+	public function get_mcp_tools(): array {
+		return $this->component_registry->get_mcp_tools();
 	}
 
 	/**
@@ -389,27 +391,29 @@ class McpServer {
 	}
 
 	/**
-	 * Get a specific resource wrapper by URI (internal use).
+	 * Get a specific McpResource by URI.
 	 *
+	 * @internal
 	 * @since n.e.x.t
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource|null
 	 */
-	public function get_resource_wrapper( string $resource_uri ): ?\WP\MCP\Domain\Resources\McpResource {
-		return $this->component_registry->get_resource_wrapper( $resource_uri );
+	public function get_mcp_resource( string $resource_uri ): ?\WP\MCP\Domain\Resources\McpResource {
+		return $this->component_registry->get_mcp_resource( $resource_uri );
 	}
 
 	/**
-	 * Get all resource wrappers (internal use).
+	 * Get all MCP resources.
 	 *
+	 * @internal
 	 * @since n.e.x.t
 	 *
 	 * @return array<string, \WP\MCP\Domain\Resources\McpResource>
 	 */
-	public function get_resource_wrappers(): array {
-		return $this->component_registry->get_resource_wrappers();
+	public function get_mcp_resources(): array {
+		return $this->component_registry->get_mcp_resources();
 	}
 
 	/**
@@ -424,16 +428,17 @@ class McpServer {
 	}
 
 	/**
-	 * Get a prompt wrapper by name (internal use).
+	 * Get an McpPrompt by name.
 	 *
+	 * @internal
 	 * @since n.e.x.t
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
 	 */
-	public function get_prompt_wrapper( string $prompt_name ): ?\WP\MCP\Domain\Prompts\McpPrompt {
-		return $this->component_registry->get_prompt_wrapper( $prompt_name );
+	public function get_mcp_prompt( string $prompt_name ): ?\WP\MCP\Domain\Prompts\McpPrompt {
+		return $this->component_registry->get_mcp_prompt( $prompt_name );
 	}
 
 	/**

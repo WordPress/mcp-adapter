@@ -1,6 +1,6 @@
 <?php
 /**
- * Contract for MCP component wrapper classes (tools, resources, prompts).
+ * Contract for MCP component classes (tools, resources, prompts).
  *
  * @package McpAdapter
  */
@@ -14,7 +14,7 @@ use WP\McpSchema\Common\AbstractDataTransferObject;
 /**
  * Interface McpComponentInterface.
  *
- * Wrapper classes implementing this interface encapsulate:
+ * Classes implementing this interface encapsulate:
  * - a clean protocol DTO (Tool/Resource/Prompt) that is safe to expose to MCP clients, and
  * - MCP Adapter internal metadata and execution wiring (ability-backed OR direct-callable).
  *

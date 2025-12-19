@@ -14,12 +14,12 @@ final class McpToolTest extends TestCase {
 	// fromAbility Tests
 	// =========================================================================
 
-	public function test_fromAbility_builds_tool_wrapper_and_preserves_user_meta(): void {
+	public function test_fromAbility_builds_mcp_tool_and_preserves_user_meta(): void {
 		$this->register_ability_in_hook(
 			'test/mcptool-from-ability',
 			array(
 				'label'               => 'McpTool From Ability',
-				'description'         => 'Test tool wrapper',
+				'description'         => 'Test MCP tool',
 				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function () {
@@ -41,10 +41,10 @@ final class McpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/mcptool-from-ability' );
 		$this->assertNotNull( $ability );
 
-		$wrapper = McpTool::fromAbility( $ability );
-		$this->assertNotWPError( $wrapper );
+		$mcp_tool = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_tool );
 
-		$dto = $wrapper->get_component();
+		$dto = $mcp_tool->get_component();
 		$this->assertInstanceOf( Tool::class, $dto );
 
 		$data = $dto->toArray();
@@ -53,8 +53,8 @@ final class McpToolTest extends TestCase {
 			$this->assertArrayHasKey( '_meta', $data );
 			$this->assertSame( 'public_meta_value', $data['_meta']['public_meta_key'] );
 
-			// Wrapper keeps adapter meta internally.
-			$adapter_meta = $wrapper->get_adapter_meta();
+			// McpTool keeps adapter meta internally.
+			$adapter_meta = $mcp_tool->get_adapter_meta();
 			$this->assertSame( 'test/mcptool-from-ability', $adapter_meta['ability'] );
 
 		wp_unregister_ability( 'test/mcptool-from-ability' );
@@ -81,10 +81,10 @@ final class McpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/mcptool-flat-schemas' );
 		$this->assertNotNull( $ability );
 
-		$wrapper = McpTool::fromAbility( $ability );
-		$this->assertNotWPError( $wrapper );
+		$mcp_tool = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_tool );
 
-		$result = $wrapper->execute( array( 'input' => 'hello' ) );
+		$result = $mcp_tool->execute( array( 'input' => 'hello' ) );
 		$this->assertNotWPError( $result );
 		$this->assertSame( array( 'result' => 'hello' ), $result );
 
@@ -111,11 +111,11 @@ final class McpToolTest extends TestCase {
 		$ability = wp_get_ability( 'test/mcptool-flat-permission' );
 		$this->assertNotNull( $ability );
 
-		$wrapper = McpTool::fromAbility( $ability );
-		$this->assertNotWPError( $wrapper );
+		$mcp_tool = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_tool );
 
-		$this->assertTrue( $wrapper->check_permission( array( 'input' => 'allowed' ) ) );
-		$this->assertFalse( $wrapper->check_permission( array( 'input' => 'denied' ) ) );
+		$this->assertTrue( $mcp_tool->check_permission( array( 'input' => 'allowed' ) ) );
+		$this->assertFalse( $mcp_tool->check_permission( array( 'input' => 'denied' ) ) );
 
 		wp_unregister_ability( 'test/mcptool-flat-permission' );
 	}

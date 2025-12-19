@@ -42,7 +42,7 @@ class ToolsHandler {
 	 * Handles the tools/list request.
 	 *
 	 * Returns a ListToolsResult DTO containing all registered tools.
-	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool wrappers and is never exposed
+	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
@@ -106,8 +106,8 @@ class ToolsHandler {
 			$tool_name = (string) $request_params['name'];
 			$args      = $request_params['arguments'] ?? array();
 
-			$tool = $this->mcp->get_tool_wrapper( $tool_name );
-			if ( ! $tool ) {
+			$mcp_tool = $this->mcp->get_mcp_tool( $tool_name );
+			if ( ! $mcp_tool ) {
 				$this->mcp->error_handler->log(
 					'Tool not found',
 					array(
@@ -119,7 +119,7 @@ class ToolsHandler {
 				return McpErrorFactory::tool_not_found( $request_id, $tool_name );
 			}
 
-			$permission = $tool->check_permission( $args );
+			$permission = $mcp_tool->check_permission( $args );
 			if ( true !== $permission ) {
 				$error_message = __( 'Permission denied', 'mcp-adapter' );
 				if ( is_wp_error( $permission ) ) {
@@ -146,7 +146,7 @@ class ToolsHandler {
 				);
 			}
 
-			$result = $tool->execute( $args );
+			$result = $mcp_tool->execute( $args );
 
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(

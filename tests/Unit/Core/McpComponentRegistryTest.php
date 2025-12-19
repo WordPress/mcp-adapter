@@ -165,9 +165,9 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-always-allowed', $tools );
 	}
 
-	public function test_register_tools_accepts_tool_wrappers(): void {
-		$wrapper = \WP\MCP\Domain\Tools\McpTool::create( 'direct-tool-wrapper' )
-			->description( 'Direct tool wrapper' )
+	public function test_register_tools_accepts_mcp_tools(): void {
+		$mcp_tool = \WP\MCP\Domain\Tools\McpTool::create( 'direct-mcp-tool' )
+			->description( 'Direct MCP tool' )
 			->handler( static function () {
 				return array( 'ok' => true );
 			} )
@@ -175,44 +175,10 @@ final class McpComponentRegistryTest extends TestCase {
 				return true;
 			} );
 
-		$this->registry->register_tools( array( $wrapper ) );
+		$this->registry->register_tools( array( $mcp_tool ) );
 
-		$this->assertSame( $wrapper, $this->registry->get_tool_wrapper( 'direct-tool-wrapper' ) );
-		$this->assertArrayHasKey( 'direct-tool-wrapper', $this->registry->get_tools() );
-	}
-
-	public function test_add_tool_direct(): void {
-		// Create a tool directly
-		$tool = new Tool(
-			'direct-tool',
-			new ToolInputSchema(),
-			'Direct Tool Title',
-			'Direct Tool'
-		);
-
-		$this->registry->add_tool( $tool );
-
-		$tools = $this->registry->get_tools();
-		$this->assertCount( 1, $tools );
-		$this->assertArrayHasKey( 'direct-tool', $tools );
-
-		$retrieved_tool = $this->registry->get_tool( 'direct-tool' );
-		$this->assertSame( $tool, $retrieved_tool );
-
-		// Verify observability event was recorded
-		$events = DummyObservabilityHandler::$events;
-		$this->assertNotEmpty( $events );
-		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registration', $event_names );
-
-		// Verify status is 'success'
-		$success_event = array_filter(
-			$events,
-			static function ( $event ) {
-				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
-			}
-		);
-		$this->assertNotEmpty( $success_event );
+		$this->assertSame( $mcp_tool, $this->registry->get_mcp_tool( 'direct-mcp-tool' ) );
+		$this->assertArrayHasKey( 'direct-mcp-tool', $this->registry->get_tools() );
 	}
 
 	public function test_register_resources_with_valid_ability(): void {
@@ -757,9 +723,9 @@ final class McpComponentRegistryTest extends TestCase {
 			$this->assertArrayHasKey( $same_uri, $resources );
 
 			// Verify the registered resource is from the first ability.
-			$wrapper = $this->registry->get_resource_wrapper( $same_uri );
-			$this->assertNotNull( $wrapper );
-			$meta = $wrapper->get_adapter_meta();
+			$mcp_resource = $this->registry->get_mcp_resource( $same_uri );
+			$this->assertNotNull( $mcp_resource );
+			$meta = $mcp_resource->get_adapter_meta();
 			$this->assertSame( 'test/resource-first', $meta['ability'] ?? null, 'First ability should win' );
 
 		// Clean up.

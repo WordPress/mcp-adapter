@@ -246,9 +246,9 @@ class RequestRouter {
 					return array();
 				}
 
-				$tool = $this->context->mcp_server->get_tool_wrapper( $tool_name );
-				if ( $tool ) {
-					return $tool->get_observability_context();
+				$mcp_tool = $this->context->mcp_server->get_mcp_tool( $tool_name );
+				if ( $mcp_tool ) {
+					return $mcp_tool->get_observability_context();
 				}
 
 				return array(
@@ -264,9 +264,9 @@ class RequestRouter {
 					return array();
 				}
 
-				$prompt = $this->context->mcp_server->get_prompt_wrapper( $prompt_name );
-				if ( $prompt ) {
-					return $prompt->get_observability_context();
+				$mcp_prompt = $this->context->mcp_server->get_mcp_prompt( $prompt_name );
+				if ( $mcp_prompt ) {
+					return $mcp_prompt->get_observability_context();
 				}
 
 				return array(
@@ -282,9 +282,9 @@ class RequestRouter {
 					return array();
 				}
 
-				$resource = $this->context->mcp_server->get_resource_wrapper( $resource_uri );
-				if ( $resource ) {
-					return $resource->get_observability_context();
+				$mcp_resource = $this->context->mcp_server->get_mcp_resource( $resource_uri );
+				if ( $mcp_resource ) {
+					return $mcp_resource->get_observability_context();
 				}
 
 				return array(

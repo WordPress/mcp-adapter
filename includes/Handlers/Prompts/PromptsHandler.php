@@ -76,20 +76,20 @@ class PromptsHandler {
 		$prompt_name = (string) $request_params['name'];
 		$prompt_name = trim( $prompt_name );
 
-		$prompt_wrapper = $this->mcp->get_prompt_wrapper( $prompt_name );
+		$mcp_prompt = $this->mcp->get_mcp_prompt( $prompt_name );
 
-		if ( ! $prompt_wrapper ) {
+		if ( ! $mcp_prompt ) {
 			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
 		}
 
 		/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt */
-		$prompt = $prompt_wrapper->get_component();
+		$prompt = $mcp_prompt->get_component();
 
 		// Get the arguments for the prompt.
 		$arguments = $request_params['arguments'] ?? array();
 
 		try {
-			$permission = $prompt_wrapper->check_permission( $arguments );
+			$permission = $mcp_prompt->check_permission( $arguments );
 			if ( true !== $permission ) {
 				$error_message = 'Access denied for prompt: ' . $prompt_name;
 				if ( is_wp_error( $permission ) ) {
@@ -99,7 +99,7 @@ class PromptsHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
-			$result = $prompt_wrapper->execute( $arguments );
+			$result = $mcp_prompt->execute( $arguments );
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(
 					'Prompt execution returned WP_Error',

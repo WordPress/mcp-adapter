@@ -1,6 +1,6 @@
 <?php
 /**
- * Unified MCP Tool wrapper with fluent API.
+ * Unified MCP Tool component with fluent API.
  *
  * @package McpAdapter
  */
@@ -12,12 +12,11 @@ namespace WP\MCP\Domain\Tools;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Server\Tools\Tool;
 use WP\McpSchema\Server\Tools\ToolAnnotations;
 
 /**
- * Tool wrapper providing unified execution and permission checks.
+ * Tool component providing unified execution and permission checks.
  *
  * This class provides multiple flexible ways to create MCP tools:
  *
@@ -273,7 +272,7 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	/**
-	 * Create an ability-backed tool wrapper.
+	 * Create an ability-backed MCP tool.
 	 *
 	 * @param \WP_Ability $ability WordPress ability.
 	 *
@@ -490,9 +489,9 @@ final class McpTool implements McpComponentInterface {
 	 *
 	 * Builds the Tool DTO if using fluent API, otherwise returns the existing DTO.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 * @return \WP\McpSchema\Server\Tools\Tool
 	 */
-	public function get_component(): AbstractDataTransferObject {
+	public function get_component(): Tool {
 		return $this->get_tool();
 	}
 

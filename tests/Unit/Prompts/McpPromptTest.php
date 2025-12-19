@@ -274,10 +274,10 @@ final class McpPromptTest extends TestCase {
 		$prompts = $server->get_prompts();
 		$this->assertArrayHasKey( 'fluent-server-test', $prompts );
 
-		$wrapper = $server->get_prompt_wrapper( 'fluent-server-test' );
-		$this->assertNotNull( $wrapper );
+		$mcp_prompt = $server->get_mcp_prompt( 'fluent-server-test' );
+		$this->assertNotNull( $mcp_prompt );
 
-		$result = $wrapper->execute( array() );
+		$result = $mcp_prompt->execute( array() );
 		$this->assertSame( 'fluent', $result['source'] );
 	}
 
@@ -293,10 +293,10 @@ final class McpPromptTest extends TestCase {
 		$prompts = $server->get_prompts();
 		$this->assertArrayHasKey( 'array-server-test', $prompts );
 
-		$wrapper = $server->get_prompt_wrapper( 'array-server-test' );
-		$this->assertNotNull( $wrapper );
+		$mcp_prompt = $server->get_mcp_prompt( 'array-server-test' );
+		$this->assertNotNull( $mcp_prompt );
 
-		$result = $wrapper->execute( array() );
+		$result = $mcp_prompt->execute( array() );
 		$this->assertSame( 'array', $result['source'] );
 	}
 

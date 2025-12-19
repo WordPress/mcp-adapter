@@ -1,6 +1,6 @@
 <?php
 /**
- * Unified MCP Resource wrapper with fluent API.
+ * Unified MCP Resource component with fluent API.
  *
  * @package McpAdapter
  */
@@ -12,12 +12,11 @@ namespace WP\MCP\Domain\Resources;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Common\Protocol\Annotations;
 use WP\McpSchema\Server\Resources\Resource;
 
 /**
- * Resource wrapper providing unified execution and permission checks.
+ * Resource component providing unified execution and permission checks.
  *
  * This class supports multiple ways to register resources:
  *
@@ -276,7 +275,7 @@ final class McpResource implements McpComponentInterface {
 	}
 
 	/**
-	 * Create an ability-backed resource wrapper.
+	 * Create an ability-backed MCP resource.
 	 *
 	 * @param \WP_Ability                                                              $ability WordPress ability.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
@@ -435,9 +434,9 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 * @return \WP\McpSchema\Server\Resources\Resource
 	 */
-	public function get_component(): AbstractDataTransferObject {
+	public function get_component(): Resource {
 		return $this->get_resource();
 	}
 
@@ -616,7 +615,7 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-			$_meta = $this->meta_value;
+		$_meta = $this->meta_value;
 		if ( ! empty( $_meta ) ) {
 			$resource_data['_meta'] = $_meta;
 		}

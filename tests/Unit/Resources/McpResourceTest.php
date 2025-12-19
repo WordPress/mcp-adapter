@@ -14,11 +14,11 @@ final class McpResourceTest extends TestCase {
 		$ability = wp_get_ability( 'test/resource-new-meta' );
 		$this->assertNotNull( $ability, 'Ability test/resource-new-meta should be registered' );
 
-		$wrapper = McpResource::fromAbility( $ability );
-		$this->assertNotWPError( $wrapper );
-		$this->assertInstanceOf( McpResource::class, $wrapper );
+		$mcp_resource = McpResource::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_resource );
+		$this->assertInstanceOf( McpResource::class, $mcp_resource );
 
-		$dto = $wrapper->get_component();
+		$dto = $mcp_resource->get_component();
 		$this->assertInstanceOf( Resource::class, $dto );
 
 			$arr = $dto->toArray();
@@ -26,7 +26,7 @@ final class McpResourceTest extends TestCase {
 			$this->assertArrayHasKey( 'custom_field', $arr['_meta'] );
 			$this->assertSame( 'custom_value', $arr['_meta']['custom_field'] );
 
-			$adapter_meta = $wrapper->get_adapter_meta();
+			$adapter_meta = $mcp_resource->get_adapter_meta();
 			$this->assertArrayHasKey( 'ability', $adapter_meta );
 			$this->assertSame( $ability->get_name(), $adapter_meta['ability'] );
 		}
@@ -35,18 +35,18 @@ final class McpResourceTest extends TestCase {
 		$ability = wp_get_ability( 'test/resource-plain-string' );
 		$this->assertNotNull( $ability, 'Ability test/resource-plain-string should be registered' );
 
-		$wrapper = McpResource::fromAbility( $ability );
-		$this->assertNotWPError( $wrapper );
+		$mcp_resource = McpResource::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_resource );
 
-		$permission = $wrapper->check_permission( array( 'uri' => 'WordPress://local/resource-plain-string' ) );
+		$permission = $mcp_resource->check_permission( array( 'uri' => 'WordPress://local/resource-plain-string' ) );
 		$this->assertTrue( $permission );
 
-		$result = $wrapper->execute( array( 'uri' => 'WordPress://local/resource-plain-string' ) );
+		$result = $mcp_resource->execute( array( 'uri' => 'WordPress://local/resource-plain-string' ) );
 		$this->assertSame( 'plain string content', $result );
 	}
 
 	public function test_permission_callback_supports_zero_arg_callable(): void {
-		$wrapper = McpResource::create( 'WordPress://local/custom' )
+		$mcp_resource = McpResource::create( 'WordPress://local/custom' )
 			->title( 'Custom' )
 			->handler(
 				static function ( $args ) {
@@ -59,11 +59,11 @@ final class McpResourceTest extends TestCase {
 				}
 			);
 
-		$this->assertTrue( $wrapper->check_permission( array( 'anything' => true ) ) );
+		$this->assertTrue( $mcp_resource->check_permission( array( 'anything' => true ) ) );
 	}
 
 	public function test_fluent_meta_allows_mcp_adapter_key(): void {
-		$wrapper = McpResource::create( 'WordPress://local/meta-test' )
+		$mcp_resource = McpResource::create( 'WordPress://local/meta-test' )
 			->meta(
 				array(
 					'mcp_adapter' => array( 'should_not' => 'leak' ),
@@ -76,7 +76,7 @@ final class McpResourceTest extends TestCase {
 				}
 			);
 
-		$dto = $wrapper->get_component();
+		$dto = $mcp_resource->get_component();
 			$arr = $dto->toArray();
 
 			$this->assertArrayHasKey( '_meta', $arr );

@@ -85,16 +85,16 @@ class ResourcesHandler {
 		$uri = $request_params['uri'];
 		$uri = is_string( $uri ) ? trim( $uri ) : '';
 
-		$resource_wrapper = $this->mcp->get_resource_wrapper( $uri );
-		if ( ! $resource_wrapper ) {
+		$mcp_resource = $this->mcp->get_mcp_resource( $uri );
+		if ( ! $mcp_resource ) {
 			return McpErrorFactory::resource_not_found( $request_id, $uri );
 		}
 
 		/** @var \WP\McpSchema\Server\Resources\Resource $resource */
-		$resource = $resource_wrapper->get_component();
+		$resource = $mcp_resource->get_component();
 
 		try {
-			$has_permission = $resource_wrapper->check_permission( $request_params );
+			$has_permission = $mcp_resource->check_permission( $request_params );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message if WP_Error was returned.
 				$error_message = 'Access denied for resource: ' . $resource->getName();
@@ -106,9 +106,9 @@ class ResourcesHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
-			$contents = $resource_wrapper->execute( $request_params );
+			$contents = $mcp_resource->execute( $request_params );
 
-			// Handle WP_Error objects returned by wrapper execution.
+			// Handle WP_Error objects returned by McpResource execution.
 			if ( is_wp_error( $contents ) ) {
 				$this->mcp->error_handler->log(
 					'Resource execution returned WP_Error object',

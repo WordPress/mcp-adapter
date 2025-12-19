@@ -1,6 +1,6 @@
 <?php
 /**
- * Unified MCP Prompt wrapper with fluent API.
+ * Unified MCP Prompt component with fluent API.
  *
  * @package McpAdapter
  */
@@ -13,12 +13,11 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptArgument;
 
 /**
- * Prompt wrapper providing unified execution and permission checks.
+ * Prompt component providing unified execution and permission checks.
  *
  * This class supports multiple ways to register prompts:
  *
@@ -256,7 +255,7 @@ final class McpPrompt implements McpComponentInterface {
 	}
 
 	/**
-	 * Create an ability-backed prompt wrapper.
+	 * Create an ability-backed MCP prompt.
 	 *
 	 * @param \WP_Ability $ability WordPress ability.
 	 *
@@ -284,7 +283,7 @@ final class McpPrompt implements McpComponentInterface {
 	}
 
 	/**
-	 * Create a builder-backed prompt wrapper.
+	 * Create a builder-backed MCP prompt.
 	 *
 	 * @param \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface $builder Builder instance.
 	 *
@@ -439,9 +438,9 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 * @return \WP\McpSchema\Server\Prompts\Prompt
 	 */
-	public function get_component(): AbstractDataTransferObject {
+	public function get_component(): Prompt {
 		return $this->get_prompt();
 	}
 
