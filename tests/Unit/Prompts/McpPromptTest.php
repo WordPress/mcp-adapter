@@ -9,32 +9,41 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Prompts\Prompt;
 
 /**
- * Tests for McpPrompt fluent builder and array configuration.
+ * Tests for McpPrompt array configuration.
  */
 final class McpPromptTest extends TestCase {
 
 	// =========================================================================
-	// Fluent API Tests
+	// fromArray Tests
 	// =========================================================================
 
-	public function test_fluent_api_creates_prompt(): void {
-		$prompt = McpPrompt::create( 'test-fluent' )
-			->title( 'Test Fluent Prompt' )
-			->description( 'A prompt created with fluent API' )
-			->argument( 'code', 'The code to review', true )
-			->argument( 'language', 'Programming language' )
-			->handler(
-				function ( array $args ): array {
-					return array( 'result' => 'success', 'args' => $args );
-				}
-			);
+	public function test_fromArray_creates_prompt(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'        => 'test-array',
+			'title'       => 'Test Array Prompt',
+			'description' => 'A prompt created from array config',
+			'arguments'   => array(
+				array(
+					'name'        => 'code',
+					'description' => 'The code to review',
+					'required'    => true,
+				),
+				array(
+					'name'        => 'language',
+					'description' => 'Programming language',
+				),
+			),
+			'handler'     => function ( array $args ): array {
+				return array( 'result' => 'success', 'args' => $args );
+			},
+		) );
 
 		$dto = $prompt->get_component();
 
 		$this->assertInstanceOf( Prompt::class, $dto );
-		$this->assertSame( 'test-fluent', $dto->getName() );
-		$this->assertSame( 'Test Fluent Prompt', $dto->getTitle() );
-		$this->assertSame( 'A prompt created with fluent API', $dto->getDescription() );
+		$this->assertSame( 'test-array', $dto->getName() );
+		$this->assertSame( 'Test Array Prompt', $dto->getTitle() );
+		$this->assertSame( 'A prompt created from array config', $dto->getDescription() );
 
 		$arguments = $dto->getArguments();
 		$this->assertCount( 2, $arguments );
@@ -44,16 +53,16 @@ final class McpPromptTest extends TestCase {
 		$this->assertNull( $arguments[1]->getRequired() );
 	}
 
-	public function test_fluent_api_handler_is_executed(): void {
-		$prompt = McpPrompt::create( 'handler-test' )
-			->handler(
-				function ( array $args ): array {
-					return array(
-						'received' => $args,
-						'computed' => $args['value'] * 2,
-					);
-				}
-			);
+	public function test_fromArray_handler_is_executed(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'handler-test',
+			'handler' => function ( array $args ): array {
+				return array(
+					'received' => $args,
+					'computed' => $args['value'] * 2,
+				);
+			},
+		) );
 
 		$result = $prompt->execute( array( 'value' => 21 ) );
 
@@ -61,23 +70,25 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 42, $result['computed'] );
 	}
 
-	public function test_fluent_api_permission_callback(): void {
-		$prompt = McpPrompt::create( 'permission-test' )
-			->handler( fn( $args ) => array() )
-			->permission(
-				function ( array $args ): bool {
-					return $args['allowed'] ?? false;
-				}
-			);
+	public function test_fromArray_permission_callback(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'       => 'permission-test',
+			'handler'    => fn( $args ) => array(),
+			'permission' => function ( array $args ): bool {
+				return $args['allowed'] ?? false;
+			},
+		) );
 
 		$this->assertTrue( $prompt->check_permission( array( 'allowed' => true ) ) );
 		$this->assertFalse( $prompt->check_permission( array( 'allowed' => false ) ) );
 		$this->assertFalse( $prompt->check_permission( array() ) );
 	}
 
-	public function test_fluent_api_no_default_permission_denies_access(): void {
-		$prompt = McpPrompt::create( 'no-permission-test' )
-			->handler( fn( $args ) => array() );
+	public function test_fromArray_no_permission_denies_access(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'no-permission-test',
+			'handler' => fn( $args ) => array(),
+		) );
 
 		// Without explicit permission callback, access should be denied.
 		$result = $prompt->check_permission( array() );
@@ -85,40 +96,28 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 	}
 
-	public function test_fluent_api_explicit_permission_allows_access(): void {
-		$prompt = McpPrompt::create( 'explicit-permission-test' )
-			->handler( fn( $args ) => array() )
-			->permission( fn() => true );
+	public function test_fromArray_explicit_permission_allows_access(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'       => 'explicit-permission-test',
+			'handler'    => fn( $args ) => array(),
+			'permission' => fn() => true,
+		) );
 
 		$this->assertTrue( $prompt->check_permission( array() ) );
 		$this->assertTrue( $prompt->check_permission( array( 'any' => 'value' ) ) );
 	}
 
-	public function test_fluent_api_required_argument_shorthand(): void {
-		$prompt = McpPrompt::create( 'required-arg-test' )
-			->argument( 'input', 'Required input', true )
-			->argument( 'optional', 'Optional input' )
-			->handler( fn( $args ) => array() );
-
-		$dto       = $prompt->get_component();
-		$arguments = $dto->getArguments();
-
-		$this->assertCount( 2, $arguments );
-		$this->assertTrue( $arguments[0]->getRequired() );
-		$this->assertNull( $arguments[1]->getRequired() );
-	}
-
-	public function test_fluent_api_with_icons(): void {
-		$prompt = McpPrompt::create( 'icons-test' )
-			->handler( fn( $args ) => array() )
-			->icons(
+	public function test_fromArray_with_icons(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'icons-test',
+			'handler' => fn( $args ) => array(),
+			'icons'   => array(
 				array(
-					array(
-						'src'      => 'https://example.com/icon.png',
-						'mimeType' => 'image/png',
-					),
-				)
-			);
+					'src'      => 'https://example.com/icon.png',
+					'mimeType' => 'image/png',
+				),
+			),
+		) );
 
 		$dto = $prompt->get_component();
 		$arr = $dto->toArray();
@@ -128,16 +127,16 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 'https://example.com/icon.png', $arr['icons'][0]['src'] );
 	}
 
-	public function test_fluent_api_with_meta(): void {
-		$prompt = McpPrompt::create( 'meta-test' )
-			->handler( fn( $args ) => array() )
-			->meta(
-				array(
-					'custom_key' => 'custom_value',
-					'mcp_adapter' => array( 'allowed' => true ),
-					'nested'     => array( 'a' => 1 ),
-				)
-			);
+	public function test_fromArray_with_meta(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'meta-test',
+			'handler' => fn( $args ) => array(),
+			'meta'    => array(
+				'custom_key'  => 'custom_value',
+				'mcp_adapter' => array( 'allowed' => true ),
+				'nested'      => array( 'a' => 1 ),
+			),
+		) );
 
 		$dto = $prompt->get_component();
 		$arr = $dto->toArray();
@@ -148,109 +147,38 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( array( 'allowed' => true ), $arr['_meta']['mcp_adapter'] );
 	}
 
-	// =========================================================================
-	// Array Configuration Tests
-	// =========================================================================
-
-	public function test_array_config_creates_prompt(): void {
-		$prompt = McpPrompt::fromArray(
-			array(
-				'name'        => 'test-array',
-				'title'       => 'Test Array Prompt',
-				'description' => 'A prompt created from array config',
-				'arguments'   => array(
-					array(
-						'name'        => 'input',
-						'description' => 'Input value',
-						'required'    => true,
-					),
-				),
-				'handler'     => function ( array $args ): array {
-					return array( 'result' => 'from-array' );
-				},
-			)
-		);
-
-		$dto = $prompt->get_component();
-
-		$this->assertSame( 'test-array', $dto->getName() );
-		$this->assertSame( 'Test Array Prompt', $dto->getTitle() );
-		$this->assertSame( 'A prompt created from array config', $dto->getDescription() );
-
-		$arguments = $dto->getArguments();
-		$this->assertCount( 1, $arguments );
-		$this->assertSame( 'input', $arguments[0]->getName() );
-		$this->assertTrue( $arguments[0]->getRequired() );
-	}
-
-	public function test_array_config_handler_is_executed(): void {
-		$prompt = McpPrompt::fromArray(
-			array(
-				'name'    => 'array-handler-test',
-				'handler' => function ( array $args ): array {
-					return array( 'doubled' => $args['n'] * 2 );
-				},
-			)
-		);
-
-		$result = $prompt->execute( array( 'n' => 10 ) );
-
-		$this->assertSame( 20, $result['doubled'] );
-	}
-
-	public function test_array_config_with_permission(): void {
-		$prompt = McpPrompt::fromArray(
-			array(
-				'name'       => 'array-permission-test',
-				'handler'    => fn( $args ) => array(),
-				'permission' => function ( array $args ): bool {
-					return $args['secret'] === 'password';
-				},
-			)
-		);
-
-		$this->assertTrue( $prompt->check_permission( array( 'secret' => 'password' ) ) );
-		$this->assertFalse( $prompt->check_permission( array( 'secret' => 'wrong' ) ) );
-	}
-
-	public function test_array_config_throws_without_name(): void {
+	public function test_fromArray_throws_without_name(): void {
 		$this->expectException( \InvalidArgumentException::class );
 		$this->expectExceptionMessage( 'Prompt configuration must include a "name" field' );
 
-		McpPrompt::fromArray(
-			array(
-				'handler' => fn( $args ) => array(),
-			)
-		);
+		McpPrompt::fromArray( array(
+			'handler' => fn( $args ) => array(),
+		) );
 	}
 
-	public function test_array_config_throws_without_handler(): void {
+	public function test_fromArray_throws_without_handler(): void {
 		$this->expectException( \InvalidArgumentException::class );
 		$this->expectExceptionMessage( 'Prompt configuration must include a callable "handler" field' );
 
-		McpPrompt::fromArray(
-			array(
-				'name' => 'no-handler',
-			)
-		);
+		McpPrompt::fromArray( array(
+			'name' => 'no-handler',
+		) );
 	}
 
-	public function test_array_config_with_icons_and_meta(): void {
-		$prompt = McpPrompt::fromArray(
-			array(
-				'name'    => 'full-config-test',
-				'handler' => fn( $args ) => array(),
-				'icons'   => array(
-					array(
-						'src'      => 'https://example.com/icon.svg',
-						'mimeType' => 'image/svg+xml',
-					),
+	public function test_fromArray_with_icons_and_meta(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'full-config-test',
+			'handler' => fn( $args ) => array(),
+			'icons'   => array(
+				array(
+					'src'      => 'https://example.com/icon.svg',
+					'mimeType' => 'image/svg+xml',
 				),
-				'meta'    => array(
-					'vendor' => 'test',
-				),
-			)
-		);
+			),
+			'meta'    => array(
+				'vendor' => 'test',
+			),
+		) );
 
 		$dto = $prompt->get_component();
 		$arr = $dto->toArray();
@@ -264,31 +192,14 @@ final class McpPromptTest extends TestCase {
 	// Server Registration Tests
 	// =========================================================================
 
-	public function test_fluent_prompt_can_be_registered_with_server(): void {
-		$fluent_prompt = McpPrompt::create( 'fluent-server-test' )
-			->title( 'Fluent Server Test' )
-			->handler( fn( $args ) => array( 'source' => 'fluent' ) );
-
-		$server = $this->makeServer( array(), array(), array( $fluent_prompt ) );
-
-		$prompts = $server->get_prompts();
-		$this->assertArrayHasKey( 'fluent-server-test', $prompts );
-
-		$mcp_prompt = $server->get_mcp_prompt( 'fluent-server-test' );
-		$this->assertNotNull( $mcp_prompt );
-
-		$result = $mcp_prompt->execute( array() );
-		$this->assertSame( 'fluent', $result['source'] );
-	}
-
-	public function test_array_config_can_be_registered_with_server(): void {
-		$array_config = array(
+	public function test_fromArray_prompt_can_be_registered_with_server(): void {
+		$prompt = McpPrompt::fromArray( array(
 			'name'    => 'array-server-test',
 			'title'   => 'Array Server Test',
 			'handler' => fn( $args ) => array( 'source' => 'array' ),
-		);
+		) );
 
-		$server = $this->makeServer( array(), array(), array( $array_config ) );
+		$server = $this->makeServer( array(), array(), array( $prompt ) );
 
 		$prompts = $server->get_prompts();
 		$this->assertArrayHasKey( 'array-server-test', $prompts );
@@ -300,21 +211,42 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 'array', $result['source'] );
 	}
 
+	public function test_array_config_can_be_registered_with_server(): void {
+		$array_config = array(
+			'name'    => 'config-server-test',
+			'title'   => 'Config Server Test',
+			'handler' => fn( $args ) => array( 'source' => 'config' ),
+		);
+
+		$server = $this->makeServer( array(), array(), array( $array_config ) );
+
+		$prompts = $server->get_prompts();
+		$this->assertArrayHasKey( 'config-server-test', $prompts );
+
+		$mcp_prompt = $server->get_mcp_prompt( 'config-server-test' );
+		$this->assertNotNull( $mcp_prompt );
+
+		$result = $mcp_prompt->execute( array() );
+		$this->assertSame( 'config', $result['source'] );
+	}
+
 	public function test_mixed_registration_formats(): void {
-		$fluent_prompt = McpPrompt::create( 'fluent-mixed' )
-			->handler( fn( $args ) => array( 'type' => 'fluent' ) );
+		$prompt_instance = McpPrompt::fromArray( array(
+			'name'    => 'instance-mixed',
+			'handler' => fn( $args ) => array( 'type' => 'instance' ),
+		) );
 
 		$array_config = array(
 			'name'    => 'array-mixed',
 			'handler' => fn( $args ) => array( 'type' => 'array' ),
 		);
 
-		// Mix: fluent instance, array config, and class name.
+		// Mix: instance, array config, and class name.
 		$server = $this->makeServer(
 			array(),
 			array(),
 			array(
-				$fluent_prompt,
+				$prompt_instance,
 				$array_config,
 				TestPrompt::class, // From existing test file.
 			)
@@ -322,7 +254,7 @@ final class McpPromptTest extends TestCase {
 
 		$prompts = $server->get_prompts();
 
-		$this->assertArrayHasKey( 'fluent-mixed', $prompts );
+		$this->assertArrayHasKey( 'instance-mixed', $prompts );
 		$this->assertArrayHasKey( 'array-mixed', $prompts );
 		$this->assertArrayHasKey( 'test-prompt', $prompts );
 	}
@@ -332,20 +264,26 @@ final class McpPromptTest extends TestCase {
 	// =========================================================================
 
 	public function test_getters_return_correct_values(): void {
-		$prompt = McpPrompt::create( 'getter-test' )
-			->title( 'Getter Title' )
-			->description( 'Getter Description' )
-			->argument( 'arg1', 'First argument', true )
-			->icons(
+		$prompt = McpPrompt::fromArray( array(
+			'name'        => 'getter-test',
+			'title'       => 'Getter Title',
+			'description' => 'Getter Description',
+			'arguments'   => array(
 				array(
-					array(
-						'src'      => 'https://example.com/icon.png',
-						'mimeType' => 'image/png',
-					),
-				)
-			)
-			->meta( array( 'key' => 'value' ) )
-			->handler( fn( $args ) => array() );
+					'name'        => 'arg1',
+					'description' => 'First argument',
+					'required'    => true,
+				),
+			),
+			'icons'       => array(
+				array(
+					'src'      => 'https://example.com/icon.png',
+					'mimeType' => 'image/png',
+				),
+			),
+			'meta'        => array( 'key' => 'value' ),
+			'handler'     => fn( $args ) => array(),
+		) );
 
 		$this->assertSame( 'Getter Title', $prompt->get_name() );
 
@@ -364,8 +302,10 @@ final class McpPromptTest extends TestCase {
 	}
 
 	public function test_defaults_for_optional_fields(): void {
-		$prompt = McpPrompt::create( 'minimal-test' )
-			->handler( fn( $args ) => array() );
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'minimal-test',
+			'handler' => fn( $args ) => array(),
+		) );
 
 		$this->assertSame( 'minimal-test', $prompt->get_name() );
 
@@ -383,27 +323,14 @@ final class McpPromptTest extends TestCase {
 	// =========================================================================
 
 	/**
-	 * Verify that no default handler is set.
-	 * Prompts must explicitly configure a handler or ability.
-	 */
-	public function test_no_default_handler_returns_error(): void {
-		$prompt = McpPrompt::create( 'no-handler-prompt' )
-			->permission( fn() => true );
-
-		$result = $prompt->execute( array() );
-
-		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'mcp_prompt_no_handler', $result->get_error_code() );
-		$this->assertStringContainsString( 'No prompt execution strategy', $result->get_error_message() );
-	}
-
-	/**
 	 * Verify that no default permission callback is set.
 	 * Prompts must explicitly configure permissions for security.
 	 */
 	public function test_no_default_permission_returns_error(): void {
-		$prompt = McpPrompt::create( 'no-permission-prompt' )
-			->handler( fn( $args ) => array() );
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'no-permission-prompt',
+			'handler' => fn( $args ) => array(),
+		) );
 
 		$result = $prompt->check_permission( array() );
 
@@ -411,5 +338,68 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
 		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );
+	}
+
+	// =========================================================================
+	// Error Handling Tests
+	// =========================================================================
+
+	public function test_execute_catches_handler_exceptions(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'throwing-prompt',
+			'handler' => fn( $args ) => throw new \RuntimeException( 'Handler exploded' ),
+		) );
+
+		$result = $prompt->execute( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_execution_failed', $result->get_error_code() );
+		$this->assertSame( 'Handler exploded', $result->get_error_message() );
+	}
+
+	public function test_check_permission_catches_exceptions(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'       => 'throwing-permission-prompt',
+			'handler'    => fn( $args ) => array(),
+			'permission' => fn() => throw new \RuntimeException( 'Permission check exploded' ),
+		) );
+
+		$result = $prompt->check_permission( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_permission_check_failed', $result->get_error_code() );
+		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
+	}
+
+	public function test_fromArray_observability_context(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'observable-prompt',
+			'handler' => fn( $args ) => array(),
+		) );
+
+		$context = $prompt->get_observability_context();
+
+		$this->assertSame( 'prompt', $context['component_type'] );
+		$this->assertSame( 'observable-prompt', $context['prompt_name'] );
+		$this->assertSame( 'array', $context['source'] );
+	}
+
+	public function test_get_name_returns_title_when_set(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'prompt-id',
+			'title'   => 'Human Readable Title',
+			'handler' => fn( $args ) => array(),
+		) );
+
+		$this->assertSame( 'Human Readable Title', $prompt->get_name() );
+	}
+
+	public function test_get_name_returns_name_when_no_title(): void {
+		$prompt = McpPrompt::fromArray( array(
+			'name'    => 'prompt-id',
+			'handler' => fn( $args ) => array(),
+		) );
+
+		$this->assertSame( 'prompt-id', $prompt->get_name() );
 	}
 }

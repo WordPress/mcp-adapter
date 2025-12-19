@@ -1,6 +1,6 @@
 <?php
 /**
- * Unified MCP Prompt component with fluent API.
+ * MCP Prompt component.
  *
  * @package McpAdapter
  */
@@ -21,17 +21,7 @@ use WP\McpSchema\Server\Prompts\PromptArgument;
  *
  * This class supports multiple ways to register prompts:
  *
- * 1. Fluent API (direct callable):
- * ```php
- * $prompt = McpPrompt::create('code-review')
- *     ->title('Code Review')
- *     ->description('Generate a comprehensive code review')
- *     ->argument('code', 'The code to review', true)
- *     ->handler(fn($args) => ['messages' => [...]] )
- *     ->permission(fn() => current_user_can('read'));
- * ```
- *
- * 2. Array configuration:
+ * 1. Array configuration:
  * ```php
  * $prompt = McpPrompt::fromArray([
  *     'name'        => 'code-review',
@@ -45,12 +35,12 @@ use WP\McpSchema\Server\Prompts\PromptArgument;
  * ]);
  * ```
  *
- * 3. From WordPress Ability (ability-backed):
+ * 2. From WordPress Ability (ability-backed):
  * ```php
  * $prompt = McpPrompt::fromAbility($ability);
  * ```
  *
- * 4. From prompt builder (builder-backed compatibility):
+ * 3. From prompt builder (builder-backed compatibility):
  * ```php
  * $prompt = McpPrompt::fromBuilder($builder);
  * ```
@@ -60,68 +50,15 @@ use WP\McpSchema\Server\Prompts\PromptArgument;
 final class McpPrompt implements McpComponentInterface {
 
 	// =========================================================================
-	// Fluent Builder Properties
-	// =========================================================================
-
-	/**
-	 * The prompt name (unique identifier).
-	 *
-	 * @var string|null
-	 */
-	private ?string $name = null;
-
-	/**
-	 * The prompt title (human-readable display name).
-	 *
-	 * @var string|null
-	 */
-	private ?string $title_value = null;
-
-	/**
-	 * The prompt description.
-	 *
-	 * @var string|null
-	 */
-	private ?string $description_value = null;
-
-	/**
-	 * The prompt arguments.
-	 *
-	 * @var array<int, array{name: string, title?: string, description?: string, required?: bool}>
-	 */
-	private array $arguments_value = array();
-
-	/**
-	 * The prompt icons for UI display.
-	 *
-	 * @var array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
-	 */
-	private ?array $icons_value = null;
-
-	/**
-	 * Additional metadata passed through to MCP clients.
-	 *
-	 * @var array<string, mixed>
-	 */
-	private array $meta_value = array();
-
-	/**
-	 * Whether the prompt was built using fluent API.
-	 *
-	 * @var bool
-	 */
-	private bool $is_fluent = false;
-
-	// =========================================================================
 	// Runtime Properties
 	// =========================================================================
 
 	/**
 	 * Clean Prompt DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Prompts\Prompt|null
+	 * @var \WP\McpSchema\Server\Prompts\Prompt
 	 */
-	private ?Prompt $prompt = null;
+	private Prompt $prompt;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed prompts).
@@ -171,30 +108,16 @@ final class McpPrompt implements McpComponentInterface {
 
 	/**
 	 * Private constructor - use factory methods.
+	 *
+	 * @param \WP\McpSchema\Server\Prompts\Prompt $prompt The Prompt DTO.
 	 */
-	private function __construct() {
-		// Properties remain null - explicit configuration required.
-		// Null handler/permission triggers proper error responses.
+	private function __construct( Prompt $prompt ) {
+		$this->prompt = $prompt;
 	}
 
 	// =========================================================================
 	// Factory Methods
 	// =========================================================================
-
-	/**
-	 * Create a new prompt definition with fluent API.
-	 *
-	 * @param string $name The unique prompt name.
-	 *
-	 * @return self
-	 */
-	public static function create( string $name ): self {
-		$instance            = new self();
-		$instance->name      = $name;
-		$instance->is_fluent = true;
-
-		return $instance;
-	}
 
 	/**
 	 * Create a prompt definition from an array configuration.
@@ -211,6 +134,8 @@ final class McpPrompt implements McpComponentInterface {
 	 * } $config The prompt configuration array.
 	 *
 	 * @return self
+	 *
+	 * @throws \InvalidArgumentException If required fields are missing.
 	 */
 	public static function fromArray( array $config ): self {
 		if ( empty( $config['name'] ) ) {
@@ -221,35 +146,64 @@ final class McpPrompt implements McpComponentInterface {
 			throw new \InvalidArgumentException( 'Prompt configuration must include a callable "handler" field.' );
 		}
 
-		$instance            = new self();
-		$instance->name      = $config['name'];
-		$instance->is_fluent = true;
+		$argument_dtos = null;
+		if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
+			$argument_dtos = array_map(
+				static function ( array $arg ): PromptArgument {
+					return PromptArgument::fromArray(
+						array(
+							'name'        => $arg['name'],
+							'title'       => $arg['title'] ?? null,
+							'description' => $arg['description'] ?? null,
+							'required'    => $arg['required'] ?? null,
+						)
+					);
+				},
+				$config['arguments']
+			);
+		}
+
+		// Validate and prepare icons if set.
+		$valid_icons = null;
+		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$valid_icons = $icons_result['valid'];
+			}
+		}
+
+		$prompt_data = array(
+			'name'        => $config['name'],
+			'description' => $config['description'] ?? null,
+			'arguments'   => $argument_dtos,
+		);
 
 		if ( isset( $config['title'] ) ) {
-			$instance->title_value = $config['title'];
+			$prompt_data['title'] = $config['title'];
 		}
 
-		if ( isset( $config['description'] ) ) {
-			$instance->description_value = $config['description'];
+		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
+			$prompt_data['_meta'] = $config['meta'];
 		}
 
-		if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) ) {
-			$instance->arguments_value = $config['arguments'];
+		if ( null !== $valid_icons ) {
+			$prompt_data['icons'] = $valid_icons;
 		}
 
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) ) {
-			$instance->icons_value = $config['icons'];
-		}
+		$prompt = Prompt::fromArray( $prompt_data );
 
-		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) ) {
-			$instance->meta_value = $config['meta'];
-		}
-
+		$instance          = new self( $prompt );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
 			$instance->permission_callback = $config['permission'];
 		}
+
+		$instance->observability_context = array(
+			'component_type' => 'prompt',
+			'prompt_name'    => $config['name'],
+			'source'         => 'array',
+		);
 
 		return $instance;
 	}
@@ -267,14 +221,13 @@ final class McpPrompt implements McpComponentInterface {
 			return $prompt_data;
 		}
 
-		$instance               = new self();
-		$instance->prompt       = $prompt_data['prompt'];
+		$instance               = new self( $prompt_data['prompt'] );
 		$instance->adapter_meta = $prompt_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'prompt',
-			'prompt_name'    => $instance->prompt->getName(),
+			'prompt_name'    => $prompt_data['prompt']->getName(),
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -300,9 +253,8 @@ final class McpPrompt implements McpComponentInterface {
 			);
 		}
 
-		$instance          = new self();
+		$instance          = new self( $prompt );
 		$instance->builder = $builder;
-		$instance->prompt  = $prompt;
 
 		$instance->adapter_meta = array(
 			'source'        => 'builder',
@@ -311,124 +263,11 @@ final class McpPrompt implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'prompt',
-			'prompt_name'    => $instance->prompt->getName(),
+			'prompt_name'    => $prompt->getName(),
 			'source'         => 'builder',
 		);
 
 		return $instance;
-	}
-
-	// =========================================================================
-	// Fluent Setters
-	// =========================================================================
-
-	/**
-	 * Set the prompt title.
-	 *
-	 * @param string $title The human-readable title.
-	 *
-	 * @return self
-	 */
-	public function title( string $title ): self {
-		$this->title_value = $title;
-		return $this;
-	}
-
-	/**
-	 * Set the prompt description.
-	 *
-	 * @param string $description The prompt description.
-	 *
-	 * @return self
-	 */
-	public function description( string $description ): self {
-		$this->description_value = $description;
-		return $this;
-	}
-
-	/**
-	 * Add an argument to the prompt.
-	 *
-	 * @param string      $name        The argument name.
-	 * @param string|null $description Optional argument description.
-	 * @param bool        $required    Whether the argument is required.
-	 *
-	 * @return self
-	 */
-	public function argument( string $name, ?string $description = null, bool $required = false ): self {
-		$arg = array( 'name' => $name );
-
-		if ( null !== $description ) {
-			$arg['description'] = $description;
-		}
-
-		if ( $required ) {
-			$arg['required'] = true;
-		}
-
-		$this->arguments_value[] = $arg;
-
-		return $this;
-	}
-
-	/**
-	 * Set multiple arguments at once.
-	 *
-	 * @param array<int, array{name: string, title?: string, description?: string, required?: bool}> $arguments The arguments array.
-	 *
-	 * @return self
-	 */
-	public function arguments( array $arguments ): self {
-		$this->arguments_value = $arguments;
-		return $this;
-	}
-
-	/**
-	 * Set the prompt icons for UI display.
-	 *
-	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
-	 *
-	 * @return self
-	 */
-	public function icons( array $icons ): self {
-		$this->icons_value = $icons;
-		return $this;
-	}
-
-	/**
-	 * Set additional metadata.
-	 *
-	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
-	 *
-	 * @return self
-	 */
-	public function meta( array $meta ): self {
-		$this->meta_value = $meta;
-		return $this;
-	}
-
-	/**
-	 * Set the handler callable for prompt execution.
-	 *
-	 * @param callable(array<string, mixed>): array<string, mixed> $handler The handler callable.
-	 *
-	 * @return self
-	 */
-	public function handler( callable $handler ): self {
-		$this->handler = $handler;
-		return $this;
-	}
-
-	/**
-	 * Set the permission check callable.
-	 *
-	 * @param callable(array<string, mixed>): bool $callback The permission callback.
-	 *
-	 * @return self
-	 */
-	public function permission( callable $callback ): self {
-		$this->permission_callback = $callback;
-		return $this;
 	}
 
 	// =========================================================================
@@ -441,7 +280,7 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return \WP\McpSchema\Server\Prompts\Prompt
 	 */
 	public function get_component(): Prompt {
-		return $this->get_prompt();
+		return $this->prompt;
 	}
 
 	/**
@@ -450,10 +289,9 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return string
 	 */
 	public function get_name(): string {
-		$prompt = $this->get_prompt();
-		$title  = $prompt->getTitle();
+		$title = $this->prompt->getTitle();
 
-		return null !== $title && '' !== trim( $title ) ? $title : $prompt->getName();
+		return null !== $title && '' !== trim( $title ) ? $title : $this->prompt->getName();
 	}
 
 	/**
@@ -464,9 +302,6 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return mixed
 	 */
 	public function execute( $arguments ) {
-		$prompt = $this->get_prompt();
-		unset( $prompt );
-
 		$args = $this->unwrap_input_if_needed( $arguments );
 		$args = is_array( $args ) ? $args : array();
 
@@ -525,9 +360,6 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return bool|\WP_Error
 	 */
 	public function check_permission( $arguments ) {
-		$prompt = $this->get_prompt();
-		unset( $prompt );
-
 		$args = $this->unwrap_input_if_needed( $arguments );
 		$args = is_array( $args ) ? $args : array();
 
@@ -604,99 +436,8 @@ final class McpPrompt implements McpComponentInterface {
 	}
 
 	// =========================================================================
-	// Builder Method
-	// =========================================================================
-
-	/**
-	 * Build and cache the Prompt DTO from fluent configuration.
-	 *
-	 * @return self
-	 */
-	private function build(): self {
-		if ( null === $this->name ) {
-			throw new \RuntimeException( 'Prompt name is required. Use create() or fromArray() to set a name.' );
-		}
-
-		$argument_dtos = null;
-		if ( ! empty( $this->arguments_value ) ) {
-			$argument_dtos = array_map(
-				static function ( array $arg ): PromptArgument {
-					return PromptArgument::fromArray(
-						array(
-							'name'        => $arg['name'],
-							'title'       => $arg['title'] ?? null,
-							'description' => $arg['description'] ?? null,
-							'required'    => $arg['required'] ?? null,
-						)
-					);
-				},
-				$this->arguments_value
-			);
-		}
-
-		// Validate and prepare icons if set.
-		$valid_icons = null;
-		if ( ! empty( $this->icons_value ) ) {
-			$icons_result = McpValidator::validate_icons_array( $this->icons_value );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$valid_icons = $icons_result['valid'];
-			}
-		}
-
-		$prompt_data = array(
-			'name'        => $this->name,
-			'description' => $this->description_value,
-			'arguments'   => $argument_dtos,
-		);
-
-		if ( null !== $this->title_value ) {
-			$prompt_data['title'] = $this->title_value;
-		}
-
-			$_meta = $this->meta_value;
-		if ( ! empty( $_meta ) ) {
-			$prompt_data['_meta'] = $_meta;
-		}
-
-		if ( null !== $valid_icons ) {
-			$prompt_data['icons'] = $valid_icons;
-		}
-
-		$this->prompt = Prompt::fromArray( $prompt_data );
-
-		$this->observability_context = array(
-			'component_type' => 'prompt',
-			'prompt_name'    => $this->name,
-			'source'         => 'fluent',
-		);
-
-		$this->adapter_meta = array(
-			'fluent' => true,
-		);
-
-		return $this;
-	}
-
-	// =========================================================================
 	// Private Helper Methods
 	// =========================================================================
-
-	/**
-	 * Get the Prompt DTO, building it if needed.
-	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt
-	 */
-	private function get_prompt(): Prompt {
-		if ( null === $this->prompt && $this->is_fluent ) {
-			$this->build();
-		}
-
-		if ( null === $this->prompt ) {
-			throw new \RuntimeException( 'Prompt DTO not initialized. Use create(), fromArray(), fromAbility(), or fromBuilder().' );
-		}
-
-		return $this->prompt;
-	}
 
 	/**
 	 * Unwrap prompt input arguments when the input schema was transformed (flattened → object wrapper).
@@ -784,6 +525,4 @@ final class McpPrompt implements McpComponentInterface {
 
 		return null;
 	}
-
-	// Intentionally no DTO meta sanitization; `_meta` is passed through unchanged.
 }

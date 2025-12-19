@@ -166,14 +166,16 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_tools_accepts_mcp_tools(): void {
-		$mcp_tool = \WP\MCP\Domain\Tools\McpTool::create( 'direct-mcp-tool' )
-			->description( 'Direct MCP tool' )
-			->handler( static function () {
+		$mcp_tool = \WP\MCP\Domain\Tools\McpTool::fromArray( array(
+			'name'        => 'direct-mcp-tool',
+			'description' => 'Direct MCP tool',
+			'handler'     => static function () {
 				return array( 'ok' => true );
-			} )
-			->permission( static function () {
+			},
+			'permission'  => static function () {
 				return true;
-			} );
+			},
+		) );
 
 		$this->registry->register_tools( array( $mcp_tool ) );
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Unified MCP Tool component with fluent API.
+ * MCP Tool component.
  *
  * @package McpAdapter
  */
@@ -20,22 +20,7 @@ use WP\McpSchema\Server\Tools\ToolAnnotations;
  *
  * This class provides multiple flexible ways to create MCP tools:
  *
- * 1. Fluent API (preferred for direct tools):
- * ```php
- * $tool = McpTool::create('uppercase-text')
- *     ->title('Uppercase Text')
- *     ->description('Converts text to uppercase')
- *     ->inputSchema([
- *         'type' => 'object',
- *         'properties' => ['text' => ['type' => 'string']],
- *         'required' => ['text'],
- *     ])
- *     ->handler(fn($args) => ['result' => strtoupper($args['text'])])
- *     ->permission(fn() => current_user_can('read'))
- *     ->readOnly();
- * ```
- *
- * 2. Array configuration:
+ * 1. Array configuration:
  * ```php
  * $tool = McpTool::fromArray([
  *     'name'        => 'uppercase-text',
@@ -48,7 +33,7 @@ use WP\McpSchema\Server\Tools\ToolAnnotations;
  * ]);
  * ```
  *
- * 3. From WordPress Ability (ability-backed):
+ * 2. From WordPress Ability (ability-backed):
  * ```php
  * $tool = McpTool::fromAbility($ability);
  * ```
@@ -58,82 +43,15 @@ use WP\McpSchema\Server\Tools\ToolAnnotations;
 final class McpTool implements McpComponentInterface {
 
 	// =========================================================================
-	// Fluent Builder Properties
-	// =========================================================================
-
-	/**
-	 * The tool name (unique identifier).
-	 *
-	 * @var string|null
-	 */
-	private ?string $name = null;
-
-	/**
-	 * The tool title (human-readable display name).
-	 *
-	 * @var string|null
-	 */
-	private ?string $title_value = null;
-
-	/**
-	 * The tool description.
-	 *
-	 * @var string|null
-	 */
-	private ?string $description_value = null;
-
-	/**
-	 * The tool input schema (JSON Schema).
-	 *
-	 * @var array<string, mixed>|null
-	 */
-	private ?array $input_schema_value = null;
-
-	/**
-	 * The tool output schema (JSON Schema).
-	 *
-	 * @var array<string, mixed>|null
-	 */
-	private ?array $output_schema_value = null;
-
-	/**
-	 * The tool icons for UI display.
-	 *
-	 * @var array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
-	 */
-	private ?array $icons_value = null;
-
-	/**
-	 * Additional metadata passed through to MCP clients.
-	 *
-	 * @var array<string, mixed>
-	 */
-	private array $meta_value = array();
-
-	/**
-	 * Tool annotations.
-	 *
-	 * @var array{title?: string, readOnlyHint?: bool, destructiveHint?: bool, idempotentHint?: bool, openWorldHint?: bool}
-	 */
-	private array $annotations_value = array();
-
-	/**
-	 * Whether the tool was built using fluent API.
-	 *
-	 * @var bool
-	 */
-	private bool $is_fluent = false;
-
-	// =========================================================================
-	// Runtime Properties (existing functionality)
+	// Runtime Properties
 	// =========================================================================
 
 	/**
 	 * Clean Tool DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Tools\Tool|null
+	 * @var \WP\McpSchema\Server\Tools\Tool
 	 */
-	private ?Tool $tool = null;
+	private Tool $tool;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed tools).
@@ -176,30 +94,16 @@ final class McpTool implements McpComponentInterface {
 
 	/**
 	 * Private constructor - use factory methods.
+	 *
+	 * @param \WP\McpSchema\Server\Tools\Tool $tool The Tool DTO.
 	 */
-	private function __construct() {
-		// Properties remain null - explicit configuration required.
-		// Null handler/permission triggers proper error responses.
+	private function __construct( Tool $tool ) {
+		$this->tool = $tool;
 	}
 
 	// =========================================================================
 	// Factory Methods
 	// =========================================================================
-
-	/**
-	 * Create a new tool definition with fluent API.
-	 *
-	 * @param string $name The unique tool name.
-	 *
-	 * @return self
-	 */
-	public static function create( string $name ): self {
-		$instance            = new self();
-		$instance->name      = $name;
-		$instance->is_fluent = true;
-
-		return $instance;
-	}
 
 	/**
 	 * Create a tool definition from an array configuration.
@@ -230,43 +134,64 @@ final class McpTool implements McpComponentInterface {
 			throw new \InvalidArgumentException( 'Tool configuration must include a callable "handler" field.' );
 		}
 
-		$instance            = new self();
-		$instance->name      = $config['name'];
-		$instance->is_fluent = true;
+		// Prepare input schema - ensure it's an object type for MCP compliance.
+		$input_schema = $config['inputSchema'] ?? array( 'type' => 'object' );
+		if ( ! isset( $input_schema['type'] ) ) {
+			$input_schema['type'] = 'object';
+		}
 
+		// Build tool data array.
+		$tool_data = array(
+			'name'        => $config['name'],
+			'inputSchema' => $input_schema,
+		);
+
+		// Optional fields.
 		if ( isset( $config['title'] ) ) {
-			$instance->title_value = $config['title'];
+			$tool_data['title'] = $config['title'];
 		}
 
 		if ( isset( $config['description'] ) ) {
-			$instance->description_value = $config['description'];
-		}
-
-		if ( isset( $config['inputSchema'] ) && is_array( $config['inputSchema'] ) ) {
-			$instance->input_schema_value = $config['inputSchema'];
+			$tool_data['description'] = $config['description'];
 		}
 
 		if ( isset( $config['outputSchema'] ) && is_array( $config['outputSchema'] ) ) {
-			$instance->output_schema_value = $config['outputSchema'];
+			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) ) {
-			$instance->icons_value = $config['icons'];
+		// Process annotations.
+		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
 		}
 
-		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) ) {
-			$instance->meta_value = $config['meta'];
+		// Validate and prepare icons if set.
+		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$tool_data['icons'] = $icons_result['valid'];
+			}
 		}
 
-		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) ) {
-			$instance->annotations_value = $config['annotations'];
+		// Preserve user-provided _meta as-is.
+		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
+			$tool_data['_meta'] = $config['meta'];
 		}
 
+		// Create the Tool DTO.
+		$tool = Tool::fromArray( $tool_data );
+
+		$instance          = new self( $tool );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
 			$instance->permission_callback = $config['permission'];
 		}
+
+		$instance->observability_context = array(
+			'component_type' => 'tool',
+			'tool_name'      => $config['name'],
+			'source'         => 'array',
+		);
 
 		return $instance;
 	}
@@ -284,200 +209,18 @@ final class McpTool implements McpComponentInterface {
 			return $tool_data;
 		}
 
-		$instance               = new self();
-		$instance->tool         = $tool_data['tool'];
+		$instance               = new self( $tool_data['tool'] );
 		$instance->adapter_meta = $tool_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'tool',
-			'tool_name'      => $instance->tool->getName(),
+			'tool_name'      => $tool_data['tool']->getName(),
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
 
 		return $instance;
-	}
-
-	// =========================================================================
-	// Fluent Setters
-	// =========================================================================
-
-	/**
-	 * Set the tool title.
-	 *
-	 * @param string $title The human-readable title.
-	 *
-	 * @return self
-	 */
-	public function title( string $title ): self {
-		$this->title_value = $title;
-		return $this;
-	}
-
-	/**
-	 * Set the tool description.
-	 *
-	 * @param string $description The tool description.
-	 *
-	 * @return self
-	 */
-	public function description( string $description ): self {
-		$this->description_value = $description;
-		return $this;
-	}
-
-	/**
-	 * Set the input schema (JSON Schema format).
-	 *
-	 * @param array<string, mixed> $schema The input schema.
-	 *
-	 * @return self
-	 */
-	public function inputSchema( array $schema ): self {
-		$this->input_schema_value = $schema;
-		return $this;
-	}
-
-	/**
-	 * Set the output schema (JSON Schema format).
-	 *
-	 * @param array<string, mixed> $schema The output schema.
-	 *
-	 * @return self
-	 */
-	public function outputSchema( array $schema ): self {
-		$this->output_schema_value = $schema;
-		return $this;
-	}
-
-	/**
-	 * Set the tool icons for UI display.
-	 *
-	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
-	 *
-	 * @return self
-	 */
-	public function icons( array $icons ): self {
-		$this->icons_value = $icons;
-		return $this;
-	}
-
-	/**
-	 * Set additional metadata.
-	 *
-	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
-	 *
-	 * @return self
-	 */
-	public function meta( array $meta ): self {
-		$this->meta_value = $meta;
-		return $this;
-	}
-
-	/**
-	 * Set the handler callable for tool execution.
-	 *
-	 * The handler receives the arguments array and should return an array result.
-	 *
-	 * @param callable(array<string, mixed>): array<string, mixed> $handler The handler callable.
-	 *
-	 * @return self
-	 */
-	public function handler( callable $handler ): self {
-		$this->handler = $handler;
-		return $this;
-	}
-
-	/**
-	 * Set the permission check callable.
-	 *
-	 * The permission callback receives the arguments array and should return true
-	 * if the current user has permission to execute the tool.
-	 *
-	 * @param callable(array<string, mixed>): bool $callback The permission callback.
-	 *
-	 * @return self
-	 */
-	public function permission( callable $callback ): self {
-		$this->permission_callback = $callback;
-		return $this;
-	}
-
-	// =========================================================================
-	// Annotation Helpers
-	// =========================================================================
-
-	/**
-	 * Mark the tool as read-only (no side effects).
-	 *
-	 * @param bool $value Whether the tool is read-only.
-	 *
-	 * @return self
-	 */
-	public function readOnly( bool $value = true ): self {
-		$this->annotations_value['readOnlyHint'] = $value;
-		return $this;
-	}
-
-	/**
-	 * Mark the tool as destructive (may cause data loss).
-	 *
-	 * @param bool $value Whether the tool is destructive.
-	 *
-	 * @return self
-	 */
-	public function destructive( bool $value = true ): self {
-		$this->annotations_value['destructiveHint'] = $value;
-		return $this;
-	}
-
-	/**
-	 * Mark the tool as idempotent (safe to retry).
-	 *
-	 * @param bool $value Whether the tool is idempotent.
-	 *
-	 * @return self
-	 */
-	public function idempotent( bool $value = true ): self {
-		$this->annotations_value['idempotentHint'] = $value;
-		return $this;
-	}
-
-	/**
-	 * Mark the tool as operating on an open world (may interact with external entities).
-	 *
-	 * @param bool $value Whether the tool operates on an open world.
-	 *
-	 * @return self
-	 */
-	public function openWorld( bool $value = true ): self {
-		$this->annotations_value['openWorldHint'] = $value;
-		return $this;
-	}
-
-	/**
-	 * Set a custom annotation title.
-	 *
-	 * @param string $title The annotation title.
-	 *
-	 * @return self
-	 */
-	public function annotationTitle( string $title ): self {
-		$this->annotations_value['title'] = $title;
-		return $this;
-	}
-
-	/**
-	 * Set multiple annotations at once.
-	 *
-	 * @param array{title?: string, readOnlyHint?: bool, destructiveHint?: bool, idempotentHint?: bool, openWorldHint?: bool} $annotations The annotations array.
-	 *
-	 * @return self
-	 */
-	public function annotations( array $annotations ): self {
-		$this->annotations_value = array_merge( $this->annotations_value, $annotations );
-		return $this;
 	}
 
 	// =========================================================================
@@ -487,12 +230,10 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * Builds the Tool DTO if using fluent API, otherwise returns the existing DTO.
-	 *
 	 * @return \WP\McpSchema\Server\Tools\Tool
 	 */
 	public function get_component(): Tool {
-		return $this->get_tool();
+		return $this->tool;
 	}
 
 	/**
@@ -501,10 +242,9 @@ final class McpTool implements McpComponentInterface {
 	 * @return string
 	 */
 	public function get_name(): string {
-		$tool  = $this->get_tool();
-		$title = $tool->getTitle();
+		$title = $this->tool->getTitle();
 
-		return null !== $title && '' !== trim( $title ) ? $title : $tool->getName();
+		return null !== $title && '' !== trim( $title ) ? $title : $this->tool->getName();
 	}
 
 	/**
@@ -515,8 +255,6 @@ final class McpTool implements McpComponentInterface {
 	 * @return mixed
 	 */
 	public function execute( $arguments ) {
-		$this->get_tool();
-
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
@@ -566,8 +304,6 @@ final class McpTool implements McpComponentInterface {
 	 * @return bool|\WP_Error
 	 */
 	public function check_permission( $arguments ) {
-		$tool = $this->get_tool();
-
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		// Ability-backed tools delegate to the ability's permission system.
@@ -604,7 +340,7 @@ final class McpTool implements McpComponentInterface {
 			'Access denied.',
 			array(
 				'failure_reason' => 'no_permission_strategy',
-				'tool_name'      => $tool->getName(),
+				'tool_name'      => $this->tool->getName(),
 			)
 		);
 	}
@@ -628,95 +364,8 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	// =========================================================================
-	// Builder Method
-	// =========================================================================
-
-	/**
-	 * Build and cache the Tool DTO from fluent configuration.
-	 *
-	 * @return self
-	 */
-	private function build(): self {
-		if ( null === $this->name ) {
-			throw new \RuntimeException( 'Tool name is required. Use create() or fromArray() to set a name.' );
-		}
-
-		// Prepare input schema - ensure it's an object type for MCP compliance.
-		$input_schema = $this->input_schema_value ?? array( 'type' => 'object' );
-		if ( ! isset( $input_schema['type'] ) ) {
-			$input_schema['type'] = 'object';
-		}
-
-		// Build tool data array.
-		$tool_data = array(
-			'name'        => $this->name,
-			'inputSchema' => $input_schema,
-		);
-
-		// Optional fields.
-		if ( null !== $this->title_value ) {
-			$tool_data['title'] = $this->title_value;
-		}
-
-		if ( null !== $this->description_value ) {
-			$tool_data['description'] = $this->description_value;
-		}
-
-		if ( null !== $this->output_schema_value ) {
-			$tool_data['outputSchema'] = $this->output_schema_value;
-		}
-
-		// Process annotations.
-		if ( ! empty( $this->annotations_value ) ) {
-			$tool_data['annotations'] = ToolAnnotations::fromArray( $this->annotations_value );
-		}
-
-			// Validate and prepare icons if set.
-		if ( ! empty( $this->icons_value ) ) {
-			$icons_result = McpValidator::validate_icons_array( $this->icons_value );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$tool_data['icons'] = $icons_result['valid'];
-			}
-		}
-
-			// Preserve user-provided _meta as-is.
-		if ( ! empty( $this->meta_value ) ) {
-			$tool_data['_meta'] = $this->meta_value;
-		}
-
-		// Create the Tool DTO.
-		$this->tool = Tool::fromArray( $tool_data );
-
-			// Set observability context.
-			$this->observability_context = array(
-				'component_type' => 'tool',
-				'tool_name'      => $this->name,
-				'source'         => 'fluent',
-			);
-
-			return $this;
-	}
-
-	// =========================================================================
 	// Private Helper Methods
 	// =========================================================================
-
-	/**
-	 * Get the Tool DTO, building it if needed.
-	 *
-	 * @return \WP\McpSchema\Server\Tools\Tool
-	 */
-	private function get_tool(): Tool {
-		if ( null === $this->tool && $this->is_fluent ) {
-			$this->build();
-		}
-
-		if ( null === $this->tool ) {
-			throw new \RuntimeException( 'Tool DTO not initialized. Use create(), fromArray(), or fromAbility().' );
-		}
-
-		return $this->tool;
-	}
 
 	/**
 	 * Invoke the permission callback, supporting both 0-arg and 1-arg callables.

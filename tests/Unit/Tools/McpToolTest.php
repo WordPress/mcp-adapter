@@ -120,19 +120,21 @@ final class McpToolTest extends TestCase {
 		wp_unregister_ability( 'test/mcptool-flat-permission' );
 	}
 
-	public function test_fluent_api_executes_handler_and_checks_permission(): void {
-		$tool = McpTool::create( 'mcptool-direct' )
-			->description( 'Direct callable tool' )
-			->inputSchema( array(
+	public function test_fromArray_executes_handler_and_checks_permission(): void {
+		$tool = McpTool::fromArray( array(
+			'name'        => 'mcptool-direct',
+			'description' => 'Direct callable tool',
+			'inputSchema' => array(
 				'type'       => 'object',
 				'properties' => array(
 					'value' => array( 'type' => 'string' ),
 				),
-			) )
-			->handler( static function ( $args ) {
+			),
+			'handler'     => static function ( $args ) {
 				return array( 'uppercased' => strtoupper( $args['value'] ?? '' ) );
-			} )
-			->permission( fn() => true );
+			},
+			'permission'  => fn() => true,
+		) );
 
 		$this->assertTrue( $tool->check_permission( array( 'value' => 'hello' ) ) );
 
@@ -141,15 +143,17 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( array( 'uppercased' => 'HELLO' ), $result );
 	}
 
-	public function test_fluent_api_uses_permission_callback(): void {
-		$tool = McpTool::create( 'mcptool-direct-permission' )
-			->description( 'Direct callable tool with permission callback' )
-			->handler( static function () {
+	public function test_fromArray_uses_permission_callback(): void {
+		$tool = McpTool::fromArray( array(
+			'name'        => 'mcptool-direct-permission',
+			'description' => 'Direct callable tool with permission callback',
+			'handler'     => static function () {
 				return array( 'ok' => true );
-			} )
-			->permission( static function ( $args ) {
+			},
+			'permission'  => static function ( $args ) {
 				return isset( $args['allowed'] ) && true === $args['allowed'];
-			} );
+			},
+		) );
 
 		$this->assertTrue( $tool->check_permission( array( 'allowed' => true ) ) );
 		$this->assertFalse( $tool->check_permission( array( 'allowed' => false ) ) );
@@ -157,12 +161,14 @@ final class McpToolTest extends TestCase {
 	}
 
 	// =========================================================================
-	// New Fluent API Tests
+	// fromArray Tests
 	// =========================================================================
 
-	public function test_create_builds_minimal_tool(): void {
-		$tool = McpTool::create( 'minimal-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) );
+	public function test_fromArray_builds_minimal_tool(): void {
+		$tool = McpTool::fromArray( array(
+			'name'    => 'minimal-tool',
+			'handler' => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$dto = $tool->get_component();
 
@@ -176,26 +182,28 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'object', $input_schema['type'] );
 	}
 
-	public function test_create_with_all_fluent_setters(): void {
-		$tool = McpTool::create( 'full-featured-tool' )
-			->title( 'Full Featured Tool' )
-			->description( 'A comprehensive test tool' )
-			->inputSchema( array(
+	public function test_fromArray_with_all_options(): void {
+		$tool = McpTool::fromArray( array(
+			'name'         => 'full-featured-tool',
+			'title'        => 'Full Featured Tool',
+			'description'  => 'A comprehensive test tool',
+			'inputSchema'  => array(
 				'type'       => 'object',
 				'properties' => array(
 					'text' => array( 'type' => 'string' ),
 				),
 				'required'   => array( 'text' ),
-			) )
-			->outputSchema( array(
+			),
+			'outputSchema' => array(
 				'type'       => 'object',
 				'properties' => array(
 					'result' => array( 'type' => 'string' ),
 				),
-			) )
-			->meta( array( 'custom_key' => 'custom_value' ) )
-			->handler( fn( $args ) => array( 'result' => strtoupper( $args['text'] ) ) )
-			->permission( fn( $args ) => true );
+			),
+			'meta'         => array( 'custom_key' => 'custom_value' ),
+			'handler'      => fn( $args ) => array( 'result' => strtoupper( $args['text'] ) ),
+			'permission'   => fn( $args ) => true,
+		) );
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -218,12 +226,16 @@ final class McpToolTest extends TestCase {
 			$this->assertSame( 'custom_value', $data['_meta']['custom_key'] );
 	}
 
-	public function test_create_with_annotation_helpers(): void {
-		$tool = McpTool::create( 'annotated-tool' )
-			->description( 'A tool with annotations' )
-			->readOnly()
-			->idempotent()
-			->handler( fn( $args ) => array( 'ok' => true ) );
+	public function test_fromArray_with_annotations(): void {
+		$tool = McpTool::fromArray( array(
+			'name'        => 'annotated-tool',
+			'description' => 'A tool with annotations',
+			'annotations' => array(
+				'readOnlyHint'   => true,
+				'idempotentHint' => true,
+			),
+			'handler'     => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -233,12 +245,16 @@ final class McpToolTest extends TestCase {
 		$this->assertTrue( $data['annotations']['idempotentHint'] );
 	}
 
-	public function test_create_destructive_tool(): void {
-		$tool = McpTool::create( 'destructive-tool' )
-			->description( 'Deletes data' )
-			->destructive()
-			->openWorld()
-			->handler( fn( $args ) => array( 'deleted' => true ) );
+	public function test_fromArray_with_destructive_annotations(): void {
+		$tool = McpTool::fromArray( array(
+			'name'        => 'destructive-tool',
+			'description' => 'Deletes data',
+			'annotations' => array(
+				'destructiveHint' => true,
+				'openWorldHint'   => true,
+			),
+			'handler'     => fn( $args ) => array( 'deleted' => true ),
+		) );
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -248,16 +264,18 @@ final class McpToolTest extends TestCase {
 		$this->assertTrue( $data['annotations']['openWorldHint'] );
 	}
 
-	public function test_create_with_all_annotations(): void {
-		$tool = McpTool::create( 'all-annotations-tool' )
-			->annotations( array(
+	public function test_fromArray_with_all_annotations(): void {
+		$tool = McpTool::fromArray( array(
+			'name'        => 'all-annotations-tool',
+			'annotations' => array(
 				'title'           => 'Custom Annotation Title',
 				'readOnlyHint'    => false,
 				'destructiveHint' => true,
 				'idempotentHint'  => true,
 				'openWorldHint'   => false,
-			) )
-			->handler( fn( $args ) => array( 'ok' => true ) );
+			),
+			'handler'     => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$dto  = $tool->get_component();
 		$data = $dto->toArray();
@@ -269,15 +287,17 @@ final class McpToolTest extends TestCase {
 		$this->assertFalse( $data['annotations']['openWorldHint'] );
 	}
 
-	public function test_create_executes_handler(): void {
-		$tool = McpTool::create( 'executable-tool' )
-			->inputSchema( array(
+	public function test_fromArray_executes_handler(): void {
+		$tool = McpTool::fromArray( array(
+			'name'        => 'executable-tool',
+			'inputSchema' => array(
 				'type'       => 'object',
 				'properties' => array(
 					'name' => array( 'type' => 'string' ),
 				),
-			) )
-			->handler( fn( $args ) => array( 'greeting' => 'Hello, ' . ( $args['name'] ?? 'World' ) ) );
+			),
+			'handler'     => fn( $args ) => array( 'greeting' => 'Hello, ' . ( $args['name'] ?? 'World' ) ),
+		) );
 
 		$result = $tool->execute( array( 'name' => 'Claude' ) );
 
@@ -285,19 +305,23 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( array( 'greeting' => 'Hello, Claude' ), $result );
 	}
 
-	public function test_create_checks_permission(): void {
-		$tool = McpTool::create( 'permission-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) )
-			->permission( fn( $args ) => ( $args['secret'] ?? '' ) === 'password123' );
+	public function test_fromArray_checks_permission(): void {
+		$tool = McpTool::fromArray( array(
+			'name'       => 'permission-tool',
+			'handler'    => fn( $args ) => array( 'ok' => true ),
+			'permission' => fn( $args ) => ( $args['secret'] ?? '' ) === 'password123',
+		) );
 
 		$this->assertTrue( $tool->check_permission( array( 'secret' => 'password123' ) ) );
 		$this->assertFalse( $tool->check_permission( array( 'secret' => 'wrong' ) ) );
 		$this->assertFalse( $tool->check_permission( array() ) );
 	}
 
-	public function test_no_default_permission_denies_access(): void {
-		$tool = McpTool::create( 'no-permission-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) );
+	public function test_no_permission_callback_denies_access(): void {
+		$tool = McpTool::fromArray( array(
+			'name'    => 'no-permission-tool',
+			'handler' => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		// Without explicit permission callback, access should be denied.
 		$result = $tool->check_permission( array() );
@@ -306,32 +330,29 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_explicit_permission_allows_access(): void {
-		$tool = McpTool::create( 'public-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) )
-			->permission( fn() => true );
+		$tool = McpTool::fromArray( array(
+			'name'       => 'public-tool',
+			'handler'    => fn( $args ) => array( 'ok' => true ),
+			'permission' => fn() => true,
+		) );
 
 		// Explicit permission callback allowing access.
 		$this->assertTrue( $tool->check_permission( array() ) );
 		$this->assertTrue( $tool->check_permission( array( 'any' => 'value' ) ) );
 	}
 
-	public function test_create_observability_context(): void {
-		$tool = McpTool::create( 'observable-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) );
-
-		// Trigger build by getting component
-		$tool->get_component();
+	public function test_fromArray_observability_context(): void {
+		$tool = McpTool::fromArray( array(
+			'name'    => 'observable-tool',
+			'handler' => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$context = $tool->get_observability_context();
 
 		$this->assertSame( 'tool', $context['component_type'] );
 		$this->assertSame( 'observable-tool', $context['tool_name'] );
-		$this->assertSame( 'fluent', $context['source'] );
+		$this->assertSame( 'array', $context['source'] );
 	}
-
-	// =========================================================================
-	// fromArray Tests
-	// =========================================================================
 
 	public function test_fromArray_creates_tool(): void {
 		$tool = McpTool::fromArray( array(
@@ -399,16 +420,20 @@ final class McpToolTest extends TestCase {
 	// =========================================================================
 
 	public function test_get_name_returns_title_when_set(): void {
-		$tool = McpTool::create( 'tool-id' )
-			->title( 'Human Readable Title' )
-			->handler( fn( $args ) => array( 'ok' => true ) );
+		$tool = McpTool::fromArray( array(
+			'name'    => 'tool-id',
+			'title'   => 'Human Readable Title',
+			'handler' => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$this->assertSame( 'Human Readable Title', $tool->get_name() );
 	}
 
 	public function test_get_name_returns_name_when_no_title(): void {
-		$tool = McpTool::create( 'tool-id' )
-			->handler( fn( $args ) => array( 'ok' => true ) );
+		$tool = McpTool::fromArray( array(
+			'name'    => 'tool-id',
+			'handler' => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$this->assertSame( 'tool-id', $tool->get_name() );
 	}
@@ -418,8 +443,10 @@ final class McpToolTest extends TestCase {
 	// =========================================================================
 
 	public function test_execute_catches_handler_exceptions(): void {
-		$tool = McpTool::create( 'throwing-tool' )
-			->handler( fn( $args ) => throw new \RuntimeException( 'Handler exploded' ) );
+		$tool = McpTool::fromArray( array(
+			'name'    => 'throwing-tool',
+			'handler' => fn( $args ) => throw new \RuntimeException( 'Handler exploded' ),
+		) );
 
 		$result = $tool->execute( array() );
 
@@ -429,9 +456,11 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_check_permission_catches_exceptions(): void {
-		$tool = McpTool::create( 'throwing-permission-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) )
-			->permission( fn( $args ) => throw new \RuntimeException( 'Permission check exploded' ) );
+		$tool = McpTool::fromArray( array(
+			'name'       => 'throwing-permission-tool',
+			'handler'    => fn( $args ) => array( 'ok' => true ),
+			'permission' => fn( $args ) => throw new \RuntimeException( 'Permission check exploded' ),
+		) );
 
 		$result = $tool->check_permission( array() );
 
@@ -445,8 +474,10 @@ final class McpToolTest extends TestCase {
 	// =========================================================================
 
 	public function test_execute_wraps_scalar_results(): void {
-		$tool = McpTool::create( 'scalar-result-tool' )
-			->handler( fn( $args ) => 'just a string' );
+		$tool = McpTool::fromArray( array(
+			'name'    => 'scalar-result-tool',
+			'handler' => fn( $args ) => 'just a string',
+		) );
 
 		$result = $tool->execute( array() );
 
@@ -455,8 +486,10 @@ final class McpToolTest extends TestCase {
 	}
 
 	public function test_execute_preserves_array_results(): void {
-		$tool = McpTool::create( 'array-result-tool' )
-			->handler( fn( $args ) => array( 'custom' => 'response', 'items' => array( 1, 2, 3 ) ) );
+		$tool = McpTool::fromArray( array(
+			'name'    => 'array-result-tool',
+			'handler' => fn( $args ) => array( 'custom' => 'response', 'items' => array( 1, 2, 3 ) ),
+		) );
 
 		$result = $tool->execute( array() );
 
@@ -468,27 +501,14 @@ final class McpToolTest extends TestCase {
 	// =========================================================================
 
 	/**
-	 * Verify that no default handler is set.
-	 * Tools must explicitly configure a handler or ability.
-	 */
-	public function test_no_default_handler_returns_error(): void {
-		$tool = McpTool::create( 'no-handler-tool' )
-			->permission( fn() => true );
-
-		$result = $tool->execute( array() );
-
-		$this->assertInstanceOf( \WP_Error::class, $result );
-		$this->assertSame( 'mcp_tool_no_handler', $result->get_error_code() );
-		$this->assertStringContainsString( 'No tool execution strategy', $result->get_error_message() );
-	}
-
-	/**
 	 * Verify that no default permission callback is set.
 	 * Tools must explicitly configure permissions for security.
 	 */
 	public function test_no_default_permission_returns_error(): void {
-		$tool = McpTool::create( 'no-permission-tool' )
-			->handler( fn( $args ) => array( 'ok' => true ) );
+		$tool = McpTool::fromArray( array(
+			'name'    => 'no-permission-tool',
+			'handler' => fn( $args ) => array( 'ok' => true ),
+		) );
 
 		$result = $tool->check_permission( array() );
 
