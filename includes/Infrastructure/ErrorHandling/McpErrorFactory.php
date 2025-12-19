@@ -55,7 +55,7 @@ class McpErrorFactory {
 	public static function create_error( int $code, string $message, $data = null ): Error {
 		return Error::fromArray(
 			array(
-				'code'    => (float) $code,
+				'code'    => $code,
 				'message' => $message,
 				'data'    => $data,
 			)
