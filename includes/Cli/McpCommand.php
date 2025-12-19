@@ -108,6 +108,29 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	}
 
 	/**
+	 * Get a user by ID, login, or email.
+	 *
+	 * @param string $user User identifier (ID, login, or email).
+	 *
+	 * @return \WP_User|false User object or false if not found.
+	 */
+	private function get_user( string $user ) {
+		// Try as ID first
+		if ( is_numeric( $user ) ) {
+			return get_user_by( 'id', (int) $user );
+		}
+
+		// Try as login
+		$user_obj = get_user_by( 'login', $user );
+		if ( $user_obj ) {
+			return $user_obj;
+		}
+
+		// Try as email
+		return get_user_by( 'email', $user );
+	}
+
+	/**
 	 * List all registered MCP servers.
 	 *
 	 * ## OPTIONS
@@ -141,6 +164,7 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 
 		if ( empty( $servers ) ) {
 			\WP_CLI::line( 'No MCP servers registered.' );
+
 			return;
 		}
 
@@ -159,27 +183,5 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 
 		$format = $assoc_args['format'] ?? 'table';
 		format_items( $format, $items, array( 'ID', 'Name', 'Version', 'Tools', 'Resources', 'Prompts' ) );
-	}
-
-	/**
-	 * Get a user by ID, login, or email.
-	 *
-	 * @param string $user User identifier (ID, login, or email).
-	 * @return \WP_User|false User object or false if not found.
-	 */
-	private function get_user( string $user ) {
-		// Try as ID first
-		if ( is_numeric( $user ) ) {
-			return get_user_by( 'id', (int) $user );
-		}
-
-		// Try as login
-		$user_obj = get_user_by( 'login', $user );
-		if ( $user_obj ) {
-			return $user_obj;
-		}
-
-		// Try as email
-		return get_user_by( 'email', $user );
 	}
 }

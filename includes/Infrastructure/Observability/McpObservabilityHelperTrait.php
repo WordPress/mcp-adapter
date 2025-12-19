@@ -20,7 +20,7 @@ trait McpObservabilityHelperTrait {
 	 * Error categories keyed by throwable class name.
 	 *
 	 * @used-by ::categorize_error() method.
-	*/
+	 */
 	private static array $error_categories = array(
 		\ArgumentCountError::class       => 'arguments',
 		\Error::class                    => 'system',
@@ -29,6 +29,42 @@ trait McpObservabilityHelperTrait {
 		\RuntimeException::class         => 'execution',
 		\TypeError::class                => 'type',
 	);
+
+	/**
+	 * Format metric name to follow consistent naming conventions.
+	 *
+	 * @param string $metric The raw metric name.
+	 *
+	 * @return string
+	 */
+	public static function format_metric_name( string $metric ): string {
+		// Ensure metric starts with 'mcp.' prefix.
+		if ( ! str_starts_with( $metric, 'mcp.' ) ) {
+			$metric = 'mcp.' . $metric;
+		}
+
+		// Convert to lowercase and replace spaces/special chars with dots.
+		$metric = strtolower( $metric );
+		$metric = (string) preg_replace( '/[^a-z0-9_\.]/', '.', $metric );
+		$metric = (string) preg_replace( '/\.+/', '.', $metric ); // Remove duplicate dots.
+		// Remove leading/trailing dots.
+
+		return trim( $metric, '.' );
+	}
+
+	/**
+	 * Merge default tags with provided tags.
+	 *
+	 * @param array $tags The user-provided tags.
+	 *
+	 * @return array
+	 */
+	public static function merge_tags( array $tags ): array {
+		$default_tags = self::get_default_tags();
+		$merged_tags  = array_merge( $default_tags, $tags );
+
+		return self::sanitize_tags( $merged_tags );
+	}
 
 	/**
 	 * Get default tags that should be included with all metrics.
@@ -77,42 +113,6 @@ trait McpObservabilityHelperTrait {
 		}
 
 		return $sanitized;
-	}
-
-	/**
-	 * Format metric name to follow consistent naming conventions.
-	 *
-	 * @param string $metric The raw metric name.
-	 *
-	 * @return string
-	 */
-	public static function format_metric_name( string $metric ): string {
-		// Ensure metric starts with 'mcp.' prefix.
-		if ( ! str_starts_with( $metric, 'mcp.' ) ) {
-			$metric = 'mcp.' . $metric;
-		}
-
-		// Convert to lowercase and replace spaces/special chars with dots.
-		$metric = strtolower( $metric );
-		$metric = (string) preg_replace( '/[^a-z0-9_\.]/', '.', $metric );
-		$metric = (string) preg_replace( '/\.+/', '.', $metric ); // Remove duplicate dots.
-		// Remove leading/trailing dots.
-
-		return trim( $metric, '.' );
-	}
-
-	/**
-	 * Merge default tags with provided tags.
-	 *
-	 * @param array $tags The user-provided tags.
-	 *
-	 * @return array
-	 */
-	public static function merge_tags( array $tags ): array {
-		$default_tags = self::get_default_tags();
-		$merged_tags  = array_merge( $default_tags, $tags );
-
-		return self::sanitize_tags( $merged_tags );
 	}
 
 	/**

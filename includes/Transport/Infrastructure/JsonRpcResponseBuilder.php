@@ -83,19 +83,6 @@ class JsonRpcResponseBuilder {
 	}
 
 	/**
-	 * Determine if a request body represents a batch request.
-	 *
-	 * Per JSON-RPC 2.0 specification, a batch request is an array with at least one element.
-	 *
-	 * @param mixed $body The decoded request body.
-	 *
-	 * @return bool True if this is a batch request.
-	 */
-	public static function is_batch_request( $body ): bool {
-		return is_array( $body ) && isset( $body[0] );
-	}
-
-	/**
 	 * Normalize request body to an array of messages.
 	 *
 	 * Converts single messages to an array for uniform processing.
@@ -106,5 +93,18 @@ class JsonRpcResponseBuilder {
 	 */
 	public static function normalize_messages( $body ): array {
 		return self::is_batch_request( $body ) ? $body : array( $body );
+	}
+
+	/**
+	 * Determine if a request body represents a batch request.
+	 *
+	 * Per JSON-RPC 2.0 specification, a batch request is an array with at least one element.
+	 *
+	 * @param mixed $body The decoded request body.
+	 *
+	 * @return bool True if this is a batch request.
+	 */
+	public static function is_batch_request( $body ): bool {
+		return is_array( $body ) && isset( $body[0] );
 	}
 }

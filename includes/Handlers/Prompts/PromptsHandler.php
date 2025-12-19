@@ -7,14 +7,14 @@
 
 declare( strict_types=1 );
 
-	namespace WP\MCP\Handlers\Prompts;
+namespace WP\MCP\Handlers\Prompts;
 
-	use WP\MCP\Core\McpServer;
-	use WP\MCP\Handlers\HandlerHelperTrait;
-	use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-	use WP\McpSchema\Server\Prompts\GetPromptResult;
-	use WP\McpSchema\Server\Prompts\ListPromptsResult;
-	use WP\McpSchema\Server\Prompts\Prompt;
+use WP\MCP\Core\McpServer;
+use WP\MCP\Handlers\HandlerHelperTrait;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Server\Prompts\GetPromptResult;
+use WP\McpSchema\Server\Prompts\ListPromptsResult;
+use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptMessage;
 
 /**
@@ -60,7 +60,7 @@ class PromptsHandler {
 	/**
 	 * Handles the prompts/get request.
 	 *
-	 * @param array $params     Request parameters.
+	 * @param array $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse Response with prompt execution results or error.

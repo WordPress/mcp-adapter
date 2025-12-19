@@ -22,7 +22,7 @@ class ErrorLogMcpErrorHandler implements Contracts\McpErrorHandlerInterface {
 	 * Log with context.
 	 *
 	 * @param string $message The log message.
-	 * @param array  $context Additional context data.
+	 * @param array $context Additional context data.
 	 * @param string $type The type of log (e.g., 'error', 'info', etc.). Default is 'error'.
 	 *
 	 * @return void

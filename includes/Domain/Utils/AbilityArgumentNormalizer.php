@@ -26,12 +26,12 @@ class AbilityArgumentNormalizer {
 	 * If the ability has no input schema, empty arrays are converted to null.
 	 * This ensures compatibility with abilities that don't accept parameters.
 	 *
-	 * @since n.e.x.t
-	 *
-	 * @param \WP_Ability $ability    The ability to normalize parameters for.
-	 * @param mixed       $parameters The parameters to normalize.
+	 * @param \WP_Ability $ability The ability to normalize parameters for.
+	 * @param mixed $parameters The parameters to normalize.
 	 *
 	 * @return mixed Normalized parameters (null if ability has no schema and params are empty).
+	 * @since n.e.x.t
+	 *
 	 */
 	public static function normalize( \WP_Ability $ability, $parameters ) {
 		$input_schema = $ability->get_input_schema();

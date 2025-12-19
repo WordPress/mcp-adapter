@@ -35,40 +35,38 @@ class McpErrorFactory {
 	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
 	 * Using conservative, well-established error codes only.
 	 */
-	public const SERVER_ERROR       = -32000; // Generic server error (includes MCP disabled)
-	public const TIMEOUT_ERROR      = -32001; // Request timeout
-	public const RESOURCE_NOT_FOUND = -32002; // Resource not found
-	public const TOOL_NOT_FOUND     = -32003; // Tool not found
-	public const PROMPT_NOT_FOUND   = -32004; // Prompt not found
-	public const PERMISSION_DENIED  = -32008; // Access denied/forbidden
-	public const UNAUTHORIZED       = -32010; // Authentication required
+	public const SERVER_ERROR       = - 32000; // Generic server error (includes MCP disabled)
+	public const TIMEOUT_ERROR      = - 32001; // Request timeout
+	public const RESOURCE_NOT_FOUND = - 32002; // Resource not found
+	public const TOOL_NOT_FOUND     = - 32003; // Tool not found
+	public const PROMPT_NOT_FOUND   = - 32004; // Prompt not found
+	public const PERMISSION_DENIED  = - 32008; // Access denied/forbidden
+	public const UNAUTHORIZED       = - 32010; // Authentication required
 
 	/**
-	 * Create an Error DTO.
+	 * Create a parse error response.
 	 *
-	 * @param int        $code    The error code.
-	 * @param string     $message The error message.
-	 * @param mixed|null $data    Optional additional error data.
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
 	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\Error
+	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
-	public static function create_error( int $code, string $message, $data = null ): Error {
-		return Error::fromArray(
-			array(
-				'code'    => $code,
-				'message' => $message,
-				'data'    => $data,
-			)
-		);
+	public static function parse_error( $id, string $details = '' ): JSONRPCErrorResponse {
+		$message = __( 'Parse error', 'mcp-adapter' );
+		if ( $details ) {
+			$message .= ': ' . $details;
+		}
+
+		return self::create_error_response( $id, self::PARSE_ERROR, $message );
 	}
 
 	/**
 	 * Create a standardized JSON-RPC error response DTO.
 	 *
-	 * @param string|int|null $id      The request ID (JSON-RPC allows string, int, or null).
-	 * @param int             $code    The error code.
-	 * @param string          $message The error message.
-	 * @param mixed|null      $data    Optional additional error data.
+	 * @param string|int|null $id The request ID (JSON-RPC allows string, int, or null).
+	 * @param int $code The error code.
+	 * @param string $message The error message.
+	 * @param mixed|null $data Optional additional error data.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -83,44 +81,29 @@ class McpErrorFactory {
 	}
 
 	/**
-	 * Create a parse error response.
+	 * Create an Error DTO.
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Optional additional details.
+	 * @param int $code The error code.
+	 * @param string $message The error message.
+	 * @param mixed|null $data Optional additional error data.
 	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\Common\JsonRpc\Error
 	 */
-	public static function parse_error( $id, string $details = '' ): JSONRPCErrorResponse {
-		$message = __( 'Parse error', 'mcp-adapter' );
-		if ( $details ) {
-			$message .= ': ' . $details;
-		}
-
-		return self::create_error_response( $id, self::PARSE_ERROR, $message );
-	}
-
-	/**
-	 * Create an invalid request error response.
-	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Optional additional details.
-	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
-	 */
-	public static function invalid_request( $id, string $details = '' ): JSONRPCErrorResponse {
-		$message = __( 'Invalid Request', 'mcp-adapter' );
-		if ( $details ) {
-			$message .= ': ' . $details;
-		}
-
-		return self::create_error_response( $id, self::INVALID_REQUEST, $message );
+	public static function create_error( int $code, string $message, $data = null ): Error {
+		return Error::fromArray(
+			array(
+				'code'    => $code,
+				'message' => $message,
+				'data'    => $data,
+			)
+		);
 	}
 
 	/**
 	 * Create a method not found error response.
 	 *
-	 * @param string|int|null $id     The request ID.
-	 * @param string          $method The method that was not found.
+	 * @param string|int|null $id The request ID.
+	 * @param string $method The method that was not found.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -129,7 +112,7 @@ class McpErrorFactory {
 			$id,
 			self::METHOD_NOT_FOUND,
 			sprintf(
-				/* translators: %s: method name */
+			/* translators: %s: method name */
 				__( 'Method not found: %s', 'mcp-adapter' ),
 				$method
 			)
@@ -139,8 +122,8 @@ class McpErrorFactory {
 	/**
 	 * Create an invalid params error response.
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Optional additional details.
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -156,8 +139,8 @@ class McpErrorFactory {
 	/**
 	 * Create an internal error response.
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Optional additional details.
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -188,8 +171,8 @@ class McpErrorFactory {
 	/**
 	 * Create a validation error response (uses standard invalid params error).
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Validation error details.
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Validation error details.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -198,7 +181,7 @@ class McpErrorFactory {
 			$id,
 			self::INVALID_PARAMS,
 			sprintf(
-				/* translators: %s: validation details */
+			/* translators: %s: validation details */
 				__( 'Validation error: %s', 'mcp-adapter' ),
 				$details
 			)
@@ -208,8 +191,8 @@ class McpErrorFactory {
 	/**
 	 * Create a missing parameter error response.
 	 *
-	 * @param string|int|null $id        The request ID.
-	 * @param string          $parameter The missing parameter name.
+	 * @param string|int|null $id The request ID.
+	 * @param string $parameter The missing parameter name.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -218,7 +201,7 @@ class McpErrorFactory {
 			$id,
 			self::INVALID_PARAMS,
 			sprintf(
-				/* translators: %s: parameter name */
+			/* translators: %s: parameter name */
 				__( 'Missing required parameter: %s', 'mcp-adapter' ),
 				$parameter
 			)
@@ -228,8 +211,8 @@ class McpErrorFactory {
 	/**
 	 * Create a resource not found error response.
 	 *
-	 * @param string|int|null $id           The request ID.
-	 * @param string          $resource_uri The resource identifier.
+	 * @param string|int|null $id The request ID.
+	 * @param string $resource_uri The resource identifier.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -238,7 +221,7 @@ class McpErrorFactory {
 			$id,
 			self::RESOURCE_NOT_FOUND,
 			sprintf(
-				/* translators: %s: resource identifier */
+			/* translators: %s: resource identifier */
 				__( 'Resource not found: %s', 'mcp-adapter' ),
 				$resource_uri
 			)
@@ -248,8 +231,8 @@ class McpErrorFactory {
 	/**
 	 * Create a tool not found error response.
 	 *
-	 * @param string|int|null $id   The request ID.
-	 * @param string          $tool The tool name.
+	 * @param string|int|null $id The request ID.
+	 * @param string $tool The tool name.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -258,7 +241,7 @@ class McpErrorFactory {
 			$id,
 			self::TOOL_NOT_FOUND,
 			sprintf(
-				/* translators: %s: tool name */
+			/* translators: %s: tool name */
 				__( 'Tool not found: %s', 'mcp-adapter' ),
 				$tool
 			)
@@ -268,8 +251,8 @@ class McpErrorFactory {
 	/**
 	 * Create an ability not found error response.
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $ability The ability name.
+	 * @param string|int|null $id The request ID.
+	 * @param string $ability The ability name.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -278,7 +261,7 @@ class McpErrorFactory {
 			$id,
 			self::TOOL_NOT_FOUND,
 			sprintf(
-				/* translators: %s: ability name */
+			/* translators: %s: ability name */
 				__( 'Ability not found: %s', 'mcp-adapter' ),
 				$ability
 			)
@@ -288,8 +271,8 @@ class McpErrorFactory {
 	/**
 	 * Create a prompt not found error response.
 	 *
-	 * @param string|int|null $id     The request ID.
-	 * @param string          $prompt The prompt name.
+	 * @param string|int|null $id The request ID.
+	 * @param string $prompt The prompt name.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -298,7 +281,7 @@ class McpErrorFactory {
 			$id,
 			self::PROMPT_NOT_FOUND,
 			sprintf(
-				/* translators: %s: prompt name */
+			/* translators: %s: prompt name */
 				__( 'Prompt not found: %s', 'mcp-adapter' ),
 				$prompt
 			)
@@ -308,8 +291,8 @@ class McpErrorFactory {
 	/**
 	 * Create a permission denied error response.
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Optional additional details.
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -325,8 +308,8 @@ class McpErrorFactory {
 	/**
 	 * Create an unauthorized error response.
 	 *
-	 * @param string|int|null $id      The request ID.
-	 * @param string          $details Optional additional details.
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
 	 *
 	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
 	 */
@@ -337,6 +320,31 @@ class McpErrorFactory {
 		}
 
 		return self::create_error_response( $id, self::UNAUTHORIZED, $message );
+	}
+
+	/**
+	 * Determine if an MCP error should return HTTP 200 or an HTTP error status.
+	 *
+	 * This method helps distinguish between transport-level errors (which should
+	 * return HTTP error codes) and application-level errors (which should return
+	 * HTTP 200 with a JSON-RPC error response).
+	 *
+	 * @param \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse|array $error_response The MCP error response (DTO or array).
+	 *
+	 * @return int The appropriate HTTP status code.
+	 */
+	public static function get_http_status_for_error( $error_response ): int {
+		// Handle DTO
+		if ( $error_response instanceof JSONRPCErrorResponse ) {
+			return self::mcp_error_to_http_status( $error_response->getError()->getCode() );
+		}
+
+		// Handle legacy array format
+		if ( ! isset( $error_response['error']['code'] ) ) {
+			return 500; // Invalid error response structure
+		}
+
+		return self::mcp_error_to_http_status( $error_response['error']['code'] );
 	}
 
 	/**
@@ -392,31 +400,6 @@ class McpErrorFactory {
 	}
 
 	/**
-	 * Determine if an MCP error should return HTTP 200 or an HTTP error status.
-	 *
-	 * This method helps distinguish between transport-level errors (which should
-	 * return HTTP error codes) and application-level errors (which should return
-	 * HTTP 200 with a JSON-RPC error response).
-	 *
-	 * @param \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse|array $error_response The MCP error response (DTO or array).
-	 *
-	 * @return int The appropriate HTTP status code.
-	 */
-	public static function get_http_status_for_error( $error_response ): int {
-		// Handle DTO
-		if ( $error_response instanceof JSONRPCErrorResponse ) {
-			return self::mcp_error_to_http_status( $error_response->getError()->getCode() );
-		}
-
-		// Handle legacy array format
-		if ( ! isset( $error_response['error']['code'] ) ) {
-			return 500; // Invalid error response structure
-		}
-
-		return self::mcp_error_to_http_status( $error_response['error']['code'] );
-	}
-
-	/**
 	 * Validate JSON-RPC message structure.
 	 *
 	 * @param mixed $message The message to validate.
@@ -433,7 +416,7 @@ class McpErrorFactory {
 			return self::invalid_request(
 				0,
 				sprintf(
-					/* translators: %s: JSON-RPC version */
+				/* translators: %s: JSON-RPC version */
 					__( 'jsonrpc version must be "%s"', 'mcp-adapter' ),
 					McpConstants::JSONRPC_VERSION
 				)
@@ -454,5 +437,22 @@ class McpErrorFactory {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Create an invalid request error response.
+	 *
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
+	 *
+	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
+	 */
+	public static function invalid_request( $id, string $details = '' ): JSONRPCErrorResponse {
+		$message = __( 'Invalid Request', 'mcp-adapter' );
+		if ( $details ) {
+			$message .= ': ' . $details;
+		}
+
+		return self::create_error_response( $id, self::INVALID_REQUEST, $message );
 	}
 }

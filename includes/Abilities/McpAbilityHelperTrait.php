@@ -58,6 +58,7 @@ trait McpAbilityHelperTrait {
 	 */
 	protected static function is_ability_mcp_public( \WP_Ability $ability ): bool {
 		$meta = $ability->get_meta();
+
 		return (bool) ( $meta['mcp']['public'] ?? false );
 	}
 

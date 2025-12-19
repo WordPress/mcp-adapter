@@ -84,15 +84,15 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 */
 	protected ?array $icons = null;
 
-		/**
-		 * Additional metadata passed through to MCP clients.
-		 *
-		 * Use this to attach purpose-specific metadata that MCP clients can consume.
-		 * Keys are passed through unchanged.
-		 *
-		 * @since n.e.x.t
-		 *
-		 * @var array<string, mixed>
+	/**
+	 * Additional metadata passed through to MCP clients.
+	 *
+	 * Use this to attach purpose-specific metadata that MCP clients can consume.
+	 * Keys are passed through unchanged.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var array<string, mixed>
 	 */
 	protected array $meta = array();
 
@@ -108,6 +108,17 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	final public function __construct() {
 		$this->configure();
 	}
+
+	/**
+	 * Configure the prompt properties.
+	 *
+	 * Subclasses must implement this method to set the name, title,
+	 * description, and arguments for the prompt. This method is called
+	 * exactly once during construction.
+	 *
+	 * @return void
+	 */
+	abstract protected function configure(): void;
 
 	/**
 	 * Build and return the Prompt DTO instance.
@@ -145,23 +156,23 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			}
 		}
 
-			$prompt_data = array(
-				'name'        => $this->name,
-				'title'       => $this->title,
-				'description' => $this->description,
-				'arguments'   => $argument_dtos,
-			);
+		$prompt_data = array(
+			'name'        => $this->name,
+			'title'       => $this->title,
+			'description' => $this->description,
+			'arguments'   => $argument_dtos,
+		);
 
-			if ( ! empty( $this->meta ) ) {
-				$prompt_data['_meta'] = $this->meta;
-			}
+		if ( ! empty( $this->meta ) ) {
+			$prompt_data['_meta'] = $this->meta;
+		}
 
-			// Only include icons if valid ones exist.
-			if ( null !== $valid_icons ) {
-				$prompt_data['icons'] = $valid_icons;
-			}
+		// Only include icons if valid ones exist.
+		if ( null !== $valid_icons ) {
+			$prompt_data['icons'] = $valid_icons;
+		}
 
-			return Prompt::fromArray( $prompt_data );
+		return Prompt::fromArray( $prompt_data );
 	}
 
 	/**
@@ -203,35 +214,63 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Get the prompt icons.
 	 *
+	 * @return array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
 	 * @since n.e.x.t
 	 *
-	 * @return array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
 	 */
 	public function get_icons(): array {
 		return $this->icons ?? array();
 	}
 
 	/**
-	 * Get the additional metadata.
+	 * Set the prompt icons for UI display.
 	 *
+	 * Icons are validated during build() using McpValidator::validate_icons_array().
+	 * Invalid icons are filtered out with warnings (graceful degradation).
+	 *
+	 * Per MCP 2025-11-25:
+	 * - MUST support: image/png, image/jpeg, image/jpg
+	 * - SHOULD support: image/svg+xml, image/webp
+	 *
+	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
+	 *
+	 * @return self
 	 * @since n.e.x.t
 	 *
+	 */
+	protected function set_icons( array $icons ): self {
+		$this->icons = $icons;
+
+		return $this;
+	}
+
+	/**
+	 * Get the additional metadata.
+	 *
 	 * @return array<string, mixed> The additional metadata.
+	 * @since n.e.x.t
+	 *
 	 */
 	public function get_meta(): array {
 		return $this->meta;
 	}
 
 	/**
-	 * Configure the prompt properties.
+	 * Set additional metadata.
 	 *
-	 * Subclasses must implement this method to set the name, title,
-	 * description, and arguments for the prompt. This method is called
-	 * exactly once during construction.
+	 * This metadata is passed through to MCP clients unchanged.
 	 *
-	 * @return void
+	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
+	 *
+	 * @return self
+	 * @since n.e.x.t
+	 *
 	 */
-	abstract protected function configure(): void;
+	protected function set_meta( array $meta ): self {
+		$this->meta = $meta;
+
+		return $this;
+	}
 
 	/**
 	 * Handle the prompt execution when called.
@@ -261,11 +300,26 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	}
 
 	/**
+	 * Helper method to add an argument to the prompt.
+	 *
+	 * @param string $name The argument name.
+	 * @param string|null $description Optional argument description.
+	 * @param bool $required Whether the argument is required.
+	 *
+	 * @return self
+	 */
+	protected function add_argument( string $name, ?string $description = null, bool $required = false ): self {
+		$this->arguments[] = $this->create_argument( $name, $description, $required );
+
+		return $this;
+	}
+
+	/**
 	 * Helper method to create an argument definition.
 	 *
-	 * @param string      $name        The argument name.
+	 * @param string $name The argument name.
 	 * @param string|null $description Optional argument description.
-	 * @param bool        $required    Whether the argument is required.
+	 * @param bool $required Whether the argument is required.
 	 *
 	 * @return array{name: string, description?: string, required?: true} The argument definition.
 	 */
@@ -283,59 +337,5 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		}
 
 		return $argument;
-	}
-
-	/**
-	 * Helper method to add an argument to the prompt.
-	 *
-	 * @param string      $name        The argument name.
-	 * @param string|null $description Optional argument description.
-	 * @param bool        $required    Whether the argument is required.
-	 *
-	 * @return self
-	 */
-	protected function add_argument( string $name, ?string $description = null, bool $required = false ): self {
-		$this->arguments[] = $this->create_argument( $name, $description, $required );
-
-		return $this;
-	}
-
-	/**
-	 * Set the prompt icons for UI display.
-	 *
-	 * Icons are validated during build() using McpValidator::validate_icons_array().
-	 * Invalid icons are filtered out with warnings (graceful degradation).
-	 *
-	 * Per MCP 2025-11-25:
-	 * - MUST support: image/png, image/jpeg, image/jpg
-	 * - SHOULD support: image/svg+xml, image/webp
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
-	 *
-	 * @return self
-	 */
-	protected function set_icons( array $icons ): self {
-		$this->icons = $icons;
-
-		return $this;
-	}
-
-		/**
-		 * Set additional metadata.
-		 *
-		 * This metadata is passed through to MCP clients unchanged.
-		 *
-		 * @since n.e.x.t
-		 *
-		 * @param array<string, mixed> $meta Additional metadata key-value pairs.
-	 *
-	 * @return self
-	 */
-	protected function set_meta( array $meta ): self {
-		$this->meta = $meta;
-
-		return $this;
 	}
 }

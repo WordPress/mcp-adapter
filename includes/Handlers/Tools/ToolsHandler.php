@@ -9,12 +9,12 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Tools;
 
-	use WP\MCP\Core\McpServer;
-	use WP\MCP\Handlers\HandlerHelperTrait;
-	use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
-	use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-	use WP\McpSchema\Server\Tools\CallToolResult;
-	use WP\McpSchema\Server\Tools\ListToolsResult;
+use WP\MCP\Core\McpServer;
+use WP\MCP\Handlers\HandlerHelperTrait;
+use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Server\Tools\CallToolResult;
+use WP\McpSchema\Server\Tools\ListToolsResult;
 
 /**
  * Handles tools-related MCP methods.
@@ -39,6 +39,23 @@ class ToolsHandler {
 	}
 
 	/**
+	 * Handles the tools/list/all request.
+	 *
+	 * This is a custom extension to the MCP spec that includes availability status.
+	 * Returns a ListToolsResult DTO containing all registered tools.
+	 *
+	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
+	 *
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with all tools.
+	 */
+	public function list_all_tools( $request_id = 0 ): ListToolsResult {
+		// Return the standard tools list.
+		return $this->list_tools( $request_id );
+	}
+
+	/**
 	 * Handles the tools/list request.
 	 *
 	 * Returns a ListToolsResult DTO containing all registered tools.
@@ -60,23 +77,6 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handles the tools/list/all request.
-	 *
-	 * This is a custom extension to the MCP spec that includes availability status.
-	 * Returns a ListToolsResult DTO containing all registered tools.
-	 *
-	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
-	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
-	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with all tools.
-	 */
-	public function list_all_tools( $request_id = 0 ): ListToolsResult {
-		// Return the standard tools list.
-		return $this->list_tools( $request_id );
-	}
-
-	/**
 	 * Handles the tools/call request.
 	 *
 	 * Returns either a CallToolResult DTO (for success or tool execution errors)
@@ -89,7 +89,7 @@ class ToolsHandler {
 	 * This distinction is critical for LLM self-correction - execution errors are
 	 * visible to the LLM, while protocol errors indicate infrastructure issues.
 	 *
-	 * @param array $message    Request message.
+	 * @param array $message Request message.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Tools\CallToolResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
@@ -186,10 +186,10 @@ class ToolsHandler {
 				);
 			}
 
-				// Successful tool execution - build CallToolResult DTO.
+			// Successful tool execution - build CallToolResult DTO.
 
-				// Handle embedded resource results (MCP ContentBlock type: "resource").
-				// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
+			// Handle embedded resource results (MCP ContentBlock type: "resource").
+			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
 				$resource_item = $result;
 				if ( isset( $result['resource'] ) && is_array( $result['resource'] ) ) {

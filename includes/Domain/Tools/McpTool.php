@@ -6,7 +6,7 @@
  * @package McpAdapter
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
@@ -173,7 +173,7 @@ final class McpTool implements McpComponentInterface {
 			return new \WP_Error(
 				'mcp_tool_dto_creation_failed',
 				sprintf(
-					/* translators: %s: error message */
+				/* translators: %s: error message */
 					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
 					$e->getMessage()
 				),
@@ -296,78 +296,6 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	/**
-	 * Check whether the current request has permission to execute this tool.
-	 *
-	 * @param mixed $arguments Tool arguments.
-	 *
-	 * @return bool|\WP_Error
-	 */
-	public function check_permission( $arguments ) {
-		$args = $this->unwrap_input_if_needed( $arguments );
-
-		// Ability-backed tools delegate to the ability's permission system.
-		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
-
-			try {
-				return $this->ability->check_permissions( $args );
-			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
-		}
-
-		// Callable-backed tools use their required permission callback.
-		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $args );
-				return $result instanceof \WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
-		}
-
-		// Defensive fallback: should never reach here if factories are used correctly.
-		return new \WP_Error(
-			'mcp_permission_denied',
-			'Access denied.',
-			array(
-				'failure_reason' => 'no_permission_strategy',
-				'tool_name'      => $this->tool->getName(),
-			)
-		);
-	}
-
-	/**
-	 * Get internal adapter metadata for this tool.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function get_adapter_meta(): array {
-		return $this->adapter_meta;
-	}
-
-	/**
-	 * Get observability context tags for logging/metrics.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function get_observability_context(): array {
-		return $this->observability_context;
-	}
-
-	// =========================================================================
-	// Private Helper Methods
-	// =========================================================================
-
-	/**
 	 * Unwrap tool input arguments when the input schema was transformed (flattened → object wrapper).
 	 *
 	 * @param mixed $arguments Raw tool arguments.
@@ -405,5 +333,78 @@ final class McpTool implements McpComponentInterface {
 		$wrapper = is_string( $wrapper ) && '' !== trim( $wrapper ) ? $wrapper : 'result';
 
 		return array( $wrapper => $result );
+	}
+
+	/**
+	 * Check whether the current request has permission to execute this tool.
+	 *
+	 * @param mixed $arguments Tool arguments.
+	 *
+	 * @return bool|\WP_Error
+	 */
+	public function check_permission( $arguments ) {
+		$args = $this->unwrap_input_if_needed( $arguments );
+
+		// Ability-backed tools delegate to the ability's permission system.
+		if ( null !== $this->ability ) {
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+
+			try {
+				return $this->ability->check_permissions( $args );
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_permission_check_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		// Callable-backed tools use their required permission callback.
+		if ( null !== $this->permission_callback ) {
+			try {
+				$result = call_user_func( $this->permission_callback, $args );
+
+				return $result instanceof \WP_Error ? $result : (bool) $result;
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_permission_check_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		// Defensive fallback: should never reach here if factories are used correctly.
+		return new \WP_Error(
+			'mcp_permission_denied',
+			'Access denied.',
+			array(
+				'failure_reason' => 'no_permission_strategy',
+				'tool_name'      => $this->tool->getName(),
+			)
+		);
+	}
+
+	// =========================================================================
+	// Private Helper Methods
+	// =========================================================================
+
+	/**
+	 * Get internal adapter metadata for this tool.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_adapter_meta(): array {
+		return $this->adapter_meta;
+	}
+
+	/**
+	 * Get observability context tags for logging/metrics.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_observability_context(): array {
+		return $this->observability_context;
 	}
 }

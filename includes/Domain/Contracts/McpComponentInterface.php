@@ -30,9 +30,9 @@ interface McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
+	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Protocol-only DTO.
 	 * @since n.e.x.t
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Protocol-only DTO.
 	 */
 	public function get_component(): AbstractDataTransferObject;
 
@@ -43,11 +43,11 @@ interface McpComponentInterface {
 	 * - an attached WordPress ability, or
 	 * - a direct callable handler (for non-ability registrations).
 	 *
-	 * @since n.e.x.t
-	 *
 	 * @param mixed $arguments Component arguments (typically an associative array).
 	 *
 	 * @return mixed Execution result.
+	 * @since n.e.x.t
+	 *
 	 */
 	public function execute( $arguments );
 
@@ -58,11 +58,11 @@ interface McpComponentInterface {
 	 * - the attached WordPress ability, or
 	 * - a direct permission callback (for non-ability registrations).
 	 *
-	 * @since n.e.x.t
-	 *
 	 * @param mixed $arguments Component arguments (typically an associative array).
 	 *
 	 * @return bool|\WP_Error True when permitted, false or WP_Error otherwise.
+	 * @since n.e.x.t
+	 *
 	 */
 	public function check_permission( $arguments );
 
@@ -71,9 +71,9 @@ interface McpComponentInterface {
 	 *
 	 * This metadata MUST NOT be stored on protocol DTOs and MUST NOT be exposed to MCP clients.
 	 *
+	 * @return array<string, mixed> Internal metadata.
 	 * @since n.e.x.t
 	 *
-	 * @return array<string, mixed> Internal metadata.
 	 */
 	public function get_adapter_meta(): array;
 
@@ -82,9 +82,9 @@ interface McpComponentInterface {
 	 *
 	 * This replaces legacy approaches that derived observability tags from DTO `_meta`.
 	 *
+	 * @return array<string, mixed> Observability tags (component_type, source, etc.).
 	 * @since n.e.x.t
 	 *
-	 * @return array<string, mixed> Observability tags (component_type, source, etc.).
 	 */
 	public function get_observability_context(): array;
 }

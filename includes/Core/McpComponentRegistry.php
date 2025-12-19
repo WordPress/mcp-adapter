@@ -6,7 +6,7 @@
  * @package McpAdapter
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
@@ -19,6 +19,7 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Resources\Resource;
 use WP\McpSchema\Server\Tools\Tool;
+use function wp_get_ability;
 
 /**
  * Registry for managing MCP server components (tools, resources, prompts).
@@ -123,12 +124,14 @@ class McpComponentRegistry {
 			/** @var \WP\McpSchema\Server\Tools\Tool $tool_dto */
 			$tool_dto = $tool_item->get_component();
 			$this->track_registration( 'tool', $tool_dto->getName(), 'success' );
+
 			return;
 		}
 
 		// Case 1: String - treat as ability name.
 		if ( is_string( $tool_item ) ) {
 			$this->register_ability_tool( $tool_item );
+
 			return;
 		}
 
@@ -143,6 +146,61 @@ class McpComponentRegistry {
 	}
 
 	/**
+	 * Register an McpTool directly.
+	 *
+	 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool McpTool instance.
+	 *
+	 * @return void
+	 * @since n.e.x.t
+	 *
+	 */
+	private function add_mcp_tool( McpTool $mcp_tool ): void {
+		/** @var \WP\McpSchema\Server\Tools\Tool $tool_dto */
+		$tool_dto  = $mcp_tool->get_component();
+		$tool_name = $tool_dto->getName();
+
+		if ( isset( $this->mcp_tools[ $tool_name ] ) ) {
+			$this->error_handler->log(
+				"Tool with name '{$tool_name}' already registered, skipping duplicate.",
+				array( 'McpComponentRegistry::add_mcp_tool' ),
+				'warning'
+			);
+
+			return;
+		}
+
+		$this->mcp_tools[ $tool_name ] = $mcp_tool;
+	}
+
+	/**
+	 * Record a component registration event.
+	 *
+	 * @param string $type Component type.
+	 * @param string $name Component name.
+	 * @param string $status Registration status ('success' or 'failed').
+	 * @param array<string, mixed> $extra Extra event data.
+	 *
+	 * @return void
+	 */
+	private function track_registration( string $type, string $name, string $status, array $extra = array() ): void {
+		if ( ! $this->should_record_component_registration ) {
+			return;
+		}
+
+		$event_data = array_merge(
+			array(
+				'status'         => $status,
+				'component_type' => $type,
+				'component_name' => $name,
+				'server_id'      => $this->mcp_server->get_server_id(),
+			),
+			$extra
+		);
+
+		$this->observability_handler->record_event( 'mcp.component.registration', $event_data );
+	}
+
+	/**
 	 * Register a tool from an ability name.
 	 *
 	 * @param string $ability_name Ability name.
@@ -150,11 +208,12 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	private function register_ability_tool( string $ability_name ): void {
-		$ability = \wp_get_ability( $ability_name );
+		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpTool::{$ability_name}" ) );
 			$this->track_registration( 'ability_tool', $ability_name, 'failed', array( 'failure_reason' => 'ability_not_found' ) );
+
 			return;
 		}
 
@@ -168,37 +227,12 @@ class McpComponentRegistry {
 				'failed',
 				array( 'error_code' => $mcp_tool->get_error_code() )
 			);
+
 			return;
 		}
 
 		$this->add_mcp_tool( $mcp_tool );
 		$this->track_registration( 'ability_tool', $ability_name, 'success' );
-	}
-
-	/**
-	 * Register an McpTool directly.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool McpTool instance.
-	 *
-	 * @return void
-	 */
-	private function add_mcp_tool( McpTool $mcp_tool ): void {
-		/** @var \WP\McpSchema\Server\Tools\Tool $tool_dto */
-		$tool_dto  = $mcp_tool->get_component();
-		$tool_name = $tool_dto->getName();
-
-		if ( isset( $this->mcp_tools[ $tool_name ] ) ) {
-			$this->error_handler->log(
-				"Tool with name '{$tool_name}' already registered, skipping duplicate.",
-				array( 'McpComponentRegistry::add_mcp_tool' ),
-				'warning'
-			);
-			return;
-		}
-
-		$this->mcp_tools[ $tool_name ] = $mcp_tool;
 	}
 
 	/**
@@ -229,12 +263,14 @@ class McpComponentRegistry {
 			/** @var \WP\McpSchema\Server\Resources\Resource $resource_dto */
 			$resource_dto = $resource_item->get_component();
 			$this->track_registration( 'resource', $resource_dto->getUri(), 'success' );
+
 			return;
 		}
 
 		// Case 1: String - treat as ability name.
 		if ( is_string( $resource_item ) ) {
 			$this->register_ability_resource( $resource_item );
+
 			return;
 		}
 
@@ -252,11 +288,11 @@ class McpComponentRegistry {
 	/**
 	 * Register an McpResource directly.
 	 *
-	 * @since n.e.x.t
-	 *
 	 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource McpResource instance.
 	 *
 	 * @return bool True if the resource was added, false if it was a duplicate.
+	 * @since n.e.x.t
+	 *
 	 */
 	private function add_mcp_resource( McpResource $mcp_resource ): bool {
 		/** @var \WP\McpSchema\Server\Resources\Resource $resource_dto */
@@ -269,10 +305,12 @@ class McpComponentRegistry {
 				array( 'McpComponentRegistry::add_mcp_resource' ),
 				'warning'
 			);
+
 			return false;
 		}
 
 		$this->mcp_resources[ $uri ] = $mcp_resource;
+
 		return true;
 	}
 
@@ -284,12 +322,13 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	private function register_ability_resource( string $ability_name ): void {
-		$ability = \wp_get_ability( $ability_name );
+		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
 
 			$this->track_registration( 'resource', $ability_name, 'failed', array( 'failure_reason' => 'ability_not_found' ) );
+
 			return;
 		}
 
@@ -305,6 +344,7 @@ class McpComponentRegistry {
 				'failed',
 				array( 'error_code' => $mcp_resource->get_error_code() )
 			);
+
 			return;
 		}
 
@@ -362,12 +402,14 @@ class McpComponentRegistry {
 			/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt_dto */
 			$prompt_dto = $prompt_item->get_component();
 			$this->track_registration( 'prompt', $prompt_dto->getName(), 'success' );
+
 			return;
 		}
 
 		// Case 1: McpPromptBuilderInterface instance (fluent API or custom builder).
 		if ( $prompt_item instanceof McpPromptBuilderInterface ) {
 			$this->register_builder_instance( $prompt_item );
+
 			return;
 		}
 
@@ -376,11 +418,13 @@ class McpComponentRegistry {
 			// Check if it's a class that implements McpPromptBuilderInterface.
 			if ( class_exists( $prompt_item ) && in_array( McpPromptBuilderInterface::class, class_implements( $prompt_item ) ?: array(), true ) ) {
 				$this->register_builder_class( $prompt_item );
+
 				return;
 			}
 
 			// Treat as ability name.
 			$this->register_ability_prompt( $prompt_item );
+
 			return;
 		}
 
@@ -393,6 +437,33 @@ class McpComponentRegistry {
 			array( 'McpComponentRegistry::register_single_prompt' ),
 			'warning'
 		);
+	}
+
+	/**
+	 * Add an McpPrompt to the registry.
+	 *
+	 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt McpPrompt instance.
+	 *
+	 * @return void
+	 * @since n.e.x.t
+	 *
+	 */
+	private function add_mcp_prompt( McpPrompt $mcp_prompt ): void {
+		/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt */
+		$prompt      = $mcp_prompt->get_component();
+		$prompt_name = $prompt->getName();
+
+		if ( isset( $this->mcp_prompts[ $prompt_name ] ) ) {
+			$this->error_handler->log(
+				"Prompt with name '{$prompt_name}' already registered, skipping duplicate.",
+				array( 'McpComponentRegistry::add_mcp_prompt' ),
+				'warning'
+			);
+
+			return;
+		}
+
+		$this->mcp_prompts[ $prompt_name ] = $mcp_prompt;
 	}
 
 	/**
@@ -415,6 +486,7 @@ class McpComponentRegistry {
 				'failed',
 				array( 'error_code' => $mcp_prompt->get_error_code() )
 			);
+
 			return;
 		}
 
@@ -422,7 +494,6 @@ class McpComponentRegistry {
 
 		$this->track_registration( 'prompt', $prompt_name, 'success' );
 	}
-
 
 	/**
 	 * Register a prompt from a builder class name.
@@ -451,12 +522,13 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	private function register_ability_prompt( string $ability_name ): void {
-		$ability = \wp_get_ability( $ability_name );
+		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$ability_name}" ) );
 
 			$this->track_registration( 'prompt', $ability_name, 'failed', array( 'failure_reason' => 'ability_not_found' ) );
+
 			return;
 		}
 
@@ -471,6 +543,7 @@ class McpComponentRegistry {
 				'failed',
 				array( 'error_code' => $mcp_prompt->get_error_code() )
 			);
+
 			return;
 		}
 
@@ -518,11 +591,11 @@ class McpComponentRegistry {
 	/**
 	 * Get a specific McpTool by tool name.
 	 *
-	 * @since n.e.x.t
-	 *
 	 * @param string $tool_name Tool name.
 	 *
 	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 * @since n.e.x.t
+	 *
 	 */
 	public function get_mcp_tool( string $tool_name ): ?McpTool {
 		return $this->mcp_tools[ $tool_name ] ?? null;
@@ -531,12 +604,12 @@ class McpComponentRegistry {
 	/**
 	 * Get a specific McpResource by URI.
 	 *
-	 * @internal
-	 * @since n.e.x.t
-	 *
 	 * @param string $resource_uri Resource URI.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 * @internal
+	 * @since n.e.x.t
+	 *
 	 */
 	public function get_mcp_resource( string $resource_uri ): ?McpResource {
 		return $this->mcp_resources[ $resource_uri ] ?? null;
@@ -545,12 +618,12 @@ class McpComponentRegistry {
 	/**
 	 * Get an McpPrompt by prompt name.
 	 *
-	 * @internal
-	 * @since n.e.x.t
-	 *
 	 * @param string $prompt_name Prompt name.
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 * @internal
+	 * @since n.e.x.t
+	 *
 	 */
 	public function get_mcp_prompt( string $prompt_name ): ?McpPrompt {
 		return $this->mcp_prompts[ $prompt_name ] ?? null;
@@ -565,60 +638,7 @@ class McpComponentRegistry {
 	 */
 	public function get_prompt_builder( string $prompt_name ): ?McpPromptBuilderInterface {
 		$mcp_prompt = $this->mcp_prompts[ $prompt_name ] ?? null;
+
 		return $mcp_prompt ? $mcp_prompt->get_builder() : null;
-	}
-
-	/**
-	 * Add an McpPrompt to the registry.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt McpPrompt instance.
-	 *
-	 * @return void
-	 */
-	private function add_mcp_prompt( McpPrompt $mcp_prompt ): void {
-		/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt */
-		$prompt      = $mcp_prompt->get_component();
-		$prompt_name = $prompt->getName();
-
-		if ( isset( $this->mcp_prompts[ $prompt_name ] ) ) {
-			$this->error_handler->log(
-				"Prompt with name '{$prompt_name}' already registered, skipping duplicate.",
-				array( 'McpComponentRegistry::add_mcp_prompt' ),
-				'warning'
-			);
-			return;
-		}
-
-		$this->mcp_prompts[ $prompt_name ] = $mcp_prompt;
-	}
-
-	/**
-	 * Record a component registration event.
-	 *
-	 * @param string               $type   Component type.
-	 * @param string               $name   Component name.
-	 * @param string               $status Registration status ('success' or 'failed').
-	 * @param array<string, mixed> $extra  Extra event data.
-	 *
-	 * @return void
-	 */
-	private function track_registration( string $type, string $name, string $status, array $extra = array() ): void {
-		if ( ! $this->should_record_component_registration ) {
-			return;
-		}
-
-		$event_data = array_merge(
-			array(
-				'status'         => $status,
-				'component_type' => $type,
-				'component_name' => $name,
-				'server_id'      => $this->mcp_server->get_server_id(),
-			),
-			$extra
-		);
-
-		$this->observability_handler->record_event( 'mcp.component.registration', $event_data );
 	}
 }

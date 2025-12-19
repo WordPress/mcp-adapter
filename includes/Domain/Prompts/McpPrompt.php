@@ -6,7 +6,7 @@
  * @package McpAdapter
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
@@ -187,7 +187,7 @@ final class McpPrompt implements McpComponentInterface {
 			return new \WP_Error(
 				'mcp_prompt_dto_creation_failed',
 				sprintf(
-					/* translators: %s: error message */
+				/* translators: %s: error message */
 					__( 'Failed to create Prompt DTO: %s', 'mcp-adapter' ),
 					$e->getMessage()
 				),
@@ -363,6 +363,26 @@ final class McpPrompt implements McpComponentInterface {
 	}
 
 	/**
+	 * Unwrap prompt input arguments when the input schema was transformed (flattened → object wrapper).
+	 *
+	 * @param mixed $arguments Raw prompt arguments.
+	 *
+	 * @return mixed
+	 */
+	private function unwrap_input_if_needed( $arguments ) {
+		$is_transformed = true === ( $this->adapter_meta['input_schema_transformed'] ?? false );
+
+		if ( ! $is_transformed ) {
+			return $arguments;
+		}
+
+		$wrapper = $this->adapter_meta['input_schema_wrapper'] ?? 'input';
+		$wrapper = is_string( $wrapper ) && '' !== trim( $wrapper ) ? $wrapper : 'input';
+
+		return is_array( $arguments ) ? ( $arguments[ $wrapper ] ?? null ) : null;
+	}
+
+	/**
 	 * Check whether the current request has permission to execute this prompt.
 	 *
 	 * @param mixed $arguments Prompt arguments.
@@ -402,6 +422,7 @@ final class McpPrompt implements McpComponentInterface {
 		if ( null !== $this->permission_callback ) {
 			try {
 				$result = call_user_func( $this->permission_callback, $args );
+
 				return $result instanceof \WP_Error ? $result : (bool) $result;
 			} catch ( \Throwable $throwable ) {
 				return new \WP_Error(
@@ -437,6 +458,10 @@ final class McpPrompt implements McpComponentInterface {
 		return $this->observability_context;
 	}
 
+	// =========================================================================
+	// Private Helper Methods
+	// =========================================================================
+
 	/**
 	 * Get the underlying builder instance, when builder-backed.
 	 *
@@ -444,29 +469,5 @@ final class McpPrompt implements McpComponentInterface {
 	 */
 	public function get_builder(): ?McpPromptBuilderInterface {
 		return $this->builder;
-	}
-
-	// =========================================================================
-	// Private Helper Methods
-	// =========================================================================
-
-	/**
-	 * Unwrap prompt input arguments when the input schema was transformed (flattened → object wrapper).
-	 *
-	 * @param mixed $arguments Raw prompt arguments.
-	 *
-	 * @return mixed
-	 */
-	private function unwrap_input_if_needed( $arguments ) {
-		$is_transformed = true === ( $this->adapter_meta['input_schema_transformed'] ?? false );
-
-		if ( ! $is_transformed ) {
-			return $arguments;
-		}
-
-		$wrapper = $this->adapter_meta['input_schema_wrapper'] ?? 'input';
-		$wrapper = is_string( $wrapper ) && '' !== trim( $wrapper ) ? $wrapper : 'input';
-
-		return is_array( $arguments ) ? ( $arguments[ $wrapper ] ?? null ) : null;
 	}
 }

@@ -12,7 +12,6 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptArgument;
-use WP_Ability;
 
 /**
  * Converts WordPress abilities to MCP prompts according to the specification.
@@ -55,7 +54,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @var \WP_Ability
 	 */
-	private WP_Ability $ability;
+	private \WP_Ability $ability;
 
 	/**
 	 * Tracks whether input_schema was transformed from flattened to object format.
@@ -90,76 +89,107 @@ class RegisterAbilityAsMcpPrompt {
 	private ?string $arguments_source = null;
 
 	/**
+	 * Constructor.
+	 *
+	 * @param \WP_Ability $ability The ability.
+	 */
+	private function __construct( \WP_Ability $ability ) {
+		$this->ability = $ability;
+	}
+
+	/**
 	 * Make a new instance of the class.
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
 	 */
-	public static function make( WP_Ability $ability ) {
+	public static function make( \WP_Ability $ability ) {
 		$prompt = new self( $ability );
 
 		return $prompt->get_prompt();
 	}
 
 	/**
-	 * Build a clean Prompt DTO and adapter metadata for internal wiring.
+	 * Get the MCP prompt instance.
 	 *
-	 * This method returns a protocol-only Prompt DTO and provides the adapter metadata
-	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
-	 * wiring to protocol surfaces.
-	 *
+	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 * @since n.e.x.t
 	 *
-	 * @param \WP_Ability $ability The ability.
-	 *
-	 * @return array{prompt: \WP\McpSchema\Server\Prompts\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
 	 */
-	public static function build( WP_Ability $ability ) {
-		$prompt = new self( $ability );
-		$data   = $prompt->build_prompt_data();
+	private function get_prompt() {
+		$built = $this->build_prompt_data();
 
+		// Propagate WP_Error from argument validation.
+		if ( is_wp_error( $built ) ) {
+			return $built;
+		}
+
+		try {
+			return Prompt::fromArray( $built['prompt_data'] );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Build Prompt DTO data and adapter metadata.
+	 *
+	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @since n.e.x.t
+	 *
+	 */
+	private function build_prompt_data() {
+		$data = $this->get_data();
+
+		// Propagate WP_Error from argument validation.
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
 
-		try {
-			$prompt_dto = Prompt::fromArray( $data['prompt_data'] );
-		} catch ( \Throwable $e ) {
-			return new \WP_Error(
-				'mcp_prompt_dto_creation_failed',
-				sprintf(
-					/* translators: %s: error message */
-					__( 'Failed to create Prompt DTO for ability %1$s: %2$s', 'mcp-adapter' ),
-					$ability->get_name(),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
+		// Get ability meta for icons and user _meta extraction.
+		$ability_meta = $this->ability->get_meta();
+		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpValidator::validate_prompt_dto( $prompt_dto );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
+		// Map icons from ability.meta.mcp.icons if present.
+		// Uses same pattern as tools/resources for consistency.
+		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$data['icons'] = $icons_result['valid'];
 			}
 		}
 
-		return array(
-			'prompt'       => $prompt_dto,
-			'adapter_meta' => $data['adapter_meta'],
+		// Build adapter metadata, tracking transformation when it occurred.
+		$adapter_meta = array(
+			'ability' => $this->ability->get_name(),
 		);
-	}
 
-	/**
-	 * Constructor.
-	 *
-	 * @param \WP_Ability $ability The ability.
-	 */
-	private function __construct( WP_Ability $ability ) {
-		$this->ability = $ability;
+		// Track arguments source when arguments are present.
+		if ( null !== $this->arguments_source ) {
+			$adapter_meta['arguments_source'] = $this->arguments_source;
+		}
+
+		// Record transformation metadata when schema was wrapped (matches tool behavior).
+		// Only relevant when arguments_source is 'schema'.
+		if ( $this->schema_was_transformed && 'schema' === $this->arguments_source ) {
+			$adapter_meta['input_schema_transformed'] = true;
+			$adapter_meta['input_schema_wrapper']     = $this->schema_wrapper_property;
+		}
+
+		// Preserve user-provided _meta from ability.meta.mcp._meta.
+		$prompt_meta = array();
+		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
+			$prompt_meta = $mcp_meta['_meta'];
+		}
+		if ( ! empty( $prompt_meta ) ) {
+			$data['_meta'] = $prompt_meta;
+		}
+
+		return array(
+			'prompt_data'  => $data,
+			'adapter_meta' => $adapter_meta,
+		);
 	}
 
 	/**
@@ -175,9 +205,9 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * This follows the `mcp.*` override pattern used elsewhere (mcp.uri, mcp.icons, mcp.annotations).
 	 *
+	 * @return array<string,mixed>|\WP_Error Prompt data array, or WP_Error if explicit arguments are invalid.
 	 * @since n.e.x.t
 	 *
-	 * @return array<string,mixed>|\WP_Error Prompt data array, or WP_Error if explicit arguments are invalid.
 	 */
 	private function get_data() {
 		$ability_name = trim( $this->ability->get_name() );
@@ -208,6 +238,7 @@ class RegisterAbilityAsMcpPrompt {
 				$prompt_data['arguments'] = $arguments;
 				$this->arguments_source   = 'explicit';
 			}
+
 			return $prompt_data;
 		}
 
@@ -234,9 +265,9 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get explicit arguments from ability meta.mcp.arguments.
 	 *
+	 * @return array<int,array<string,mixed>>|null Explicit arguments array or null if not defined.
 	 * @since n.e.x.t
 	 *
-	 * @return array<int,array<string,mixed>>|null Explicit arguments array or null if not defined.
 	 */
 	private function get_explicit_arguments(): ?array {
 		$meta = $this->ability->get_meta();
@@ -261,10 +292,11 @@ class RegisterAbilityAsMcpPrompt {
 	 * - description (string, optional): Human-readable description
 	 * - required (boolean, optional): Whether the argument must be provided
 	 *
+	 * @param array<int,array<string,mixed>> $explicit_arguments User-defined arguments array.
+	 *
+	 * @return array<int,\WP\McpSchema\Server\Prompts\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
 	 * @since n.e.x.t
 	 *
-	 * @param array<int,array<string,mixed>> $explicit_arguments User-defined arguments array.
-	 * @return array<int,\WP\McpSchema\Server\Prompts\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
 	 */
 	private function convert_explicit_arguments( array $explicit_arguments ) {
 		$arguments = array();
@@ -274,7 +306,7 @@ class RegisterAbilityAsMcpPrompt {
 				return new \WP_Error(
 					'mcp_prompt_invalid_argument',
 					sprintf(
-						/* translators: 1: argument index, 2: ability name */
+					/* translators: 1: argument index, 2: ability name */
 						__( 'Argument at index %1$d must be an array for ability "%2$s".', 'mcp-adapter' ),
 						$index,
 						$this->ability->get_name()
@@ -287,7 +319,7 @@ class RegisterAbilityAsMcpPrompt {
 				return new \WP_Error(
 					'mcp_prompt_argument_missing_name',
 					sprintf(
-						/* translators: 1: argument index, 2: ability name */
+					/* translators: 1: argument index, 2: ability name */
 						__( 'Argument at index %1$d is missing required "name" field for ability "%2$s".', 'mcp-adapter' ),
 						$index,
 						$this->ability->get_name()
@@ -341,10 +373,11 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * Note: `required` is only emitted when true; optional arguments omit the field entirely.
 	 *
+	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
+	 *
+	 * @return array<int, \WP\McpSchema\Server\Prompts\PromptArgument> Argument DTO list.
 	 * @since n.e.x.t
 	 *
-	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
-	 * @return array<int, \WP\McpSchema\Server\Prompts\PromptArgument> Argument DTO list.
 	 */
 	private function convert_input_schema_to_arguments( array $input_schema ): array {
 		$arguments = array();
@@ -394,84 +427,53 @@ class RegisterAbilityAsMcpPrompt {
 	}
 
 	/**
-	 * Get the MCP prompt instance.
+	 * Build a clean Prompt DTO and adapter metadata for internal wiring.
 	 *
+	 * This method returns a protocol-only Prompt DTO and provides the adapter metadata
+	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
+	 * wiring to protocol surfaces.
+	 *
+	 * @param \WP_Ability $ability The ability.
+	 *
+	 * @return array{prompt: \WP\McpSchema\Server\Prompts\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 */
-	private function get_prompt() {
-		$built = $this->build_prompt_data();
+	public static function build( \WP_Ability $ability ) {
+		$prompt = new self( $ability );
+		$data   = $prompt->build_prompt_data();
 
-		// Propagate WP_Error from argument validation.
-		if ( is_wp_error( $built ) ) {
-			return $built;
-		}
-
-		try {
-			return Prompt::fromArray( $built['prompt_data'] );
-		} catch ( \Throwable $e ) {
-			return new \WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
-		}
-	}
-
-	/**
-	 * Build Prompt DTO data and adapter metadata.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
-	 */
-	private function build_prompt_data() {
-		$data = $this->get_data();
-
-		// Propagate WP_Error from argument validation.
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
 
-		// Get ability meta for icons and user _meta extraction.
-		$ability_meta = $this->ability->get_meta();
-		$mcp_meta     = $ability_meta['mcp'] ?? array();
+		try {
+			$prompt_dto = Prompt::fromArray( $data['prompt_data'] );
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'mcp_prompt_dto_creation_failed',
+				sprintf(
+				/* translators: %s: error message */
+					__( 'Failed to create Prompt DTO for ability %1$s: %2$s', 'mcp-adapter' ),
+					$ability->get_name(),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
+			);
+		}
 
-		// Map icons from ability.meta.mcp.icons if present.
-		// Uses same pattern as tools/resources for consistency.
-		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$data['icons'] = $icons_result['valid'];
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpValidator::validate_prompt_dto( $prompt_dto );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
 			}
 		}
 
-		// Build adapter metadata, tracking transformation when it occurred.
-		$adapter_meta = array(
-			'ability' => $this->ability->get_name(),
-		);
-
-		// Track arguments source when arguments are present.
-		if ( null !== $this->arguments_source ) {
-			$adapter_meta['arguments_source'] = $this->arguments_source;
-		}
-
-		// Record transformation metadata when schema was wrapped (matches tool behavior).
-		// Only relevant when arguments_source is 'schema'.
-		if ( $this->schema_was_transformed && 'schema' === $this->arguments_source ) {
-			$adapter_meta['input_schema_transformed'] = true;
-			$adapter_meta['input_schema_wrapper']     = $this->schema_wrapper_property;
-		}
-
-		// Preserve user-provided _meta from ability.meta.mcp._meta.
-		$prompt_meta = array();
-		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$prompt_meta = $mcp_meta['_meta'];
-		}
-		if ( ! empty( $prompt_meta ) ) {
-			$data['_meta'] = $prompt_meta;
-		}
-
 		return array(
-			'prompt_data'  => $data,
-			'adapter_meta' => $adapter_meta,
+			'prompt'       => $prompt_dto,
+			'adapter_meta' => $data['adapter_meta'],
 		);
 	}
 }

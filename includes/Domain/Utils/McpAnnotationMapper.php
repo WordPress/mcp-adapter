@@ -90,8 +90,8 @@ class McpAnnotationMapper {
 	 * Only includes annotations applicable to the specified feature type.
 	 * Null values are excluded from the result.
 	 *
-	 * @param array  $ability_annotations WordPress ability annotations.
-	 * @param string $feature_type        The MCP feature type ('tool', 'resource', or 'prompt').
+	 * @param array $ability_annotations WordPress ability annotations.
+	 * @param string $feature_type The MCP feature type ('tool', 'resource', or 'prompt').
 	 *
 	 * @return array Mapped annotations for the specified feature type.
 	 */
@@ -127,8 +127,8 @@ class McpAnnotationMapper {
 	/**
 	 * Resolve the annotation value, preferring WordPress-format overrides when available.
 	 *
-	 * @param array       $annotations     Raw annotations from the ability.
-	 * @param string      $mcp_field       The MCP field name.
+	 * @param array $annotations Raw annotations from the ability.
+	 * @param string $mcp_field The MCP field name.
 	 * @param string|null $ability_property Optional WordPress-format field name, or null if mapping 1:1.
 	 *
 	 * @return mixed The annotation value, or null if not found.
@@ -150,7 +150,7 @@ class McpAnnotationMapper {
 	 * Normalize annotation values to the types expected by MCP.
 	 *
 	 * @param string $field_type Expected MCP type (boolean, string, array, number).
-	 * @param mixed  $value      Raw annotation value.
+	 * @param mixed $value Raw annotation value.
 	 *
 	 * @return mixed|null Normalized value or null if invalid.
 	 */
@@ -164,6 +164,7 @@ class McpAnnotationMapper {
 					return null;
 				}
 				$trimmed = trim( (string) $value );
+
 				return '' === $trimmed ? null : $trimmed;
 
 			case 'array':
@@ -206,6 +207,7 @@ class McpAnnotationMapper {
 			if ( 0 === $value ) {
 				return false;
 			}
+
 			// Other integers are invalid (e.g., 2, -1).
 			return null;
 		}
@@ -219,6 +221,7 @@ class McpAnnotationMapper {
 			if ( 'false' === $lower || '0' === $lower ) {
 				return false;
 			}
+
 			// Other strings are invalid (e.g., 'yes', 'no', empty string).
 			return null;
 		}

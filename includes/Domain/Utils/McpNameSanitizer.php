@@ -55,11 +55,11 @@ class McpNameSanitizer {
 	 * 5. If too long: truncate + add hash suffix for uniqueness
 	 * 6. If still invalid/empty: return WP_Error
 	 *
-	 * @since n.e.x.t
-	 *
 	 * @param string $name Original name.
 	 *
 	 * @return string|\WP_Error Sanitized name or WP_Error if unsalvageable.
+	 * @since n.e.x.t
+	 *
 	 */
 	public static function sanitize_name( string $name ) {
 		$original = $name;
@@ -100,7 +100,7 @@ class McpNameSanitizer {
 			return new \WP_Error(
 				'mcp_name_invalid',
 				sprintf(
-					/* translators: %s: original ability name */
+				/* translators: %s: original ability name */
 					__( 'Unable to derive valid MCP name from: %s', 'mcp-adapter' ),
 					$original
 				)

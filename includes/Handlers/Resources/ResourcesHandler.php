@@ -40,16 +40,16 @@ class ResourcesHandler {
 	}
 
 
-		/**
-		 * Handles the resources/list request.
-		 *
-		 * Returns a ListResourcesResult DTO containing all registered resources.
-		 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
-		 *
-		 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-		 *
-		 * @return \WP\McpSchema\Server\Resources\ListResourcesResult Response with resources list.
-		 */
+	/**
+	 * Handles the resources/list request.
+	 *
+	 * Returns a ListResourcesResult DTO containing all registered resources.
+	 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
+	 *
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 *
+	 * @return \WP\McpSchema\Server\Resources\ListResourcesResult Response with resources list.
+	 */
 	public function list_resources( $request_id = 0 ): ListResourcesResult {
 		$resources = array_values( $this->mcp->get_resources() );
 
@@ -69,7 +69,7 @@ class ResourcesHandler {
 	 * Unlike tools, resources don't have a concept of "execution errors" that should be
 	 * reported with isError=true. Resource reads either succeed or fail at the protocol level.
 	 *
-	 * @param array $params     Request parameters.
+	 * @param array $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Resources\ReadResourceResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
@@ -152,8 +152,8 @@ class ResourcesHandler {
 	 * The MCP spec expects contents to be an array of TextResourceContents or BlobResourceContents.
 	 * This method handles various return formats from abilities and normalizes them.
 	 *
-	 * @param mixed  $contents The contents returned by the ability.
-	 * @param string $uri      The resource URI.
+	 * @param mixed $contents The contents returned by the ability.
+	 * @param string $uri The resource URI.
 	 *
 	 * @return array<\WP\McpSchema\Common\Protocol\TextResourceContents|\WP\McpSchema\Common\Protocol\BlobResourceContents>
 	 */
@@ -195,7 +195,7 @@ class ResourcesHandler {
 	/**
 	 * Create a content DTO from an array item.
 	 *
-	 * @param array  $item The content item array.
+	 * @param array $item The content item array.
 	 * @param string $default_uri The default URI to use if not specified.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\TextResourceContents|\WP\McpSchema\Common\Protocol\BlobResourceContents

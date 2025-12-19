@@ -67,45 +67,6 @@ final class DiscoverAbilitiesAbility {
 	}
 
 	/**
-	 * Check permissions for discovering abilities.
-	 *
-	 * Validates user capabilities and caller identity.
-	 *
-	 * @param array $input Input parameters (unused for this ability).
-	 *
-	 * @return bool|\WP_Error True if the user has permission to discover abilities.
-	 * @phpstan-return bool|\WP_Error
-	 */
-	public static function check_permission( $input = array() ) {
-		// Validate user authentication and capabilities
-		return self::validate_user_access();
-	}
-
-	/**
-	 * Validate user authentication and basic capabilities for discover abilities.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
-	 */
-	private static function validate_user_access() {
-		// Verify caller identity - ensure user is authenticated
-		if ( ! is_user_logged_in() ) {
-			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
-		}
-
-		// Check basic capability requirement - allow customization via filter
-		$required_capability = apply_filters( 'mcp_adapter_discover_abilities_capability', 'read' );
-		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
-		if ( ! current_user_can( $required_capability ) ) {
-			return new \WP_Error(
-				'insufficient_capability',
-				sprintf( 'User lacks required capability: %s', $required_capability )
-			);
-		}
-
-		return true;
-	}
-
-	/**
 	 * Execute the discover abilities functionality.
 	 *
 	 * Enforces security checks and mcp.public filtering.
@@ -150,5 +111,44 @@ final class DiscoverAbilitiesAbility {
 		return array(
 			'abilities' => $ability_list,
 		);
+	}
+
+	/**
+	 * Check permissions for discovering abilities.
+	 *
+	 * Validates user capabilities and caller identity.
+	 *
+	 * @param array $input Input parameters (unused for this ability).
+	 *
+	 * @return bool|\WP_Error True if the user has permission to discover abilities.
+	 * @phpstan-return bool|\WP_Error
+	 */
+	public static function check_permission( $input = array() ) {
+		// Validate user authentication and capabilities
+		return self::validate_user_access();
+	}
+
+	/**
+	 * Validate user authentication and basic capabilities for discover abilities.
+	 *
+	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
+	 */
+	private static function validate_user_access() {
+		// Verify caller identity - ensure user is authenticated
+		if ( ! is_user_logged_in() ) {
+			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
+		}
+
+		// Check basic capability requirement - allow customization via filter
+		$required_capability = apply_filters( 'mcp_adapter_discover_abilities_capability', 'read' );
+		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
+		if ( ! current_user_can( $required_capability ) ) {
+			return new \WP_Error(
+				'insufficient_capability',
+				sprintf( 'User lacks required capability: %s', $required_capability )
+			);
+		}
+
+		return true;
 	}
 }

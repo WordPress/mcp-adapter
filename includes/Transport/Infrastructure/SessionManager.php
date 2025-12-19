@@ -40,37 +40,6 @@ final class SessionManager {
 	private const DEFAULT_INACTIVITY_TIMEOUT = DAY_IN_SECONDS;
 
 	/**
-	 * Get configuration values.
-	 *
-	 * @return array<string, int> Configuration array.
-	 */
-	private static function get_config(): array {
-		return array(
-			'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS ),
-			'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT ),
-		);
-	}
-
-	/**
-	 * Clear an inactive session (internal cleanup).
-	 *
-	 * @param int $user_id The user ID.
-	 * @param string $session_id The session ID to clear.
-	 *
-	 * @return void
-	 */
-	private static function clear_session( int $user_id, string $session_id ): void {
-		$sessions = self::get_all_user_sessions( $user_id );
-
-		if ( ! isset( $sessions[ $session_id ] ) ) {
-			return;
-		}
-
-		unset( $sessions[ $session_id ] );
-		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
-	}
-
-	/**
 	 * Create a new session for a user
 	 *
 	 * @param int $user_id The user ID.
@@ -121,6 +90,80 @@ final class SessionManager {
 	}
 
 	/**
+	 * Cleanup inactive sessions for a user
+	 *
+	 * @param int $user_id The user ID.
+	 *
+	 * @return int Number of sessions removed.
+	 */
+	public static function cleanup_expired_sessions( int $user_id ): int {
+		if ( ! $user_id ) {
+			return 0;
+		}
+
+		$sessions = self::get_all_user_sessions( $user_id );
+		$now      = time();
+		$removed  = 0;
+
+		$config             = self::get_config();
+		$inactivity_timeout = $config['inactivity_timeout'];
+
+		foreach ( $sessions as $session_id => $session ) {
+			// Check if still active - skip if valid
+			if ( $session['last_activity'] + $inactivity_timeout >= $now ) {
+				continue;
+			}
+
+			// Session is inactive - remove it
+			unset( $sessions[ $session_id ] );
+			++$removed;
+		}
+
+		if ( $removed > 0 ) {
+			if ( empty( $sessions ) ) {
+				delete_user_meta( $user_id, self::SESSION_META_KEY );
+			} else {
+				update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+			}
+		}
+
+		return $removed;
+	}
+
+	/**
+	 * Get all sessions for a user
+	 *
+	 * @param int $user_id The user ID.
+	 *
+	 * @return array Array of sessions.
+	 */
+	public static function get_all_user_sessions( int $user_id ): array {
+		if ( ! $user_id ) {
+			return array();
+		}
+
+		$sessions = get_user_meta( $user_id, self::SESSION_META_KEY, true );
+
+		if ( ! is_array( $sessions ) ) {
+			return array();
+		}
+
+		return $sessions;
+	}
+
+	/**
+	 * Get configuration values.
+	 *
+	 * @return array<string, int> Configuration array.
+	 */
+	private static function get_config(): array {
+		return array(
+			'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS ),
+			'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT ),
+		);
+	}
+
+	/**
 	 * Get a specific session for a user
 	 *
 	 * @param int $user_id The user ID.
@@ -151,6 +194,25 @@ final class SessionManager {
 		}
 
 		return $session;
+	}
+
+	/**
+	 * Clear an inactive session (internal cleanup).
+	 *
+	 * @param int $user_id The user ID.
+	 * @param string $session_id The session ID to clear.
+	 *
+	 * @return void
+	 */
+	private static function clear_session( int $user_id, string $session_id ): void {
+		$sessions = self::get_all_user_sessions( $user_id );
+
+		if ( ! isset( $sessions[ $session_id ] ) ) {
+			return;
+		}
+
+		unset( $sessions[ $session_id ] );
+		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
 	}
 
 	/**
@@ -221,67 +283,5 @@ final class SessionManager {
 		}
 
 		return true;
-	}
-
-	/**
-	 * Cleanup inactive sessions for a user
-	 *
-	 * @param int $user_id The user ID.
-	 *
-	 * @return int Number of sessions removed.
-	 */
-	public static function cleanup_expired_sessions( int $user_id ): int {
-		if ( ! $user_id ) {
-			return 0;
-		}
-
-		$sessions = self::get_all_user_sessions( $user_id );
-		$now      = time();
-		$removed  = 0;
-
-		$config             = self::get_config();
-		$inactivity_timeout = $config['inactivity_timeout'];
-
-		foreach ( $sessions as $session_id => $session ) {
-			// Check if still active - skip if valid
-			if ( $session['last_activity'] + $inactivity_timeout >= $now ) {
-				continue;
-			}
-
-			// Session is inactive - remove it
-			unset( $sessions[ $session_id ] );
-			++$removed;
-		}
-
-		if ( $removed > 0 ) {
-			if ( empty( $sessions ) ) {
-				delete_user_meta( $user_id, self::SESSION_META_KEY );
-			} else {
-				update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
-			}
-		}
-
-		return $removed;
-	}
-
-	/**
-	 * Get all sessions for a user
-	 *
-	 * @param int $user_id The user ID.
-	 *
-	 * @return array Array of sessions.
-	 */
-	public static function get_all_user_sessions( int $user_id ): array {
-		if ( ! $user_id ) {
-			return array();
-		}
-
-		$sessions = get_user_meta( $user_id, self::SESSION_META_KEY, true );
-
-		if ( ! is_array( $sessions ) ) {
-			return array();
-		}
-
-		return $sessions;
 	}
 }

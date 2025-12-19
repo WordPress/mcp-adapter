@@ -7,11 +7,11 @@
 
 declare( strict_types=1 );
 
-	namespace WP\MCP\Transport\Infrastructure;
+namespace WP\MCP\Transport\Infrastructure;
 
-	use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-	use WP\McpSchema\Common\AbstractDataTransferObject;
-	use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Common\AbstractDataTransferObject;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -43,8 +43,8 @@ class RequestRouter {
 	 * Route a request to the appropriate handler.
 	 *
 	 * @param string $method The MCP method name.
-	 * @param array  $params The request parameters.
-	 * @param mixed  $request_id The request ID (for JSON-RPC) - string, number, or null.
+	 * @param array $params The request parameters.
+	 * @param mixed $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
 	 *
@@ -96,6 +96,7 @@ class RequestRouter {
 				$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
 				$tags['error_code'] = $handler_result->getError()->getCode();
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+
 				return $result;
 			}
 
@@ -117,6 +118,7 @@ class RequestRouter {
 
 				$tags = array_merge( $common_tags, $component_tags, array( 'status' => 'success' ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+
 				return $result;
 			}
 
@@ -146,88 +148,19 @@ class RequestRouter {
 
 			// Create error response from exception.
 			$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Handler error occurred' );
+
 			return array( 'error' => $unexpected_error->getError()->toArray() );
 		}
 	}
 
 	/**
-	 * Handle initialize requests with session management.
+	 * Resolve per-component observability tags for a request.
 	 *
-	 * Converts InitializeResult DTO to array and adds session management.
+	 * This replaces legacy approaches that derived tags from DTO `_meta`.
 	 *
-	 * @param array $params The request parameters.
-	 * @param mixed $request_id The request ID.
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
-	 * @param string|null $new_session_id Newly created session id, if any.
+	 * @param string $method MCP method name.
+	 * @param array $params Request parameters (root or nested under `params`).
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
-	 */
-	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
-		// Get the initialize response from the handler (returns InitializeResult DTO).
-		$init_result = $this->context->initialize_handler->handle( $request_id );
-
-		// Handle session creation if HTTP context is provided.
-		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
-		if ( $http_context && ! $http_context->session_id ) {
-			$session_result = HttpSessionValidator::create_session( $params );
-
-			if ( is_array( $session_result ) ) {
-				$error = $session_result['error'] ?? array();
-
-				return McpErrorFactory::create_error_response(
-					$request_id,
-					isset( $error['code'] ) ? (int) $error['code'] : McpErrorFactory::INTERNAL_ERROR,
-					(string) ( $error['message'] ?? __( 'Failed to create session', 'mcp-adapter' ) ),
-					$error['data'] ?? null
-				);
-			}
-
-			$new_session_id = $session_result;
-		}
-
-		return $init_result;
-	}
-
-	/**
-	 * Create a method not found error with generic format.
-	 *
-	 * @param string $method The method that was not found.
-	 * @param mixed $request_id The request ID.
-	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
-	 */
-	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
-		return McpErrorFactory::method_not_found( $request_id, $method );
-	}
-
-	/**
-	 * Categorize an exception into a general error category.
-	 *
-	 * @param \Throwable $exception The exception to categorize.
-	 *
-	 * @return string
-	 */
-	private function categorize_error( \Throwable $exception ): string {
-		$error_categories = array(
-			\ArgumentCountError::class       => 'arguments',
-			\Error::class                    => 'system',
-			\InvalidArgumentException::class => 'validation',
-			\LogicException::class           => 'logic',
-			\RuntimeException::class         => 'execution',
-			\TypeError::class                => 'type',
-		);
-
-		return $error_categories[ get_class( $exception ) ] ?? 'unknown';
-	}
-
-		/**
-		 * Resolve per-component observability tags for a request.
-		 *
-		 * This replaces legacy approaches that derived tags from DTO `_meta`.
-		 *
-		 * @param string $method MCP method name.
-		 * @param array  $params Request parameters (root or nested under `params`).
-		 *
 	 * @return array<string, mixed>
 	 */
 	private function resolve_component_observability_context( string $method, array $params ): array {
@@ -334,5 +267,75 @@ class RequestRouter {
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Handle initialize requests with session management.
+	 *
+	 * Converts InitializeResult DTO to array and adds session management.
+	 *
+	 * @param array $params The request parameters.
+	 * @param mixed $request_id The request ID.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @param string|null $new_session_id Newly created session id, if any.
+	 *
+	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 */
+	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
+		// Get the initialize response from the handler (returns InitializeResult DTO).
+		$init_result = $this->context->initialize_handler->handle( $request_id );
+
+		// Handle session creation if HTTP context is provided.
+		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
+		if ( $http_context && ! $http_context->session_id ) {
+			$session_result = HttpSessionValidator::create_session( $params );
+
+			if ( is_array( $session_result ) ) {
+				$error = $session_result['error'] ?? array();
+
+				return McpErrorFactory::create_error_response(
+					$request_id,
+					isset( $error['code'] ) ? (int) $error['code'] : McpErrorFactory::INTERNAL_ERROR,
+					(string) ( $error['message'] ?? __( 'Failed to create session', 'mcp-adapter' ) ),
+					$error['data'] ?? null
+				);
+			}
+
+			$new_session_id = $session_result;
+		}
+
+		return $init_result;
+	}
+
+	/**
+	 * Create a method not found error with generic format.
+	 *
+	 * @param string $method The method that was not found.
+	 * @param mixed $request_id The request ID.
+	 *
+	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
+	 */
+	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
+		return McpErrorFactory::method_not_found( $request_id, $method );
+	}
+
+	/**
+	 * Categorize an exception into a general error category.
+	 *
+	 * @param \Throwable $exception The exception to categorize.
+	 *
+	 * @return string
+	 */
+	private function categorize_error( \Throwable $exception ): string {
+		$error_categories = array(
+			\ArgumentCountError::class       => 'arguments',
+			\Error::class                    => 'system',
+			\InvalidArgumentException::class => 'validation',
+			\LogicException::class           => 'logic',
+			\RuntimeException::class         => 'execution',
+			\TypeError::class                => 'type',
+		);
+
+		return $error_categories[ get_class( $exception ) ] ?? 'unknown';
 	}
 }

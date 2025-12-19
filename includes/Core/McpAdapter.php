@@ -32,20 +32,18 @@ final class McpAdapter {
 	 * @var \WP\MCP\Core\McpAdapter
 	 */
 	private static self $instance;
-
-	/**
-	 * Registered servers
-	 *
-	 * @var \WP\MCP\Core\McpServer[]
-	 */
-	private array $servers = array();
-
 	/**
 	 * Track if adapter has been initialized to prevent duplicate initialization
 	 *
 	 * @var bool
 	 */
 	private static bool $initialized = false;
+	/**
+	 * Registered servers
+	 *
+	 * @var \WP\MCP\Core\McpServer[]
+	 */
+	private array $servers = array();
 
 	/**
 	 * Get the registry instance
@@ -68,7 +66,7 @@ final class McpAdapter {
 		return self::$instance;
 	}
 
-		/**
+	/**
 	 * Initialize the registry
 	 *
 	 * @internal For use by instance initialization only.
@@ -83,6 +81,49 @@ final class McpAdapter {
 		do_action( 'mcp_adapter_init', $this );
 		$this->register_wp_cli_commands();
 		self::$initialized = true;
+	}
+
+	/**
+	 * Conditionally create the default server based on filter.
+	 *
+	 * @internal For use by adapter initialization only.
+	 */
+	private function maybe_create_default_server(): void {
+		// Allow disabling default server creation
+		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
+			return;
+		}
+
+		// Register category before abilities
+		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
+		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
+
+		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+	}
+
+	/**
+	 * Register WP-CLI commands if WP-CLI is available
+	 *
+	 * @internal For use by adapter initialization only.
+	 */
+	private function register_wp_cli_commands(): void {
+		// Only register if WP-CLI is available
+		if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) ) {
+			return;
+		}
+
+		if ( ! class_exists( '\WP_CLI' ) ) {
+			return;
+		}
+
+		\WP_CLI::add_command(
+			'mcp-adapter',
+			McpCommand::class,
+			array(
+				'shortdesc' => 'Manage MCP servers via WP-CLI.',
+				'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport.',
+			)
+		);
 	}
 
 	/**
@@ -115,7 +156,7 @@ final class McpAdapter {
 			return new \WP_Error(
 				'invalid_error_handler',
 				sprintf(
-					/* translators: %s: error handler class name */
+				/* translators: %s: error handler class name */
 					esc_html__( 'Error handler class "%s" does not exist.', 'mcp-adapter' ),
 					esc_html( $error_handler )
 				)
@@ -167,6 +208,7 @@ final class McpAdapter {
 				esc_html__( 'MCP Servers must be created during the "mcp_adapter_init" action. Hook into "mcp_adapter_init" to register your server.', 'mcp-adapter' ),
 				'0.1.0'
 			);
+
 			return new \WP_Error(
 				'invalid_timing',
 				esc_html__( 'MCP Server creation must be done during mcp_adapter_init action.', 'mcp-adapter' )
@@ -183,6 +225,7 @@ final class McpAdapter {
 				),
 				'0.1.0'
 			);
+
 			return new \WP_Error(
 				'duplicate_server_id',
 				// translators: %s: server ID.
@@ -247,24 +290,6 @@ final class McpAdapter {
 	}
 
 	/**
-	 * Conditionally create the default server based on filter.
-	 *
-	 * @internal For use by adapter initialization only.
-	 */
-	private function maybe_create_default_server(): void {
-		// Allow disabling default server creation
-		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
-			return;
-		}
-
-		// Register category before abilities
-		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
-		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
-
-		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
-	}
-
-	/**
 	 * Register the default MCP category.
 	 *
 	 * @return void
@@ -289,30 +314,5 @@ final class McpAdapter {
 		DiscoverAbilitiesAbility::register();
 		GetAbilityInfoAbility::register();
 		ExecuteAbilityAbility::register();
-	}
-
-	/**
-	 * Register WP-CLI commands if WP-CLI is available
-	 *
-	 * @internal For use by adapter initialization only.
-	 */
-	private function register_wp_cli_commands(): void {
-		// Only register if WP-CLI is available
-		if ( ! defined( 'WP_CLI' ) || ! constant( 'WP_CLI' ) ) {
-			return;
-		}
-
-		if ( ! class_exists( 'WP_CLI' ) ) {
-			return;
-		}
-
-		\WP_CLI::add_command(
-			'mcp-adapter',
-			McpCommand::class,
-			array(
-				'shortdesc' => 'Manage MCP servers via WP-CLI.',
-				'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport.',
-			)
-		);
 	}
 }

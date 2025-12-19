@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 
 /**
  * Provides common helper methods for MCP handlers.
@@ -35,8 +36,8 @@ trait HandlerHelperTrait {
 	 * This helper ensures all error responses follow the same format and
 	 * properly extract the error field from McpErrorFactory responses.
 	 *
-	 * @param int             $code       Error code.
-	 * @param string          $message    Error message.
+	 * @param int $code Error code.
+	 * @param string $message Error message.
 	 * @param string|int|null $request_id Optional. Request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Error response array with 'error' key.
@@ -63,7 +64,7 @@ trait HandlerHelperTrait {
 	 */
 	protected function extract_error( $factory_response ): array {
 		// Handle DTO responses
-		if ( $factory_response instanceof \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse ) {
+		if ( $factory_response instanceof JSONRPCErrorResponse ) {
 			return $factory_response->getError()->toArray();
 		}
 
@@ -98,7 +99,7 @@ trait HandlerHelperTrait {
 	/**
 	 * Creates internal error response.
 	 *
-	 * @param string $message    Error message.
+	 * @param string $message Error message.
 	 * @param string|int|null $request_id Optional. Request ID for JSON-RPC. Default 0.
 	 *
 	 * @return array Error response array.

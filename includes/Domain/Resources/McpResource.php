@@ -6,7 +6,7 @@
  * @package McpAdapter
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
@@ -180,7 +180,7 @@ final class McpResource implements McpComponentInterface {
 			return new \WP_Error(
 				'mcp_resource_dto_creation_failed',
 				sprintf(
-					/* translators: %s: error message */
+				/* translators: %s: error message */
 					__( 'Failed to create Resource DTO: %s', 'mcp-adapter' ),
 					$e->getMessage()
 				),
@@ -216,7 +216,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Create an ability-backed MCP resource.
 	 *
-	 * @param \WP_Ability                                                              $ability WordPress ability.
+	 * @param \WP_Ability $ability WordPress ability.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
 	 *
 	 * @return self|\WP_Error
@@ -314,6 +314,7 @@ final class McpResource implements McpComponentInterface {
 		if ( null !== $this->permission_callback ) {
 			try {
 				$result = call_user_func( $this->permission_callback, $arguments );
+
 				return $result instanceof \WP_Error ? $result : (bool) $result;
 			} catch ( \Throwable $throwable ) {
 				return new \WP_Error(

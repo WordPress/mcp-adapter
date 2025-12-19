@@ -59,6 +59,18 @@ class StdioServerBridge {
 	}
 
 	/**
+	 * Create a request router for the server.
+	 *
+	 * @return \WP\MCP\Transport\Infrastructure\RequestRouter
+	 */
+	private function create_request_router(): RequestRouter {
+		// Create transport context using server's infrastructure
+		$context = $this->server->create_transport_context();
+
+		return $context->request_router;
+	}
+
+	/**
 	 * Start the STDIO server bridge.
 	 *
 	 * This method reads JSON-RPC messages from stdin and writes responses to stdout.
@@ -119,7 +131,7 @@ class StdioServerBridge {
 					JsonRpcResponseBuilder::create_error_response(
 						null,
 						array(
-							'code'    => -32603,
+							'code'    => - 32603,
 							'message' => 'Internal error',
 							'data'    => array(
 								'details' => $e->getMessage(),
@@ -137,10 +149,12 @@ class StdioServerBridge {
 	}
 
 	/**
-	 * Stop the STDIO server bridge.
+	 * Log a message to stderr.
+	 *
+	 * @param string $message The message to log.
 	 */
-	public function stop(): void {
-		$this->is_running = false;
+	private function log_to_stderr( string $message ): void {
+		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore
 	}
 
 	/**
@@ -158,7 +172,7 @@ class StdioServerBridge {
 			if ( json_last_error() !== JSON_ERROR_NONE ) {
 				return $this->create_error_response(
 					null,
-					-32700,
+					- 32700,
 					'Parse error',
 					'Invalid JSON was received by the server.'
 				);
@@ -168,7 +182,7 @@ class StdioServerBridge {
 			if ( ! is_array( $request ) ) {
 				return $this->create_error_response(
 					null,
-					-32600,
+					- 32600,
 					'Invalid Request',
 					'The JSON sent is not a valid Request object.'
 				);
@@ -178,7 +192,7 @@ class StdioServerBridge {
 			if ( ! isset( $request['jsonrpc'] ) || '2.0' !== $request['jsonrpc'] ) {
 				return $this->create_error_response(
 					$request['id'] ?? null,
-					-32600,
+					- 32600,
 					'Invalid Request',
 					'The JSON-RPC version must be 2.0.'
 				);
@@ -192,7 +206,7 @@ class StdioServerBridge {
 			if ( ! is_string( $method ) ) {
 				return $this->create_error_response(
 					$id,
-					-32600,
+					- 32600,
 					'Invalid Request',
 					'Method must be a string.'
 				);
@@ -226,7 +240,7 @@ class StdioServerBridge {
 			// Handle unexpected errors
 			return $this->create_error_response(
 				null,
-				-32603,
+				- 32603,
 				'Internal error',
 				$e->getMessage()
 			);
@@ -234,42 +248,12 @@ class StdioServerBridge {
 	}
 
 	/**
-	 * Format a handler result as a JSON-RPC response.
-	 *
-	 * @param array $result The handler result.
-	 * @param mixed $id     The request ID.
-	 *
-	 * @return string The JSON-RPC response string.
-	 */
-	private function format_response( array $result, $id ): string {
-		// Check if result contains an error
-		if ( isset( $result['error'] ) ) {
-			$error = $result['error'];
-
-			// Ensure error has required fields
-			$error_payload = array(
-				'code'    => $error['code'] ?? -32603,
-				'message' => $error['message'] ?? 'Internal error',
-			);
-
-			// Add data field if present
-			if ( isset( $error['data'] ) ) {
-				$error_payload['data'] = $error['data'];
-			}
-
-			return $this->encode_response( JsonRpcResponseBuilder::create_error_response( $id, $error_payload ) );
-		}
-
-		return $this->encode_response( JsonRpcResponseBuilder::create_success_response( $id, $result ) );
-	}
-
-	/**
 	 * Create a JSON-RPC error response.
 	 *
-	 * @param mixed  $id      The request ID (can be null).
-	 * @param int    $code    The error code.
+	 * @param mixed $id The request ID (can be null).
+	 * @param int $code The error code.
 	 * @param string $message The error message.
-	 * @param string $data    Optional error data.
+	 * @param string $data Optional error data.
 	 *
 	 * @return string The JSON error response string.
 	 */
@@ -304,23 +288,40 @@ class StdioServerBridge {
 	}
 
 	/**
-	 * Create a request router for the server.
+	 * Format a handler result as a JSON-RPC response.
 	 *
-	 * @return \WP\MCP\Transport\Infrastructure\RequestRouter
+	 * @param array $result The handler result.
+	 * @param mixed $id The request ID.
+	 *
+	 * @return string The JSON-RPC response string.
 	 */
-	private function create_request_router(): RequestRouter {
-		// Create transport context using server's infrastructure
-		$context = $this->server->create_transport_context();
-		return $context->request_router;
+	private function format_response( array $result, $id ): string {
+		// Check if result contains an error
+		if ( isset( $result['error'] ) ) {
+			$error = $result['error'];
+
+			// Ensure error has required fields
+			$error_payload = array(
+				'code'    => $error['code'] ?? - 32603,
+				'message' => $error['message'] ?? 'Internal error',
+			);
+
+			// Add data field if present
+			if ( isset( $error['data'] ) ) {
+				$error_payload['data'] = $error['data'];
+			}
+
+			return $this->encode_response( JsonRpcResponseBuilder::create_error_response( $id, $error_payload ) );
+		}
+
+		return $this->encode_response( JsonRpcResponseBuilder::create_success_response( $id, $result ) );
 	}
 
 	/**
-	 * Log a message to stderr.
-	 *
-	 * @param string $message The message to log.
+	 * Stop the STDIO server bridge.
 	 */
-	private function log_to_stderr( string $message ): void {
-		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore
+	public function stop(): void {
+		$this->is_running = false;
 	}
 
 	/**

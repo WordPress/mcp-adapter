@@ -6,7 +6,7 @@
  * @package McpAdapter
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
@@ -70,7 +70,7 @@ class RegisterAbilityAsMcpTool {
 			return new \WP_Error(
 				'mcp_tool_dto_creation_failed',
 				sprintf(
-					/* translators: %s: error message */
+				/* translators: %s: error message */
 					__( 'Failed to create Tool DTO for ability %1$s: %2$s', 'mcp-adapter' ),
 					$ability->get_name(),
 					$e->getMessage()
@@ -92,48 +92,6 @@ class RegisterAbilityAsMcpTool {
 			'tool'         => $tool_dto,
 			'adapter_meta' => $data['adapter_meta'],
 		);
-	}
-
-	/**
-	 * Resolve the MCP tool name from ability.
-	 *
-	 * Sanitizes the ability name to MCP-valid format, applies filter, and validates result.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @return string|\WP_Error Valid tool name or error.
-	 */
-	private function resolve_tool_name() {
-		// Sanitize ability name to MCP-valid format.
-		$sanitized_name = McpNameSanitizer::sanitize_name( $this->ability->get_name() );
-
-		if ( is_wp_error( $sanitized_name ) ) {
-			return $sanitized_name;
-		}
-
-		/**
-		 * Filters the MCP tool name derived from an ability.
-		 *
-		 * @since n.e.x.t
-		 *
-		 * @param string      $name    The sanitized tool name.
-		 * @param \WP_Ability $ability The source ability instance.
-		 */
-		$filtered_name = apply_filters( 'mcp_adapter_tool_name', $sanitized_name, $this->ability );
-
-		// Validate post-filter (in case filter broke it).
-		if ( ! is_string( $filtered_name ) || ! McpValidator::validate_tool_or_prompt_name( $filtered_name ) ) {
-			return new \WP_Error(
-				'mcp_tool_name_filter_invalid',
-				sprintf(
-					/* translators: %s: invalid tool name returned by filter */
-					__( 'Filter returned invalid MCP tool name: %s', 'mcp-adapter' ),
-					is_string( $filtered_name ) ? $filtered_name : gettype( $filtered_name )
-				)
-			);
-		}
-
-		return $filtered_name;
 	}
 
 	/**
@@ -236,5 +194,48 @@ class RegisterAbilityAsMcpTool {
 			'tool_data'    => $tool_data,
 			'adapter_meta' => $adapter_meta,
 		);
+	}
+
+	/**
+	 * Resolve the MCP tool name from ability.
+	 *
+	 * Sanitizes the ability name to MCP-valid format, applies filter, and validates result.
+	 *
+	 * @return string|\WP_Error Valid tool name or error.
+	 * @since n.e.x.t
+	 *
+	 */
+	private function resolve_tool_name() {
+		// Sanitize ability name to MCP-valid format.
+		$sanitized_name = McpNameSanitizer::sanitize_name( $this->ability->get_name() );
+
+		if ( is_wp_error( $sanitized_name ) ) {
+			return $sanitized_name;
+		}
+
+		/**
+		 * Filters the MCP tool name derived from an ability.
+		 *
+		 * @param string $name The sanitized tool name.
+		 * @param \WP_Ability $ability The source ability instance.
+		 *
+		 * @since n.e.x.t
+		 *
+		 */
+		$filtered_name = apply_filters( 'mcp_adapter_tool_name', $sanitized_name, $this->ability );
+
+		// Validate post-filter (in case filter broke it).
+		if ( ! is_string( $filtered_name ) || ! McpValidator::validate_tool_or_prompt_name( $filtered_name ) ) {
+			return new \WP_Error(
+				'mcp_tool_name_filter_invalid',
+				sprintf(
+				/* translators: %s: invalid tool name returned by filter */
+					__( 'Filter returned invalid MCP tool name: %s', 'mcp-adapter' ),
+					is_string( $filtered_name ) ? $filtered_name : gettype( $filtered_name )
+				)
+			);
+		}
+
+		return $filtered_name;
 	}
 }
