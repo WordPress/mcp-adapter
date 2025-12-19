@@ -33,7 +33,7 @@ final class McpAdapter {
 	 */
 	private static self $instance;
 	/**
-	 * Track if adapter has been initialized to prevent duplicate initialization
+	 * Track if the adapter has been initialized to prevent duplicate initialization
 	 *
 	 * @var bool
 	 */
@@ -156,7 +156,7 @@ final class McpAdapter {
 			return new \WP_Error(
 				'invalid_error_handler',
 				sprintf(
-				/* translators: %s: error handler class name */
+					/* translators: %s: error handler class name */
 					esc_html__( 'Error handler class "%s" does not exist.', 'mcp-adapter' ),
 					esc_html( $error_handler )
 				)

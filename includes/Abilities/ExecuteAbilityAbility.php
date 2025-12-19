@@ -219,7 +219,7 @@ final class ExecuteAbilityAbility {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	private static function validate_user_access() {
-		// Verify caller identity - ensure user is authenticated
+		// Verify caller identity - ensure the user is authenticated
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}

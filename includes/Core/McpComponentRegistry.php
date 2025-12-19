@@ -19,7 +19,6 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Resources\Resource;
 use WP\McpSchema\Server\Tools\Tool;
-use function wp_get_ability;
 
 /**
  * Registry for managing MCP server components (tools, resources, prompts).
@@ -208,7 +207,7 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	private function register_ability_tool( string $ability_name ): void {
-		$ability = wp_get_ability( $ability_name );
+		$ability = \wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpTool::{$ability_name}" ) );
@@ -322,7 +321,7 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	private function register_ability_resource( string $ability_name ): void {
-		$ability = wp_get_ability( $ability_name );
+		$ability = \wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
@@ -522,7 +521,7 @@ class McpComponentRegistry {
 	 * @return void
 	 */
 	private function register_ability_prompt( string $ability_name ): void {
-		$ability = wp_get_ability( $ability_name );
+		$ability = \wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$ability_name}" ) );

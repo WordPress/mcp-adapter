@@ -30,60 +30,70 @@ class McpServer {
 	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 */
 	public McpErrorHandlerInterface $error_handler;
+
 	/**
 	 * Observability handler instance.
 	 *
 	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
 	 */
 	public McpObservabilityHandlerInterface $observability_handler;
+
 	/**
 	 * Server ID.
 	 *
 	 * @var string
 	 */
 	private string $server_id;
+
 	/**
 	 * Server URL.
 	 *
 	 * @var string
 	 */
 	private string $server_route_namespace;
+
 	/**
 	 * Server route.
 	 *
 	 * @var string
 	 */
 	private string $server_route;
+
 	/**
 	 * Server name.
 	 *
 	 * @var string
 	 */
 	private string $server_name;
+
 	/**
 	 * Server description.
 	 *
 	 * @var string
 	 */
 	private string $server_description;
+
 	/**
 	 * Server version.
 	 *
 	 * @var string
 	 */
 	private string $server_version;
+
 	/**
 	 * Component registry for managing tools, resources, and prompts.
 	 *
 	 * @var \WP\MCP\Core\McpComponentRegistry
 	 */
 	private McpComponentRegistry $component_registry;
+
 	/**
 	 * Transport factory for initializing transports.
 	 *
 	 * @var \WP\MCP\Core\McpTransportFactory
 	 */
 	private McpTransportFactory $transport_factory;
+
 	/**
 	 * Whether MCP validation is enabled.
 	 *
@@ -259,7 +269,7 @@ class McpServer {
 	}
 
 	/**
-	 * Get server name.
+	 * Get the server name.
 	 *
 	 * @return string
 	 */

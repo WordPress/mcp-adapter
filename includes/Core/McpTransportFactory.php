@@ -44,7 +44,7 @@ class McpTransportFactory {
 	 */
 	public function initialize_transports( array $mcp_transports ): void {
 		foreach ( $mcp_transports as $mcp_transport ) {
-			// Check if class exists
+			// Check if the class exists
 			if ( ! class_exists( $mcp_transport ) ) {
 				_doing_it_wrong(
 					__FUNCTION__,
@@ -89,7 +89,7 @@ class McpTransportFactory {
 	}
 
 	/**
-	 * Create transport context with all required dependencies.
+	 * Create the transport context with all required dependencies.
 	 *
 	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
