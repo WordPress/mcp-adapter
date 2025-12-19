@@ -49,7 +49,7 @@ final class McpResource implements McpComponentInterface {
 	 *
 	 * @var \WP\McpSchema\Server\Resources\Resource
 	 */
-	private Resource $resource;
+	private Resource $mcp_resource_dto;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed resources).
@@ -93,10 +93,10 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\Resource $resource The Resource DTO.
+	 * @param \WP\McpSchema\Server\Resources\Resource $resource_dto The Resource DTO.
 	 */
-	private function __construct( Resource $resource ) {
-		$this->resource = $resource;
+	private function __construct( Resource $resource_dto ) {
+		$this->mcp_resource_dto = $resource_dto;
 	}
 
 	// =========================================================================
@@ -243,7 +243,7 @@ final class McpResource implements McpComponentInterface {
 	 * @return \WP\McpSchema\Server\Resources\Resource
 	 */
 	public function get_component(): Resource {
-		return $this->resource;
+		return $this->mcp_resource_dto;
 	}
 
 	/**

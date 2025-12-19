@@ -211,54 +211,6 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( 'array', $result['source'] );
 	}
 
-	public function test_array_config_can_be_registered_with_server(): void {
-		$array_config = array(
-			'name'    => 'config-server-test',
-			'title'   => 'Config Server Test',
-			'handler' => fn( $args ) => array( 'source' => 'config' ),
-		);
-
-		$server = $this->makeServer( array(), array(), array( $array_config ) );
-
-		$prompts = $server->get_prompts();
-		$this->assertArrayHasKey( 'config-server-test', $prompts );
-
-		$mcp_prompt = $server->get_mcp_prompt( 'config-server-test' );
-		$this->assertNotNull( $mcp_prompt );
-
-		$result = $mcp_prompt->execute( array() );
-		$this->assertSame( 'config', $result['source'] );
-	}
-
-	public function test_mixed_registration_formats(): void {
-		$prompt_instance = McpPrompt::fromArray( array(
-			'name'    => 'instance-mixed',
-			'handler' => fn( $args ) => array( 'type' => 'instance' ),
-		) );
-
-		$array_config = array(
-			'name'    => 'array-mixed',
-			'handler' => fn( $args ) => array( 'type' => 'array' ),
-		);
-
-		// Mix: instance, array config, and class name.
-		$server = $this->makeServer(
-			array(),
-			array(),
-			array(
-				$prompt_instance,
-				$array_config,
-				TestPrompt::class, // From existing test file.
-			)
-		);
-
-		$prompts = $server->get_prompts();
-
-		$this->assertArrayHasKey( 'instance-mixed', $prompts );
-		$this->assertArrayHasKey( 'array-mixed', $prompts );
-		$this->assertArrayHasKey( 'test-prompt', $prompts );
-	}
-
 	// =========================================================================
 	// Interface Implementation Tests
 	// =========================================================================

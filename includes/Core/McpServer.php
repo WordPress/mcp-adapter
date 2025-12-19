@@ -15,8 +15,6 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Resources\Resource;
-use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -343,17 +341,6 @@ class McpServer {
 	}
 
 	/**
-	 * Get a specific tool by name.
-	 *
-	 * @param string $tool_name Tool name.
-	 *
-	 * @return \WP\McpSchema\Server\Tools\Tool|null
-	 */
-	public function get_tool( string $tool_name ): ?Tool {
-		return $this->component_registry->get_tool( $tool_name );
-	}
-
-	/**
 	 * Get a specific McpTool by name.
 	 *
 	 * @internal
@@ -365,29 +352,6 @@ class McpServer {
 	 */
 	public function get_mcp_tool( string $tool_name ): ?\WP\MCP\Domain\Tools\McpTool {
 		return $this->component_registry->get_mcp_tool( $tool_name );
-	}
-
-	/**
-	 * Get all MCP tools.
-	 *
-	 * @internal
-	 * @since n.e.x.t
-	 *
-	 * @return array<string, \WP\MCP\Domain\Tools\McpTool>
-	 */
-	public function get_mcp_tools(): array {
-		return $this->component_registry->get_mcp_tools();
-	}
-
-	/**
-	 * Get a specific resource by URI.
-	 *
-	 * @param string $resource_uri Resource URI.
-	 *
-	 * @return \WP\McpSchema\Server\Resources\Resource|null
-	 */
-	public function get_resource( string $resource_uri ): ?Resource {
-		return $this->component_registry->get_resource( $resource_uri );
 	}
 
 	/**
@@ -405,18 +369,6 @@ class McpServer {
 	}
 
 	/**
-	 * Get all MCP resources.
-	 *
-	 * @internal
-	 * @since n.e.x.t
-	 *
-	 * @return array<string, \WP\MCP\Domain\Resources\McpResource>
-	 */
-	public function get_mcp_resources(): array {
-		return $this->component_registry->get_mcp_resources();
-	}
-
-	/**
 	 * Get a specific prompt by name.
 	 *
 	 * @param string $prompt_name Prompt name.
@@ -424,7 +376,8 @@ class McpServer {
 	 * @return \WP\McpSchema\Server\Prompts\Prompt|null
 	 */
 	public function get_prompt( string $prompt_name ): ?Prompt {
-		return $this->component_registry->get_prompt( $prompt_name );
+		$mcp_prompt = $this->component_registry->get_mcp_prompt( $prompt_name );
+		return $mcp_prompt ? $mcp_prompt->get_component() : null;
 	}
 
 	/**
@@ -468,14 +421,5 @@ class McpServer {
 	 */
 	public function is_mcp_validation_enabled(): bool {
 		return $this->mcp_validation_enabled;
-	}
-
-	/**
-	 * Get the component registry instance.
-	 *
-	 * @return \WP\MCP\Core\McpComponentRegistry
-	 */
-	public function get_component_registry(): McpComponentRegistry {
-		return $this->component_registry;
 	}
 }

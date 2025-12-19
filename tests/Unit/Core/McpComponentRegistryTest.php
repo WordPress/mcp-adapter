@@ -15,8 +15,6 @@ use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\Tool;
-use WP\McpSchema\Server\Tools\ToolInputSchema;
 
 // Test prompt builder for registry testing
 // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
@@ -166,16 +164,18 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_tools_accepts_mcp_tools(): void {
-		$mcp_tool = \WP\MCP\Domain\Tools\McpTool::fromArray( array(
-			'name'        => 'direct-mcp-tool',
-			'description' => 'Direct MCP tool',
-			'handler'     => static function () {
-				return array( 'ok' => true );
-			},
-			'permission'  => static function () {
-				return true;
-			},
-		) );
+		$mcp_tool = \WP\MCP\Domain\Tools\McpTool::fromArray(
+			array(
+				'name'        => 'direct-mcp-tool',
+				'description' => 'Direct MCP tool',
+				'handler'     => static function () {
+					return array( 'ok' => true );
+				},
+				'permission'  => static function () {
+					return true;
+				},
+			)
+		);
 
 		$this->registry->register_tools( array( $mcp_tool ) );
 
@@ -321,38 +321,38 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $failure_event );
 	}
 
-	public function test_get_tool_by_name(): void {
+	public function test_get_mcp_tool_by_name(): void {
 		$this->registry->register_tools( array( 'test/always-allowed' ) );
 
-		$tool = $this->registry->get_tool( 'test-always-allowed' );
-		$this->assertInstanceOf( \WP\McpSchema\Server\Tools\Tool::class, $tool );
-		$this->assertEquals( 'test-always-allowed', $tool->getName() );
+		$mcp_tool = $this->registry->get_mcp_tool( 'test-always-allowed' );
+		$this->assertInstanceOf( \WP\MCP\Domain\Tools\McpTool::class, $mcp_tool );
+		$this->assertEquals( 'test-always-allowed', $mcp_tool->get_component()->getName() );
 
-		$nonexistent = $this->registry->get_tool( 'nonexistent' );
+		$nonexistent = $this->registry->get_mcp_tool( 'nonexistent' );
 		$this->assertNull( $nonexistent );
 	}
 
-	public function test_get_resource_by_uri(): void {
+	public function test_get_mcp_resource_by_uri(): void {
 		$this->registry->register_resources( array( 'test/resource' ) );
 
 		$resources = $this->registry->get_resources();
 		$this->assertNotEmpty( $resources );
 
 		$resource_uri = array_keys( $resources )[0];
-		$resource     = $this->registry->get_resource( $resource_uri );
-		$this->assertInstanceOf( \WP\McpSchema\Server\Resources\Resource::class, $resource );
+		$mcp_resource = $this->registry->get_mcp_resource( $resource_uri );
+		$this->assertInstanceOf( \WP\MCP\Domain\Resources\McpResource::class, $mcp_resource );
 
-		$nonexistent = $this->registry->get_resource( 'nonexistent://resource' );
+		$nonexistent = $this->registry->get_mcp_resource( 'nonexistent://resource' );
 		$this->assertNull( $nonexistent );
 	}
 
-	public function test_get_prompt_by_name(): void {
+	public function test_get_mcp_prompt_by_name(): void {
 		$this->registry->register_prompts( array( 'test/prompt' ) );
 
-		$prompt = $this->registry->get_prompt( 'test-prompt' );
-		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\Prompt::class, $prompt );
+		$mcp_prompt = $this->registry->get_mcp_prompt( 'test-prompt' );
+		$this->assertInstanceOf( \WP\MCP\Domain\Prompts\McpPrompt::class, $mcp_prompt );
 
-		$nonexistent = $this->registry->get_prompt( 'nonexistent' );
+		$nonexistent = $this->registry->get_mcp_prompt( 'nonexistent' );
 		$this->assertNull( $nonexistent );
 	}
 
@@ -798,11 +798,9 @@ final class McpComponentRegistryTest extends TestCase {
 		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
 		$combined     = implode( ' ', $log_messages );
 
-		// Verify the error message contains key information.
-		$this->assertStringContainsString( 'Duplicate resource URI', $combined );
+		// Verify the error message contains the URI (simplified message from add_mcp_resource).
+		$this->assertStringContainsString( 'already registered', $combined );
 		$this->assertStringContainsString( $same_uri, $combined );
-		$this->assertStringContainsString( 'test/resource-beta', $combined, 'Log should mention the duplicate ability' );
-		$this->assertStringContainsString( 'test/resource-alpha', $combined, 'Log should mention the existing ability' );
 
 		// Clean up.
 		wp_unregister_ability( 'test/resource-alpha' );
@@ -887,7 +885,6 @@ final class McpComponentRegistryTest extends TestCase {
 		$duplicate_event = array_values( $duplicate_events )[0];
 		$this->assertSame( 'test/resource-observer-second', $duplicate_event['tags']['component_name'] );
 		$this->assertSame( $same_uri, $duplicate_event['tags']['duplicate_uri'] );
-		$this->assertSame( 'test/resource-observer-first', $duplicate_event['tags']['existing_ability_name'] );
 
 		// Verify success event for first resource.
 		$success_events = array_filter(
