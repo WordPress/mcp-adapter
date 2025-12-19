@@ -93,14 +93,13 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$result = $handler->call_tool( array( 'params' => array() ) )->toArray();
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
-		// Error codes are now float from DTOs
-		$this->assertEquals( (float) McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 
 		// Test tool not found error
 		$result = $handler->call_tool( array( 'params' => array( 'name' => 'nonexistent-tool' ) ) )->toArray();
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
-		$this->assertEquals( (float) McpErrorFactory::TOOL_NOT_FOUND, $result['error']['code'] );
+		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $result['error']['code'] );
 	}
 
 	public function test_error_logging_works_with_instances(): void {

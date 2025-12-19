@@ -21,7 +21,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$this->assertSame( '2.0', $response->getJsonrpc() );
 		$this->assertSame( 1, $response->getId() );
 		$this->assertInstanceOf( Error::class, $response->getError() );
-		$this->assertSame( -32603.0, $response->getError()->getCode() );
+		$this->assertSame( -32603, $response->getError()->getCode() );
 		$this->assertSame( 'Test error', $response->getError()->getMessage() );
 	}
 
@@ -39,7 +39,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $array );
 		$this->assertArrayHasKey( 'code', $array['error'] );
 		$this->assertArrayHasKey( 'message', $array['error'] );
-		$this->assertSame( -32603.0, $array['error']['code'] );
+		$this->assertSame( -32603, $array['error']['code'] );
 		$this->assertSame( 'Test error', $array['error']['message'] );
 	}
 
@@ -97,7 +97,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::parse_error( 1, 'Invalid JSON' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::PARSE_ERROR, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PARSE_ERROR, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Parse error', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'Invalid JSON', $response->getError()->getMessage() );
 	}
@@ -109,7 +109,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::parse_error( 1 );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::PARSE_ERROR, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PARSE_ERROR, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Parse error', $response->getError()->getMessage() );
 	}
 
@@ -120,7 +120,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::invalid_request( 1, 'Missing method' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Invalid Request', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'Missing method', $response->getError()->getMessage() );
 	}
@@ -132,7 +132,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::method_not_found( 1, 'test/method' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::METHOD_NOT_FOUND, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'test/method', $response->getError()->getMessage() );
 	}
 
@@ -143,7 +143,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::invalid_params( 1, 'Parameter validation failed' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::INVALID_PARAMS, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Invalid params', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'Parameter validation failed', $response->getError()->getMessage() );
 	}
@@ -155,7 +155,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::internal_error( 1, 'Database connection failed' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::INTERNAL_ERROR, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Internal error', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'Database connection failed', $response->getError()->getMessage() );
 	}
@@ -167,7 +167,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::mcp_disabled( 1 );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::SERVER_ERROR, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::SERVER_ERROR, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'MCP functionality is currently disabled', $response->getError()->getMessage() );
 	}
 
@@ -178,7 +178,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::validation_error( 1, 'Tool name is required' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::INVALID_PARAMS, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Validation error', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'Tool name is required', $response->getError()->getMessage() );
 	}
@@ -190,7 +190,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::missing_parameter( 1, 'tool_name' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::INVALID_PARAMS, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Missing required parameter', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'tool_name', $response->getError()->getMessage() );
 	}
@@ -202,7 +202,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::resource_not_found( 1, 'mcp://resource/test' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::RESOURCE_NOT_FOUND, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::RESOURCE_NOT_FOUND, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Resource not found', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'mcp://resource/test', $response->getError()->getMessage() );
 	}
@@ -214,7 +214,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::tool_not_found( 1, 'test-tool' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::TOOL_NOT_FOUND, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Tool not found', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'test-tool', $response->getError()->getMessage() );
 	}
@@ -226,7 +226,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::ability_not_found( 1, 'test-ability' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::TOOL_NOT_FOUND, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Ability not found', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'test-ability', $response->getError()->getMessage() );
 	}
@@ -238,7 +238,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::prompt_not_found( 1, 'test-prompt' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::PROMPT_NOT_FOUND, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PROMPT_NOT_FOUND, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Prompt not found', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'test-prompt', $response->getError()->getMessage() );
 	}
@@ -250,7 +250,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::permission_denied( 1, 'User lacks required capability' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::PERMISSION_DENIED, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PERMISSION_DENIED, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Permission denied', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'User lacks required capability', $response->getError()->getMessage() );
 	}
@@ -262,7 +262,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::permission_denied( 1 );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::PERMISSION_DENIED, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PERMISSION_DENIED, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Permission denied', $response->getError()->getMessage() );
 	}
 
@@ -273,7 +273,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::unauthorized( 1, 'Authentication required' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::UNAUTHORIZED, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::UNAUTHORIZED, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Unauthorized', $response->getError()->getMessage() );
 		$this->assertStringContainsString( 'Authentication required', $response->getError()->getMessage() );
 	}
@@ -285,7 +285,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$response = McpErrorFactory::unauthorized( 1 );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $response );
-		$this->assertSame( (float) McpErrorFactory::UNAUTHORIZED, $response->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::UNAUTHORIZED, $response->getError()->getCode() );
 		$this->assertStringContainsString( 'Unauthorized', $response->getError()->getMessage() );
 	}
 
@@ -512,7 +512,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$result = McpErrorFactory::validate_jsonrpc_message( 'not an array' );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
 		$this->assertStringContainsString( 'JSON object', $result->getError()->getMessage() );
 	}
 
@@ -528,7 +528,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$result = McpErrorFactory::validate_jsonrpc_message( $message );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
 		$this->assertStringContainsString( 'jsonrpc version', $result->getError()->getMessage() );
 	}
 
@@ -545,7 +545,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$result = McpErrorFactory::validate_jsonrpc_message( $message );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
 	}
 
 	/**
@@ -561,7 +561,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$result = McpErrorFactory::validate_jsonrpc_message( $message );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
 		$this->assertStringContainsString( 'method or result/error field', $result->getError()->getMessage() );
 	}
 
@@ -578,7 +578,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$result = McpErrorFactory::validate_jsonrpc_message( $message );
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result->getError()->getCode() );
 		$this->assertStringContainsString( 'id field', $result->getError()->getMessage() );
 	}
 
@@ -589,7 +589,7 @@ final class McpErrorFactoryTest extends TestCase {
 		$error = McpErrorFactory::create_error( -32603, 'Test error' );
 
 		$this->assertInstanceOf( Error::class, $error );
-		$this->assertSame( -32603.0, $error->getCode() );
+		$this->assertSame( -32603, $error->getCode() );
 		$this->assertSame( 'Test error', $error->getMessage() );
 		$this->assertNull( $error->getData() );
 	}

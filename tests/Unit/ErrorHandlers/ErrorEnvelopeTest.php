@@ -46,7 +46,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 123, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::INVALID_PARAMS, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'test_param', $err->getError()->getMessage() );
 	}
 
@@ -55,7 +55,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 456, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::METHOD_NOT_FOUND, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'test/method', $err->getError()->getMessage() );
 	}
 
@@ -64,7 +64,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 789, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::INTERNAL_ERROR, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'Something went wrong', $err->getError()->getMessage() );
 	}
 
@@ -73,7 +73,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 101, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::TOOL_NOT_FOUND, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'missing-tool', $err->getError()->getMessage() );
 	}
 
@@ -82,7 +82,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 102, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::RESOURCE_NOT_FOUND, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::RESOURCE_NOT_FOUND, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'missing-resource', $err->getError()->getMessage() );
 	}
 
@@ -91,7 +91,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 103, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::PROMPT_NOT_FOUND, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PROMPT_NOT_FOUND, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'missing-prompt', $err->getError()->getMessage() );
 	}
 
@@ -100,7 +100,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 104, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::PERMISSION_DENIED, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PERMISSION_DENIED, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'Access denied', $err->getError()->getMessage() );
 	}
 
@@ -109,7 +109,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 105, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::UNAUTHORIZED, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::UNAUTHORIZED, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'Not logged in', $err->getError()->getMessage() );
 	}
 
@@ -118,7 +118,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 106, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::PARSE_ERROR, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::PARSE_ERROR, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'Invalid JSON', $err->getError()->getMessage() );
 	}
 
@@ -127,7 +127,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 107, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::INVALID_REQUEST, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'Missing field', $err->getError()->getMessage() );
 	}
 
@@ -140,7 +140,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 108, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::INVALID_PARAMS, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'Wrong type', $err->getError()->getMessage() );
 	}
 
@@ -153,7 +153,7 @@ final class ErrorEnvelopeTest extends TestCase {
 
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $err );
 		$this->assertSame( 109, $err->getId() );
-		$this->assertSame( (float) McpErrorFactory::SERVER_ERROR, $err->getError()->getCode() );
+		$this->assertSame( McpErrorFactory::SERVER_ERROR, $err->getError()->getCode() );
 		$this->assertStringContainsString( 'disabled', $err->getError()->getMessage() );
 	}
 

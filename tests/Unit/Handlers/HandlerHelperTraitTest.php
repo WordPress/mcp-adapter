@@ -189,8 +189,7 @@ final class HandlerHelperTraitTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			// Note: Error codes from DTOs are float for JSON number compatibility
-			$this->assertIsNumeric( $error['error']['code'] );
+			$this->assertIsInt( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 		}
 	}

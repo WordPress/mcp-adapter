@@ -75,9 +75,20 @@ final class McpPromptTest extends TestCase {
 		$this->assertFalse( $prompt->check_permission( array() ) );
 	}
 
-	public function test_fluent_api_default_permission_allows_all(): void {
+	public function test_fluent_api_no_default_permission_denies_access(): void {
 		$prompt = McpPrompt::create( 'no-permission-test' )
 			->handler( fn( $args ) => array() );
+
+		// Without explicit permission callback, access should be denied.
+		$result = $prompt->check_permission( array() );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
+	}
+
+	public function test_fluent_api_explicit_permission_allows_access(): void {
+		$prompt = McpPrompt::create( 'explicit-permission-test' )
+			->handler( fn( $args ) => array() )
+			->permission( fn() => true );
 
 		$this->assertTrue( $prompt->check_permission( array() ) );
 		$this->assertTrue( $prompt->check_permission( array( 'any' => 'value' ) ) );
@@ -365,5 +376,40 @@ final class McpPromptTest extends TestCase {
 		$this->assertNull( $dto->getArguments() );
 		$this->assertNull( $dto->getIcons() );
 		$this->assertNull( $dto->get_meta() );
+	}
+
+	// =========================================================================
+	// Secure-by-Default Behavior Tests
+	// =========================================================================
+
+	/**
+	 * Verify that no default handler is set.
+	 * Prompts must explicitly configure a handler or ability.
+	 */
+	public function test_no_default_handler_returns_error(): void {
+		$prompt = McpPrompt::create( 'no-handler-prompt' )
+			->permission( fn() => true );
+
+		$result = $prompt->execute( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_prompt_no_handler', $result->get_error_code() );
+		$this->assertStringContainsString( 'No prompt execution strategy', $result->get_error_message() );
+	}
+
+	/**
+	 * Verify that no default permission callback is set.
+	 * Prompts must explicitly configure permissions for security.
+	 */
+	public function test_no_default_permission_returns_error(): void {
+		$prompt = McpPrompt::create( 'no-permission-prompt' )
+			->handler( fn( $args ) => array() );
+
+		$result = $prompt->check_permission( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
+		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
+		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );
 	}
 }

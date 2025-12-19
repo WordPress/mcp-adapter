@@ -84,4 +84,39 @@ final class McpResourceTest extends TestCase {
 			$this->assertSame( 'bar', $arr['_meta']['foo'] );
 			$this->assertSame( array( 'should_not' => 'leak' ), $arr['_meta']['mcp_adapter'] );
 		}
+
+	// =========================================================================
+	// Secure-by-Default Behavior Tests
+	// =========================================================================
+
+	/**
+	 * Verify that no default handler is set.
+	 * Resources must explicitly configure a handler or ability.
+	 */
+	public function test_no_default_handler_returns_error(): void {
+		$resource = McpResource::create( 'WordPress://local/no-handler' )
+			->permission( fn() => true );
+
+		$result = $resource->execute( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_resource_no_handler', $result->get_error_code() );
+		$this->assertStringContainsString( 'No resource execution strategy', $result->get_error_message() );
+	}
+
+	/**
+	 * Verify that no default permission callback is set.
+	 * Resources must explicitly configure permissions for security.
+	 */
+	public function test_no_default_permission_returns_error(): void {
+		$resource = McpResource::create( 'WordPress://local/no-permission' )
+			->handler( fn( $args ) => 'content' );
+
+		$result = $resource->check_permission( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
+		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
+		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );
+	}
 }

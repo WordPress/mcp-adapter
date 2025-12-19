@@ -131,7 +131,8 @@ final class McpToolTest extends TestCase {
 			) )
 			->handler( static function ( $args ) {
 				return array( 'uppercased' => strtoupper( $args['value'] ?? '' ) );
-			} );
+			} )
+			->permission( fn() => true );
 
 		$this->assertTrue( $tool->check_permission( array( 'value' => 'hello' ) ) );
 
@@ -294,11 +295,22 @@ final class McpToolTest extends TestCase {
 		$this->assertFalse( $tool->check_permission( array() ) );
 	}
 
-	public function test_create_default_permission_allows_all(): void {
-		$tool = McpTool::create( 'public-tool' )
+	public function test_no_default_permission_denies_access(): void {
+		$tool = McpTool::create( 'no-permission-tool' )
 			->handler( fn( $args ) => array( 'ok' => true ) );
 
-		// No permission callback set - defaults to allowing all
+		// Without explicit permission callback, access should be denied.
+		$result = $tool->check_permission( array() );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
+	}
+
+	public function test_explicit_permission_allows_access(): void {
+		$tool = McpTool::create( 'public-tool' )
+			->handler( fn( $args ) => array( 'ok' => true ) )
+			->permission( fn() => true );
+
+		// Explicit permission callback allowing access.
 		$this->assertTrue( $tool->check_permission( array() ) );
 		$this->assertTrue( $tool->check_permission( array( 'any' => 'value' ) ) );
 	}
@@ -449,5 +461,40 @@ final class McpToolTest extends TestCase {
 		$result = $tool->execute( array() );
 
 		$this->assertSame( array( 'custom' => 'response', 'items' => array( 1, 2, 3 ) ), $result );
+	}
+
+	// =========================================================================
+	// Secure-by-Default Behavior Tests
+	// =========================================================================
+
+	/**
+	 * Verify that no default handler is set.
+	 * Tools must explicitly configure a handler or ability.
+	 */
+	public function test_no_default_handler_returns_error(): void {
+		$tool = McpTool::create( 'no-handler-tool' )
+			->permission( fn() => true );
+
+		$result = $tool->execute( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_tool_no_handler', $result->get_error_code() );
+		$this->assertStringContainsString( 'No tool execution strategy', $result->get_error_message() );
+	}
+
+	/**
+	 * Verify that no default permission callback is set.
+	 * Tools must explicitly configure permissions for security.
+	 */
+	public function test_no_default_permission_returns_error(): void {
+		$tool = McpTool::create( 'no-permission-tool' )
+			->handler( fn( $args ) => array( 'ok' => true ) );
+
+		$result = $tool->check_permission( array() );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
+		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
+		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );
 	}
 }
