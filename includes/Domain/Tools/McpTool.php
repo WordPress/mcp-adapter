@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Server\Tools\Tool;
@@ -520,7 +521,7 @@ final class McpTool implements McpComponentInterface {
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
-			$args = $this->normalize_ability_args( $args );
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
 
 			try {
 				$result = $this->ability->execute( $args );
@@ -572,7 +573,7 @@ final class McpTool implements McpComponentInterface {
 
 		// Ability-backed tools delegate to the ability's permission system.
 		if ( null !== $this->ability ) {
-			$args = $this->normalize_ability_args( $args );
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
 
 			try {
 				return $this->ability->check_permissions( $args );
@@ -783,29 +784,6 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		return null;
-	}
-
-	/**
-	 * Normalize arguments for ability callbacks.
-	 *
-	 * When an ability has no input schema, pass null instead of an empty array to maintain compatibility.
-	 *
-	 * @param mixed $args Arguments after unwrapping.
-	 *
-	 * @return mixed
-	 */
-	private function normalize_ability_args( $args ) {
-		if ( null === $this->ability ) {
-			return $args;
-		}
-
-		$ability_input_schema = $this->ability->get_input_schema();
-
-		if ( empty( $ability_input_schema ) && empty( $args ) ) {
-			return null;
-		}
-
-		return $args;
 	}
 
 	/**

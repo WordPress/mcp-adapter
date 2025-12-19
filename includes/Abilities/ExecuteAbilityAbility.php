@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+
 /**
  * Execute Ability - Executes a WordPress ability with provided parameters.
  *
@@ -116,7 +118,7 @@ final class ExecuteAbilityAbility {
 		// Normalize parameters for ability's schema requirements
 		// Empty {} from MCP is treated as null for abilities without input schema
 		$parameters        = $input['parameters'] ?? null;
-		$parameters        = self::normalize_parameters_for_ability( $ability, $parameters );
+		$parameters        = AbilityArgumentNormalizer::normalize( $ability, $parameters );
 		$permission_result = $ability->check_permissions( $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
@@ -125,26 +127,6 @@ final class ExecuteAbilityAbility {
 		}
 
 		return (bool) $permission_result;
-	}
-
-	/**
-	 * Normalize parameters based on ability's input schema.
-	 *
-	 * If the ability has no input schema, empty arrays (from MCP {} arguments)
-	 * are normalized to null, as abilities without schemas don't accept input.
-	 *
-	 * @param \WP_Ability $ability    The ability to normalize parameters for.
-	 * @param mixed       $parameters The parameters to normalize.
-	 * @return mixed Normalized parameters (null if ability has no schema and params are empty).
-	 */
-	private static function normalize_parameters_for_ability( \WP_Ability $ability, $parameters ) {
-		// If ability has no input schema, treat empty array as null.
-		// This allows MCP clients to send {} for abilities that don't take arguments.
-		$input_schema = $ability->get_input_schema();
-		if ( empty( $input_schema ) && is_array( $parameters ) && empty( $parameters ) ) {
-			return null;
-		}
-		return $parameters;
 	}
 
 	/**
@@ -221,7 +203,7 @@ final class ExecuteAbilityAbility {
 
 		// Normalize parameters for ability's schema requirements
 		// Empty {} from MCP is treated as null for abilities without input schema
-		$parameters = self::normalize_parameters_for_ability( $ability, $parameters );
+		$parameters = AbilityArgumentNormalizer::normalize( $ability, $parameters );
 
 		try {
 			// Execute the ability

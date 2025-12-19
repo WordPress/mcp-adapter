@@ -11,6 +11,7 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Server\Prompts\Prompt;
@@ -471,7 +472,7 @@ final class McpPrompt implements McpComponentInterface {
 		$args = is_array( $args ) ? $args : array();
 
 		if ( null !== $this->ability ) {
-			$args = $this->normalize_ability_args( $args );
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
 
 			try {
 				$result = $this->ability->execute( $args );
@@ -532,7 +533,7 @@ final class McpPrompt implements McpComponentInterface {
 		$args = is_array( $args ) ? $args : array();
 
 		if ( null !== $this->ability ) {
-			$args = $this->normalize_ability_args( $args );
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
 
 			try {
 				return $this->ability->check_permissions( $args );
@@ -696,29 +697,6 @@ final class McpPrompt implements McpComponentInterface {
 		}
 
 		return $this->prompt;
-	}
-
-	/**
-	 * Normalize arguments for ability callbacks.
-	 *
-	 * When an ability has no input schema, pass null instead of an empty array to maintain compatibility.
-	 *
-	 * @param array<string, mixed> $args Arguments after unwrapping.
-	 *
-	 * @return array<string, mixed>|null The normalized arguments, or null if ability has no schema and no args provided.
-	 */
-	private function normalize_ability_args( array $args ) {
-		if ( null === $this->ability ) {
-			return $args;
-		}
-
-		$ability_input_schema = $this->ability->get_input_schema();
-
-		if ( empty( $ability_input_schema ) && empty( $args ) ) {
-			return null;
-		}
-
-		return $args;
 	}
 
 	/**
