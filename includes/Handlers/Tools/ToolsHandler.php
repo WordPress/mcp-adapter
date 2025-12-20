@@ -10,8 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
-use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
+use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
