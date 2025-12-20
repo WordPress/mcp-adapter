@@ -91,7 +91,9 @@ final class ExecuteAbilityAbility {
 	/**
 	 * Execute the ability execution functionality.
 	 *
-	 * Enforces security checks before executing any ability.
+	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
+	 * before this callback is invoked (see WP_Ability::execute() line 605). This ensures
+	 * all ability executions are properly authorized by the framework.
 	 *
 	 * @param array $input Input parameters containing ability_name and parameters.
 	 *
@@ -106,24 +108,6 @@ final class ExecuteAbilityAbility {
 			return array(
 				'success' => false,
 				'error'   => 'Ability name is required',
-			);
-		}
-
-		// Enforce security checks before execution
-		// Note: WordPress will have already called check_permission, but we double-check
-		// as an additional security layer for direct method calls
-		$permission_check = self::check_permission( $input );
-		if ( is_wp_error( $permission_check ) ) {
-			return array(
-				'success' => false,
-				'error'   => $permission_check->get_error_message(),
-			);
-		}
-
-		if ( ! $permission_check ) {
-			return array(
-				'success' => false,
-				'error'   => 'Permission denied for ability execution',
 			);
 		}
 

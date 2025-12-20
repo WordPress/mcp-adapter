@@ -82,7 +82,8 @@ final class GetAbilityInfoAbility {
 	/**
 	 * Execute the get ability info functionality.
 	 *
-	 * Enforces security checks before returning ability information.
+	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
+	 * before this callback is invoked (see WP_Ability::execute() line 605).
 	 *
 	 * @param array $input Input parameters containing ability_name.
 	 *
@@ -94,14 +95,6 @@ final class GetAbilityInfoAbility {
 		if ( empty( $ability_name ) ) {
 			return array(
 				'error' => 'Ability name is required',
-			);
-		}
-
-		// Enforce security checks before execution
-		$permission_check = self::check_permission( $input );
-		if ( is_wp_error( $permission_check ) ) {
-			return array(
-				'error' => $permission_check->get_error_message(),
 			);
 		}
 

@@ -69,21 +69,14 @@ final class DiscoverAbilitiesAbility {
 	/**
 	 * Execute the discover abilities functionality.
 	 *
-	 * Enforces security checks and mcp.public filtering.
+	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
+	 * before this callback is invoked (see WP_Ability::execute() line 605).
 	 *
 	 * @param array $input Input parameters (unused for this ability).
 	 *
 	 * @return array Array containing public MCP abilities.
 	 */
 	public static function execute( $input = array() ): array {
-		// Enforce security checks before execution
-		$permission_check = self::check_permission( $input );
-		if ( is_wp_error( $permission_check ) ) {
-			return array(
-				'error' => $permission_check->get_error_message(),
-			);
-		}
-
 		// Get all abilities and filter for publicly exposed ones
 		$abilities = wp_get_abilities();
 
