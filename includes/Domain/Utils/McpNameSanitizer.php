@@ -71,7 +71,7 @@ class McpNameSanitizer {
 		$name = str_replace( '/', '-', $name );
 
 		// Step 3: Early validation - if already valid, return as-is.
-		if ( McpValidator::validate_tool_or_prompt_name( $name ) ) {
+		if ( McpValidator::validate_name( $name ) ) {
 			return $name;
 		}
 

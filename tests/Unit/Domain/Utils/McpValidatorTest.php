@@ -12,9 +12,6 @@ namespace WP\MCP\Tests\Unit\Domain\Utils;
 
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Resources\Resource;
-use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * Test McpValidator functionality.
@@ -129,6 +126,13 @@ final class McpValidatorTest extends TestCase {
 		$this->assertTrue( McpValidator::validate_name( 'api.v2.endpoint' ) );
 	}
 
+	public function test_validate_name_accepts_numeric_zero(): void {
+		// Numeric "0" should be valid (matches regex but not empty()).
+		$this->assertTrue( McpValidator::validate_name( '0' ) );
+		$this->assertTrue( McpValidator::validate_name( '123' ) );
+		$this->assertTrue( McpValidator::validate_name( '000' ) );
+	}
+
 	public function test_validate_name_with_custom_max_length(): void {
 		$name_64_chars = str_repeat( 'a', 64 );
 		$name_65_chars = str_repeat( 'a', 65 );
@@ -137,9 +141,9 @@ final class McpValidatorTest extends TestCase {
 		$this->assertFalse( McpValidator::validate_name( $name_65_chars, 64 ) );
 	}
 
-	// Tool/Prompt Name Validation Tests
+	// Tool/Prompt Name Validation Tests (using validate_name with default 128-char limit)
 
-	public function test_validate_tool_or_prompt_name_with_valid_names(): void {
+	public function test_validate_name_default_128_with_valid_names(): void {
 		$valid_names = array(
 			'tool-name',
 			'prompt_name',
@@ -147,11 +151,11 @@ final class McpValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be valid" );
+			$this->assertTrue( McpValidator::validate_name( $name ), "Name '{$name}' should be valid" );
 		}
 	}
 
-	public function test_validate_tool_or_prompt_name_rejects_invalid(): void {
+	public function test_validate_name_default_128_rejects_invalid(): void {
 		$invalid_names = array(
 			'',
 			'tool with spaces',
@@ -160,65 +164,29 @@ final class McpValidatorTest extends TestCase {
 		);
 
 		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_name( $name ), "Name '{$name}' should be invalid" );
 		}
 	}
 
-	public function test_validate_tool_or_prompt_name_max_length_128(): void {
-		// MCP 2025-11-25 spec: tool/prompt names max 128 characters.
+	public function test_validate_name_default_max_length_128(): void {
+		// MCP 2025-11-25 spec: tool/prompt names max 128 characters (default).
 		$name_128_chars = str_repeat( 'a', 128 );
 		$name_129_chars = str_repeat( 'a', 129 );
 
-		$this->assertTrue( McpValidator::validate_tool_or_prompt_name( $name_128_chars ), '128 chars should be valid' );
-		$this->assertFalse( McpValidator::validate_tool_or_prompt_name( $name_129_chars ), '129 chars should be invalid' );
+		$this->assertTrue( McpValidator::validate_name( $name_128_chars ), '128 chars should be valid' );
+		$this->assertFalse( McpValidator::validate_name( $name_129_chars ), '129 chars should be invalid' );
 	}
 
-	public function test_validate_tool_or_prompt_name_allows_dot(): void {
+	public function test_validate_name_allows_dot(): void {
 		// MCP 2025-11-25 spec allows dots in tool/prompt names.
-		$this->assertTrue( McpValidator::validate_tool_or_prompt_name( 'foo.bar' ) );
-		$this->assertTrue( McpValidator::validate_tool_or_prompt_name( 'namespace.tool.action' ) );
+		$this->assertTrue( McpValidator::validate_name( 'foo.bar' ) );
+		$this->assertTrue( McpValidator::validate_name( 'namespace.tool.action' ) );
 	}
 
-	public function test_validate_tool_or_prompt_name_rejects_slash(): void {
+	public function test_validate_name_rejects_slash(): void {
 		// Forward slash is NOT allowed in MCP tool/prompt names.
-		$this->assertFalse( McpValidator::validate_tool_or_prompt_name( 'foo/bar' ) );
-		$this->assertFalse( McpValidator::validate_tool_or_prompt_name( 'namespace/tool' ) );
-	}
-
-	// Argument Name Validation Tests
-
-	public function test_validate_argument_name_with_valid_names(): void {
-		$valid_names = array(
-			'arg-name',
-			'arg_name',
-			'arg123',
-		);
-
-		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpValidator::validate_argument_name( $name ), "Name '{$name}' should be valid" );
-		}
-	}
-
-	public function test_validate_argument_name_rejects_too_long(): void {
-		$long_name = str_repeat( 'a', 65 );
-		$this->assertFalse( McpValidator::validate_argument_name( $long_name ) );
-	}
-
-	public function test_validate_argument_name_accepts_max_length(): void {
-		$max_length_name = str_repeat( 'a', 64 );
-		$this->assertTrue( McpValidator::validate_argument_name( $max_length_name ) );
-	}
-
-	public function test_validate_argument_name_rejects_invalid(): void {
-		$invalid_names = array(
-			'',
-			'arg with spaces',
-			'arg@invalid',
-		);
-
-		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpValidator::validate_argument_name( $name ), "Name '{$name}' should be invalid" );
-		}
+		$this->assertFalse( McpValidator::validate_name( 'foo/bar' ) );
+		$this->assertFalse( McpValidator::validate_name( 'namespace/tool' ) );
 	}
 
 	// MIME Type Validation Tests
@@ -254,18 +222,42 @@ final class McpValidatorTest extends TestCase {
 		}
 	}
 
-	public function test_validate_mime_type_with_special_characters(): void {
-		$valid_special_types = array(
+	public function test_validate_mime_type_with_structured_syntax_suffix(): void {
+		// RFC 6839: Structured syntax suffixes like +json, +xml are valid.
+		$valid_suffix_types = array(
 			'application/vnd.api+json',
-			'text/html; charset=utf-8',
+			'image/svg+xml',
+			'application/atom+xml',
+			'application/hal+json',
 		);
 
-		// Note: The regex may not support all special characters, test what's actually supported
-		foreach ( $valid_special_types as $type ) {
-			// This might fail depending on regex implementation
-			$result = McpValidator::validate_mime_type( $type );
-			// Just verify the method doesn't throw an error
-			$this->assertIsBool( $result );
+		foreach ( $valid_suffix_types as $type ) {
+			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
+		}
+	}
+
+	public function test_validate_mime_type_with_vendor_types(): void {
+		// RFC 2045: Vendor-specific types with dots and other characters.
+		$valid_vendor_types = array(
+			'application/vnd.ms-excel',
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			'text/vnd.example.custom',
+		);
+
+		foreach ( $valid_vendor_types as $type ) {
+			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
+		}
+	}
+
+	public function test_validate_mime_type_rejects_parameters(): void {
+		// MIME type parameters (after ;) are not supported by the validator.
+		$types_with_parameters = array(
+			'text/html; charset=utf-8',
+			'text/plain; format=flowed',
+		);
+
+		foreach ( $types_with_parameters as $type ) {
+			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type with parameter '{$type}' should be rejected" );
 		}
 	}
 
@@ -974,111 +966,5 @@ final class McpValidatorTest extends TestCase {
 		$this->assertEquals( 'image/png', $result['valid'][0]['mimeType'] );
 		$this->assertEquals( array( '48x48' ), $result['valid'][0]['sizes'] );
 		$this->assertEquals( 'light', $result['valid'][0]['theme'] );
-	}
-
-	// DTO Validation Tests
-
-	public function test_validate_tool_dto_with_valid_tool(): void {
-		$tool = Tool::fromArray(
-			array(
-				'name'        => 'test-tool',
-				'inputSchema' => array( 'type' => 'object' ),
-			)
-		);
-
-		$result = McpValidator::validate_tool_dto( $tool );
-		$this->assertTrue( $result );
-	}
-
-	public function test_validate_tool_dto_rejects_invalid_name(): void {
-		$tool = Tool::fromArray(
-			array(
-				'name'        => 'invalid/name',
-				'inputSchema' => array( 'type' => 'object' ),
-			)
-		);
-
-		$result = McpValidator::validate_tool_dto( $tool );
-		$this->assertWPError( $result );
-		$this->assertSame( 'mcp_tool_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Tool name', $result->get_error_message() );
-	}
-
-	public function test_validate_tool_dto_rejects_invalid_icons(): void {
-		// We have to bypass DTO level validation to test our deep validation if it overlaps,
-		// but Tool::fromArray already validates required fields.
-		// However, validate_icons_array in McpValidator handles deeper icon validation.
-		$tool = Tool::fromArray(
-			array(
-				'name'        => 'test-tool',
-				'inputSchema' => array( 'type' => 'object' ),
-				'icons'       => array(
-					array(
-						'src'      => 'https://example.com/icon.png',
-						'mimeType' => 'image/png',
-					),
-					array( 'src' => 'invalid-url' ), // Invalid src
-				),
-			)
-		);
-
-		$result = McpValidator::validate_tool_dto( $tool );
-		$this->assertWPError( $result );
-		$this->assertStringContainsString( 'Icon at index 1', $result->get_error_message() );
-	}
-
-	public function test_validate_prompt_dto_with_valid_prompt(): void {
-		$prompt = Prompt::fromArray(
-			array(
-				'name'      => 'test-prompt',
-				'arguments' => array(
-					array(
-						'name'     => 'arg1',
-						'required' => true,
-					),
-				),
-			)
-		);
-
-		$result = McpValidator::validate_prompt_dto( $prompt );
-		$this->assertTrue( $result );
-	}
-
-	public function test_validate_prompt_dto_rejects_invalid_name(): void {
-		$prompt = Prompt::fromArray(
-			array(
-				'name' => 'invalid name with spaces',
-			)
-		);
-
-		$result = McpValidator::validate_prompt_dto( $prompt );
-		$this->assertWPError( $result );
-		$this->assertSame( 'mcp_prompt_validation_failed', $result->get_error_code() );
-	}
-
-	public function test_validate_resource_dto_with_valid_resource(): void {
-		$resource = Resource::fromArray(
-			array(
-				'uri'  => 'https://example.com/resource',
-				'name' => 'test-resource',
-			)
-		);
-
-		$result = McpValidator::validate_resource_dto( $resource );
-		$this->assertTrue( $result );
-	}
-
-	public function test_validate_resource_dto_with_valid_uri(): void {
-		$resource = Resource::fromArray(
-			array(
-				'uri'  => 'https://example.com/valid',
-				'name' => 'test-resource',
-			)
-		);
-
-		// Since we cannot easily mutate the DTO's protected URI property,
-		// we verify that the deep validation correctly accepts a valid DTO.
-		$result = McpValidator::validate_resource_dto( $resource );
-		$this->assertTrue( $result );
 	}
 }

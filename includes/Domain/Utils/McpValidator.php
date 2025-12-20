@@ -11,9 +11,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Utils;
 
 use DateTime;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Resources\Resource;
-use WP\McpSchema\Server\Tools\Tool;
 
 /**
  * Utility class for validating MCP component data according to MCP specification.
@@ -43,17 +40,6 @@ class McpValidator {
 	);
 
 	/**
-	 * Validate an argument name (max 64 characters).
-	 *
-	 * @param string $name The name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_argument_name( string $name ): bool {
-		return self::validate_name( $name, 64 );
-	}
-
-	/**
 	 * Validate an MCP component name.
 	 *
 	 * Validates that a name follows MCP naming conventions per MCP 2025-11-25 spec:
@@ -69,8 +55,8 @@ class McpValidator {
 	 *
 	 */
 	public static function validate_name( string $name, int $max_length = 128 ): bool {
-		// Names should not be empty.
-		if ( empty( $name ) ) {
+		// Names should not be empty (but allow "0" since it matches the regex).
+		if ( '' === $name ) {
 			return false;
 		}
 
@@ -131,79 +117,6 @@ class McpValidator {
 
 		// Check if it's valid base64 encoding.
 		return base64_decode( $content, true ) !== false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-	}
-
-	/**
-	 * Validate a Tool DTO.
-	 *
-	 * @param \WP\McpSchema\Server\Tools\Tool $tool The tool DTO to validate.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_tool_dto( Tool $tool ) {
-		$errors = array();
-
-		// Validate name.
-		if ( ! self::validate_tool_or_prompt_name( $tool->getName() ) ) {
-			$errors[] = __( 'Tool name must be 1-128 characters and contain only [A-Za-z0-9_.-]', 'mcp-adapter' );
-		}
-
-		// Validate icons if present.
-		$icons = $tool->getIcons();
-		if ( ! empty( $icons ) ) {
-			// Convert DTO icons to arrays for validation.
-			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
-			$icons_result = self::validate_icons_array( $icons_array );
-			if ( ! empty( $icons_result['errors'] ) ) {
-				foreach ( $icons_result['errors'] as $error_group ) {
-					foreach ( $error_group['errors'] as $error ) {
-						$errors[] = sprintf(
-						/* translators: 1: icon index, 2: error message */
-							__( 'Icon at index %1$d: %2$s', 'mcp-adapter' ),
-							$error_group['index'],
-							$error
-						);
-					}
-				}
-			}
-		}
-
-		// Validate annotations if present.
-		$annotations = $tool->getAnnotations();
-		if ( $annotations ) {
-			$annotations_array = $annotations->toArray();
-			$shared_errors     = self::get_annotation_validation_errors( $annotations_array );
-			$tool_errors       = self::get_tool_annotation_validation_errors( $annotations_array );
-			$errors            = array_merge( $errors, $shared_errors, $tool_errors );
-		}
-
-		if ( ! empty( $errors ) ) {
-			return new \WP_Error(
-				'mcp_tool_validation_failed',
-				sprintf(
-				/* translators: %s: list of validation errors */
-					__( 'Tool validation failed: %s', 'mcp-adapter' ),
-					implode( '; ', $errors )
-				)
-			);
-		}
-
-		return true;
-	}
-
-	/**
-	 * Validate a tool or prompt name per MCP 2025-11-25 spec.
-	 *
-	 * Tool and prompt names must be 1-128 characters using charset [A-Za-z0-9_.-].
-	 *
-	 * @param string $name The name to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 * @since n.e.x.t
-	 *
-	 */
-	public static function validate_tool_or_prompt_name( string $name ): bool {
-		return self::validate_name( $name, 128 );
 	}
 
 	/**
@@ -439,7 +352,9 @@ class McpValidator {
 	 * - priority must be a number between 0.0 and 1.0
 	 *
 	 * Only validates known shared annotation fields. Unknown fields are ignored.
-	 * Used by resources, prompts, and tools.
+	 * Used by resources and content types (text, image, audio).
+	 *
+	 * Note: Tools use ToolAnnotations which is a separate type validated by McpToolValidator.
 	 *
 	 * @param array $annotations The annotations to validate.
 	 *
@@ -583,169 +498,6 @@ class McpValidator {
 		return $priority_float >= 0.0 && $priority_float <= 1.0;
 	}
 
-	/**
-	 * Get validation errors for tool-specific MCP annotations.
-	 *
-	 * Validates tool annotation fields per MCP 2025-11-25 specification:
-	 * - readOnlyHint, destructiveHint, idempotentHint, openWorldHint must be booleans
-	 * - title must be a non-empty string
-	 *
-	 * Only validates known tool annotation fields. Unknown fields are ignored.
-	 *
-	 * @param array $annotations The annotations to validate.
-	 *
-	 * @return array Array of validation errors, empty if valid.
-	 */
-	public static function get_tool_annotation_validation_errors( array $annotations ): array {
-		$errors = array();
-
-		foreach ( $annotations as $field => $value ) {
-			switch ( $field ) {
-				case 'readOnlyHint':
-				case 'destructiveHint':
-				case 'idempotentHint':
-				case 'openWorldHint':
-					if ( ! is_bool( $value ) ) {
-						$errors[] = sprintf(
-						/* translators: %s: annotation field name */
-							__( 'Tool annotation field %s must be a boolean', 'mcp-adapter' ),
-							$field
-						);
-					}
-					break;
-
-				case 'title':
-					if ( ! is_string( $value ) ) {
-						$errors[] = sprintf(
-						/* translators: %s: annotation field name */
-							__( 'Tool annotation field %s must be a string', 'mcp-adapter' ),
-							$field
-						);
-						break;
-					}
-					if ( empty( trim( $value ) ) ) {
-						$errors[] = sprintf(
-						/* translators: %s: annotation field name */
-							__( 'Tool annotation field %s must be a non-empty string', 'mcp-adapter' ),
-							$field
-						);
-					}
-					break;
-
-				default:
-					// Unknown fields are ignored to allow forward compatibility.
-					break;
-			}
-		}
-
-		return $errors;
-	}
-
-	/**
-	 * Validate a Prompt DTO.
-	 *
-	 * @param \WP\McpSchema\Server\Prompts\Prompt $prompt The prompt DTO to validate.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_prompt_dto( Prompt $prompt ) {
-		$errors = array();
-
-		// Validate name.
-		if ( ! self::validate_tool_or_prompt_name( $prompt->getName() ) ) {
-			$errors[] = __( 'Prompt name must be 1-128 characters and contain only [A-Za-z0-9_.-]', 'mcp-adapter' );
-		}
-
-		// Validate icons if present.
-		$icons = $prompt->getIcons();
-		if ( ! empty( $icons ) ) {
-			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
-			$icons_result = self::validate_icons_array( $icons_array );
-			if ( ! empty( $icons_result['errors'] ) ) {
-				foreach ( $icons_result['errors'] as $error_group ) {
-					foreach ( $error_group['errors'] as $error ) {
-						$errors[] = sprintf(
-						/* translators: 1: icon index, 2: error message */
-							__( 'Icon at index %1$d: %2$s', 'mcp-adapter' ),
-							$error_group['index'],
-							$error
-						);
-					}
-				}
-			}
-		}
-
-		// Validate annotations if present (shared annotations).
-		// Currently Prompt DTO doesn't have annotations field in spec, but if it did, we'd validate here.
-		// BaseMetadata has title and name, handled separately.
-
-		if ( ! empty( $errors ) ) {
-			return new \WP_Error(
-				'mcp_prompt_validation_failed',
-				sprintf(
-				/* translators: %s: list of validation errors */
-					__( 'Prompt validation failed: %s', 'mcp-adapter' ),
-					implode( '; ', $errors )
-				)
-			);
-		}
-
-		return true;
-	}
-
-	/**
-	 * Validate a Resource DTO.
-	 *
-	 * @param \WP\McpSchema\Server\Resources\Resource $resource_dto The resource DTO to validate.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_resource_dto( Resource $resource_dto ) {
-		$errors = array();
-
-		// Validate URI.
-		if ( ! self::validate_resource_uri( $resource_dto->getUri() ) ) {
-			$errors[] = __( 'Resource URI must be a valid URI string', 'mcp-adapter' );
-		}
-
-		// Validate MIME type if present.
-		$mime_type = $resource_dto->getMimeType();
-		if ( $mime_type && ! self::validate_mime_type( $mime_type ) ) {
-			$errors[] = __( 'Resource MIME type is invalid', 'mcp-adapter' );
-		}
-
-		// Validate icons if present.
-		$icons = $resource_dto->getIcons();
-		if ( ! empty( $icons ) ) {
-			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
-			$icons_result = self::validate_icons_array( $icons_array );
-			if ( ! empty( $icons_result['errors'] ) ) {
-				foreach ( $icons_result['errors'] as $error_group ) {
-					foreach ( $error_group['errors'] as $error ) {
-						$errors[] = sprintf(
-						/* translators: 1: icon index, 2: error message */
-							__( 'Icon at index %1$d: %2$s', 'mcp-adapter' ),
-							$error_group['index'],
-							$error
-						);
-					}
-				}
-			}
-		}
-
-		if ( ! empty( $errors ) ) {
-			return new \WP_Error(
-				'mcp_resource_validation_failed',
-				sprintf(
-				/* translators: %s: list of validation errors */
-					__( 'Resource validation failed: %s', 'mcp-adapter' ),
-					implode( '; ', $errors )
-				)
-			);
-		}
-
-		return true;
-	}
 
 	/**
 	 * Validate a resource URI format.
@@ -784,6 +536,8 @@ class McpValidator {
 	 * @return bool True if valid MIME type format, false otherwise.
 	 */
 	public static function validate_mime_type( string $mime_type ): bool {
-		return (bool) preg_match( '/^[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&\-\^_]*$/', $mime_type );
+		// RFC 2045 compliant: allows +, ., and other valid MIME type characters.
+		// Examples: image/svg+xml, application/vnd.api+json, text/plain.
+		return (bool) preg_match( '/^[a-zA-Z0-9][a-zA-Z0-9!#$&^_.+-]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&^_.+-]*$/', $mime_type );
 	}
 }

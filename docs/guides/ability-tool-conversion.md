@@ -254,7 +254,7 @@ String fields (e.g., `title`) must be non-empty after trimming:
 
 #### Validation
 
-After mapping, annotations can optionally be validated via `McpValidator::get_tool_annotation_validation_errors()`:
+After mapping, annotations can optionally be validated via `McpToolValidator::get_tool_annotation_validation_errors()`:
 
 - Boolean fields must be actual booleans
 - String fields must be non-empty strings
