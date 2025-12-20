@@ -55,7 +55,7 @@ trait HandlerHelperTrait {
 	/**
 	 * Extracts error array from McpErrorFactory response.
 	 *
-	 * McpErrorFactory methods now return JSONRPCErrorResponse DTOs.
+	 * McpErrorFactory methods return JSONRPCErrorResponse DTOs.
 	 * This helper extracts the error array for handlers that need it.
 	 *
 	 * @param \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse|array $factory_response Response from McpErrorFactory method (DTO or legacy array).
