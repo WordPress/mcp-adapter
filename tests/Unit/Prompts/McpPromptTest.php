@@ -378,8 +378,12 @@ final class McpPromptTest extends TestCase {
 
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 'mcp_prompt_dto_creation_failed', $result->get_error_code() );
-		// The error message comes from PHP 8's strict array key handling.
-		$this->assertStringContainsString( 'name', $result->get_error_message() );
+		// PHP 8 throws "Undefined array key 'name'", PHP 7.4 returns NULL triggering "Expected string, got NULL".
+		$message = $result->get_error_message();
+		$this->assertTrue(
+			false !== strpos( $message, 'name' ) || false !== strpos( $message, 'NULL' ),
+			"Expected error message to contain 'name' or 'NULL', got: {$message}"
+		);
 	}
 
 	public function test_fromArray_observability_context(): void {
