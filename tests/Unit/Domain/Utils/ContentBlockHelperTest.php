@@ -2,14 +2,14 @@
 /**
  * Tests for ContentBlockHelper factory class.
  *
- * @package WP\MCP\Tests\Unit\Infrastructure\Dto
+ * @package WP\MCP\Tests\Unit\Domain\Utils
  */
 
 declare( strict_types=1 );
 
-namespace WP\MCP\Tests\Unit\Infrastructure\Dto;
+namespace WP\MCP\Tests\Unit\Domain\Utils;
 
-use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
+use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\Content\AudioContent;
 use WP\McpSchema\Common\Content\ImageContent;

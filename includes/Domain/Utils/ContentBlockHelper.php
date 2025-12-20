@@ -6,12 +6,12 @@
  * from the php-mcp-schema library. It simplifies the creation of TextContent,
  * ImageContent, AudioContent, and EmbeddedResource instances.
  *
- * @package WP\MCP\Infrastructure\Dto
+ * @package WP\MCP\Domain\Utils
  */
 
 declare( strict_types=1 );
 
-namespace WP\MCP\Infrastructure\Dto;
+namespace WP\MCP\Domain\Utils;
 
 use WP\McpSchema\Common\Content\AudioContent;
 use WP\McpSchema\Common\Content\ImageContent;
@@ -23,13 +23,13 @@ use WP\McpSchema\Common\Protocol\TextResourceContents;
 use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
 
 /**
- * Factory class for creating MCP content block DTOs.
+ * Helper class for creating MCP content block DTOs.
  *
  * Provides static factory methods to create typed content blocks that implement
  * ContentBlockInterface. These DTOs are used in tool call results, prompt messages,
  * and resource contents throughout the MCP protocol.
  *
- * @since 0.5.0
+ * @since n.e.x.t
  */
 final class ContentBlockHelper {
 

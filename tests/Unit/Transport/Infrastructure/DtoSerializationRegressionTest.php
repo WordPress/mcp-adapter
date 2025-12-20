@@ -12,7 +12,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
-use WP\MCP\Infrastructure\Dto\ContentBlockHelper;
+use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\McpSchema\Common\Protocol\BlobResourceContents;
