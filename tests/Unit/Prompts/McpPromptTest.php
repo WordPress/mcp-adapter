@@ -328,7 +328,9 @@ final class McpPromptTest extends TestCase {
 		$prompt = McpPrompt::fromArray(
 			array(
 				'name'    => 'throwing-prompt',
-				'handler' => static fn( $args ) => throw new \RuntimeException( 'Handler exploded' ),
+				'handler' => static function ( $args ) {
+					throw new \RuntimeException( 'Handler exploded' );
+				},
 			)
 		);
 
@@ -344,7 +346,9 @@ final class McpPromptTest extends TestCase {
 			array(
 				'name'       => 'throwing-permission-prompt',
 				'handler'    => static fn( $args ) => array(),
-				'permission' => static fn() => throw new \RuntimeException( 'Permission check exploded' ),
+				'permission' => static function () {
+					throw new \RuntimeException( 'Permission check exploded' );
+				},
 			)
 		);
 

@@ -223,7 +223,9 @@ final class McpResourceTest extends TestCase {
 		$resource = McpResource::fromArray(
 			array(
 				'uri'     => 'WordPress://local/throwing',
-				'handler' => static fn() => throw new \RuntimeException( 'Handler exploded' ),
+				'handler' => static function () {
+					throw new \RuntimeException( 'Handler exploded' );
+				},
 			)
 		);
 
@@ -239,7 +241,9 @@ final class McpResourceTest extends TestCase {
 			array(
 				'uri'        => 'WordPress://local/throwing-permission',
 				'handler'    => static fn() => 'content',
-				'permission' => static fn() => throw new \RuntimeException( 'Permission check exploded' ),
+				'permission' => static function () {
+					throw new \RuntimeException( 'Permission check exploded' );
+				},
 			)
 		);
 

@@ -456,7 +456,9 @@ final class McpToolTest extends TestCase {
 		$tool = McpTool::fromArray(
 			array(
 				'name'    => 'throwing-tool',
-				'handler' => static fn( $args ) => throw new \RuntimeException( 'Handler exploded' ),
+				'handler' => static function ( $args ) {
+					throw new \RuntimeException( 'Handler exploded' );
+				},
 			)
 		);
 
@@ -472,7 +474,9 @@ final class McpToolTest extends TestCase {
 			array(
 				'name'       => 'throwing-permission-tool',
 				'handler'    => static fn( $args ) => array( 'ok' => true ),
-				'permission' => static fn( $args ) => throw new \RuntimeException( 'Permission check exploded' ),
+				'permission' => static function ( $args ) {
+					throw new \RuntimeException( 'Permission check exploded' );
+				},
 			)
 		);
 
