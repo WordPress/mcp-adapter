@@ -347,7 +347,7 @@ class McpValidator {
 	 * Get validation errors for shared MCP annotations.
 	 *
 	 * Validates shared annotation fields per MCP 2025-11-25 specification:
-	 * - audience must be a non-empty array of valid Role values ("user", "assistant")
+	 * - audience must be an array of valid Role values ("user", "assistant")
 	 * - lastModified must be a valid ISO 8601 formatted string
 	 * - priority must be a number between 0.0 and 1.0
 	 *
@@ -368,10 +368,6 @@ class McpValidator {
 				case 'audience':
 					if ( ! is_array( $value ) ) {
 						$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
-						break;
-					}
-					if ( empty( $value ) ) {
-						$errors[] = __( 'Annotation field audience must be a non-empty array', 'mcp-adapter' );
 						break;
 					}
 					if ( ! self::validate_roles_array( $value ) ) {
@@ -418,10 +414,6 @@ class McpValidator {
 	 * @return bool True if all roles are valid, false otherwise.
 	 */
 	public static function validate_roles_array( array $roles ): bool {
-		if ( empty( $roles ) ) {
-			return false;
-		}
-
 		foreach ( $roles as $role ) {
 			if ( ! is_string( $role ) || ! self::validate_role( $role ) ) {
 				return false;

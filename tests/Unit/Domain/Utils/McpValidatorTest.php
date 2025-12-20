@@ -480,8 +480,8 @@ final class McpValidatorTest extends TestCase {
 		}
 	}
 
-	public function test_validate_roles_array_rejects_empty_array(): void {
-		$this->assertFalse( McpValidator::validate_roles_array( array() ) );
+	public function test_validate_roles_array_accepts_empty_array(): void {
+		$this->assertTrue( McpValidator::validate_roles_array( array() ) );
 	}
 
 	public function test_validate_roles_array_rejects_invalid_roles(): void {
@@ -601,9 +601,9 @@ final class McpValidatorTest extends TestCase {
 		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => 'user' ) );
 		$this->assertNotEmpty( $errors );
 
-		// Invalid: empty array
+		// Valid: empty array (no audience preference).
 		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array() ) );
-		$this->assertNotEmpty( $errors );
+		$this->assertEmpty( $errors );
 
 		// Invalid: invalid role
 		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array( 'admin' ) ) );

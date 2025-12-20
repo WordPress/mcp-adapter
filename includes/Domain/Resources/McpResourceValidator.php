@@ -109,15 +109,19 @@ class McpResourceValidator {
 	}
 
 	/**
-	 * Get validation errors for MCP ResourceContents data.
+	 * Get validation errors for MCP resource contents.
 	 *
-	 * NOTE: This validates ResourceContents (from resources/read response),
-	 * NOT the Resource type (from resources/list). ResourceContents requires
-	 * either text or blob content, while Resource does not.
+	 * NOTE: This validates the `resource` object used by:
+	 * - `resources/read` results (`TextResourceContents` / `BlobResourceContents`)
+	 * - `content` blocks of type `resource` (`EmbeddedResource.resource`)
 	 *
-	 * For Resource DTO validation (resources/list), use validate_resource_dto() instead.
+	 * It does NOT validate the `Resource` metadata object returned by `resources/list`.
+	 * For `Resource` DTO validation (resources/list), use validate_resource_dto() instead.
 	 *
-	 * @param array $resource_data The resource contents data to validate.
+	 * This validator focuses on the MCP-required fields and ignores unknown fields to remain
+	 * forward-compatible with future schema versions.
+	 *
+	 * @param array $resource_data The resource contents object to validate.
 	 *
 	 * @return array Array of validation errors, empty if valid.
 	 */
@@ -131,49 +135,37 @@ class McpResourceValidator {
 			$errors[] = __( 'Resource URI must be a valid URI format', 'mcp-adapter' );
 		}
 
-		// Validate content - must have either text OR blob (but not both).
+		// Validate content: at least one of text/blob must be present and correctly typed.
 		// Use array_key_exists to allow empty strings as valid content.
-		$has_text = array_key_exists( 'text', $resource_data ) && is_string( $resource_data['text'] );
-		$has_blob = array_key_exists( 'blob', $resource_data ) && is_string( $resource_data['blob'] );
+		$has_text_key = array_key_exists( 'text', $resource_data );
+		$has_blob_key = array_key_exists( 'blob', $resource_data );
+
+		$has_text = $has_text_key && is_string( $resource_data['text'] );
+		$has_blob = $has_blob_key && is_string( $resource_data['blob'] );
 
 		if ( ! $has_text && ! $has_blob ) {
-			$errors[] = __( 'Resource must have either text or blob content', 'mcp-adapter' );
-		} elseif ( $has_text && $has_blob ) {
-			$errors[] = __( 'Resource cannot have both text and blob content - only one is allowed', 'mcp-adapter' );
+			$errors[] = __( 'Resource contents must include at least one of: text (string) or blob (base64 string)', 'mcp-adapter' );
 		}
 
-		// Validate blob content if present (text is already validated as string above).
+		if ( $has_text_key && ! is_string( $resource_data['text'] ) ) {
+			$errors[] = __( 'Resource text content must be a string when provided', 'mcp-adapter' );
+		}
+
+		if ( $has_blob_key && ! is_string( $resource_data['blob'] ) ) {
+			$errors[] = __( 'Resource blob content must be a string when provided', 'mcp-adapter' );
+		}
+
+		// Validate blob content if present and typed.
 		if ( $has_blob && ! McpValidator::validate_base64( $resource_data['blob'] ) ) {
 			$errors[] = __( 'Resource blob content must be valid base64-encoded data', 'mcp-adapter' );
 		}
 
-		// Validate optional fields if present.
-		if ( isset( $resource_data['name'] ) && ! is_string( $resource_data['name'] ) ) {
-			$errors[] = __( 'Resource name must be a string if provided', 'mcp-adapter' );
-		}
-
-		if ( isset( $resource_data['description'] ) && ! is_string( $resource_data['description'] ) ) {
-			$errors[] = __( 'Resource description must be a string if provided', 'mcp-adapter' );
-		}
-
-		// Validate mimeType if present (optional per MCP 2025-11-25 schema).
+		// Validate mimeType if present (optional).
 		if ( isset( $resource_data['mimeType'] ) ) {
 			if ( ! is_string( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a string if provided', 'mcp-adapter' );
 			} elseif ( ! McpValidator::validate_mime_type( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a valid MIME type format', 'mcp-adapter' );
-			}
-		}
-
-		// Validate annotations structure if present.
-		if ( isset( $resource_data['annotations'] ) ) {
-			if ( ! is_array( $resource_data['annotations'] ) ) {
-				$errors[] = __( 'Resource annotations must be an array if provided', 'mcp-adapter' );
-			} else {
-				$annotation_errors = McpValidator::get_annotation_validation_errors( $resource_data['annotations'] );
-				if ( ! empty( $annotation_errors ) ) {
-					$errors = array_merge( $errors, $annotation_errors );
-				}
 			}
 		}
 

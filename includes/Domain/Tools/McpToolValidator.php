@@ -249,12 +249,17 @@ class McpToolValidator {
 
 		$errors = array();
 
-		// Input schemas commonly describe an object of arguments. Allow omitted type (empty schema) or type 'object'.
-		// For output schemas, do not enforce a specific type; any valid JSON Schema is acceptable per MCP.
-		if ( 'inputSchema' === $field_name && isset( $schema['type'] ) && 'object' !== $schema['type'] ) {
+		// MCP Tool inputSchema and outputSchema are currently restricted to a root type of "object".
+		if ( ! isset( $schema['type'] ) ) {
 			$errors[] = sprintf(
 			/* translators: %s: field name */
-				__( 'Tool %s, if specifying a type, must use type \'object\'', 'mcp-adapter' ),
+				__( 'Tool %s must specify a root type of \'object\'', 'mcp-adapter' ),
+				$field_name
+			);
+		} elseif ( ! is_string( $schema['type'] ) || 'object' !== $schema['type'] ) {
+			$errors[] = sprintf(
+			/* translators: %s: field name */
+				__( 'Tool %s root type must be \'object\'', 'mcp-adapter' ),
 				$field_name
 			);
 		}

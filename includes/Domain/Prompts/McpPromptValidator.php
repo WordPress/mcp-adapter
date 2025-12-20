@@ -134,18 +134,6 @@ class McpPromptValidator {
 			}
 		}
 
-		// Validate annotations structure if present.
-		if ( isset( $prompt_data['annotations'] ) ) {
-			if ( ! is_array( $prompt_data['annotations'] ) ) {
-				$errors[] = __( 'Prompt annotations must be an array if provided', 'mcp-adapter' );
-			} else {
-				$annotation_errors = McpValidator::get_annotation_validation_errors( $prompt_data['annotations'] );
-				if ( ! empty( $annotation_errors ) ) {
-					$errors = array_merge( $errors, $annotation_errors );
-				}
-			}
-		}
-
 		return $errors;
 	}
 
@@ -400,6 +388,85 @@ class McpPromptValidator {
 				}
 				break;
 
+			case 'resource_link':
+				// ResourceLink is a metadata-only reference (same shape as Resource + type discriminator).
+				if ( empty( $content['name'] ) || ! is_string( $content['name'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content must have a name field', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( empty( $content['uri'] ) || ! is_string( $content['uri'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content must have a uri field', 'mcp-adapter' ),
+						$message_index
+					);
+				} elseif ( ! McpValidator::validate_resource_uri( $content['uri'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content uri must be a valid URI format', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['mimeType'] ) ) {
+					if ( ! is_string( $content['mimeType'] ) ) {
+						$errors[] = sprintf(
+						/* translators: %d: message index */
+							__( 'Message %d resource_link content mimeType must be a string if provided', 'mcp-adapter' ),
+							$message_index
+						);
+					} elseif ( ! McpValidator::validate_mime_type( $content['mimeType'] ) ) {
+						$errors[] = sprintf(
+						/* translators: %d: message index */
+							__( 'Message %d resource_link content mimeType must be a valid MIME type format', 'mcp-adapter' ),
+							$message_index
+						);
+					}
+				}
+
+				if ( isset( $content['size'] ) && ! is_int( $content['size'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content size must be an integer if provided', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['title'] ) && ! is_string( $content['title'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content title must be a string if provided', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['description'] ) && ! is_string( $content['description'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content description must be a string if provided', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['icons'] ) ) {
+					if ( ! is_array( $content['icons'] ) ) {
+						$errors[] = sprintf(
+						/* translators: %d: message index */
+							__( 'Message %d resource_link content icons must be an array if provided', 'mcp-adapter' ),
+							$message_index
+						);
+					} else {
+						$icons_result = McpValidator::validate_icons_array( $content['icons'], false );
+						$errors       = array_merge( $errors, self::format_icon_validation_errors( $icons_result ) );
+					}
+				}
+
+				break;
+
 			case 'resource':
 				if ( empty( $content['resource'] ) || ! is_array( $content['resource'] ) ) {
 					$errors[] = sprintf(
@@ -424,7 +491,7 @@ class McpPromptValidator {
 			default:
 				$errors[] = sprintf(
 				/* translators: %1$d: message index, %2$s: content type */
-					__( 'Message %1$d content type \'%2$s\' is not supported. Must be \'text\', \'image\', \'audio\', or \'resource\'', 'mcp-adapter' ),
+					__( 'Message %1$d content type \'%2$s\' is not supported. Must be \'text\', \'image\', \'audio\', \'resource\', or \'resource_link\'', 'mcp-adapter' ),
 					$message_index,
 					$type
 				);

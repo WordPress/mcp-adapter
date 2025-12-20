@@ -183,8 +183,6 @@ final class McpResourceValidatorTest extends TestCase {
 	public function test_get_validation_errors_with_valid_resource_data(): void {
 		$resource_data = array(
 			'uri'         => 'test://resource',
-			'name'        => 'test-resource',
-			'description' => 'A test resource',
 			'text'        => 'Content',
 		);
 
@@ -242,43 +240,40 @@ final class McpResourceValidatorTest extends TestCase {
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
 		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'must have either text or blob content', $errors[0] );
+		$this->assertStringContainsString( 'must include at least one of', $errors[0] );
 	}
 
 	public function test_get_validation_errors_with_both_text_and_blob(): void {
 		$resource_data = array(
 			'uri'  => 'test://resource',
 			'text' => 'Text content',
-			'blob' => 'Blob content',
+			'blob' => base64_encode( 'Blob content' ),
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'cannot have both text and blob', $errors[0] );
+		$this->assertEmpty( $errors );
 	}
 
 	public function test_get_validation_errors_with_non_string_text(): void {
 		$resource_data = array(
 			'uri'  => 'test://resource',
-			'text' => 123, // Non-string text is treated as missing content
+			'text' => 123,
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
 		$this->assertNotEmpty( $errors );
-		// Non-string text fails the is_string() check in content presence, so it's treated as missing.
-		$this->assertStringContainsString( 'must have either text or blob content', $errors[0] );
+		$this->assertStringContainsString( 'text content must be a string', implode( ' ', $errors ) );
 	}
 
 	public function test_get_validation_errors_with_non_string_blob(): void {
 		$resource_data = array(
 			'uri'  => 'test://resource',
-			'blob' => array( 'data' ), // Non-string blob is treated as missing content
+			'blob' => array( 'data' ),
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
 		$this->assertNotEmpty( $errors );
-		// Non-string blob fails the is_string() check in content presence, so it's treated as missing.
-		$this->assertStringContainsString( 'must have either text or blob content', $errors[0] );
+		$this->assertStringContainsString( 'blob content must be a string', implode( ' ', $errors ) );
 	}
 
 	public function test_get_validation_errors_rejects_invalid_base64_blob(): void {
@@ -290,30 +285,6 @@ final class McpResourceValidatorTest extends TestCase {
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
 		$this->assertNotEmpty( $errors );
 		$this->assertStringContainsString( 'valid base64', $errors[0] );
-	}
-
-	public function test_get_validation_errors_with_non_string_name(): void {
-		$resource_data = array(
-			'uri'  => 'test://resource',
-			'text' => 'Content',
-			'name' => 123,
-		);
-
-		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'name must be a string', $errors[0] );
-	}
-
-	public function test_get_validation_errors_with_non_string_description(): void {
-		$resource_data = array(
-			'uri'         => 'test://resource',
-			'text'        => 'Content',
-			'description' => array( 'desc' ),
-		);
-
-		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'description must be a string', $errors[0] );
 	}
 
 	public function test_get_validation_errors_with_non_string_mime_type(): void {
@@ -351,45 +322,6 @@ final class McpResourceValidatorTest extends TestCase {
 		$this->assertEmpty( $errors );
 	}
 
-	public function test_get_validation_errors_with_non_array_annotations(): void {
-		$resource_data = array(
-			'uri'         => 'test://resource',
-			'text'        => 'Content',
-			'annotations' => 'not-an-array',
-		);
-
-		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'annotations must be an array', $errors[0] );
-	}
-
-	public function test_get_validation_errors_with_invalid_annotations(): void {
-		$resource_data = array(
-			'uri'         => 'test://resource',
-			'text'        => 'Content',
-			'annotations' => array(
-				'audience' => 123, // Invalid: should be array
-			),
-		);
-
-		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertNotEmpty( $errors );
-	}
-
-	public function test_get_validation_errors_with_valid_annotations(): void {
-		$resource_data = array(
-			'uri'         => 'test://resource',
-			'text'        => 'Content',
-			'annotations' => array(
-				'audience' => array( 'user', 'assistant' ),
-				'priority' => 0.5,
-			),
-		);
-
-		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertEmpty( $errors );
-	}
-
 	// =========================================================================
 	// Edge Cases and Multiple Errors
 	// =========================================================================
@@ -397,14 +329,12 @@ final class McpResourceValidatorTest extends TestCase {
 	public function test_get_validation_errors_reports_multiple_errors(): void {
 		$resource_data = array(
 			'uri'         => 'invalid uri',
-			'name'        => 123,
-			'description' => array(),
 			'mimeType'    => 'invalid-mime',
-			// Missing text/blob content - will add 5th error
+			// Missing text/blob content
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertCount( 5, $errors, 'Should report all validation errors: invalid URI, invalid name, invalid description, invalid mimeType, and missing content' );
+		$this->assertCount( 3, $errors, 'Should report all validation errors: invalid URI, invalid mimeType, and missing content' );
 	}
 
 	public function test_get_validation_errors_allows_empty_string_text(): void {
@@ -422,7 +352,7 @@ final class McpResourceValidatorTest extends TestCase {
 		$resource_data = array(
 			'uri'  => 'test://resource',
 			'text' => 'Content',
-			// name, description, mimeType omitted - should be valid (all optional)
+			// mimeType omitted - should be valid (optional)
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );

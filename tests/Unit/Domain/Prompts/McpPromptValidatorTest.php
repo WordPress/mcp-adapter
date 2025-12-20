@@ -164,24 +164,11 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'description must be a string', $errors[0] );
 	}
 
-	public function test_get_validation_errors_with_non_array_annotations(): void {
+	public function test_get_validation_errors_ignores_annotations_field(): void {
+		// MCP prompt templates do not have an annotations field in the 2025-11-25 schema.
 		$prompt_data = array(
 			'name'        => 'test-prompt',
 			'annotations' => 'not-an-array',
-		);
-
-		$errors = McpPromptValidator::get_validation_errors( $prompt_data );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'annotations must be an array', $errors[0] );
-	}
-
-	public function test_get_validation_errors_with_valid_annotations(): void {
-		$prompt_data = array(
-			'name'        => 'test-prompt',
-			'annotations' => array(
-				'audience' => array( 'user', 'assistant' ),
-				'priority' => 0.5,
-			),
 		);
 
 		$errors = McpPromptValidator::get_validation_errors( $prompt_data );
@@ -552,6 +539,52 @@ final class McpPromptValidatorTest extends TestCase {
 
 		$errors = McpPromptValidator::validate_prompt_messages( $messages );
 		$this->assertEmpty( $errors );
+	}
+
+	public function test_validate_prompt_messages_with_valid_resource_link_content(): void {
+		$messages = array(
+			array(
+				'role'    => 'assistant',
+				'content' => array(
+					'type'        => 'resource_link',
+					'name'        => 'test-resource',
+					'uri'         => 'test://resource',
+					'title'       => 'Test Resource',
+					'description' => 'A resource reference',
+					'mimeType'    => 'application/json',
+					'size'        => 123,
+					'annotations' => array(
+						'audience' => array( 'user' ),
+						'priority' => 0.5,
+					),
+					'icons'       => array(
+						array(
+							'src'      => 'https://example.com/icon.png',
+							'mimeType' => 'image/png',
+						),
+					),
+				),
+			),
+		);
+
+		$errors = McpPromptValidator::validate_prompt_messages( $messages );
+		$this->assertEmpty( $errors );
+	}
+
+	public function test_validate_prompt_messages_with_invalid_resource_link_missing_uri(): void {
+		$messages = array(
+			array(
+				'role'    => 'assistant',
+				'content' => array(
+					'type' => 'resource_link',
+					'name' => 'test-resource',
+				),
+			),
+		);
+
+		$errors = McpPromptValidator::validate_prompt_messages( $messages );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'resource_link content must have a uri field', implode( ' ', $errors ) );
 	}
 
 	public function test_validate_prompt_messages_with_invalid_resource_content(): void {
