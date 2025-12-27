@@ -61,7 +61,7 @@ class HttpRequestHandler {
 
 		// Method not allowed
 		return new \WP_REST_Response(
-			McpErrorFactory::internal_error( 0, 'Method not allowed' )->toArray(),
+			McpErrorFactory::internal_error( null, 'Method not allowed' )->toArray(),
 			405
 		);
 	}
@@ -79,7 +79,7 @@ class HttpRequestHandler {
 			// Validate request body
 			if ( null === $context->body ) {
 				return new \WP_REST_Response(
-					McpErrorFactory::parse_error( 0, 'Invalid JSON in request body' )->toArray(),
+					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' )->toArray(),
 					400
 				);
 			}
@@ -96,7 +96,7 @@ class HttpRequestHandler {
 			);
 
 			return new \WP_REST_Response(
-				McpErrorFactory::internal_error( 0, 'Handler error occurred' )->toArray(),
+				McpErrorFactory::internal_error( null, 'Handler error occurred' )->toArray(),
 				500
 			);
 		}

@@ -583,6 +583,90 @@ final class McpErrorFactoryTest extends TestCase {
 	}
 
 	/**
+	 * Test validate_jsonrpc_message returns null ID for non-array input.
+	 *
+	 * JSON-RPC 2.0 spec: When request ID cannot be determined, use null.
+	 */
+	public function test_validate_jsonrpc_message_not_array_returns_null_id(): void {
+		$result = McpErrorFactory::validate_jsonrpc_message( 'not an array' );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertNull( $result->getId() );
+
+		$array = $result->toArray();
+		$this->assertArrayNotHasKey( 'id', $array );
+	}
+
+	/**
+	 * Test validate_jsonrpc_message returns null ID for missing jsonrpc version.
+	 *
+	 * JSON-RPC 2.0 spec: When request ID cannot be determined, use null.
+	 */
+	public function test_validate_jsonrpc_message_missing_version_returns_null_id(): void {
+		$message = array(
+			'method' => 'test/method',
+			'id'     => 1,
+		);
+
+		$result = McpErrorFactory::validate_jsonrpc_message( $message );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertNull( $result->getId() );
+	}
+
+	/**
+	 * Test validate_jsonrpc_message returns null ID for wrong jsonrpc version.
+	 *
+	 * JSON-RPC 2.0 spec: When request ID cannot be determined, use null.
+	 */
+	public function test_validate_jsonrpc_message_wrong_version_returns_null_id(): void {
+		$message = array(
+			'jsonrpc' => '1.0',
+			'method'  => 'test/method',
+			'id'      => 1,
+		);
+
+		$result = McpErrorFactory::validate_jsonrpc_message( $message );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertNull( $result->getId() );
+	}
+
+	/**
+	 * Test validate_jsonrpc_message returns null ID for missing method/result/error.
+	 *
+	 * JSON-RPC 2.0 spec: When request ID cannot be determined, use null.
+	 */
+	public function test_validate_jsonrpc_message_missing_method_returns_null_id(): void {
+		$message = array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+		);
+
+		$result = McpErrorFactory::validate_jsonrpc_message( $message );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertNull( $result->getId() );
+	}
+
+	/**
+	 * Test validate_jsonrpc_message returns null ID for response missing id.
+	 *
+	 * JSON-RPC 2.0 spec: When request ID cannot be determined, use null.
+	 */
+	public function test_validate_jsonrpc_message_response_missing_id_returns_null_id(): void {
+		$message = array(
+			'jsonrpc' => '2.0',
+			'result'  => array( 'success' => true ),
+		);
+
+		$result = McpErrorFactory::validate_jsonrpc_message( $message );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertNull( $result->getId() );
+	}
+
+	/**
 	 * Test create_error helper method returns Error DTO.
 	 */
 	public function test_create_error_returns_dto(): void {

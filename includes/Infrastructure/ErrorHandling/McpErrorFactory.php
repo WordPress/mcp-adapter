@@ -408,13 +408,13 @@ class McpErrorFactory {
 	 */
 	public static function validate_jsonrpc_message( $message ) {
 		if ( ! is_array( $message ) ) {
-			return self::invalid_request( 0, __( 'Message must be a JSON object', 'mcp-adapter' ) );
+			return self::invalid_request( null, __( 'Message must be a JSON object', 'mcp-adapter' ) );
 		}
 
 		// Must have jsonrpc field with value "2.0".
 		if ( ! isset( $message['jsonrpc'] ) || McpConstants::JSONRPC_VERSION !== $message['jsonrpc'] ) {
 			return self::invalid_request(
-				0,
+				null,
 				sprintf(
 				/* translators: %s: JSON-RPC version */
 					__( 'jsonrpc version must be "%s"', 'mcp-adapter' ),
@@ -428,12 +428,12 @@ class McpErrorFactory {
 		$is_response                = isset( $message['result'] ) || isset( $message['error'] );
 
 		if ( ! $is_request_or_notification && ! $is_response ) {
-			return self::invalid_request( 0, __( 'Message must have either method or result/error field', 'mcp-adapter' ) );
+			return self::invalid_request( null, __( 'Message must have either method or result/error field', 'mcp-adapter' ) );
 		}
 
 		// Responses must have an id field.
 		if ( $is_response && ! isset( $message['id'] ) ) {
-			return self::invalid_request( 0, __( 'Response messages must have an id field', 'mcp-adapter' ) );
+			return self::invalid_request( null, __( 'Response messages must have an id field', 'mcp-adapter' ) );
 		}
 
 		return true;
