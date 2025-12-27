@@ -13,6 +13,7 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Tools\CallToolResult;
 use WP\McpSchema\Server\Tools\ListToolsResult;
 
@@ -132,7 +133,7 @@ class ToolsHandler {
 							'error_code'     => $permission->get_error_code(),
 							'error_message'  => $permission->get_error_message(),
 							'error_data'     => $permission->get_error_data(),
-							'failure_reason' => 'permission_check_failed',
+							'failure_reason' => FailureReason::PERMISSION_CHECK_FAILED,
 						)
 					);
 				}

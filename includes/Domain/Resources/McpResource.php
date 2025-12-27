@@ -13,6 +13,7 @@ namespace WP\MCP\Domain\Resources;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
+use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Common\Protocol\Annotations;
 use WP\McpSchema\Server\Resources\Resource;
 
@@ -328,7 +329,7 @@ final class McpResource implements McpComponentInterface {
 		return new \WP_Error(
 			'mcp_permission_denied',
 			'Access denied.',
-			array( 'failure_reason' => 'no_permission_strategy' )
+			array( 'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY )
 		);
 	}
 

@@ -13,6 +13,7 @@ namespace WP\MCP\Domain\Tools;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Tools\Tool;
 use WP\McpSchema\Server\Tools\ToolAnnotations;
 
@@ -380,7 +381,7 @@ final class McpTool implements McpComponentInterface {
 			'mcp_permission_denied',
 			'Access denied.',
 			array(
-				'failure_reason' => 'no_permission_strategy',
+				'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY,
 				'tool_name'      => $this->tool->getName(),
 			)
 		);

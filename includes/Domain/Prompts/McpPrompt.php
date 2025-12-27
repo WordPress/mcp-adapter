@@ -14,6 +14,7 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Prompts\PromptArgument;
 
@@ -436,7 +437,7 @@ final class McpPrompt implements McpComponentInterface {
 		return new \WP_Error(
 			'mcp_permission_denied',
 			'Access denied.',
-			array( 'failure_reason' => 'no_permission_strategy' )
+			array( 'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY )
 		);
 	}
 

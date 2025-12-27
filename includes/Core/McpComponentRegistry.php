@@ -16,6 +16,7 @@ use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
+use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Prompts\Prompt;
 use WP\McpSchema\Server\Resources\Resource;
 use WP\McpSchema\Server\Tools\Tool;
@@ -211,7 +212,7 @@ class McpComponentRegistry {
 
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpTool::{$ability_name}" ) );
-			$this->track_registration( 'ability_tool', $ability_name, 'failed', array( 'failure_reason' => 'ability_not_found' ) );
+			$this->track_registration( 'ability_tool', $ability_name, 'failed', array( 'failure_reason' => FailureReason::ABILITY_NOT_FOUND ) );
 
 			return;
 		}
@@ -326,7 +327,7 @@ class McpComponentRegistry {
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpResource::{$ability_name}" ) );
 
-			$this->track_registration( 'resource', $ability_name, 'failed', array( 'failure_reason' => 'ability_not_found' ) );
+			$this->track_registration( 'resource', $ability_name, 'failed', array( 'failure_reason' => FailureReason::ABILITY_NOT_FOUND ) );
 
 			return;
 		}
@@ -359,7 +360,7 @@ class McpComponentRegistry {
 				$ability_name,
 				'failed',
 				array(
-					'failure_reason' => 'duplicate_uri',
+					'failure_reason' => FailureReason::DUPLICATE_URI,
 					'duplicate_uri'  => $resource_dto->getUri(),
 				)
 			);
@@ -509,7 +510,7 @@ class McpComponentRegistry {
 		} catch ( \Throwable $e ) {
 			$this->error_handler->log( "Failed to build prompt from class '{$class_name}': {$e->getMessage()}", array( "McpPromptBuilder::{$class_name}" ) );
 
-			$this->track_registration( 'prompt', $class_name, 'failed', array( 'failure_reason' => 'builder_exception' ) );
+			$this->track_registration( 'prompt', $class_name, 'failed', array( 'failure_reason' => FailureReason::BUILDER_EXCEPTION ) );
 		}
 	}
 
@@ -526,7 +527,7 @@ class McpComponentRegistry {
 		if ( ! $ability ) {
 			$this->error_handler->log( "WordPress ability '{$ability_name}' does not exist.", array( "RegisterAbilityAsMcpPrompt::{$ability_name}" ) );
 
-			$this->track_registration( 'prompt', $ability_name, 'failed', array( 'failure_reason' => 'ability_not_found' ) );
+			$this->track_registration( 'prompt', $ability_name, 'failed', array( 'failure_reason' => FailureReason::ABILITY_NOT_FOUND ) );
 
 			return;
 		}
