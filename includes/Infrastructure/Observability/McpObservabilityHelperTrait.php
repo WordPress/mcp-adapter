@@ -31,6 +31,44 @@ trait McpObservabilityHelperTrait {
 	);
 
 	/**
+	 * Patterns that indicate sensitive data in keys or values.
+	 *
+	 * These patterns are designed to match both camelCase and snake_case variants:
+	 * - apiKey, api_key, API_KEY
+	 * - authToken, auth_token, AUTH_TOKEN
+	 * - secretKey, secret_key, SECRET_KEY
+	 *
+	 * @var string[]
+	 */
+	private static array $sensitive_patterns = array(
+		'password',
+		'passwd',
+		'pwd',
+		'secret',
+		'token',
+		'bearer',
+		'credential',
+		'private',
+		'apikey',
+		'api_key',
+		'authtoken',
+		'auth_token',
+		'accesstoken',
+		'access_token',
+		'refreshtoken',
+		'refresh_token',
+		'clientsecret',
+		'client_secret',
+		'privatekey',
+		'private_key',
+		'secretkey',
+		'secret_key',
+		'authorization',
+		'authenticate',
+		'encryption',
+	);
+
+	/**
 	 * Format metric name to follow consistent naming conventions.
 	 *
 	 * @param string $metric The raw metric name.
@@ -90,8 +128,14 @@ trait McpObservabilityHelperTrait {
 		$sanitized = array();
 
 		foreach ( $tags as $key => $value ) {
-			// Convert to string and limit length to prevent log bloat.
+			// Convert key to string and limit length to prevent log bloat.
 			$key = substr( (string) $key, 0, 64 );
+
+			// Check if the key itself indicates sensitive data.
+			if ( self::is_sensitive_key( $key ) ) {
+				$sanitized[ $key ] = '[REDACTED]';
+				continue;
+			}
 
 			// Convert value to string, handling null specially.
 			if ( null === $value ) {
@@ -106,13 +150,60 @@ trait McpObservabilityHelperTrait {
 				}
 			}
 
-			// Remove potentially sensitive information patterns.
-			$value = preg_replace( '/\b(?:password|token|key|secret|auth)\b/i', '[REDACTED]', $value );
+			// Limit value length to prevent log bloat.
+			if ( strlen( $value ) > 1024 ) {
+				$value = substr( $value, 0, 1024 ) . '...[truncated]';
+			}
+
+			// Remove potentially sensitive information patterns from values.
+			$value = self::redact_sensitive_values( $value );
 
 			$sanitized[ $key ] = $value;
 		}
 
 		return $sanitized;
+	}
+
+	/**
+	 * Check if a key name indicates sensitive data.
+	 *
+	 * Matches patterns in camelCase, snake_case, and SCREAMING_CASE.
+	 *
+	 * @param string $key The key name to check.
+	 *
+	 * @return bool True if the key appears to contain sensitive data.
+	 */
+	public static function is_sensitive_key( string $key ): bool {
+		// Normalize: lowercase and remove underscores/hyphens for pattern matching.
+		$normalized = strtolower( str_replace( array( '_', '-' ), '', $key ) );
+
+		foreach ( self::$sensitive_patterns as $pattern ) {
+			// Remove underscores from pattern for normalized comparison.
+			$normalized_pattern = str_replace( '_', '', $pattern );
+
+			if ( str_contains( $normalized, $normalized_pattern ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Redact sensitive values from a string.
+	 *
+	 * Uses a more comprehensive pattern that catches compound words.
+	 *
+	 * @param string $value The value to redact.
+	 *
+	 * @return string The value with sensitive patterns redacted.
+	 */
+	public static function redact_sensitive_values( string $value ): string {
+		// Build a regex pattern that matches sensitive words as substrings.
+		// This catches camelCase (apiKey), snake_case (api_key), and standalone words.
+		$pattern = '/(?:' . implode( '|', array_map( 'preg_quote', self::$sensitive_patterns ) ) . ')/i';
+
+		return (string) preg_replace( $pattern, '[REDACTED]', $value );
 	}
 
 	/**

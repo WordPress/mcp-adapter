@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Infrastructure\Observability\McpObservabilityHelperTrait;
 use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
 
@@ -260,10 +261,21 @@ class RequestRouter {
 			$sanitized['client_name'] = $params['clientInfo']['name'];
 		}
 
-		// Add arguments count for tool calls (but not the actual arguments to avoid logging sensitive data)
+		// Add arguments count for tool calls (but not the actual arguments to avoid logging sensitive data).
+		// Also filter out sensitive-looking keys to avoid leaking secret names.
 		if ( isset( $params['arguments'] ) && is_array( $params['arguments'] ) ) {
 			$sanitized['arguments_count'] = count( $params['arguments'] );
-			$sanitized['arguments_keys']  = array_keys( $params['arguments'] );
+
+			// Filter argument keys to exclude sensitive-looking ones.
+			$safe_keys = array();
+			foreach ( array_keys( $params['arguments'] ) as $arg_key ) {
+				if ( McpObservabilityHelperTrait::is_sensitive_key( (string) $arg_key ) ) {
+					$safe_keys[] = '[REDACTED]';
+				} else {
+					$safe_keys[] = $arg_key;
+				}
+			}
+			$sanitized['arguments_keys'] = $safe_keys;
 		}
 
 		return $sanitized;
