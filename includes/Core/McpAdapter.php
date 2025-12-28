@@ -136,8 +136,8 @@ final class McpAdapter {
 	 * @param string $server_description Server description.
 	 * @param string $server_version Server version.
 	 * @param array $mcp_transports Array of classes that extend the BaseTransport.
-	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface> $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
-	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface> $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
+	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
+	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
 	 * @param array $tools Ability names to register as tools.
 	 * @param array $resources Resources to register.
 	 * @param array $prompts Prompts to register.
@@ -234,21 +234,33 @@ final class McpAdapter {
 		}
 
 		// Create server with tools, resources, and prompts - let server handle all registration logic.
-		$server = new McpServer(
-			$server_id,
-			$server_route_namespace,
-			$server_route,
-			$server_name,
-			$server_description,
-			$server_version,
-			$mcp_transports,
-			$error_handler,
-			$observability_handler,
-			$tools,
-			$resources,
-			$prompts,
-			$transport_permission_callback
-		);
+		try {
+			$server = new McpServer(
+				$server_id,
+				$server_route_namespace,
+				$server_route,
+				$server_name,
+				$server_description,
+				$server_version,
+				$mcp_transports,
+				$error_handler,
+				$observability_handler,
+				$tools,
+				$resources,
+				$prompts,
+				$transport_permission_callback
+			);
+		} catch ( \Throwable $e ) {
+			return new \WP_Error(
+				'server_creation_failed',
+				sprintf(
+					/* translators: 1: server ID, 2: error message */
+					esc_html__( 'Failed to create server "%1$s": %2$s', 'mcp-adapter' ),
+					esc_html( $server_id ),
+					esc_html( $e->getMessage() )
+				)
+			);
+		}
 
 		// Track server creation.
 		$server->get_observability_handler()->record_event(
