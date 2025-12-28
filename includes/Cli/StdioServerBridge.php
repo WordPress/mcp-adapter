@@ -13,6 +13,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 
@@ -131,7 +132,7 @@ class StdioServerBridge {
 					JsonRpcResponseBuilder::create_error_response(
 						null,
 						array(
-							'code'    => - 32603,
+							'code'    => McpErrorFactory::INTERNAL_ERROR,
 							'message' => 'Internal error',
 							'data'    => array(
 								'details' => $e->getMessage(),
@@ -172,7 +173,7 @@ class StdioServerBridge {
 			if ( json_last_error() !== JSON_ERROR_NONE ) {
 				return $this->create_error_response(
 					null,
-					- 32700,
+					McpErrorFactory::PARSE_ERROR,
 					'Parse error',
 					'Invalid JSON was received by the server.'
 				);
@@ -182,7 +183,7 @@ class StdioServerBridge {
 			if ( ! is_array( $request ) ) {
 				return $this->create_error_response(
 					null,
-					- 32600,
+					McpErrorFactory::INVALID_REQUEST,
 					'Invalid Request',
 					'The JSON sent is not a valid Request object.'
 				);
@@ -192,7 +193,7 @@ class StdioServerBridge {
 			if ( ! isset( $request['jsonrpc'] ) || '2.0' !== $request['jsonrpc'] ) {
 				return $this->create_error_response(
 					$request['id'] ?? null,
-					- 32600,
+					McpErrorFactory::INVALID_REQUEST,
 					'Invalid Request',
 					'The JSON-RPC version must be 2.0.'
 				);
@@ -206,7 +207,7 @@ class StdioServerBridge {
 			if ( ! is_string( $method ) ) {
 				return $this->create_error_response(
 					$id,
-					- 32600,
+					McpErrorFactory::INVALID_REQUEST,
 					'Invalid Request',
 					'Method must be a string.'
 				);
@@ -240,7 +241,7 @@ class StdioServerBridge {
 			// Handle unexpected errors
 			return $this->create_error_response(
 				null,
-				- 32603,
+				McpErrorFactory::INTERNAL_ERROR,
 				'Internal error',
 				$e->getMessage()
 			);
@@ -281,7 +282,11 @@ class StdioServerBridge {
 		$json = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		if ( false === $json ) {
-			return '{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal error"},"id":null}';
+			// Fallback when JSON encoding fails - use constant for consistency.
+			return sprintf(
+				'{"jsonrpc":"2.0","error":{"code":%d,"message":"Internal error"},"id":null}',
+				McpErrorFactory::INTERNAL_ERROR
+			);
 		}
 
 		return $json;
@@ -302,7 +307,7 @@ class StdioServerBridge {
 
 			// Ensure error has required fields
 			$error_payload = array(
-				'code'    => $error['code'] ?? - 32603,
+				'code'    => $error['code'] ?? McpErrorFactory::INTERNAL_ERROR,
 				'message' => $error['message'] ?? 'Internal error',
 			);
 

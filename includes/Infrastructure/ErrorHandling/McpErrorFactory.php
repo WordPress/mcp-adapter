@@ -35,13 +35,13 @@ class McpErrorFactory {
 	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
 	 * Using conservative, well-established error codes only.
 	 */
-	public const SERVER_ERROR       = - 32000; // Generic server error (includes MCP disabled)
-	public const TIMEOUT_ERROR      = - 32001; // Request timeout
-	public const RESOURCE_NOT_FOUND = - 32002; // Resource not found
-	public const TOOL_NOT_FOUND     = - 32003; // Tool not found
-	public const PROMPT_NOT_FOUND   = - 32004; // Prompt not found
-	public const PERMISSION_DENIED  = - 32008; // Access denied/forbidden
-	public const UNAUTHORIZED       = - 32010; // Authentication required
+	public const SERVER_ERROR       = -32000; // Generic server error (includes MCP disabled)
+	public const TIMEOUT_ERROR      = -32001; // Request timeout
+	public const RESOURCE_NOT_FOUND = -32002; // Resource not found
+	public const TOOL_NOT_FOUND     = -32003; // Tool not found
+	public const PROMPT_NOT_FOUND   = -32004; // Prompt not found
+	public const PERMISSION_DENIED  = -32008; // Access denied/forbidden
+	public const UNAUTHORIZED       = -32010; // Authentication required
 
 	/**
 	 * Create a parse error response.
