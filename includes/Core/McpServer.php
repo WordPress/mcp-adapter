@@ -152,9 +152,20 @@ class McpServer {
 		$this->server_version                = $server_version;
 		$this->transport_permission_callback = $transport_permission_callback;
 
-		// Setup validation flag. Validation is disabled by default for performance.
-		// Abilities API is also validating all abilities.
-		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		/**
+		 * Filters whether MCP protocol validation is enabled for a server.
+		 *
+		 * Validation is disabled by default for performance, as the Abilities API
+		 * also validates all abilities. Enable this filter for stricter MCP protocol
+		 * compliance checking during development or debugging.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param bool      $enabled   Whether validation is enabled. Default false.
+		 * @param string    $server_id The server ID being configured.
+		 * @param \WP\MCP\Core\McpServer $server    The McpServer instance being constructed.
+		 */
+		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false, $this->server_id, $this );
 
 		// Setup handlers and components
 		$this->setup_handlers( $error_handler, $observability_handler );
@@ -351,7 +362,7 @@ class McpServer {
 	 *
 	 * @return \WP\MCP\Domain\Tools\McpTool|null
 	 * @internal
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	public function get_mcp_tool( string $tool_name ): ?McpTool {
@@ -365,7 +376,7 @@ class McpServer {
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource|null
 	 * @internal
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	public function get_mcp_resource( string $resource_uri ): ?McpResource {
@@ -392,7 +403,7 @@ class McpServer {
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
 	 * @internal
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	public function get_mcp_prompt( string $prompt_name ): ?McpPrompt {

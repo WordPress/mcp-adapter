@@ -80,7 +80,16 @@ class StdioServerBridge {
 	 * @throws \RuntimeException If STDIO transport is disabled.
 	 */
 	public function serve(): void {
-		// Check if STDIO transport is enabled
+		/**
+		 * Filters whether the STDIO transport is enabled.
+		 *
+		 * Return false to disable STDIO transport entirely. This prevents
+		 * the WP-CLI `mcp-adapter serve` command from functioning.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param bool $enabled Whether STDIO transport is enabled. Default true.
+		 */
 		$enable_serve = apply_filters( 'mcp_adapter_enable_stdio_transport', true );
 
 		if ( ! $enable_serve ) {

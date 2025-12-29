@@ -91,9 +91,25 @@ class McpComponentRegistry {
 		$this->error_handler         = $error_handler;
 		$this->observability_handler = $observability_handler;
 
-		// Allow filtering whether component registration events should be recorded.
-		// Default is false to avoid polluting observability logs during startup.
-		$this->should_record_component_registration = apply_filters( 'mcp_adapter_observability_record_component_registration', false );
+		/**
+		 * Filters whether component registration events should be recorded for observability.
+		 *
+		 * Default is false to avoid polluting observability logs during startup.
+		 * Enable this filter to track tool, resource, and prompt registrations
+		 * for debugging or monitoring purposes.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param bool      $should_record Whether to record component registration events. Default false.
+		 * @param string    $server_id     The server ID for which components are being registered.
+		 * @param \WP\MCP\Core\McpServer $server        The McpServer instance owning the registry.
+		 */
+		$this->should_record_component_registration = apply_filters(
+			'mcp_adapter_observability_record_component_registration',
+			false,
+			$this->mcp_server->get_server_id(),
+			$this->mcp_server
+		);
 	}
 
 	/**
@@ -151,7 +167,7 @@ class McpComponentRegistry {
 	 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool McpTool instance.
 	 *
 	 * @return void
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	private function add_mcp_tool( McpTool $mcp_tool ): void {
@@ -291,7 +307,7 @@ class McpComponentRegistry {
 	 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource McpResource instance.
 	 *
 	 * @return bool True if the resource was added, false if it was a duplicate.
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	private function add_mcp_resource( McpResource $mcp_resource ): bool {
@@ -445,7 +461,7 @@ class McpComponentRegistry {
 	 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt McpPrompt instance.
 	 *
 	 * @return void
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	private function add_mcp_prompt( McpPrompt $mcp_prompt ): void {
@@ -594,7 +610,7 @@ class McpComponentRegistry {
 	 * @param string $tool_name Tool name.
 	 *
 	 * @return \WP\MCP\Domain\Tools\McpTool|null
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	public function get_mcp_tool( string $tool_name ): ?McpTool {
@@ -608,7 +624,7 @@ class McpComponentRegistry {
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource|null
 	 * @internal
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	public function get_mcp_resource( string $resource_uri ): ?McpResource {
@@ -622,7 +638,7 @@ class McpComponentRegistry {
 	 *
 	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
 	 * @internal
-	 * @since n.e.x.t
+	 * @since 0.3.0
 	 *
 	 */
 	public function get_mcp_prompt( string $prompt_name ): ?McpPrompt {

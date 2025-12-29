@@ -101,6 +101,19 @@ class HttpTransport implements McpRestTransportInterface {
 				$this->request_handler->transport_context->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
 			}
 		}
+
+		/**
+		 * Filters the default user capability required for MCP transport access.
+		 *
+		 * This filter is only applied when no custom transport permission callback
+		 * is provided or when the custom callback fails. The capability is checked
+		 * using current_user_can().
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param string                                        $capability The required capability. Default 'read'.
+		 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context    The HTTP request context.
+		 */
 		$user_capability = apply_filters( 'mcp_adapter_default_transport_permission_user_capability', 'read', $context );
 
 		// Validate that the filtered capability is a non-empty string

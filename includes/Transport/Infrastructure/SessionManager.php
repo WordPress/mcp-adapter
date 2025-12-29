@@ -157,9 +157,33 @@ final class SessionManager {
 	 * @return array<string, int> Configuration array.
 	 */
 	private static function get_config(): array {
+		/**
+		 * Filters the maximum number of MCP sessions allowed per user.
+		 *
+		 * When a user exceeds this limit, the oldest inactive session is
+		 * automatically removed to make room for new sessions.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param int $max_sessions Maximum sessions per user. Default 5.
+		 */
+		$max_sessions = (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS );
+
+		/**
+		 * Filters the session inactivity timeout in seconds.
+		 *
+		 * Sessions that have been inactive longer than this duration are
+		 * considered expired and may be cleaned up automatically.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param int $timeout Inactivity timeout in seconds. Default 3600 (1 hour).
+		 */
+		$inactivity_timeout = (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT );
+
 		return array(
-			'max_sessions'       => (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS ),
-			'inactivity_timeout' => (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT ),
+			'max_sessions'       => $max_sessions,
+			'inactivity_timeout' => $inactivity_timeout,
 		);
 	}
 

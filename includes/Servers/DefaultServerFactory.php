@@ -59,7 +59,32 @@ class DefaultServerFactory {
 			'prompts'                => $auto_discovered_prompts,
 		);
 
-		// Apply WordPress filter for customization
+		/**
+		 * Filters the default MCP server configuration.
+		 *
+		 * Allows customization of the default server's settings before creation.
+		 * The filtered array is merged with defaults, so you only need to specify
+		 * the values you want to override.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param array $config {
+		 *     Default server configuration.
+		 *
+		 *     @type string   $server_id              Server identifier. Default 'mcp-adapter-default-server'.
+		 *     @type string   $server_route_namespace REST API namespace. Default 'mcp-adapter/v1'.
+		 *     @type string   $server_route           REST API route. Default 'mcp'.
+		 *     @type string   $server_name            Human-readable name. Default 'WordPress MCP Server'.
+		 *     @type string   $server_description     Server description.
+		 *     @type string   $server_version         Server version. Default WORDPRESS_MCP_ADAPTER_VERSION.
+		 *     @type string[] $mcp_transports         Transport class names. Default [HttpTransport::class].
+		 *     @type string   $error_handler          Error handler class. Default ErrorLogMcpErrorHandler::class.
+		 *     @type string   $observability_handler  Observability handler class. Default NullMcpObservabilityHandler::class.
+		 *     @type string[] $tools                  Tool ability names to expose.
+		 *     @type string[] $resources              Resource ability names to expose.
+		 *     @type string[] $prompts                Prompt ability names to expose.
+		 * }
+		 */
 		$config = apply_filters( 'mcp_adapter_default_server_config', $wordpress_defaults );
 
 		// Ensure config is an array and merge with defaults

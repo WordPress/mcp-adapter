@@ -132,7 +132,16 @@ final class DiscoverAbilitiesAbility {
 			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}
 
-		// Check basic capability requirement - allow customization via filter
+		/**
+		 * Filters the capability required to discover available abilities.
+		 *
+		 * This capability is checked before listing all registered WordPress abilities
+		 * through the mcp-adapter-discover-abilities tool.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param string $capability The required capability. Default 'read'.
+		 */
 		$required_capability = apply_filters( 'mcp_adapter_discover_abilities_capability', 'read' );
 		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
 		if ( ! current_user_can( $required_capability ) ) {

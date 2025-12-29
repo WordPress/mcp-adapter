@@ -208,7 +208,19 @@ final class ExecuteAbilityAbility {
 			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}
 
-		// Check basic capability requirement - allow customization via filter
+		/**
+		 * Filters the capability required to execute abilities.
+		 *
+		 * This is intentionally set to 'read' as the minimum baseline capability.
+		 * Each ability defines its own permission_callback that enforces the actual
+		 * capability requirements for that specific operation. This filter serves
+		 * only as a gate to prevent completely unauthenticated or capability-less
+		 * users from reaching the ability execution layer.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param string $capability The required capability. Default 'read'.
+		 */
 		$required_capability = apply_filters( 'mcp_adapter_execute_ability_capability', 'read' );
 		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
 		if ( ! current_user_can( $required_capability ) ) {

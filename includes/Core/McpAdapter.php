@@ -78,6 +78,17 @@ final class McpAdapter {
 
 		$this->maybe_create_default_server();
 
+		/**
+		 * Fires after the MCP Adapter has been initialized.
+		 *
+		 * Use this action to register custom MCP servers. The adapter instance
+		 * provides methods to create and configure additional servers beyond
+		 * the default server.
+		 *
+		 * @since 0.1.0
+		 *
+		 * @param \WP\MCP\Core\McpAdapter $adapter The MCP Adapter singleton instance.
+		 */
 		do_action( 'mcp_adapter_init', $this );
 		$this->register_wp_cli_commands();
 		self::$initialized = true;
@@ -89,7 +100,16 @@ final class McpAdapter {
 	 * @internal For use by adapter initialization only.
 	 */
 	private function maybe_create_default_server(): void {
-		// Allow disabling default server creation
+		/**
+		 * Filters whether the default MCP server should be created.
+		 *
+		 * Return false to prevent the default server from being created.
+		 * This is useful when you want to define custom servers only.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param bool $create_default Whether to create the default server. Default true.
+		 */
 		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
 			return;
 		}
