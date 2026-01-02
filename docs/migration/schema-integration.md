@@ -26,57 +26,6 @@ The adapter now uses DTOs from `WP\McpSchema` namespace throughout:
 
 **Good news**: If you're using the standard WordPress abilities API (`wp_register_ability()`), **no changes are required**. The adapter handles all DTO conversions internally.
 
-### 3. For Advanced Integrations
-
-If you're directly creating MCP components or custom handlers, you'll need to work with the DTOs:
-
-**Before:**
-```php
-// Manual array construction
-$tool = array(
-    'name' => 'my-tool',
-    'description' => 'My tool description',
-    'inputSchema' => array(
-        'type' => 'object',
-        'properties' => array(
-            'input' => array('type' => 'string')
-        )
-    )
-);
-```
-
-**After:**
-```php
-use WP\McpSchema\Server\Tools\Tool;
-
-// Type-safe DTO construction
-$tool = new Tool(
-    name: 'my-tool',
-    description: 'My tool description',
-    inputSchema: (object) array(
-        'type' => 'object',
-        'properties' => array(
-            'input' => array('type' => 'string')
-        )
-    )
-);
-```
-
-### 4. Validation
-
-The existing validator classes (`McpToolValidator`, `McpResourceValidator`, `McpPromptValidator`) continue to work and now validate the DTOs:
-
-```php
-use WP\MCP\Domain\Tools\McpToolValidator;
-use WP\McpSchema\Server\Tools\Tool;
-
-$tool = new Tool(...);
-$result = McpToolValidator::validate_tool_dto($tool);
-if (is_wp_error($result)) {
-    // Handle validation error
-}
-```
-
 ## Benefits
 
 1. **Type Safety**: IDEs can now provide better autocomplete and type checking
@@ -84,21 +33,13 @@ if (is_wp_error($result)) {
 3. **Future Proof**: Updates to the MCP specification can be handled by updating the schema package
 4. **Less Boilerplate**: DTOs handle serialization/deserialization automatically
 
-## No Breaking Changes for Most Users
+## No Breaking Changes
 
-The integration has been designed to be transparent for most users:
+The integration has been designed to be transparent for all users:
 
 - ✅ WordPress abilities work exactly as before
 - ✅ All existing hooks and filters continue to work
 - ✅ The public API remains unchanged
 - ✅ Custom transports continue to work
-
-## Need Help?
-
-If you encounter any issues with the schema integration:
-
-1. Ensure you have the latest version of MCP Adapter
-2. Run `composer install` to get the schema package
-3. Check that your PHP version meets the requirements (PHP 7.4+)
 
 For more information about the schema package, see: [wordpress/php-mcp-schema](https://github.com/wordpress/php-mcp-schema)
