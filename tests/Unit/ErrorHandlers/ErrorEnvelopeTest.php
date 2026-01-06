@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\ErrorHandlers;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 /**
  * Tests for McpErrorFactory error envelope structure.

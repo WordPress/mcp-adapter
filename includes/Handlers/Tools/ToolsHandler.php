@@ -14,8 +14,8 @@ use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\CallToolResult;
-use WP\McpSchema\Server\Tools\ListToolsResult;
+use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
 
 /**
  * Handles tools-related MCP methods.
@@ -49,7 +49,7 @@ class ToolsHandler {
 	 *
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with all tools.
+	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with all tools.
 	 */
 	public function list_all_tools( $request_id = 0 ): ListToolsResult {
 		// Return the standard tools list.
@@ -65,7 +65,7 @@ class ToolsHandler {
 	 *
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\ListToolsResult Response with tools list.
+	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with tools list.
 	 */
 	public function list_tools( $request_id = 0 ): ListToolsResult {
 		$tools = array_values( $this->mcp->get_tools() );
@@ -93,7 +93,7 @@ class ToolsHandler {
 	 * @param array $message Request message.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\CallToolResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	public function call_tool( array $message, $request_id = 0 ) {
 		// Extract parameters using helper method.

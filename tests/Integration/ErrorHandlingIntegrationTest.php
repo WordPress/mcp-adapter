@@ -13,7 +13,7 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 final class ErrorHandlingIntegrationTest extends TestCase {
 

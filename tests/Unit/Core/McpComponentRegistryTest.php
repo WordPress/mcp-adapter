@@ -106,7 +106,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-always-allowed', $tools );
 
 		$tool = $tools['test-always-allowed'];
-		$this->assertInstanceOf( \WP\McpSchema\Server\Tools\Tool::class, $tool );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Tools\DTO\Tool::class, $tool );
 		$this->assertEquals( 'test-always-allowed', $tool->getName() );
 
 		// Verify observability event was recorded
@@ -191,7 +191,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Get the first resource
 		$resource = array_values( $resources )[0];
-		$this->assertInstanceOf( \WP\McpSchema\Server\Resources\Resource::class, $resource );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Resources\DTO\Resource::class, $resource );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -245,7 +245,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Get the first prompt
 		$prompt = array_values( $prompts )[0];
-		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\Prompt::class, $prompt );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\DTO\Prompt::class, $prompt );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -274,7 +274,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-registry-prompt', $prompts );
 
 		$prompt = $prompts['test-registry-prompt'];
-		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\Prompt::class, $prompt );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\DTO\Prompt::class, $prompt );
 		$this->assertNotNull( $this->registry->get_prompt_builder( 'test-registry-prompt' ) );
 
 		// Verify observability event was recorded

@@ -9,7 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts\Contracts;
 
-use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 
 /**
  * Interface for building MCP prompts.
@@ -22,7 +22,7 @@ interface McpPromptBuilderInterface {
 	/**
 	 * Build and return the Prompt DTO instance.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt The built prompt DTO.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
 	 */
 	public function build(): Prompt;
 

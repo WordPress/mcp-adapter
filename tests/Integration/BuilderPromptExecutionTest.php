@@ -7,9 +7,9 @@ namespace WP\MCP\Tests\Integration;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Prompts\GetPromptResult;
-use WP\McpSchema\Server\Prompts\PromptMessage;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
+use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 // Test prompt that requires admin permissions
 class AdminOnlyPrompt extends McpPromptBuilder {

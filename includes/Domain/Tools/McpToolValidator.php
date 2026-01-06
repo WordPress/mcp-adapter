@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Tools\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 /**
  * Validates MCP tools against the Model Context Protocol specification.
@@ -74,7 +74,7 @@ class McpToolValidator {
 	/**
 	 * Validate a Tool DTO against the MCP schema.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\Tool $tool The tool DTO to validate.
+	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The tool DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */

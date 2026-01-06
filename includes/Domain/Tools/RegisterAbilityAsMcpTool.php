@@ -14,7 +14,7 @@ use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Tools\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 /**
  * RegisterAbilityAsMcpTool class.
@@ -52,7 +52,7 @@ class RegisterAbilityAsMcpTool {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{tool: \WP\McpSchema\Server\Tools\Tool, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{tool: \WP\McpSchema\Server\Tools\DTO\Tool, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
 	 */

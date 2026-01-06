@@ -6,11 +6,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Prompts\GetPromptResult;
-use WP\McpSchema\Server\Prompts\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Prompts\PromptMessage;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
+use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 final class PromptsHandlerTest extends TestCase {
 

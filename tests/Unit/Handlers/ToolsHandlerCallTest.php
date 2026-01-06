@@ -7,13 +7,13 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\ImageContent;
-use WP\McpSchema\Common\Content\TextContent;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\TextResourceContents;
-use WP\McpSchema\Server\Tools\CallToolResult;
+use WP\McpSchema\Common\Content\DTO\ImageContent;
+use WP\McpSchema\Common\Content\DTO\TextContent;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
+use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 
 final class ToolsHandlerCallTest extends TestCase {
 

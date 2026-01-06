@@ -6,8 +6,8 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\ListToolsResult;
-use WP\McpSchema\Server\Tools\Tool;
+use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 final class ToolsHandlerListTest extends TestCase {
 

@@ -11,11 +11,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\TextContent;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Tools\CallToolResult;
-use WP\McpSchema\Server\Tools\ListToolsResult;
-use WP\McpSchema\Server\Tools\Tool;
+use WP\McpSchema\Common\Content\DTO\TextContent;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 /**
  * Test ToolsHandler functionality.

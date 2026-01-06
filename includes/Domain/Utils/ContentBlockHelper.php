@@ -13,13 +13,13 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Utils;
 
-use WP\McpSchema\Common\Content\AudioContent;
-use WP\McpSchema\Common\Content\ImageContent;
-use WP\McpSchema\Common\Content\TextContent;
-use WP\McpSchema\Common\Protocol\Annotations;
-use WP\McpSchema\Common\Protocol\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\TextResourceContents;
+use WP\McpSchema\Common\Content\DTO\AudioContent;
+use WP\McpSchema\Common\Content\DTO\ImageContent;
+use WP\McpSchema\Common\Content\DTO\TextContent;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
+use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
+use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
 use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
 
 /**
@@ -38,10 +38,10 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $data Base64-encoded image data.
 	 * @param string $mime_type The MIME type of the image (e.g., 'image/png').
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Content\ImageContent The created ImageContent DTO.
+	 * @return \WP\McpSchema\Common\Content\DTO\ImageContent The created ImageContent DTO.
 	 */
 	public static function image( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): ImageContent {
 		return ImageContent::fromArray(
@@ -60,10 +60,10 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $data Base64-encoded audio data.
 	 * @param string $mime_type The MIME type of the audio (e.g., 'audio/mp3').
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Content\AudioContent The created AudioContent DTO.
+	 * @return \WP\McpSchema\Common\Content\DTO\AudioContent The created AudioContent DTO.
 	 */
 	public static function audio( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): AudioContent {
 		return AudioContent::fromArray(
@@ -85,10 +85,10 @@ final class ContentBlockHelper {
 	 * @param string $uri The URI of the resource.
 	 * @param string $text The text content of the resource.
 	 * @param string|null $mime_type Optional MIME type of the resource.
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\EmbeddedResource The created EmbeddedResource DTO.
+	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
 	 */
 	public static function embedded_text_resource(
 		string $uri,
@@ -123,10 +123,10 @@ final class ContentBlockHelper {
 	 * @param string $uri The URI of the resource.
 	 * @param string $blob Base64-encoded binary data.
 	 * @param string|null $mime_type Optional MIME type of the resource.
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\EmbeddedResource The created EmbeddedResource DTO.
+	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
 	 */
 	public static function embedded_blob_resource(
 		string $uri,
@@ -160,10 +160,10 @@ final class ContentBlockHelper {
 	 * This is semantically equivalent to text() but makes the intent clearer in code.
 	 *
 	 * @param string $message The error message.
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Content\TextContent The created TextContent DTO.
+	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
 	public static function error_text( string $message, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
 		return self::text( $message, $annotations, $_meta );
@@ -173,10 +173,10 @@ final class ContentBlockHelper {
 	 * Creates a TextContent DTO.
 	 *
 	 * @param string $text The text content.
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Content\TextContent The created TextContent DTO.
+	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
 	public static function text( string $text, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
 		return TextContent::fromArray(
@@ -197,10 +197,10 @@ final class ContentBlockHelper {
 	 *
 	 * @param mixed $data The data to JSON-encode.
 	 * @param int $flags JSON encoding flags (default: 0).
-	 * @param \WP\McpSchema\Common\Protocol\Annotations|null $annotations Optional annotations for the client.
+	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata.
 	 *
-	 * @return \WP\McpSchema\Common\Content\TextContent The created TextContent DTO.
+	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
 	public static function json_text( $data, int $flags = 0, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
 		$json = wp_json_encode( $data, $flags );

@@ -6,8 +6,8 @@ namespace WP\MCP\Tests\Unit\Infrastructure\ErrorHandling;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\Error;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\JsonRpc\DTO\Error;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 final class McpErrorFactoryTest extends TestCase {
 

@@ -11,7 +11,7 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 
 /**
  * Validates MCP prompts against the Model Context Protocol specification.
@@ -50,7 +50,7 @@ class McpPromptValidator {
 	/**
 	 * Validate a Prompt DTO against the MCP schema.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\Prompt $prompt The prompt DTO to validate.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */

@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPromptValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 
 /**
  * Tests for McpPromptValidator class.

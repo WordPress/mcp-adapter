@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\System;
 
 use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\Protocol\Result;
+use WP\McpSchema\Common\Protocol\DTO\Result;
 
 /**
  * Handles system-related MCP methods.

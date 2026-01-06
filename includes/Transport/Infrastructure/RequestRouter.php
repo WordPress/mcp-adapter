@@ -12,7 +12,7 @@ namespace WP\MCP\Transport\Infrastructure;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\McpObservabilityHelperTrait;
 use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -325,7 +325,7 @@ class RequestRouter {
 	 * @param string $method The method that was not found.
 	 * @param mixed $request_id The request ID.
 	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
 		return McpErrorFactory::method_not_found( $request_id, $method );

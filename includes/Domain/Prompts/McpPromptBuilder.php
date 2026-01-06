@@ -11,8 +11,8 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Prompts\PromptArgument;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -127,7 +127,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Safe to call multiple times - always returns a fresh DTO based on
 	 * the current (immutable after construction) state.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt The built prompt DTO.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
 	 */
 	public function build(): Prompt {
 		$argument_dtos = null;

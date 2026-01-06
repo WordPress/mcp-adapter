@@ -9,10 +9,10 @@ use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Lifecycle\Implementation;
+use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
 use WP\McpSchema\Common\McpConstants;
-use WP\McpSchema\Common\Protocol\InitializeResult;
-use WP\McpSchema\Server\Lifecycle\ServerCapabilities;
+use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
+use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
 
 final class InitializeHandlerTest extends TestCase {
 

@@ -14,8 +14,8 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Common\Protocol\Annotations;
-use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 /**
  * Resource component providing unified execution and permission checks.
@@ -50,7 +50,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Clean Resource DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Resources\Resource
+	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
 	 */
 	private Resource $mcp_resource_dto;
 
@@ -96,7 +96,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\Resource $resource_dto The Resource DTO.
+	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
 	 */
 	private function __construct( Resource $resource_dto ) {
 		$this->mcp_resource_dto = $resource_dto;
@@ -249,7 +249,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\Resource
+	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
 	 */
 	public function get_component(): Resource {
 		return $this->mcp_resource_dto;

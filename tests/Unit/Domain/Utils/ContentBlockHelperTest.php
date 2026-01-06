@@ -11,13 +11,13 @@ namespace WP\MCP\Tests\Unit\Domain\Utils;
 
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\AudioContent;
-use WP\McpSchema\Common\Content\ImageContent;
-use WP\McpSchema\Common\Content\TextContent;
-use WP\McpSchema\Common\Protocol\Annotations;
-use WP\McpSchema\Common\Protocol\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\TextResourceContents;
+use WP\McpSchema\Common\Content\DTO\AudioContent;
+use WP\McpSchema\Common\Content\DTO\ImageContent;
+use WP\McpSchema\Common\Content\DTO\TextContent;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
+use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
+use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
 use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
 
 /**

@@ -10,10 +10,10 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
-use WP\McpSchema\Common\Lifecycle\Implementation;
+use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
 use WP\McpSchema\Common\McpConstants;
-use WP\McpSchema\Common\Protocol\InitializeResult;
-use WP\McpSchema\Server\Lifecycle\ServerCapabilities;
+use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
+use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
 
 /**
  * Handles the initialize MCP method.
@@ -40,7 +40,7 @@ class InitializeHandler {
 	 *
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\InitializeResult Response with server capabilities and information.
+	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
 	 */
 	public function handle( $request_id = 0 ): InitializeResult {
 		$server_info = Implementation::fromArray(

@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 /**
  * Provides common helper methods for MCP handlers.
@@ -58,7 +58,7 @@ trait HandlerHelperTrait {
 	 * McpErrorFactory methods return JSONRPCErrorResponse DTOs.
 	 * This helper extracts the error array for handlers that need it.
 	 *
-	 * @param \WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse|array $factory_response Response from McpErrorFactory method (DTO or legacy array).
+	 * @param \WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse|array $factory_response Response from McpErrorFactory method (DTO or legacy array).
 	 *
 	 * @return array Error array (without wrapping 'error' key).
 	 */

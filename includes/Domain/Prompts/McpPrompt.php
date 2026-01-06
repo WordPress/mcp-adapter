@@ -15,8 +15,8 @@ use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Prompts\PromptArgument;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Prompt component providing unified execution and permission checks.
@@ -59,7 +59,7 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Clean Prompt DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Prompts\Prompt
+	 * @var \WP\McpSchema\Server\Prompts\DTO\Prompt
 	 */
 	private Prompt $prompt;
 
@@ -112,7 +112,7 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\Prompt $prompt The Prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The Prompt DTO.
 	 */
 	private function __construct( Prompt $prompt ) {
 		$this->prompt = $prompt;
@@ -299,7 +299,7 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt
 	 */
 	public function get_component(): Prompt {
 		return $this->prompt;

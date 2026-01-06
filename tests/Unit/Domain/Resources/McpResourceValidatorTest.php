@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Domain\Resources;
 
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 /**
  * Tests for McpResourceValidator class.

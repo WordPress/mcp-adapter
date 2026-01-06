@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 final class RegisterAbilityAsMcpToolTest extends TestCase {
 

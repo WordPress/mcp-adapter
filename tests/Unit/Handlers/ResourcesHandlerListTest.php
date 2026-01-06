@@ -9,8 +9,8 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\ListResourcesResult;
-use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 final class ResourcesHandlerListTest extends TestCase {
 

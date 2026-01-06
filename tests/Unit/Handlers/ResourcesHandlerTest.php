@@ -11,11 +11,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\TextResourceContents;
-use WP\McpSchema\Server\Resources\ListResourcesResult;
-use WP\McpSchema\Server\Resources\ReadResourceResult;
-use WP\McpSchema\Server\Resources\Resource;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
+use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 /**
  * Test ResourcesHandler functionality.

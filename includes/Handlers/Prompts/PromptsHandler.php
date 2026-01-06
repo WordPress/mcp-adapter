@@ -12,10 +12,10 @@ namespace WP\MCP\Handlers\Prompts;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Server\Prompts\GetPromptResult;
-use WP\McpSchema\Server\Prompts\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Prompts\PromptMessage;
+use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
+use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 /**
  * Handles prompts-related MCP methods.
@@ -68,7 +68,7 @@ class PromptsHandler {
 	 *
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\ListPromptsResult Response with prompts list DTO.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\ListPromptsResult Response with prompts list DTO.
 	 */
 	public function list_prompts( $request_id = 0 ): ListPromptsResult {
 		$prompts = array_values( $this->mcp->get_prompts() );
@@ -86,7 +86,7 @@ class PromptsHandler {
 	 * @param array           $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult|\WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse Response with prompt execution results or error.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse Response with prompt execution results or error.
 	 */
 	public function get_prompt( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
@@ -105,7 +105,7 @@ class PromptsHandler {
 			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
 		}
 
-		/** @var \WP\McpSchema\Server\Prompts\Prompt $prompt */
+		/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt */
 		$prompt = $mcp_prompt->get_component();
 
 		// Get the arguments for the prompt.
@@ -168,10 +168,10 @@ class PromptsHandler {
 	 * @since n.e.x.t
 	 *
 	 * @param array                                 $result      Raw result from prompt execution.
-	 * @param \WP\McpSchema\Server\Prompts\Prompt   $prompt      The prompt DTO for description fallback.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO for description fallback.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
 	private function normalize_result_to_dto(
 		array $result,
@@ -208,10 +208,10 @@ class PromptsHandler {
 	 * @since n.e.x.t
 	 *
 	 * @param array                                 $result      Raw result with 'messages' key.
-	 * @param \WP\McpSchema\Server\Prompts\Prompt   $prompt      The prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
 	private function normalize_tier1_messages(
 		array $result,
@@ -266,9 +266,9 @@ class PromptsHandler {
 	 * @since n.e.x.t
 	 *
 	 * @param array                                 $result Raw result with 'text' key.
-	 * @param \WP\McpSchema\Server\Prompts\Prompt   $prompt The prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt The prompt DTO.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
 	private function normalize_tier2_text( array $result, Prompt $prompt ): GetPromptResult {
 		$content = array(
@@ -302,10 +302,10 @@ class PromptsHandler {
 	 * @since n.e.x.t
 	 *
 	 * @param array                                 $result      Raw result with 'role' and 'content' keys.
-	 * @param \WP\McpSchema\Server\Prompts\Prompt   $prompt      The prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
 	private function normalize_tier3_single_message(
 		array $result,
@@ -330,9 +330,9 @@ class PromptsHandler {
 	 * @since n.e.x.t
 	 *
 	 * @param array                                 $result Raw result with 'texts' key.
-	 * @param \WP\McpSchema\Server\Prompts\Prompt   $prompt The prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt The prompt DTO.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
 	private function normalize_tier4_texts( array $result, Prompt $prompt ): GetPromptResult {
 		$role         = $this->validate_role( $result['role'] ?? self::$default_role, '' );
@@ -383,10 +383,10 @@ class PromptsHandler {
 	 * @since n.e.x.t
 	 *
 	 * @param array                                 $result      Raw result (arbitrary structure).
-	 * @param \WP\McpSchema\Server\Prompts\Prompt   $prompt      The prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\GetPromptResult
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
 	private function normalize_tier5_fallback(
 		array $result,
@@ -439,7 +439,7 @@ class PromptsHandler {
 	 * @param array  $message     Raw message array.
 	 * @param string $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\PromptMessage
+	 * @return \WP\McpSchema\Server\Prompts\DTO\PromptMessage
 	 */
 	private function validate_and_create_message( array $message, string $prompt_name ): PromptMessage {
 		// Validate and normalize role.

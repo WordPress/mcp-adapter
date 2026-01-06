@@ -10,8 +10,8 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Prompts\Prompt;
-use WP\McpSchema\Server\Prompts\PromptArgument;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Converts WordPress abilities to MCP prompts according to the specification.
@@ -102,7 +102,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
 	 */
 	public static function make( \WP_Ability $ability ) {
 		$prompt = new self( $ability );
@@ -113,7 +113,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt instance.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -294,7 +294,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param array<int,array<string,mixed>> $explicit_arguments User-defined arguments array.
 	 *
-	 * @return array<int,\WP\McpSchema\Server\Prompts\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
+	 * @return array<int,\WP\McpSchema\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -375,7 +375,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
 	 *
-	 * @return array<int, \WP\McpSchema\Server\Prompts\PromptArgument> Argument DTO list.
+	 * @return array<int, \WP\McpSchema\Server\Prompts\DTO\PromptArgument> Argument DTO list.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -435,7 +435,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{prompt: \WP\McpSchema\Server\Prompts\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{prompt: \WP\McpSchema\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
 	 */

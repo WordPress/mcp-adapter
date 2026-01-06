@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 
 // Test prompt class
 class TestPrompt extends McpPromptBuilder {

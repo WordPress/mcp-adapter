@@ -6,10 +6,10 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\TextResourceContents;
-use WP\McpSchema\Server\Resources\ReadResourceResult;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
 
 final class ResourcesHandlerReadTest extends TestCase {
 

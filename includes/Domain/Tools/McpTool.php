@@ -14,8 +14,8 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\Tool;
-use WP\McpSchema\Server\Tools\ToolAnnotations;
+use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
 
 /**
  * Tool component providing unified execution and permission checks.
@@ -52,7 +52,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Clean Tool DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Tools\Tool
+	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
 	 */
 	private Tool $tool;
 
@@ -98,7 +98,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\Tool $tool The Tool DTO.
+	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
 	 */
 	private function __construct( Tool $tool ) {
 		$this->tool = $tool;
@@ -241,7 +241,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\Tool
+	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
 	 */
 	public function get_component(): Tool {
 		return $this->tool;
