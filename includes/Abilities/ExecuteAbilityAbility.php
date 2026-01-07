@@ -56,6 +56,7 @@ final class ExecuteAbilityAbility {
 					'properties' => array(
 						'success' => array( 'type' => 'boolean' ),
 						'data'    => array(
+							'type'        => array( 'object', 'array', 'string', 'number', 'integer', 'boolean', 'null' ),
 							'description' => 'The result data from the ability execution',
 						),
 						'error'   => array(
