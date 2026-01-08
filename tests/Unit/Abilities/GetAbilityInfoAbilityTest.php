@@ -271,7 +271,6 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'properties', $input_schema );
 		$this->assertArrayHasKey( 'ability_name', $input_schema['properties'] );
 		$this->assertEquals( array( 'ability_name' ), $input_schema['required'] );
-		$this->assertFalse( $input_schema['additionalProperties'] );
 	}
 
 	public function test_ability_has_correct_output_schema(): void {

@@ -245,13 +245,26 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertSame( array( HttpTransport::class ), $received_config['mcp_transports'] );
 		$this->assertSame( ErrorLogMcpErrorHandler::class, $received_config['error_handler'] );
 		$this->assertSame( NullMcpObservabilityHandler::class, $received_config['observability_handler'] );
-		// Auto-discovered resources from test fixtures (test/resource* abilities have mcp.public=true and mcp.type='resource', resulting in 4 discovered resources)
+		// Auto-discovered resources from test fixtures (test/resource* abilities have mcp.public=true and mcp.type='resource')
 		$this->assertSame(
 			array(
 				'test/resource',
 				'test/resource-with-annotations',
 				'test/resource-partial-annotations',
 				'test/resource-invalid-annotations',
+				'test/resource-new-meta',
+				'test/resource-invalid-uri',
+				'test/resource-invalid-mimetype',
+				'test/resource-with-size',
+				'test/resource-invalid-annotations-new-meta',
+				'test/resource-mixed-annotations',
+				'test/resource-with-icons',
+				'test/resource-missing-uri',
+				'test/resource-valid-mimetype',
+				'test/resource-blob-content',
+				'test/resource-multiple-contents',
+				'test/resource-text-with-mimetype',
+				'test/resource-plain-string',
 			),
 			$received_config['resources']
 		);
@@ -262,6 +275,22 @@ final class McpAdapterConfigTest extends TestCase {
 				'test/prompt-with-annotations',
 				'test/prompt-partial-annotations',
 				'test/prompt-invalid-annotations',
+				'test/prompt-flattened-string',
+				'test/prompt-flattened-array',
+				'test/prompt-with-titles',
+				'test/prompt-mixed-required',
+				'test/prompt-empty-object',
+				'test/prompt-no-schema',
+				'test/prompt-with-icons',
+				'test/prompt-with-mixed-icons',
+				'test/prompt-with-custom-meta',
+				'test/prompt-with-icons-and-meta',
+				'test/prompt-explicit-args',
+				'test/prompt-explicit-args-override',
+				'test/prompt-empty-explicit-args',
+				'test/prompt-invalid-explicit-args-no-name',
+				'test/prompt-invalid-explicit-args-not-array',
+				'test/prompt-explicit-args-all-fields',
 			),
 			$received_config['prompts']
 		);

@@ -12,12 +12,12 @@ namespace WP\MCP\Tests\Unit\Core;
 use WP\MCP\Core\McpComponentRegistry;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
-use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 
 // Test prompt builder for registry testing
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 class TestRegistryPrompt extends McpPromptBuilder {
 
 	protected function configure(): void {
@@ -42,6 +42,7 @@ class TestRegistryPrompt extends McpPromptBuilder {
 }
 
 // Test prompt builder that throws exception during build
+// phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
 class ExceptionPromptBuilder extends McpPromptBuilder {
 
 	protected function configure(): void {
@@ -87,8 +88,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->registry = new McpComponentRegistry(
 			$this->server,
 			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			false // Disable validation for simpler testing
+			new DummyObservabilityHandler()
 		);
 	}
 
@@ -106,8 +106,8 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-always-allowed', $tools );
 
 		$tool = $tools['test-always-allowed'];
-		$this->assertInstanceOf( \WP\MCP\Domain\Tools\McpTool::class, $tool );
-		$this->assertEquals( 'test-always-allowed', $tool->get_name() );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Tools\DTO\Tool::class, $tool );
+		$this->assertEquals( 'test-always-allowed', $tool->getName() );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -163,40 +163,24 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-always-allowed', $tools );
 	}
 
-	public function test_add_tool_direct(): void {
-		// Create a tool directly
-		$tool = new McpTool(
-			'test/direct-tool',
-			'direct-tool',
-			'Direct Tool',
-			array( 'type' => 'object' ),
-			'Direct Tool Title'
+	public function test_register_tools_accepts_mcp_tools(): void {
+		$mcp_tool = \WP\MCP\Domain\Tools\McpTool::fromArray(
+			array(
+				'name'        => 'direct-mcp-tool',
+				'description' => 'Direct MCP tool',
+				'handler'     => static function () {
+					return array( 'ok' => true );
+				},
+				'permission'  => static function () {
+					return true;
+				},
+			)
 		);
-		$tool->set_mcp_server( $this->server );
 
-		$this->registry->add_tool( $tool );
+		$this->registry->register_tools( array( $mcp_tool ) );
 
-		$tools = $this->registry->get_tools();
-		$this->assertCount( 1, $tools );
-		$this->assertArrayHasKey( 'direct-tool', $tools );
-
-		$retrieved_tool = $this->registry->get_tool( 'direct-tool' );
-		$this->assertSame( $tool, $retrieved_tool );
-
-		// Verify observability event was recorded
-		$events = DummyObservabilityHandler::$events;
-		$this->assertNotEmpty( $events );
-		$event_names = array_column( $events, 'event' );
-		$this->assertContains( 'mcp.component.registration', $event_names );
-
-		// Verify status is 'success'
-		$success_event = array_filter(
-			$events,
-			static function ( $event ) {
-				return 'mcp.component.registration' === $event['event'] && isset( $event['tags']['status'] ) && 'success' === $event['tags']['status'];
-			}
-		);
-		$this->assertNotEmpty( $success_event );
+		$this->assertSame( $mcp_tool, $this->registry->get_mcp_tool( 'direct-mcp-tool' ) );
+		$this->assertArrayHasKey( 'direct-mcp-tool', $this->registry->get_tools() );
 	}
 
 	public function test_register_resources_with_valid_ability(): void {
@@ -207,7 +191,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Get the first resource
 		$resource = array_values( $resources )[0];
-		$this->assertInstanceOf( \WP\MCP\Domain\Resources\McpResource::class, $resource );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Resources\DTO\Resource::class, $resource );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -261,7 +245,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Get the first prompt
 		$prompt = array_values( $prompts )[0];
-		$this->assertInstanceOf( \WP\MCP\Domain\Prompts\McpPrompt::class, $prompt );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\DTO\Prompt::class, $prompt );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -290,8 +274,8 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-registry-prompt', $prompts );
 
 		$prompt = $prompts['test-registry-prompt'];
-		$this->assertInstanceOf( \WP\MCP\Domain\Prompts\McpPrompt::class, $prompt );
-		$this->assertTrue( $prompt->is_builder_based() );
+		$this->assertInstanceOf( \WP\McpSchema\Server\Prompts\DTO\Prompt::class, $prompt );
+		$this->assertNotNull( $this->registry->get_prompt_builder( 'test-registry-prompt' ) );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -337,38 +321,38 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $failure_event );
 	}
 
-	public function test_get_tool_by_name(): void {
+	public function test_get_mcp_tool_by_name(): void {
 		$this->registry->register_tools( array( 'test/always-allowed' ) );
 
-		$tool = $this->registry->get_tool( 'test-always-allowed' );
-		$this->assertInstanceOf( \WP\MCP\Domain\Tools\McpTool::class, $tool );
-		$this->assertEquals( 'test-always-allowed', $tool->get_name() );
+		$mcp_tool = $this->registry->get_mcp_tool( 'test-always-allowed' );
+		$this->assertInstanceOf( \WP\MCP\Domain\Tools\McpTool::class, $mcp_tool );
+		$this->assertEquals( 'test-always-allowed', $mcp_tool->get_component()->getName() );
 
-		$nonexistent = $this->registry->get_tool( 'nonexistent' );
+		$nonexistent = $this->registry->get_mcp_tool( 'nonexistent' );
 		$this->assertNull( $nonexistent );
 	}
 
-	public function test_get_resource_by_uri(): void {
+	public function test_get_mcp_resource_by_uri(): void {
 		$this->registry->register_resources( array( 'test/resource' ) );
 
 		$resources = $this->registry->get_resources();
 		$this->assertNotEmpty( $resources );
 
 		$resource_uri = array_keys( $resources )[0];
-		$resource     = $this->registry->get_resource( $resource_uri );
-		$this->assertInstanceOf( \WP\MCP\Domain\Resources\McpResource::class, $resource );
+		$mcp_resource = $this->registry->get_mcp_resource( $resource_uri );
+		$this->assertInstanceOf( \WP\MCP\Domain\Resources\McpResource::class, $mcp_resource );
 
-		$nonexistent = $this->registry->get_resource( 'nonexistent://resource' );
+		$nonexistent = $this->registry->get_mcp_resource( 'nonexistent://resource' );
 		$this->assertNull( $nonexistent );
 	}
 
-	public function test_get_prompt_by_name(): void {
+	public function test_get_mcp_prompt_by_name(): void {
 		$this->registry->register_prompts( array( 'test/prompt' ) );
 
-		$prompt = $this->registry->get_prompt( 'test-prompt' );
-		$this->assertInstanceOf( \WP\MCP\Domain\Prompts\McpPrompt::class, $prompt );
+		$mcp_prompt = $this->registry->get_mcp_prompt( 'test-prompt' );
+		$this->assertInstanceOf( \WP\MCP\Domain\Prompts\McpPrompt::class, $mcp_prompt );
 
-		$nonexistent = $this->registry->get_prompt( 'nonexistent' );
+		$nonexistent = $this->registry->get_mcp_prompt( 'nonexistent' );
 		$this->assertNull( $nonexistent );
 	}
 
@@ -403,92 +387,6 @@ final class McpComponentRegistryTest extends TestCase {
 			}
 		);
 		$this->assertCount( 4, $success_events );
-	}
-
-	public function test_registry_with_validation_enabled(): void {
-		// Create registry with validation enabled
-		$registry_with_validation = new McpComponentRegistry(
-			$this->server,
-			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			true // Enable validation
-		);
-
-		// This should still work with valid abilities
-		$registry_with_validation->register_tools( array( 'test/always-allowed' ) );
-
-		$tools = $registry_with_validation->get_tools();
-		$this->assertCount( 1, $tools );
-
-		// Verify observability event was recorded
-		$events = DummyObservabilityHandler::$events;
-		$this->assertNotEmpty( $events );
-	}
-
-	public function test_register_tools_with_wp_error_from_validation(): void {
-		// Register an ability that will fail validation when validation is enabled
-		$this->register_ability_in_hook(
-			'test/invalid-tool',
-			array(
-				'label'               => 'Invalid Tool',
-				'description'         => '', // Empty description will fail validation
-				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function () {
-					return array();
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'mcp' => array(
-						'public' => true,
-					),
-				),
-			)
-		);
-
-		// Create registry with validation enabled
-		$registry_with_validation = new McpComponentRegistry(
-			$this->server,
-			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			true // Enable validation
-		);
-
-		// Clear previous events
-		DummyObservabilityHandler::$events = array();
-		DummyErrorHandler::$logs           = array();
-
-		// Register the invalid tool
-		$registry_with_validation->register_tools( array( 'test/invalid-tool' ) );
-
-		// Tool should not be registered due to validation failure
-		$tools = $registry_with_validation->get_tools();
-		$this->assertCount( 0, $tools );
-
-		// Verify error was logged
-		$this->assertNotEmpty( DummyErrorHandler::$logs );
-		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertStringContainsString( 'WordPress ability \'test/invalid-tool\' does not exist.', implode( ' ', $log_messages ) );
-
-		// Verify failure event was recorded
-		$events = DummyObservabilityHandler::$events;
-		$this->assertNotEmpty( $events );
-		$failure_event = array_filter(
-			$events,
-			static function ( $event ) {
-				return 'mcp.component.registration' === $event['event']
-					&& isset( $event['tags']['status'] )
-					&& 'failed' === $event['tags']['status']
-					&& isset( $event['tags']['component_type'] )
-					&& 'ability_tool' === $event['tags']['component_type'];
-			}
-		);
-		$this->assertNotEmpty( $failure_event );
-
-		// Clean up
-		wp_unregister_ability( 'test/invalid-tool' );
 	}
 
 	public function test_register_resources_with_missing_uri(): void {
@@ -586,185 +484,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNotEmpty( $failure_event );
 	}
 
-	public function test_add_tool_with_validation_failure(): void {
-		// Create registry with validation enabled
-		$registry_with_validation = new McpComponentRegistry(
-			$this->server,
-			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			true // Enable validation
-		);
-
-		// Create an invalid tool (empty description)
-		$invalid_tool = new McpTool(
-			'test/invalid',
-			'invalid-tool',
-			'', // Empty description will fail validation
-			array( 'type' => 'object' )
-		);
-		$invalid_tool->set_mcp_server( $this->server );
-
-		// Clear previous events
-		DummyObservabilityHandler::$events = array();
-		DummyErrorHandler::$logs           = array();
-
-		// Try to add the invalid tool
-		$registry_with_validation->add_tool( $invalid_tool );
-
-		// Tool should not be registered
-		$tools = $registry_with_validation->get_tools();
-		$this->assertCount( 0, $tools );
-
-		// Verify error was logged
-		$this->assertNotEmpty( DummyErrorHandler::$logs );
-		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertStringContainsString( 'Tool validation failed', implode( ' ', $log_messages ) );
-
-		// Verify failure event was recorded
-		$events = DummyObservabilityHandler::$events;
-		$this->assertNotEmpty( $events );
-		$failure_event = array_filter(
-			$events,
-			static function ( $event ) {
-				return 'mcp.component.registration' === $event['event']
-					&& isset( $event['tags']['status'] )
-					&& 'failed' === $event['tags']['status']
-					&& isset( $event['tags']['component_type'] )
-					&& 'tool' === $event['tags']['component_type'];
-			}
-		);
-		$this->assertNotEmpty( $failure_event );
-	}
-
-	public function test_register_prompts_with_builder_validation_failure(): void {
-		// Create a prompt builder that will fail validation
-		$invalid_builder = new class() extends McpPromptBuilder {
-			protected function configure(): void {
-				$this->name        = ''; // Empty name will fail validation
-				$this->title       = 'Invalid Prompt';
-				$this->description = 'This prompt will fail validation';
-			}
-
-			public function handle( array $arguments ): array {
-				return array();
-			}
-
-			public function has_permission( array $arguments ): bool {
-				return true;
-			}
-		};
-
-		// Create registry with validation enabled
-		$registry_with_validation = new McpComponentRegistry(
-			$this->server,
-			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			true // Enable validation
-		);
-
-		// Clear previous events
-		DummyObservabilityHandler::$events = array();
-		DummyErrorHandler::$logs           = array();
-
-		// Register the invalid prompt builder
-		$registry_with_validation->register_prompts( array( get_class( $invalid_builder ) ) );
-
-		// Prompt should not be registered
-		$prompts = $registry_with_validation->get_prompts();
-		$this->assertCount( 0, $prompts );
-
-		// Verify error was logged
-		$this->assertNotEmpty( DummyErrorHandler::$logs );
-		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertStringContainsString( 'Prompt validation failed', implode( ' ', $log_messages ) );
-
-		// Verify failure event was recorded
-		$events = DummyObservabilityHandler::$events;
-		$this->assertNotEmpty( $events );
-		$failure_event = array_filter(
-			$events,
-			static function ( $event ) {
-				return 'mcp.component.registration' === $event['event']
-					&& isset( $event['tags']['status'] )
-					&& 'failed' === $event['tags']['status']
-					&& isset( $event['tags']['component_type'] )
-					&& 'prompt' === $event['tags']['component_type'];
-			}
-		);
-		$this->assertNotEmpty( $failure_event );
-	}
-
-	public function test_register_prompts_with_wp_error_from_ability(): void {
-		// Register an ability that will fail when converted to prompt (missing input_schema for validation)
-		$this->register_ability_in_hook(
-			'test/invalid-prompt-ability',
-			array(
-				'label'               => 'Invalid Prompt Ability',
-				'description'         => '', // Empty description might fail validation if enabled
-				'category'            => 'test',
-				// No input_schema - might cause issues
-				'execute_callback'    => static function () {
-					return array();
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'mcp' => array(
-						'public' => true,
-						'type'   => 'prompt',
-					),
-				),
-			)
-		);
-
-		// Create registry with validation enabled to test WP_Error path
-		$registry_with_validation = new McpComponentRegistry(
-			$this->server,
-			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			true // Enable validation
-		);
-
-		// Clear previous events
-		DummyObservabilityHandler::$events = array();
-		DummyErrorHandler::$logs           = array();
-
-		// Register the prompt - this might fail validation
-		$registry_with_validation->register_prompts( array( 'test/invalid-prompt-ability' ) );
-
-		// Verify error was logged (if validation failed)
-		// The exact behavior depends on prompt validation rules
-		$events = DummyObservabilityHandler::$events;
-		if ( ! empty( DummyErrorHandler::$logs ) ) {
-			// If validation failed, verify the failure was logged
-			$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
-			$has_error    = false;
-			foreach ( $log_messages as $message ) {
-				if ( strpos( $message, 'test/invalid-prompt-ability' ) !== false ) {
-					$has_error = true;
-					break;
-				}
-			}
-			// Error should be logged if validation failed
-			if ( $has_error ) {
-				$failure_event = array_filter(
-					$events,
-					static function ( $event ) {
-						return 'mcp.component.registration' === $event['event']
-							&& isset( $event['tags']['status'] )
-							&& 'failed' === $event['tags']['status'];
-					}
-				);
-				$this->assertNotEmpty( $failure_event, 'Failure event should be recorded when validation fails' );
-			}
-		}
-
-		// Clean up
-		wp_unregister_ability( 'test/invalid-prompt-ability' );
-	}
-
-	// Note: Validation failure tests require complex setup and are covered in integration tests
+	// Note: DTO schema validation is handled by the php-mcp-schema DTO constructors.
 
 	public function test_register_resources_skips_non_strings(): void {
 		$this->registry->register_resources( array( 123, null, array(), 'test/resource' ) );
@@ -788,8 +508,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$registry_no_observability = new McpComponentRegistry(
 			$this->server,
 			new DummyErrorHandler(),
-			new DummyObservabilityHandler(),
-			false
+			new DummyObservabilityHandler()
 		);
 
 		// Clear events from previous tests
@@ -807,5 +526,381 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Re-enable the filter for subsequent tests
 		add_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
+	}
+
+	/**
+	 * Test that registry continues processing other tools when one tool name is invalid.
+	 *
+	 * This verifies that:
+	 * 1. Invalid tool names don't break MCP functionality
+	 * 2. Invalid tool names don't break the WordPress site
+	 * 3. Errors are logged for invalid tools
+	 * 4. Other valid tools are still registered
+	 */
+	public function test_register_tools_continues_after_invalid_tool_name(): void {
+		// Register two test abilities.
+		$this->register_ability_in_hook(
+			'test/first-valid-tool',
+			array(
+				'label'               => 'First Valid Tool',
+				'description'         => 'First tool for continue test',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/will-be-invalid',
+			array(
+				'label'               => 'Will Be Invalid Tool',
+				'description'         => 'This tool name will be invalidated by filter',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/second-valid-tool',
+			array(
+				'label'               => 'Second Valid Tool',
+				'description'         => 'Second tool for continue test',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return 'ok';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
+
+		// Filter that invalidates the middle tool's name by returning invalid characters.
+		$filter_callback = static function ( $name ) {
+			if ( 'test-will-be-invalid' === $name ) {
+				return 'invalid name with spaces!!!'; // Invalid: contains spaces and special chars
+			}
+			return $name;
+		};
+		add_filter( 'mcp_adapter_tool_name', $filter_callback );
+
+		// Clear previous logs and events.
+		DummyErrorHandler::$logs           = array();
+		DummyObservabilityHandler::$events = array();
+
+		// Register all three tools - the middle one will fail.
+		$this->registry->register_tools(
+			array(
+				'test/first-valid-tool',
+				'test/will-be-invalid',
+				'test/second-valid-tool',
+			)
+		);
+
+		// Verify both valid tools were registered (invalid one was skipped).
+		$tools = $this->registry->get_tools();
+		$this->assertCount( 2, $tools, 'Both valid tools should be registered despite one invalid tool' );
+		$this->assertArrayHasKey( 'test-first-valid-tool', $tools );
+		$this->assertArrayHasKey( 'test-second-valid-tool', $tools );
+		$this->assertArrayNotHasKey( 'test-will-be-invalid', $tools );
+
+		// Verify error was logged for the invalid tool.
+		$this->assertNotEmpty( DummyErrorHandler::$logs, 'Error should be logged for invalid tool' );
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertStringContainsString( 'invalid', implode( ' ', $log_messages ) );
+
+		// Verify observability events: 2 successes and 1 failure.
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		$success_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'success' === $event['tags']['status'];
+			}
+		);
+		$this->assertCount( 2, $success_events, 'Two tools should have successful registration events' );
+
+		$failure_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status'];
+			}
+		);
+		$this->assertCount( 1, $failure_events, 'One tool should have a failed registration event' );
+
+		// Clean up.
+		remove_filter( 'mcp_adapter_tool_name', $filter_callback );
+		wp_unregister_ability( 'test/first-valid-tool' );
+		wp_unregister_ability( 'test/will-be-invalid' );
+		wp_unregister_ability( 'test/second-valid-tool' );
+	}
+
+	/**
+	 * Test that duplicate resource URIs are detected and first registration wins.
+	 */
+	public function test_register_resources_duplicate_uri_first_wins(): void {
+		// Register two abilities with the same URI.
+		$same_uri = 'WordPress://test/duplicate-uri-resource';
+
+		$this->register_ability_in_hook(
+			'test/resource-first',
+			array(
+				'label'               => 'First Resource',
+				'description'         => 'First resource with this URI',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'first content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/resource-second',
+			array(
+				'label'               => 'Second Resource',
+				'description'         => 'Second resource with same URI',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'second content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		// Clear previous events and logs.
+		DummyObservabilityHandler::$events = array();
+		DummyErrorHandler::$logs           = array();
+
+		// Register both resources (second will be duplicate).
+		$this->registry->register_resources( array( 'test/resource-first', 'test/resource-second' ) );
+
+		// Verify only one resource is registered.
+		$resources = $this->registry->get_resources();
+		$this->assertCount( 1, $resources, 'Only first resource should be registered (first-wins policy)' );
+			$this->assertArrayHasKey( $same_uri, $resources );
+
+			// Verify the registered resource is from the first ability.
+			$mcp_resource = $this->registry->get_mcp_resource( $same_uri );
+			$this->assertNotNull( $mcp_resource );
+			$meta = $mcp_resource->get_adapter_meta();
+			$this->assertSame( 'test/resource-first', $meta['ability'] ?? null, 'First ability should win' );
+
+		// Clean up.
+		wp_unregister_ability( 'test/resource-first' );
+		wp_unregister_ability( 'test/resource-second' );
+	}
+
+	/**
+	 * Test that duplicate resource URIs are logged via error handler.
+	 */
+	public function test_register_resources_duplicate_uri_logs_error(): void {
+		// Register two abilities with the same URI.
+		$same_uri = 'WordPress://test/duplicate-uri-logged';
+
+		$this->register_ability_in_hook(
+			'test/resource-alpha',
+			array(
+				'label'               => 'Alpha Resource',
+				'description'         => 'Alpha resource',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'alpha';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/resource-beta',
+			array(
+				'label'               => 'Beta Resource',
+				'description'         => 'Beta resource (duplicate)',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'beta';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		// Clear previous logs.
+		DummyErrorHandler::$logs = array();
+
+		// Register both resources.
+		$this->registry->register_resources( array( 'test/resource-alpha', 'test/resource-beta' ) );
+
+		// Verify error was logged for the duplicate.
+		$this->assertNotEmpty( DummyErrorHandler::$logs, 'Error should be logged for duplicate URI' );
+
+		$log_messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$combined     = implode( ' ', $log_messages );
+
+		// Verify the error message contains the URI (simplified message from add_mcp_resource).
+		$this->assertStringContainsString( 'already registered', $combined );
+		$this->assertStringContainsString( $same_uri, $combined );
+
+		// Clean up.
+		wp_unregister_ability( 'test/resource-alpha' );
+		wp_unregister_ability( 'test/resource-beta' );
+	}
+
+	/**
+	 * Test that duplicate resource URIs record observability event.
+	 */
+	public function test_register_resources_duplicate_uri_records_observability_event(): void {
+		// Register two abilities with the same URI.
+		$same_uri = 'WordPress://test/duplicate-uri-observed';
+
+		$this->register_ability_in_hook(
+			'test/resource-observer-first',
+			array(
+				'label'               => 'Observer First',
+				'description'         => 'First resource for observability test',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'first';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		$this->register_ability_in_hook(
+			'test/resource-observer-second',
+			array(
+				'label'               => 'Observer Second',
+				'description'         => 'Second resource for observability test',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'second';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $same_uri,
+					),
+				),
+			)
+		);
+
+		// Clear previous events.
+		DummyObservabilityHandler::$events = array();
+
+		// Register both resources.
+		$this->registry->register_resources( array( 'test/resource-observer-first', 'test/resource-observer-second' ) );
+
+		// Verify observability events: 1 success + 1 failure.
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		// Find the duplicate failure event.
+		$duplicate_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'failed' === $event['tags']['status']
+					&& isset( $event['tags']['failure_reason'] )
+					&& 'duplicate_uri' === $event['tags']['failure_reason'];
+			}
+		);
+		$this->assertCount( 1, $duplicate_events, 'Should have one duplicate_uri failure event' );
+
+		// Verify the event contains expected data.
+		$duplicate_event = array_values( $duplicate_events )[0];
+		$this->assertSame( 'test/resource-observer-second', $duplicate_event['tags']['component_name'] );
+		$this->assertSame( $same_uri, $duplicate_event['tags']['duplicate_uri'] );
+
+		// Verify success event for first resource.
+		$success_events = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.component.registration' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'success' === $event['tags']['status']
+					&& isset( $event['tags']['component_type'] )
+					&& 'resource' === $event['tags']['component_type'];
+			}
+		);
+		$this->assertCount( 1, $success_events, 'Should have one success event for the first resource' );
+
+		// Clean up.
+		wp_unregister_ability( 'test/resource-observer-first' );
+		wp_unregister_ability( 'test/resource-observer-second' );
 	}
 }

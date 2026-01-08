@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
+use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
@@ -17,11 +18,26 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
  */
 class McpServer {
+	/**
+	 * Error handler instance.
+	 *
+	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
+	 */
+	public McpErrorHandlerInterface $error_handler;
+
+	/**
+	 * Observability handler instance.
+	 *
+	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
+	 */
+	public McpObservabilityHandlerInterface $observability_handler;
+
 	/**
 	 * Server ID.
 	 *
@@ -79,20 +95,6 @@ class McpServer {
 	private McpTransportFactory $transport_factory;
 
 	/**
-	 * Error handler instance.
-	 *
-	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
-	 */
-	public McpErrorHandlerInterface $error_handler;
-
-	/**
-	 * Observability handler instance.
-	 *
-	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
-	 */
-	public McpObservabilityHandlerInterface $observability_handler;
-
-	/**
 	 * Whether MCP validation is enabled.
 	 *
 	 * @var bool
@@ -110,19 +112,19 @@ class McpServer {
 	/**
 	 * Constructor.
 	 *
-	 * @param string                                              $server_id Unique identifier for the server.
-	 * @param string                                              $server_route_namespace Server route namespace.
-	 * @param string                                              $server_route Server route.
-	 * @param string                                              $server_name Human-readable server name.
-	 * @param string                                              $server_description Server description.
-	 * @param string                                              $server_version Server version.
-	 * @param array                                               $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
-	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null         $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
+	 * @param string $server_id Unique identifier for the server.
+	 * @param string $server_route_namespace Server route namespace.
+	 * @param string $server_route Server route.
+	 * @param string $server_name Human-readable server name.
+	 * @param string $server_description Server description.
+	 * @param string $server_version Server version.
+	 * @param array $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
+	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
 	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
-	 * @param array                                               $tools Optional ability names to register as tools during construction.
-	 * @param array                                               $resources Optional resources to register during construction.
-	 * @param array                                               $prompts Optional prompts to register during construction.
-	 * @param callable|null                                       $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
+	 * @param array $tools Optional ability names to register as tools during construction.
+	 * @param array $resources Optional resources to register during construction.
+	 * @param array $prompts Optional prompts to register during construction.
+	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
 	 * @throws \Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
 	 */
@@ -150,9 +152,20 @@ class McpServer {
 		$this->server_version                = $server_version;
 		$this->transport_permission_callback = $transport_permission_callback;
 
-		// Setup validation flag. Validation is disabled by default for performance.
-		// Abilities API is also validating all abilities.
-		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		/**
+		 * Filters whether MCP protocol validation is enabled for a server.
+		 *
+		 * Validation is disabled by default for performance, as the Abilities API
+		 * also validates all abilities. Enable this filter for stricter MCP protocol
+		 * compliance checking during development or debugging.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param bool      $enabled   Whether validation is enabled. Default false.
+		 * @param string    $server_id The server ID being configured.
+		 * @param \WP\MCP\Core\McpServer $server    The McpServer instance being constructed.
+		 */
+		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false, $this->server_id, $this );
 
 		// Setup handlers and components
 		$this->setup_handlers( $error_handler, $observability_handler );
@@ -200,8 +213,7 @@ class McpServer {
 		$this->component_registry = new McpComponentRegistry(
 			$this,
 			$this->error_handler,
-			$this->observability_handler,
-			$this->mcp_validation_enabled
+			$this->observability_handler
 		);
 
 		// Initialize transport factory
@@ -268,7 +280,7 @@ class McpServer {
 	}
 
 	/**
-	 * Get server name.
+	 * Get the server name.
 	 *
 	 * @return string
 	 */
@@ -319,7 +331,7 @@ class McpServer {
 	/**
 	 * Get all tools registered to this server.
 	 *
-	 * @return array
+	 * @return array<string, \WP\McpSchema\Server\Tools\DTO\Tool>
 	 */
 	public function get_tools(): array {
 		return $this->component_registry->get_tools();
@@ -328,7 +340,7 @@ class McpServer {
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource[]
+	 * @return array<string, \WP\McpSchema\Server\Resources\DTO\Resource>
 	 */
 	public function get_resources(): array {
 		return $this->component_registry->get_resources();
@@ -337,32 +349,38 @@ class McpServer {
 	/**
 	 * Get all prompts registered to this server.
 	 *
-	 * @return array
+	 * @return array<string, \WP\McpSchema\Server\Prompts\DTO\Prompt>
 	 */
 	public function get_prompts(): array {
 		return $this->component_registry->get_prompts();
 	}
 
 	/**
-	 * Get a specific tool by name.
+	 * Get a specific McpTool by name.
 	 *
 	 * @param string $tool_name Tool name.
 	 *
 	 * @return \WP\MCP\Domain\Tools\McpTool|null
+	 * @internal
+	 * @since 0.3.0
+	 *
 	 */
-	public function get_tool( string $tool_name ): ?McpTool {
-		return $this->component_registry->get_tool( $tool_name );
+	public function get_mcp_tool( string $tool_name ): ?McpTool {
+		return $this->component_registry->get_mcp_tool( $tool_name );
 	}
 
 	/**
-	 * Get a specific resource by URI.
+	 * Get a specific McpResource by URI.
 	 *
 	 * @param string $resource_uri Resource URI.
 	 *
 	 * @return \WP\MCP\Domain\Resources\McpResource|null
+	 * @internal
+	 * @since 0.3.0
+	 *
 	 */
-	public function get_resource( string $resource_uri ): ?McpResource {
-		return $this->component_registry->get_resource( $resource_uri );
+	public function get_mcp_resource( string $resource_uri ): ?McpResource {
+		return $this->component_registry->get_mcp_resource( $resource_uri );
 	}
 
 	/**
@@ -370,10 +388,37 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|null
 	 */
-	public function get_prompt( string $prompt_name ): ?McpPrompt {
-		return $this->component_registry->get_prompt( $prompt_name );
+	public function get_prompt( string $prompt_name ): ?Prompt {
+		$mcp_prompt = $this->component_registry->get_mcp_prompt( $prompt_name );
+
+		return $mcp_prompt ? $mcp_prompt->get_component() : null;
+	}
+
+	/**
+	 * Get an McpPrompt by name.
+	 *
+	 * @param string $prompt_name Prompt name.
+	 *
+	 * @return \WP\MCP\Domain\Prompts\McpPrompt|null
+	 * @internal
+	 * @since 0.3.0
+	 *
+	 */
+	public function get_mcp_prompt( string $prompt_name ): ?McpPrompt {
+		return $this->component_registry->get_mcp_prompt( $prompt_name );
+	}
+
+	/**
+	 * Get a prompt builder instance by prompt name (builder-based prompts).
+	 *
+	 * @param string $prompt_name Prompt name.
+	 *
+	 * @return \WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface|null
+	 */
+	public function get_prompt_builder( string $prompt_name ): ?McpPromptBuilderInterface {
+		return $this->component_registry->get_prompt_builder( $prompt_name );
 	}
 
 	/**
@@ -392,14 +437,5 @@ class McpServer {
 	 */
 	public function is_mcp_validation_enabled(): bool {
 		return $this->mcp_validation_enabled;
-	}
-
-	/**
-	 * Get the component registry instance.
-	 *
-	 * @return \WP\MCP\Core\McpComponentRegistry
-	 */
-	public function get_component_registry(): McpComponentRegistry {
-		return $this->component_registry;
 	}
 }
