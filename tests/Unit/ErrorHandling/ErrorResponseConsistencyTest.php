@@ -12,6 +12,7 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 final class ErrorResponseConsistencyTest extends TestCase {
 
@@ -38,10 +39,11 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test parameter validation errors (INVALID_PARAMS) from all handlers
-		$tools_error     = $tools_handler->call_tool( array( 'params' => array() ) ); // Missing 'name'
-		$prompts_error   = $prompts_handler->get_prompt( array( 'params' => array() ) ); // Missing 'name'
-		$resources_error = $resources_handler->read_resource( array( 'params' => array() ) ); // Missing 'uri'
+		// Test parameter validation errors (INVALID_PARAMS) from all handlers.
+		// All handlers now return DTOs, convert to array for consistent testing.
+		$tools_error     = $tools_handler->call_tool( array( 'params' => array() ) )->toArray(); // Missing 'name'
+		$prompts_error   = $prompts_handler->get_prompt( array( 'params' => array() ) )->toArray(); // Missing 'name'
+		$resources_error = $resources_handler->read_resource( array( 'params' => array() ) )->toArray(); // Missing 'uri'
 
 		$errors = array( $tools_error, $prompts_error, $resources_error );
 
@@ -49,7 +51,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			$this->assertIsInt( $error['error']['code'] );
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility.
+			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 		}
 	}
@@ -80,7 +83,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			$this->assertIsInt( $error['error']['code'] );
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility
+			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 			$this->assertNotEmpty( $error['error']['message'] );
 		}
@@ -96,7 +100,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 
 		// Test parameter validation error from both factory and helper
 		// Note: missing_parameter() is a convenience wrapper that returns INVALID_PARAMS error code
-		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' );
+		// Factory now returns a DTO, convert it to array for comparison
+		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' )->toArray();
 		$helper_error  = $invalid_param_method->invoke( $tools_handler, 'test_param', 100 );
 
 		// Both should have the same structure
@@ -104,8 +109,8 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $helper_error );
 
 		// Error codes should match (both use INVALID_PARAMS)
-		$this->assertSame( $factory_error['error']['code'], $helper_error['error']['code'] );
-		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $factory_error['error']['code'] );
+		$this->assertEquals( $factory_error['error']['code'], $helper_error['error']['code'] );
+		$this->assertEquals( (float) McpErrorFactory::INVALID_PARAMS, $factory_error['error']['code'] );
 
 		// Both should contain the parameter name
 		$this->assertStringContainsString( 'test_param', $factory_error['error']['message'] );
@@ -120,15 +125,17 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$extract_error_method = $reflection->getMethod( 'extract_error' );
 		$extract_error_method->setAccessible( true );
 
-		// Test with McpErrorFactory response
+		// Test with McpErrorFactory response (now returns DTO)
 		$factory_response = McpErrorFactory::tool_not_found( 200, 'test_tool' );
-		$extracted_error  = $extract_error_method->invoke( $tools_handler, $factory_response );
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $factory_response );
+
+		$extracted_error = $extract_error_method->invoke( $tools_handler, $factory_response );
 
 		$this->assertArrayHasKey( 'code', $extracted_error );
 		$this->assertArrayHasKey( 'message', $extracted_error );
-		$this->assertSame( $factory_response['error'], $extracted_error );
+		$this->assertEquals( $factory_response->getError()->toArray(), $extracted_error );
 
-		// Test with plain error array
+		// Test with plain error array (backwards compatibility)
 		$plain_error     = array(
 			'code'    => 300,
 			'message' => 'Plain error',
@@ -143,10 +150,11 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test "not found" errors from all handlers
-		$tool_not_found     = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) );
-		$prompt_not_found   = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) );
-		$resource_not_found = $resources_handler->read_resource( array( 'params' => array( 'uri' => 'nonexistent://resource' ) ) );
+		// Test "not found" errors from all handlers.
+		// All handlers now return DTOs, convert to array for consistent testing.
+		$tool_not_found     = $tools_handler->call_tool( array( 'params' => array( 'name' => 'nonexistent_tool' ) ) )->toArray();
+		$prompt_not_found   = $prompts_handler->get_prompt( array( 'params' => array( 'name' => 'nonexistent_prompt' ) ) )->toArray();
+		$resource_not_found = $resources_handler->read_resource( array( 'params' => array( 'uri' => 'nonexistent://resource' ) ) )->toArray();
 
 		$errors = array( $tool_not_found, $prompt_not_found, $resource_not_found );
 
@@ -154,10 +162,11 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			$this->assertArrayHasKey( 'error', $error );
 			$this->assertArrayHasKey( 'code', $error['error'] );
 			$this->assertArrayHasKey( 'message', $error['error'] );
-			$this->assertIsInt( $error['error']['code'] );
+			// Note: Error codes are now float (from DTOs) for JSON number compatibility.
+			$this->assertIsNumeric( $error['error']['code'] );
 			$this->assertIsString( $error['error']['message'] );
 
-			// All "not found" errors should have negative codes (MCP convention)
+			// All "not found" errors should have negative codes (MCP convention).
 			$this->assertLessThan( 0, $error['error']['code'] );
 		}
 	}
@@ -253,22 +262,23 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$prompts_handler   = new PromptsHandler( $this->server );
 		$resources_handler = new ResourcesHandler( $this->server );
 
-		// Test parameter validation error messages (INVALID_PARAMS error code)
+		// Test parameter validation error messages (INVALID_PARAMS error code).
+		// All handlers now return DTOs, convert to array for consistent testing.
 		$errors = array(
-			$tools_handler->call_tool( array( 'params' => array() ) ), // Missing name
-			$prompts_handler->get_prompt( array( 'params' => array() ) ), // Missing name
-			$resources_handler->read_resource( array( 'params' => array() ) ), // Missing uri
+			$tools_handler->call_tool( array( 'params' => array() ) )->toArray(), // Missing name
+			$prompts_handler->get_prompt( array( 'params' => array() ) )->toArray(), // Missing name
+			$resources_handler->read_resource( array( 'params' => array() ) )->toArray(), // Missing uri
 		);
 
 		foreach ( $errors as $error ) {
 			$message = $error['error']['message'];
 
-			// Error messages should be informative
+			// Error messages should be informative.
 			$this->assertNotEmpty( $message );
 			$this->assertGreaterThan( 10, strlen( $message ) ); // Not too short
 			$this->assertLessThan( 200, strlen( $message ) ); // Not too long
 
-			// Should mention what's missing or invalid
+			// Should mention what's missing or invalid.
 			$this->assertTrue(
 				strpos( $message, 'missing' ) !== false ||
 				strpos( $message, 'required' ) !== false ||
