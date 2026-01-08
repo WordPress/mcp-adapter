@@ -1,403 +1,361 @@
 <?php
-/**
- * Tests for McpResourceValidator class.
- *
- * @package WP\MCP\Tests
- */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Domain\Resources;
 
-use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Resources\McpResourceValidator;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 /**
- * Test McpResourceValidator functionality.
+ * Tests for McpResourceValidator class.
+ *
+ * @covers \WP\MCP\Domain\Resources\McpResourceValidator
  */
 final class McpResourceValidatorTest extends TestCase {
 
-	public function test_validate_resource_data_with_valid_text_resource(): void {
-		$valid_resource_data = array(
-			'uri'         => 'WordPress://local/test-resource',
-			'name'        => 'Test Resource',
-			'description' => 'A test resource for validation',
-			'text'        => 'This is test content',
-			'mimeType'    => 'text/plain',
-			'annotations' => array( 'priority' => 0.5 ),
+	// =========================================================================
+	// validate_resource_dto Tests
+	// =========================================================================
+
+	public function test_validate_resource_dto_with_valid_resource(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'  => 'test://resource',
+				'name' => 'test-resource',
+			)
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $valid_resource_data, 'test-context' );
+		$result = McpResourceValidator::validate_resource_dto( $resource );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_data_with_valid_blob_resource(): void {
-		$valid_resource_data = array(
-			'uri'         => 'WordPress://local/test-blob',
-			'name'        => 'Test Blob',
-			'description' => 'A test blob resource',
-			'blob'        => 'SGVsbG8gV29ybGQ=', // Base64 encoded "Hello World"
-			'mimeType'    => 'application/octet-stream',
+	public function test_validate_resource_dto_rejects_invalid_uri(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'  => 'not a valid uri',
+				'name' => 'test-resource',
+			)
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
+		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'URI must be a valid URI', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_dto_rejects_invalid_mime_type(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'      => 'test://resource',
+				'name'     => 'test-resource',
+				'mimeType' => 'invalid-mime',
+			)
+		);
+
+		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$this->assertWPError( $result );
+		$this->assertStringContainsString( 'MIME type is invalid', $result->get_error_message() );
+	}
+
+	public function test_validate_resource_dto_accepts_valid_mime_type(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'      => 'test://resource',
+				'name'     => 'test-resource',
+				'mimeType' => 'application/json',
+			)
+		);
+
+		$result = McpResourceValidator::validate_resource_dto( $resource );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_data_with_missing_uri(): void {
-		$invalid_resource_data = array(
-			'name'        => 'Test Resource',
-			'description' => 'Missing URI',
-			'text'        => 'Content',
+	public function test_validate_resource_dto_rejects_invalid_icons(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'   => 'test://resource',
+				'name'  => 'test-resource',
+				'icons' => array(
+					array(
+						'src'      => 'https://example.com/icon.png',
+						'mimeType' => 'image/png',
+					),
+					array( 'src' => 'invalid-url' ), // Invalid src
+				),
+			)
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
+		$result = McpResourceValidator::validate_resource_dto( $resource );
 		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource validation failed', $result->get_error_message() );
-		$this->assertStringContainsString( 'Resource URI is required', $result->get_error_message() );
+		$this->assertStringContainsString( 'Icon at index 1', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_data_with_invalid_uri(): void {
-		$invalid_resource_data = array(
-			'uri'  => 'not-a-valid-uri',
-			'text' => 'Content',
+	public function test_validate_resource_dto_rejects_invalid_annotation_values(): void {
+		// Note: The DTO validates structure (e.g., audience must be array).
+		// Our validator tests for invalid VALUES within valid structure.
+		$resource = Resource::fromArray(
+			array(
+				'uri'         => 'test://resource',
+				'name'        => 'test-resource',
+				'annotations' => array(
+					'audience' => array( 'admin' ), // Invalid role - should be 'user' or 'assistant'
+				),
+			)
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
+		$result = McpResourceValidator::validate_resource_dto( $resource );
 		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource URI must be a valid URI format', $result->get_error_message() );
+		$this->assertStringContainsString( 'valid roles', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_data_with_no_content(): void {
-		$invalid_resource_data = array(
-			'uri'         => 'WordPress://local/no-content',
-			'name'        => 'No Content Resource',
-			'description' => 'Missing both text and blob',
+	public function test_validate_resource_dto_rejects_invalid_annotation_priority(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'         => 'test://resource',
+				'name'        => 'test-resource',
+				'annotations' => array(
+					'priority' => 1.5, // Out of range - should be 0.0 to 1.0
+				),
+			)
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
+		$result = McpResourceValidator::validate_resource_dto( $resource );
 		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource must have either text or blob content', $result->get_error_message() );
+		$this->assertStringContainsString( 'priority must be between', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_data_with_both_text_and_blob(): void {
-		$invalid_resource_data = array(
-			'uri'  => 'WordPress://local/conflicting-content',
-			'text' => 'Text content',
-			'blob' => 'SGVsbG8=', // Both text and blob (not allowed)
+	public function test_validate_resource_dto_accepts_valid_annotations(): void {
+		$resource = Resource::fromArray(
+			array(
+				'uri'         => 'test://resource',
+				'name'        => 'test-resource',
+				'annotations' => array(
+					'audience' => array( 'user', 'assistant' ),
+					'priority' => 0.8,
+				),
+			)
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource cannot have both text and blob content', $result->get_error_message() );
+		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_data_with_invalid_mime_type(): void {
-		$invalid_resource_data = array(
-			'uri'      => 'WordPress://local/invalid-mime',
-			'text'     => 'Content',
-			'mimeType' => 'invalid-mime-type',
-		);
+	// =========================================================================
+	// validate_resource_data Tests
+	// =========================================================================
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource mimeType must be a valid MIME type format', $result->get_error_message() );
-	}
-
-	public function test_validate_resource_uri_with_valid_uris(): void {
-		$valid_uris = array(
-			'WordPress://local/resource',
-			'https://example.com/resource',
-			'file:///path/to/resource',
-			'custom-protocol://resource-id',
-			'ftp://server.com/file.txt',
-		);
-
-		foreach ( $valid_uris as $uri ) {
-			$this->assertTrue( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be valid" );
-		}
-	}
-
-	public function test_validate_resource_uri_with_invalid_uris(): void {
-		$invalid_uris = array(
-			'',                           // Empty
-			'not-a-uri',                 // No scheme
-			'://missing-scheme',         // Missing scheme
-			'123://invalid-scheme',      // Scheme can't start with number
-			str_repeat( 'a', 2049 ),     // Too long
-		);
-
-		foreach ( $invalid_uris as $uri ) {
-			$this->assertFalse( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid" );
-		}
-	}
-
-	public function test_validate_mime_type_with_valid_types(): void {
-		$valid_types = array(
-			'text/plain',
-			'application/json',
-			'image/jpeg',
-			'audio/mp3',
-			'video/mp4',
-			'application/octet-stream',
-			'text/html',
-		);
-
-		foreach ( $valid_types as $type ) {
-			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
-		}
-	}
-
-	public function test_validate_mime_type_with_invalid_types(): void {
-		$invalid_types = array(
-			'',
-			'text',                      // Missing subtype
-			'text/',                     // Empty subtype
-			'/plain',                    // Missing type
-			'text/plain/extra',          // Too many parts
-			'invalid-mime-type',         // No slash
-		);
-
-		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be invalid" );
-		}
-	}
-
-	public function test_validate_resource_instance_with_valid_resource(): void {
-		$server = $this->makeServer();
-
+	public function test_validate_resource_data_with_valid_text_content(): void {
 		$resource_data = array(
-			'ability'     => 'test/valid-resource',
-			'uri'         => 'WordPress://local/valid-resource',
-			'name'        => 'Valid Resource',
-			'description' => 'A valid test resource',
-			'mimeType'    => 'text/plain',
-			'text'        => 'This is test content',
+			'uri'  => 'test://resource',
+			'text' => 'Test content',
 		);
 
-		$resource = McpResource::from_array( $resource_data, $server );
-
-		$result = McpResourceValidator::validate_resource_instance( $resource, 'test-context' );
+		$result = McpResourceValidator::validate_resource_data( $resource_data );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_requires_server_before_validation(): void {
-		$resource = new McpResource(
-			'test/missing-server',
-			'WordPress://local/missing-server'
-		);
-
-		$result = $resource->validate();
-		$this->assertWPError( $result );
-		$this->assertSame( 'resource_missing_mcp_server', $result->get_error_code() );
-	}
-
-	public function test_validate_resource_uniqueness_method_exists(): void {
-		// Test that the uniqueness validation method exists and is callable
-		$server = $this->makeServer();
-
+	public function test_validate_resource_data_with_valid_blob_content(): void {
 		$resource_data = array(
-			'ability'     => 'test/test-resource',
-			'uri'         => 'WordPress://local/test-resource',
-			'name'        => 'Test Resource',
-			'description' => 'Test resource',
-			'text'        => 'Test content',
+			'uri'  => 'test://resource',
+			'blob' => base64_encode( 'Test content' ),
 		);
-		$resource      = McpResource::from_array( $resource_data, $server );
 
-		// The method should exist and be callable
-		$this->assertTrue( method_exists( McpResourceValidator::class, 'validate_resource_uniqueness' ) );
-
-		// Should return true for unique resource
-		$result = McpResourceValidator::validate_resource_uniqueness( $resource, 'test-context' );
+		$result = McpResourceValidator::validate_resource_data( $resource_data );
 		$this->assertTrue( $result );
-	}
-
-	public function test_get_validation_errors_returns_array(): void {
-		$invalid_data = array(
-			'uri'         => '',
-			'name'        => 123,
-			'mimeType'    => 'invalid-type',
-			'annotations' => 'not-an-array',
-		);
-
-		$errors = McpResourceValidator::get_validation_errors( $invalid_data );
-
-		$this->assertIsArray( $errors );
-		$this->assertNotEmpty( $errors );
-		$this->assertGreaterThan( 3, count( $errors ) ); // Should have multiple validation errors
 	}
 
 	public function test_validate_resource_data_with_context_in_error_message(): void {
-		$invalid_resource_data = array(
-			'uri' => '',
+		$resource_data = array(
+			'uri' => 'invalid uri',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data, 'custom-context' );
-
+		$result = McpResourceValidator::validate_resource_data( $resource_data, 'TestContext' );
 		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( '[custom-context]', $result->get_error_message() );
-		$this->assertStringContainsString( 'Resource validation failed', $result->get_error_message() );
+		$this->assertStringContainsString( '[TestContext]', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_data_sanitizes_string_inputs(): void {
-		$resource_data_with_whitespace = array(
-			'uri'         => '  WordPress://local/test  ',
-			'name'        => '  Test Resource  ',
-			'description' => '  Test description  ',
-			'mimeType'    => '  text/plain  ',
+	// =========================================================================
+	// get_validation_errors Tests
+	// =========================================================================
+
+	public function test_get_validation_errors_with_valid_resource_data(): void {
+		$resource_data = array(
+			'uri'         => 'test://resource',
 			'text'        => 'Content',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $resource_data_with_whitespace );
-		$this->assertTrue( $result );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertEmpty( $errors );
 	}
 
-	public function test_validate_resource_data_with_invalid_text_type(): void {
-		$invalid_resource_data = array(
-			'uri'  => 'WordPress://local/invalid-text',
-			'text' => 123, // Should be string
+	public function test_get_validation_errors_with_missing_uri(): void {
+		$resource_data = array(
+			'text' => 'Content',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource text content must be a string', $result->get_error_message() );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'URI is required', $errors[0] );
 	}
 
-	public function test_validate_resource_data_with_invalid_blob_type(): void {
-		$invalid_resource_data = array(
-			'uri'  => 'WordPress://local/invalid-blob',
-			'blob' => array(), // Should be string, but also need to have content
-			'text' => '', // This will trigger the "must have either text or blob" error first
+	public function test_get_validation_errors_with_empty_uri(): void {
+		$resource_data = array(
+			'uri'  => '',
+			'text' => 'Content',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Resource must have either text or blob content', $result->get_error_message() );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'URI is required', $errors[0] );
 	}
 
-	public function test_validate_resource_data_with_valid_mcp_annotations(): void {
-		$valid_resource_data = array(
-			'uri'         => 'WordPress://local/annotated-resource',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'audience'     => array( 'user', 'assistant' ),
-				'lastModified' => '2024-01-15T10:30:00Z',
-				'priority'     => 0.8,
-			),
+	public function test_get_validation_errors_with_non_string_uri(): void {
+		$resource_data = array(
+			'uri'  => 123,
+			'text' => 'Content',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
-		$this->assertTrue( $result );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'URI is required', $errors[0] );
 	}
 
-	public function test_validate_resource_data_with_unknown_annotation_field_name(): void {
-		// Unknown fields should be ignored (filtered out by mapper before validation)
-		$valid_resource_data = array(
-			'uri'         => 'WordPress://local/unknown-annotations',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'invalidField' => 'value', // Unknown field, should be ignored
-			),
+	public function test_get_validation_errors_with_invalid_uri_format(): void {
+		$resource_data = array(
+			'uri'  => 'not a valid uri',
+			'text' => 'Content',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
-
-		$this->assertTrue( $result, 'Unknown annotation fields should be ignored' );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'URI must be a valid URI format', $errors[0] );
 	}
 
-	public function test_validate_resource_data_with_invalid_audience_type(): void {
-		$invalid_resource_data = array(
-			'uri'         => 'WordPress://local/invalid-audience',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'audience' => 'not-an-array', // Should be array
-			),
+	public function test_get_validation_errors_with_missing_content(): void {
+		$resource_data = array(
+			'uri' => 'test://resource',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Annotation field audience must be an array', $result->get_error_message() );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'must include at least one of', $errors[0] );
 	}
 
-	public function test_validate_resource_data_with_invalid_audience_role(): void {
-		$invalid_resource_data = array(
-			'uri'         => 'WordPress://local/invalid-audience-role',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'audience' => array( 'invalid-role' ), // Invalid role
-			),
+	public function test_get_validation_errors_with_both_text_and_blob(): void {
+		$resource_data = array(
+			'uri'  => 'test://resource',
+			'text' => 'Text content',
+			'blob' => base64_encode( 'Blob content' ),
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'audience must contain only valid roles', $result->get_error_message() );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertEmpty( $errors );
 	}
 
-	public function test_validate_resource_data_with_invalid_lastModified_format(): void {
-		$invalid_resource_data = array(
-			'uri'         => 'WordPress://local/invalid-date',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'lastModified' => 'not-a-date', // Invalid ISO 8601 format
-			),
+	public function test_get_validation_errors_with_non_string_text(): void {
+		$resource_data = array(
+			'uri'  => 'test://resource',
+			'text' => 123,
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'lastModified must be a valid ISO 8601 timestamp', $result->get_error_message() );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'text content must be a string', implode( ' ', $errors ) );
 	}
 
-	public function test_validate_resource_data_with_invalid_priority_range(): void {
-		$invalid_resource_data = array(
-			'uri'         => 'WordPress://local/invalid-priority',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'priority' => 2.0, // Out of range (should be 0-1)
-			),
+	public function test_get_validation_errors_with_non_string_blob(): void {
+		$resource_data = array(
+			'uri'  => 'test://resource',
+			'blob' => array( 'data' ),
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $invalid_resource_data );
-
-		$this->assertWPError( $result );
-		$this->assertEquals( 'resource_validation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'priority must be between 0.0 and 1.0', $result->get_error_message() );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'blob content must be a string', implode( ' ', $errors ) );
 	}
 
-	public function test_validate_resource_data_with_partial_annotations(): void {
-		// Should be valid - not all annotation fields are required
-		$valid_resource_data = array(
-			'uri'         => 'WordPress://local/partial-annotations',
-			'text'        => 'Test content',
-			'annotations' => array(
-				'priority' => 0.5,
-			),
+	public function test_get_validation_errors_rejects_invalid_base64_blob(): void {
+		$resource_data = array(
+			'uri'  => 'test://resource',
+			'blob' => 'not-valid-base64!!!',
 		);
 
-		$result = McpResourceValidator::validate_resource_data( $valid_resource_data );
-		$this->assertTrue( $result );
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'valid base64', $errors[0] );
+	}
+
+	public function test_get_validation_errors_with_non_string_mime_type(): void {
+		$resource_data = array(
+			'uri'      => 'test://resource',
+			'text'     => 'Content',
+			'mimeType' => 123,
+		);
+
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'mimeType must be a string', $errors[0] );
+	}
+
+	public function test_get_validation_errors_with_invalid_mime_type_format(): void {
+		$resource_data = array(
+			'uri'      => 'test://resource',
+			'text'     => 'Content',
+			'mimeType' => 'invalid-mime',
+		);
+
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'mimeType must be a valid MIME type format', $errors[0] );
+	}
+
+	public function test_get_validation_errors_with_valid_mime_type(): void {
+		$resource_data = array(
+			'uri'      => 'test://resource',
+			'text'     => 'Content',
+			'mimeType' => 'application/json',
+		);
+
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertEmpty( $errors );
+	}
+
+	// =========================================================================
+	// Edge Cases and Multiple Errors
+	// =========================================================================
+
+	public function test_get_validation_errors_reports_multiple_errors(): void {
+		$resource_data = array(
+			'uri'         => 'invalid uri',
+			'mimeType'    => 'invalid-mime',
+			// Missing text/blob content
+		);
+
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertCount( 3, $errors, 'Should report all validation errors: invalid URI, invalid mimeType, and missing content' );
+	}
+
+	public function test_get_validation_errors_allows_empty_string_text(): void {
+		$resource_data = array(
+			'uri'  => 'test://resource',
+			'text' => '', // Empty but string type - valid per array_key_exists check
+		);
+
+		// Empty string IS valid content after the fix - array_key_exists allows it.
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertEmpty( $errors, 'Empty string text content should be valid' );
+	}
+
+	public function test_get_validation_errors_allows_optional_fields_when_omitted(): void {
+		$resource_data = array(
+			'uri'  => 'test://resource',
+			'text' => 'Content',
+			// mimeType omitted - should be valid (optional)
+		);
+
+		$errors = McpResourceValidator::get_validation_errors( $resource_data );
+		$this->assertEmpty( $errors );
 	}
 }

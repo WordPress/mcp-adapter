@@ -10,24 +10,52 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
+use WP\MCP\Domain\Utils\McpValidator;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
  *
- * Extend this class to create custom prompts that can be registered
- * directly with McpServer without requiring WordPress abilities.
+ * @deprecated Use {@see \WP\MCP\Domain\Prompts\McpPrompt} instead for creating prompts.
+ *
+ * The fluent API or array configuration provided by McpPrompt is simpler
+ * and more flexible than subclassing this abstract class:
+ *
+ * ```php
+ * // Fluent API (preferred)
+ * $prompt = McpPrompt::create('my-prompt')
+ *     ->title('My Prompt')
+ *     ->argument('input', 'Input text', true)
+ *     ->handler(function(array $args): array {
+ *         return ['messages' => [...]];
+ *     });
+ *
+ * // Array configuration (WordPress-style)
+ * $prompt = McpPrompt::fromArray([
+ *     'name'      => 'my-prompt',
+ *     'title'     => 'My Prompt',
+ *     'arguments' => [['name' => 'input', 'description' => 'Input text', 'required' => true]],
+ *     'handler'   => function(array $args): array { return [...]; },
+ * ]);
+ * ```
+ *
+ * This class remains functional for backward compatibility but will be
+ * removed in a future major version.
+ *
+ * @see McpPrompt For the preferred prompt creation API.
  */
 abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 
 	/**
-	 * The prompt name.
+	 * The prompt name (unique identifier).
 	 *
 	 * @var string
 	 */
-	protected string $name;
+	protected string $name = '';
 
 	/**
-	 * The prompt title.
+	 * The prompt title (human-readable display name).
 	 *
 	 * @var string|null
 	 */
@@ -43,86 +71,108 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * The prompt arguments.
 	 *
-	 * @var array
+	 * @var array<int, array{name: string, title?: string, description?: string, required?: bool}>
 	 */
 	protected array $arguments = array();
 
 	/**
-	 * The prompt annotations.
+	 * The prompt icons for UI display.
 	 *
-	 * @var array
+	 * @since n.e.x.t
+	 *
+	 * @var array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
 	 */
-	protected array $annotations = array();
+	protected ?array $icons = null;
 
 	/**
-	 * Build and return the MCP prompt instance.
+	 * Additional metadata passed through to MCP clients.
 	 *
-	 * @return \WP\MCP\Domain\Prompts\McpPrompt The built prompt.
-	 * @throws \InvalidArgumentException If validation fails.
+	 * Use this to attach purpose-specific metadata that MCP clients can consume.
+	 * Keys are passed through unchanged.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var array<string, mixed>
 	 */
-	public function build(): McpPrompt {
+	protected array $meta = array();
+
+	/**
+	 * Constructor - automatically configures the prompt.
+	 *
+	 * Configuration happens exactly once during construction, ensuring
+	 * idempotent behavior. Subclasses should NOT override this constructor;
+	 * instead, implement the configure() method.
+	 *
+	 * @since n.e.x.t
+	 */
+	final public function __construct() {
 		$this->configure();
+	}
 
-		// Create a synthetic ability name for the prompt
-		// Use empty string if name is empty (validation will catch it)
-		$synthetic_ability = empty( $this->name ) ? 'synthetic/' : 'synthetic/' . $this->name;
+	/**
+	 * Configure the prompt properties.
+	 *
+	 * Subclasses must implement this method to set the name, title,
+	 * description, and arguments for the prompt. This method is called
+	 * exactly once during construction.
+	 *
+	 * @return void
+	 */
+	abstract protected function configure(): void;
 
-		// Create a builder-based prompt that completely bypasses abilities
-		$builder = $this;
-		$prompt  = new class(
-			$synthetic_ability,
-			$this->name,
-			$this->title,
-			$this->description,
-			$this->arguments,
-			$this->annotations,
-			$builder
-		) extends McpPrompt {
-			private McpPromptBuilderInterface $builder;
+	/**
+	 * Build and return the Prompt DTO instance.
+	 *
+	 * This method converts the configured state into an MCP Prompt DTO.
+	 * Safe to call multiple times - always returns a fresh DTO based on
+	 * the current (immutable after construction) state.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
+	 */
+	public function build(): Prompt {
+		$argument_dtos = null;
+		if ( ! empty( $this->arguments ) ) {
+			$argument_dtos = array_map(
+				static function ( array $arg ): PromptArgument {
+					return PromptArgument::fromArray(
+						array(
+							'name'        => $arg['name'],
+							'title'       => $arg['title'] ?? null,
+							'description' => $arg['description'] ?? null,
+							'required'    => $arg['required'] ?? null,
+						)
+					);
+				},
+				$this->arguments
+			);
+		}
 
-			public function __construct(
-				string $ability,
-				string $name,
-				?string $title,
-				?string $description,
-				array $arguments,
-				array $annotations,
-				McpPromptBuilderInterface $builder
-			) {
-				parent::__construct( $ability, $name, $title, $description, $arguments, $annotations );
-				$this->builder = $builder;
+		// Validate and prepare icons if set.
+		$valid_icons = null;
+		if ( ! empty( $this->icons ) ) {
+			$icons_result = McpValidator::validate_icons_array( $this->icons );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$valid_icons = $icons_result['valid'];
 			}
+		}
 
-			// This prompt is builder-based and doesn't need abilities
-			public function is_builder_based(): bool {
-				return true;
-			}
+		$prompt_data = array(
+			'name'        => $this->name,
+			'title'       => $this->title,
+			'description' => $this->description,
+			'arguments'   => $argument_dtos,
+		);
 
-			// Direct execution through the builder
-			public function execute_direct( array $arguments ): array {
-				return $this->builder->handle( $arguments );
-			}
+		if ( ! empty( $this->meta ) ) {
+			$prompt_data['_meta'] = $this->meta;
+		}
 
-			// Direct permission checking through the builder
-			public function check_permission_direct( array $arguments ): bool {
-				return $this->builder->has_permission( $arguments );
-			}
+		// Only include icons if valid ones exist.
+		if ( null !== $valid_icons ) {
+			$prompt_data['icons'] = $valid_icons;
+		}
 
-			/**
-			 * Fallback for ability-based execution (should not be used).
-			 *
-			 * @return \WP_Error Always returns an error as builder-based prompts don't have abilities.
-			 */
-			public function get_ability(): \WP_Error {
-				// This should not be called for builder-based prompts
-				return new \WP_Error(
-					'builder_has_no_ability',
-					esc_html__( 'Builder-based prompts do not have an associated ability.', 'mcp-adapter' )
-				);
-			}
-		};
-
-		return $prompt;
+		return Prompt::fromArray( $prompt_data );
 	}
 
 	/**
@@ -131,10 +181,6 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * @return string The prompt name.
 	 */
 	public function get_name(): string {
-		if ( empty( $this->name ) ) {
-			$this->configure();
-		}
-
 		return $this->name;
 	}
 
@@ -144,10 +190,6 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * @return string|null The prompt title.
 	 */
 	public function get_title(): ?string {
-		if ( empty( $this->name ) ) {
-			$this->configure();
-		}
-
 		return $this->title;
 	}
 
@@ -157,57 +199,87 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * @return string|null The prompt description.
 	 */
 	public function get_description(): ?string {
-		if ( empty( $this->name ) ) {
-			$this->configure();
-		}
-
 		return $this->description;
 	}
 
 	/**
 	 * Get the prompt arguments.
 	 *
-	 * @return array The prompt arguments.
+	 * @return array<int, array{name: string, title?: string, description?: string, required?: bool}> The prompt arguments.
 	 */
 	public function get_arguments(): array {
-		if ( empty( $this->name ) ) {
-			$this->configure();
-		}
-
 		return $this->arguments;
 	}
 
 	/**
-	 * Get the prompt annotations.
+	 * Get the prompt icons.
 	 *
-	 * @return array The prompt annotations.
+	 * @return array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
+	 * @since n.e.x.t
+	 *
 	 */
-	public function get_annotations(): array {
-		if ( empty( $this->name ) ) {
-			$this->configure();
-		}
-
-		return $this->annotations;
+	public function get_icons(): array {
+		return $this->icons ?? array();
 	}
 
 	/**
-	 * Configure the prompt properties.
+	 * Set the prompt icons for UI display.
 	 *
-	 * Subclasses must implement this method to set the name, title,
-	 * description, and arguments for the prompt.
+	 * Icons are validated during build() using McpValidator::validate_icons_array().
+	 * Invalid icons are filtered out with warnings (graceful degradation).
 	 *
-	 * @return void
+	 * Per MCP 2025-11-25:
+	 * - MUST support: image/png, image/jpeg, image/jpg
+	 * - SHOULD support: image/svg+xml, image/webp
+	 *
+	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
+	 *
+	 * @return self
+	 * @since n.e.x.t
+	 *
 	 */
-	abstract protected function configure(): void;
+	protected function set_icons( array $icons ): self {
+		$this->icons = $icons;
+
+		return $this;
+	}
+
+	/**
+	 * Get the additional metadata.
+	 *
+	 * @return array<string, mixed> The additional metadata.
+	 * @since n.e.x.t
+	 *
+	 */
+	public function get_meta(): array {
+		return $this->meta;
+	}
+
+	/**
+	 * Set additional metadata.
+	 *
+	 * This metadata is passed through to MCP clients unchanged.
+	 *
+	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
+	 *
+	 * @return self
+	 * @since n.e.x.t
+	 *
+	 */
+	protected function set_meta( array $meta ): self {
+		$this->meta = $meta;
+
+		return $this;
+	}
 
 	/**
 	 * Handle the prompt execution when called.
 	 *
 	 * Subclasses must implement this method to handle the prompt logic.
 	 *
-	 * @param array $arguments The arguments passed to the prompt.
+	 * @param array<string, mixed> $arguments The arguments passed to the prompt.
 	 *
-	 * @return array The prompt response.
+	 * @return array<string, mixed> The prompt response.
 	 */
 	abstract public function handle( array $arguments ): array;
 
@@ -217,7 +289,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Default implementation allows all executions. Override this method
 	 * to implement custom permission logic.
 	 *
-	 * @param array $arguments The arguments passed to the prompt.
+	 * @param array<string, mixed> $arguments The arguments passed to the prompt.
 	 *
 	 * @return bool True if execution is allowed, false otherwise.
 	 */
@@ -228,20 +300,35 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	}
 
 	/**
+	 * Helper method to add an argument to the prompt.
+	 *
+	 * @param string $name The argument name.
+	 * @param string|null $description Optional argument description.
+	 * @param bool $required Whether the argument is required.
+	 *
+	 * @return self
+	 */
+	protected function add_argument( string $name, ?string $description = null, bool $required = false ): self {
+		$this->arguments[] = $this->create_argument( $name, $description, $required );
+
+		return $this;
+	}
+
+	/**
 	 * Helper method to create an argument definition.
 	 *
-	 * @param string      $name The argument name.
+	 * @param string $name The argument name.
 	 * @param string|null $description Optional argument description.
-	 * @param bool        $required Whether the argument is required.
+	 * @param bool $required Whether the argument is required.
 	 *
-	 * @return array The argument definition.
+	 * @return array{name: string, description?: string, required?: true} The argument definition.
 	 */
 	protected function create_argument( string $name, ?string $description = null, bool $required = false ): array {
 		$argument = array(
 			'name' => $name,
 		);
 
-		if ( ! is_null( $description ) ) {
+		if ( null !== $description ) {
 			$argument['description'] = $description;
 		}
 
@@ -250,20 +337,5 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		}
 
 		return $argument;
-	}
-
-	/**
-	 * Helper method to add an argument to the prompt.
-	 *
-	 * @param string      $name The argument name.
-	 * @param string|null $description Optional argument description.
-	 * @param bool        $required Whether the argument is required.
-	 *
-	 * @return self
-	 */
-	protected function add_argument( string $name, ?string $description = null, bool $required = false ): self {
-		$this->arguments[] = $this->create_argument( $name, $description, $required );
-
-		return $this;
 	}
 }
