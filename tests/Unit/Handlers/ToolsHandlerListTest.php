@@ -4,44 +4,53 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Handlers;
 
-use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Tests\Fixtures\DummyErrorHandler;
-use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 final class ToolsHandlerListTest extends TestCase {
 
-	public function test_list_and_list_all_only_include_json_safe_fields(): void {
-		$server = new McpServer(
-			'srv',
-			'mcp/v1',
-			'/mcp',
-			'Srv',
-			'desc',
-			'0.0.1',
-			array(),
-			DummyErrorHandler::class,
-			DummyObservabilityHandler::class,
-			array( 'test/always-allowed' ),
-		);
+	public function test_list_tools_returns_dto(): void {
+		// Use makeServer helper to properly set up the server with registered abilities.
+		$server = $this->makeServer( array( 'test/always-allowed' ) );
 
 		$handler = new ToolsHandler( $server );
-		$list    = $handler->list_tools();
-		$all     = $handler->list_all_tools();
+		$result  = $handler->list_tools();
 
-		$this->assertArrayHasKey( 'tools', $list );
-		$this->assertArrayHasKey( 'tools', $all );
-		$this->assertNotEmpty( $list['tools'] );
+		// Verify it returns a ListToolsResult DTO
+		$this->assertInstanceOf( ListToolsResult::class, $result );
+	}
 
-		$tool = $list['tools'][0];
-		$this->assertArrayHasKey( 'name', $tool );
-		$this->assertArrayHasKey( 'description', $tool );
-		$this->assertArrayHasKey( 'inputSchema', $tool );
-		$this->assertArrayNotHasKey( 'callback', $tool );
-		$this->assertArrayNotHasKey( 'permission_callback', $tool );
+	public function test_list_and_list_all_only_include_json_safe_fields(): void {
+		// Use makeServer helper to properly set up the server with registered abilities.
+		$server = $this->makeServer( array( 'test/always-allowed' ) );
 
-		$tool_all = $all['tools'][0];
-		$this->assertTrue( $tool_all['available'] );
+		$handler     = new ToolsHandler( $server );
+		$list_result = $handler->list_tools();
+		$all_result  = $handler->list_all_tools();
+
+		// Use DTO getter methods instead of toArray()
+		$list_tools = $list_result->getTools();
+		$all_tools  = $all_result->getTools();
+
+		$this->assertNotEmpty( $list_tools );
+		$this->assertNotEmpty( $all_tools );
+		$this->assertContainsOnlyInstancesOf( Tool::class, $list_tools );
+		$this->assertContainsOnlyInstancesOf( Tool::class, $all_tools );
+
+		// Verify Tool DTO structure via toArray() for field checks
+		$tool       = $list_tools[0];
+		$tool_array = $tool->toArray();
+		$this->assertArrayHasKey( 'name', $tool_array );
+		$this->assertArrayHasKey( 'description', $tool_array );
+		$this->assertArrayHasKey( 'inputSchema', $tool_array );
+		$this->assertArrayNotHasKey( 'callback', $tool_array );
+		$this->assertArrayNotHasKey( 'permission_callback', $tool_array );
+
+		// list_all_tools now returns the same as list_tools (standard MCP format)
+		$tool_all       = $all_tools[0];
+		$tool_all_array = $tool_all->toArray();
+		$this->assertArrayHasKey( 'name', $tool_all_array );
 	}
 }

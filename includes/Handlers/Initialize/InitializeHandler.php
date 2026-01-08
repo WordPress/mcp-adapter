@@ -10,7 +10,10 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
-use stdClass;
+use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
+use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
+use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
 
 /**
  * Handles the initialize MCP method.
@@ -35,31 +38,40 @@ class InitializeHandler {
 	/**
 	 * Handles the initialize request.
 	 *
-	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with server capabilities and information.
+	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
 	 */
-	public function handle( int $request_id = 0 ): array {
-		$server_info = array(
-			'name'    => $this->mcp->get_server_name(),
-			'version' => $this->mcp->get_server_version(),
+	public function handle( $request_id = 0 ): InitializeResult {
+		$server_info = Implementation::fromArray(
+			array(
+				'name'    => $this->mcp->get_server_name(),
+				'version' => $this->mcp->get_server_version(),
+			)
 		);
 
-		// MCP 2025-06-18 compliant capabilities
-		$capabilities = array(
-			'tools'       => new stdClass(), // Empty object indicates support
-			'resources'   => new stdClass(), // Basic resources support without listChanged/subscribe
-			'prompts'     => new stdClass(), // Basic prompts support without listChanged
-			'logging'     => new stdClass(), // Server supports sending log messages to client
-			'completions' => new stdClass(), // Server supports argument autocompletion (note: plural!)
+		// Capabilities should only be advertised if they are implemented end-to-end.
+		// IMPORTANT: We set explicit boolean values (not empty arrays) to ensure proper JSON serialization.
+		// Empty arrays `[]` serialize as JSON arrays `[]`, but MCP spec requires JSON objects `{}`.
+		// Setting explicit values like `listChanged: false` produces associative arrays that serialize correctly.
+		$capabilities = ServerCapabilities::fromArray(
+			array(
+				'prompts'   => array( 'listChanged' => false ),
+				'resources' => array(
+					'subscribe'   => false,
+					'listChanged' => false,
+				),
+				'tools'     => array( 'listChanged' => false ),
+			)
 		);
 
-		// Send the response according to JSON-RPC 2.0 and InitializeResult schema.
-		return array(
-			'protocolVersion' => '2025-06-18',
-			'serverInfo'      => $server_info,
-			'capabilities'    => (object) $capabilities,
-			'instructions'    => $this->mcp->get_server_description(),
+		return InitializeResult::fromArray(
+			array(
+				'protocolVersion' => McpConstants::LATEST_PROTOCOL_VERSION,
+				'capabilities'    => $capabilities,
+				'serverInfo'      => $server_info,
+				'instructions'    => $this->mcp->get_server_description(),
+			)
 		);
 	}
 }

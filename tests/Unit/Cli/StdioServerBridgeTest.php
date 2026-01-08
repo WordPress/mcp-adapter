@@ -76,7 +76,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-06-18',
+					'protocolVersion' => '2025-11-25',
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -190,7 +190,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$format_response_method->setAccessible( true );
 
 		$result = array(
-			'protocolVersion' => '2025-06-18',
+			'protocolVersion' => '2025-11-25',
 			'serverInfo'      => array(
 				'name'    => 'Test Server',
 				'version' => '1.0.0',
@@ -451,5 +451,249 @@ final class StdioServerBridgeTest extends TestCase {
 
 		// The response should have either result or error
 		$this->assertTrue( isset( $response['result'] ) || isset( $response['error'] ) );
+	}
+
+	public function test_handle_request_with_non_array_json(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		// Test with a JSON string that parses to a non-array (e.g., a string)
+		$json_input = '"just a string"';
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'error', $response );
+		$this->assertEquals( -32600, $response['error']['code'] ); // Invalid Request
+		$this->assertStringContainsString( 'not a valid Request object', $response['error']['data'] );
+	}
+
+	public function test_handle_request_with_null_json(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		// Test with JSON null
+		$json_input = 'null';
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'error', $response );
+		$this->assertEquals( -32600, $response['error']['code'] ); // Invalid Request
+	}
+
+	public function test_handle_request_with_missing_jsonrpc_version(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'id'     => 1,
+				'method' => 'ping',
+				'params' => array(),
+				// Missing 'jsonrpc' field
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'error', $response );
+		$this->assertEquals( -32600, $response['error']['code'] ); // Invalid Request
+		$this->assertStringContainsString( '2.0', $response['error']['data'] );
+	}
+
+	public function test_handle_request_with_non_string_method(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 12345, // Non-string method
+				'params'  => array(),
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'error', $response );
+		$this->assertEquals( -32600, $response['error']['code'] ); // Invalid Request
+		$this->assertStringContainsString( 'Method must be a string', $response['error']['data'] );
+	}
+
+	public function test_format_response_with_error_missing_fields(): void {
+		// Use reflection to access private method
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$format_response_method = $reflection->getMethod( 'format_response' );
+		$format_response_method->setAccessible( true );
+
+		// Test error result with missing optional fields (code and message)
+		$result = array(
+			'error' => array(
+				// Missing 'code' and 'message' - should use defaults
+			),
+		);
+
+		$response = $format_response_method->invoke( $this->bridge, $result, 999 );
+
+		$this->assertIsString( $response );
+		$response_data = json_decode( $response, true );
+		$this->assertArrayHasKey( 'error', $response_data );
+		$this->assertEquals( -32603, $response_data['error']['code'] ); // Default internal error
+		$this->assertEquals( 'Internal error', $response_data['error']['message'] ); // Default message
+	}
+
+	public function test_handle_request_with_string_id(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		// Test with string ID (JSON-RPC allows string IDs)
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 'string-request-id',
+				'method'  => 'ping',
+				'params'  => array(),
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'id', $response );
+		$this->assertEquals( 'string-request-id', $response['id'] );
+	}
+
+	public function test_handle_request_with_null_id(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		// Test with null ID (should be treated as notification but with explicit null)
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => null,
+				'method'  => 'ping',
+				'params'  => array(),
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		// Null ID is treated as notification, so empty response
+		$this->assertEquals( '', $result );
+	}
+
+	public function test_handle_request_with_resources_list(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 3,
+				'method'  => 'resources/list',
+				'params'  => array(),
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'result', $response );
+		$this->assertArrayHasKey( 'resources', $response['result'] );
+	}
+
+	public function test_handle_request_with_prompts_list(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 4,
+				'method'  => 'prompts/list',
+				'params'  => array(),
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'result', $response );
+		$this->assertArrayHasKey( 'prompts', $response['result'] );
+	}
+
+	public function test_handle_request_with_unknown_method(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 5,
+				'method'  => 'unknown/method',
+				'params'  => array(),
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertArrayHasKey( 'error', $response );
+		$this->assertEquals( -32601, $response['error']['code'] ); // Method not found
+	}
+
+	public function test_handle_request_with_missing_params(): void {
+		// Use reflection to access private method
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		// Test request without params field - should default to empty array
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 6,
+				'method'  => 'ping',
+				// Missing 'params' field
+			)
+		);
+
+		$result = $handle_request_method->invoke( $this->bridge, $json_input );
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		// Should succeed since ping doesn't need params
+		$this->assertArrayHasKey( 'result', $response );
 	}
 }

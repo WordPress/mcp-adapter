@@ -7,6 +7,9 @@ namespace WP\MCP\Tests\Integration;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
+use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 // Test prompt that requires admin permissions
 class AdminOnlyPrompt extends McpPromptBuilder {
@@ -65,7 +68,7 @@ final class BuilderPromptExecutionTest extends TestCase {
 
 		$handler = new PromptsHandler( $server );
 
-		// Test successful execution
+		// Test successful execution.
 		$result = $handler->get_prompt(
 			array(
 				'name'      => 'open-test',
@@ -73,9 +76,17 @@ final class BuilderPromptExecutionTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayNotHasKey( 'error', $result );
-		$this->assertSame( 'Hello from open prompt!', $result['message'] );
-		$this->assertArrayHasKey( 'timestamp', $result );
+		// Builder prompts return GetPromptResult DTO.
+		// The arbitrary result is wrapped as JSON in a text message.
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$messages = $result->getMessages();
+		$this->assertNotEmpty( $messages );
+		$this->assertContainsOnlyInstancesOf( PromptMessage::class, $messages );
+
+		// The wrapped content contains the original data as JSON.
+		$content = $messages[0]->getContent();
+		$text    = $content->toArray()['text'] ?? '';
+		$this->assertStringContainsString( 'Hello from open prompt!', $text );
 	}
 
 	public function test_builder_prompt_permission_denied(): void {
@@ -83,7 +94,7 @@ final class BuilderPromptExecutionTest extends TestCase {
 
 		$handler = new PromptsHandler( $server );
 
-		// Test permission denied (always denies in test)
+		// Test permission denied (always denies in test).
 		$result = $handler->get_prompt(
 			array(
 				'name'      => 'admin-only-test',
@@ -91,9 +102,11 @@ final class BuilderPromptExecutionTest extends TestCase {
 			)
 		);
 
-		// Should return permission denied error
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'Access denied', $result['error']['message'] ?? '' );
+		// Should return permission denied error as JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertStringContainsString( 'Access denied', $error->getMessage() );
 	}
 
 	public function test_mixed_ability_and_builder_prompts(): void {
@@ -111,23 +124,20 @@ final class BuilderPromptExecutionTest extends TestCase {
 
 		// Should have the builder prompt even if ability registration failed
 		$this->assertArrayHasKey( 'open-test', $prompts );
-		$this->assertTrue( $prompts['open-test']->is_builder_based() );
+		$this->assertNotNull( $server->get_prompt_builder( 'open-test' ) );
 	}
 
 	public function test_builder_prompt_bypasses_abilities_completely(): void {
 		$server = $this->makeServer( array(), array(), array( OpenPrompt::class ) );
 
 		$prompt = $server->get_prompt( 'open-test' );
+		$this->assertNotNull( $prompt );
 
-		// Verify complete ability bypass
-		$this->assertTrue( $prompt->is_builder_based() );
-		$ability = $prompt->get_ability();
-		$this->assertWPError( $ability );
-		$this->assertEquals( 'builder_has_no_ability', $ability->get_error_code() );
+		$builder = $server->get_prompt_builder( 'open-test' );
+		$this->assertNotNull( $builder );
+		$this->assertTrue( $builder->has_permission( array() ) );
 
-		// Verify direct execution works
-		$this->assertTrue( $prompt->check_permission_direct( array() ) );
-		$result = $prompt->execute_direct( array() );
+		$result = $builder->handle( array() );
 		$this->assertSame( 'Hello from open prompt!', $result['message'] );
 	}
 }

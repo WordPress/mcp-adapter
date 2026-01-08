@@ -12,12 +12,39 @@ namespace WP\MCP\Handlers\Prompts;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
+use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 /**
  * Handles prompts-related MCP methods.
+ *
+ * @since n.e.x.t
  */
 class PromptsHandler {
 	use HandlerHelperTrait;
+
+	/**
+	 * Valid content types from ContentBlockFactory.
+	 *
+	 * @var array<int, string>
+	 */
+	private static $valid_content_types = array( 'text', 'image', 'audio', 'resource_link', 'resource' );
+
+	/**
+	 * Valid role values for PromptMessage.
+	 *
+	 * @var array<int, string>
+	 */
+	private static $valid_roles = array( 'user', 'assistant' );
+
+	/**
+	 * Default role for messages when not specified.
+	 *
+	 * @var string
+	 */
+	private static $default_role = 'user';
 
 	/**
 	 * The WordPress MCP instance.
@@ -39,189 +66,77 @@ class PromptsHandler {
 	/**
 	 * Handles the prompts/list request.
 	 *
-	 * @param int $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with prompts list and metadata.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\ListPromptsResult Response with prompts list DTO.
 	 */
-	public function list_prompts( int $request_id = 0 ): array {
-		// Get the registered prompts from the MCP instance and extract only the args.
-		$prompts = array();
-		foreach ( $this->mcp->get_prompts() as $prompt ) {
-			$prompts[] = $prompt->to_array();
-		}
+	public function list_prompts( $request_id = 0 ): ListPromptsResult {
+		$prompts = array_values( $this->mcp->get_prompts() );
 
-		return array(
-			'prompts'   => $prompts,
-			'_metadata' => array(
-				'component_type' => 'prompts',
-				'prompts_count'  => count( $prompts ),
-			),
+		return ListPromptsResult::fromArray(
+			array(
+				'prompts' => $prompts,
+			)
 		);
 	}
 
 	/**
 	 * Handles the prompts/get request.
 	 *
-	 * @param array $params     Request parameters.
-	 * @param int   $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param array           $params Request parameters.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return array Response with prompt execution results or error.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse Response with prompt execution results or error.
 	 */
-	public function get_prompt( array $params, int $request_id = 0 ): array {
+	public function get_prompt( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['name'] ) ) {
-			return array(
-				'error'     => McpErrorFactory::missing_parameter( $request_id, 'name' )['error'],
-				'_metadata' => array(
-					'component_type' => 'prompt',
-					'failure_reason' => 'missing_parameter',
-				),
-			);
+			return McpErrorFactory::missing_parameter( $request_id, 'name' );
 		}
 
-		// Get the prompt by name.
-		$prompt_name = $request_params['name'];
-		$prompt      = $this->mcp->get_prompt( $prompt_name );
+		$prompt_name = (string) $request_params['name'];
+		$prompt_name = trim( $prompt_name );
 
-		if ( ! $prompt ) {
-			return array(
-				'error'     => McpErrorFactory::prompt_not_found( $request_id, $prompt_name )['error'],
-				'_metadata' => array(
-					'component_type' => 'prompt',
-					'prompt_name'    => $prompt_name,
-					'failure_reason' => 'not_found',
-				),
-			);
+		$mcp_prompt = $this->mcp->get_mcp_prompt( $prompt_name );
+
+		if ( ! $mcp_prompt ) {
+			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
 		}
+
+		/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt */
+		$prompt = $mcp_prompt->get_component();
 
 		// Get the arguments for the prompt.
 		$arguments = $request_params['arguments'] ?? array();
 
 		try {
-			// Check if this is a builder-based prompt that can execute directly
-			if ( $prompt->is_builder_based() ) {
-				// Direct execution through the builder (bypasses abilities completely)
-				// Note: Builder permission checks return bool only, not WP_Error
-				$has_permission = $prompt->check_permission_direct( $arguments );
-				if ( ! $has_permission ) {
-					return array(
-						'error'     => McpErrorFactory::permission_denied( $request_id, 'Access denied for prompt: ' . $prompt_name )['error'],
-						'_metadata' => array(
-							'component_type' => 'prompt',
-							'prompt_name'    => $prompt_name,
-							'failure_reason' => 'permission_denied',
-							'is_builder'     => true,
-						),
-					);
+			$permission = $mcp_prompt->check_permission( $arguments );
+			if ( true !== $permission ) {
+				$error_message = 'Access denied for prompt: ' . $prompt_name;
+				if ( is_wp_error( $permission ) ) {
+					$error_message = $permission->get_error_message();
 				}
 
-				$result              = $prompt->execute_direct( $arguments );
-				$result['_metadata'] = array(
-					'component_type' => 'prompt',
-					'prompt_name'    => $prompt_name,
-					'is_builder'     => true,
-				);
-
-				return $result;
+				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
-			/**
-			 * Traditional ability-based execution
-			 *
-			 * Get the ability for the prompt.
-			 *
-			 * @var \WP_Ability|\WP_Error $ability
-			 */
-			$ability = $prompt->get_ability();
-
-			// Check if getting the ability returned an error
-			if ( is_wp_error( $ability ) ) {
-				$this->mcp->error_handler->log(
-					'Failed to get ability for prompt',
-					array(
-						'prompt_name'   => $prompt_name,
-						'error_message' => $ability->get_error_message(),
-					)
-				);
-
-				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $ability->get_error_message() )['error'],
-					'_metadata' => array(
-						'component_type' => 'prompt',
-						'prompt_name'    => $prompt_name,
-						'failure_reason' => 'ability_retrieval_failed',
-						'error_code'     => $ability->get_error_code(),
-						'is_builder'     => false,
-					),
-				);
-			}
-
-			// If ability has no input schema and arguments is empty, pass null
-			// This is required by WP_Ability::validate_input() which expects null when no schema
-			$ability_input_schema = $ability->get_input_schema();
-			if ( empty( $ability_input_schema ) && empty( $arguments ) ) {
-				$arguments = null;
-			}
-			$has_permission = $ability->check_permissions( $arguments );
-			if ( true !== $has_permission ) {
-				// Extract detailed error message and code if WP_Error was returned
-				$error_message  = 'Access denied for prompt: ' . $prompt_name;
-				$failure_reason = 'permission_denied';
-
-				if ( is_wp_error( $has_permission ) ) {
-					$error_message  = $has_permission->get_error_message();
-					$failure_reason = $has_permission->get_error_code(); // Use WP_Error code as failure_reason
-				}
-
-				return array(
-					'error'     => McpErrorFactory::permission_denied( $request_id, $error_message )['error'],
-					'_metadata' => array(
-						'component_type' => 'prompt',
-						'prompt_name'    => $prompt_name,
-						'ability_name'   => $ability->get_name(),
-						'failure_reason' => $failure_reason,
-						'is_builder'     => false,
-					),
-				);
-			}
-
-			$result = $ability->execute( $arguments );
-
-			// Handle WP_Error objects that weren't converted by the ability.
+			$result = $mcp_prompt->execute( $arguments );
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(
-					'Ability returned WP_Error object',
+					'Prompt execution returned WP_Error',
 					array(
-						'ability'       => $ability->get_name(),
+						'prompt_name'   => $prompt_name,
 						'error_code'    => $result->get_error_code(),
 						'error_message' => $result->get_error_message(),
 					)
 				);
 
-				return array(
-					'error'     => McpErrorFactory::internal_error( $request_id, $result->get_error_message() )['error'],
-					'_metadata' => array(
-						'component_type' => 'prompt',
-						'prompt_name'    => $prompt_name,
-						'ability_name'   => $ability->get_name(),
-						'failure_reason' => 'wp_error',
-						'error_code'     => $result->get_error_code(),
-						'is_builder'     => false,
-					),
-				);
+				return McpErrorFactory::internal_error( $request_id, $result->get_error_message() );
 			}
 
-			// Successful execution - add metadata.
-			$result['_metadata'] = array(
-				'component_type' => 'prompt',
-				'prompt_name'    => $prompt_name,
-				'ability_name'   => $ability->get_name(),
-				'is_builder'     => false,
-			);
-
-			return $result;
+			return $this->normalize_result_to_dto( $result, $prompt, $prompt_name );
 		} catch ( \Throwable $e ) {
 			$this->mcp->error_handler->log(
 				'Prompt execution failed',
@@ -232,15 +147,408 @@ class PromptsHandler {
 				)
 			);
 
-			return array(
-				'error'     => McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' )['error'],
-				'_metadata' => array(
-					'component_type' => 'prompt',
-					'prompt_name'    => $prompt_name,
-					'failure_reason' => 'execution_failed',
-					'error_type'     => get_class( $e ),
-				),
+			return McpErrorFactory::internal_error( $request_id, 'Prompt execution failed' );
+		}
+	}
+
+	// =========================================================================
+	// Result Normalization (Tiered Convenience Shortcuts)
+	// =========================================================================
+
+	/**
+	 * Normalize and convert prompt execution result to GetPromptResult DTO.
+	 *
+	 * Supports tiered return formats:
+	 * - Tier 1: Full MCP format with 'messages' array
+	 * - Tier 2: Simple 'text' shorthand
+	 * - Tier 3: Single message with 'role' and 'content'
+	 * - Tier 4: Multi-text with 'texts' array
+	 * - Tier 5: Fallback JSON encoding for arbitrary data
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array                                 $result      Raw result from prompt execution.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO for description fallback.
+	 * @param string                                $prompt_name Prompt name for logging.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 */
+	private function normalize_result_to_dto(
+		array $result,
+		Prompt $prompt,
+		string $prompt_name
+	): GetPromptResult {
+		// Tier 1: Full MCP format with 'messages' array.
+		if ( isset( $result['messages'] ) && is_array( $result['messages'] ) ) {
+			return $this->normalize_tier1_messages( $result, $prompt, $prompt_name );
+		}
+
+		// Tier 2: Simple 'text' shorthand.
+		if ( isset( $result['text'] ) && is_string( $result['text'] ) ) {
+			return $this->normalize_tier2_text( $result, $prompt );
+		}
+
+		// Tier 3: Single message with 'role' key.
+		if ( isset( $result['role'] ) && isset( $result['content'] ) ) {
+			return $this->normalize_tier3_single_message( $result, $prompt, $prompt_name );
+		}
+
+		// Tier 4: Multi-text with 'texts' array.
+		if ( isset( $result['texts'] ) && is_array( $result['texts'] ) ) {
+			return $this->normalize_tier4_texts( $result, $prompt );
+		}
+
+		// Tier 5: Fallback - JSON encode arbitrary data.
+		return $this->normalize_tier5_fallback( $result, $prompt, $prompt_name );
+	}
+
+	/**
+	 * Tier 1: Full MCP-compliant format with 'messages' array.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array                                 $result      Raw result with 'messages' key.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO.
+	 * @param string                                $prompt_name Prompt name for logging.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 */
+	private function normalize_tier1_messages(
+		array $result,
+		Prompt $prompt,
+		string $prompt_name
+	): GetPromptResult {
+		$message_dtos = array();
+
+		foreach ( $result['messages'] as $index => $message ) {
+			if ( ! is_array( $message ) ) {
+				$this->mcp->error_handler->log(
+					'Invalid message structure in prompt result, skipping',
+					array(
+						'prompt_name'   => $prompt_name,
+						'message_index' => $index,
+						'message_type'  => gettype( $message ),
+					),
+					'warning'
+				);
+				continue;
+			}
+
+			$message_dtos[] = $this->validate_and_create_message( $message, $prompt_name );
+		}
+
+		// Ensure we have at least one message.
+		if ( empty( $message_dtos ) ) {
+			$message_dtos[] = PromptMessage::fromArray(
+				array(
+					'role'    => self::$default_role,
+					'content' => array(
+						'type' => 'text',
+						'text' => '(No messages returned)',
+					),
+				)
 			);
 		}
+
+		return GetPromptResult::fromArray(
+			array(
+				'messages'    => $message_dtos,
+				'description' => $result['description'] ?? $prompt->getDescription(),
+			)
+		);
+	}
+
+	/**
+	 * Tier 2: Simple 'text' shorthand.
+	 *
+	 * Creates a single user message with text content.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array                                 $result Raw result with 'text' key.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt The prompt DTO.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 */
+	private function normalize_tier2_text( array $result, Prompt $prompt ): GetPromptResult {
+		$content = array(
+			'type' => 'text',
+			'text' => (string) $result['text'],
+		);
+
+		// Support optional annotations on the text.
+		if ( isset( $result['annotations'] ) && is_array( $result['annotations'] ) ) {
+			$content['annotations'] = $result['annotations'];
+		}
+
+		$message_dto = PromptMessage::fromArray(
+			array(
+				'role'    => self::$default_role,
+				'content' => $content,
+			)
+		);
+
+		return GetPromptResult::fromArray(
+			array(
+				'messages'    => array( $message_dto ),
+				'description' => $result['description'] ?? $prompt->getDescription(),
+			)
+		);
+	}
+
+	/**
+	 * Tier 3: Single message with 'role' and 'content'.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array                                 $result      Raw result with 'role' and 'content' keys.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO.
+	 * @param string                                $prompt_name Prompt name for logging.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 */
+	private function normalize_tier3_single_message(
+		array $result,
+		Prompt $prompt,
+		string $prompt_name
+	): GetPromptResult {
+		$message_dto = $this->validate_and_create_message( $result, $prompt_name );
+
+		return GetPromptResult::fromArray(
+			array(
+				'messages'    => array( $message_dto ),
+				'description' => $result['description'] ?? $prompt->getDescription(),
+			)
+		);
+	}
+
+	/**
+	 * Tier 4: Multi-text with 'texts' array.
+	 *
+	 * Creates multiple messages with the same role.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array                                 $result Raw result with 'texts' key.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt The prompt DTO.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 */
+	private function normalize_tier4_texts( array $result, Prompt $prompt ): GetPromptResult {
+		$role         = $this->validate_role( $result['role'] ?? self::$default_role, '' );
+		$message_dtos = array();
+
+		foreach ( $result['texts'] as $text ) {
+			if ( ! is_string( $text ) ) {
+				continue;
+			}
+
+			$message_dtos[] = PromptMessage::fromArray(
+				array(
+					'role'    => $role,
+					'content' => array(
+						'type' => 'text',
+						'text' => $text,
+					),
+				)
+			);
+		}
+
+		// Ensure we have at least one message.
+		if ( empty( $message_dtos ) ) {
+			$message_dtos[] = PromptMessage::fromArray(
+				array(
+					'role'    => $role,
+					'content' => array(
+						'type' => 'text',
+						'text' => '(No texts provided)',
+					),
+				)
+			);
+		}
+
+		return GetPromptResult::fromArray(
+			array(
+				'messages'    => $message_dtos,
+				'description' => $result['description'] ?? $prompt->getDescription(),
+			)
+		);
+	}
+
+	/**
+	 * Tier 5: Fallback - JSON encode arbitrary data.
+	 *
+	 * Used when no other tier matches. Logs an observability event.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array                                 $result      Raw result (arbitrary structure).
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt   $prompt      The prompt DTO.
+	 * @param string                                $prompt_name Prompt name for logging.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 */
+	private function normalize_tier5_fallback(
+		array $result,
+		Prompt $prompt,
+		string $prompt_name
+	): GetPromptResult {
+		// Log observability event for fallback normalization.
+		$this->mcp->observability_handler->record_event(
+			'prompt_result_fallback_normalization',
+			array(
+				'prompt_name' => $prompt_name,
+				'result_keys' => array_keys( $result ),
+			)
+		);
+
+		$json_content = wp_json_encode( $result, JSON_PRETTY_PRINT );
+		if ( false === $json_content ) {
+			$json_content = '{}';
+		}
+
+		$message_dto = PromptMessage::fromArray(
+			array(
+				'role'    => self::$default_role,
+				'content' => array(
+					'type' => 'text',
+					'text' => $json_content,
+				),
+			)
+		);
+
+		return GetPromptResult::fromArray(
+			array(
+				'messages'    => array( $message_dto ),
+				'description' => $prompt->getDescription(),
+			)
+		);
+	}
+
+	// =========================================================================
+	// Validation Helpers
+	// =========================================================================
+
+	/**
+	 * Validate message structure and create PromptMessage DTO.
+	 *
+	 * Validates role and content type, applying defaults where needed.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array  $message     Raw message array.
+	 * @param string $prompt_name Prompt name for logging.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\PromptMessage
+	 */
+	private function validate_and_create_message( array $message, string $prompt_name ): PromptMessage {
+		// Validate and normalize role.
+		$role = $this->validate_role( $message['role'] ?? self::$default_role, $prompt_name );
+
+		// Validate and normalize content.
+		$content = $message['content'] ?? array();
+		if ( ! is_array( $content ) ) {
+			// If content is a string, wrap it as text.
+			$content = array(
+				'type' => 'text',
+				'text' => is_string( $content ) ? $content : (string) $content,
+			);
+		}
+
+		$content = $this->validate_content_type( $content, $prompt_name );
+
+		return PromptMessage::fromArray(
+			array(
+				'role'    => $role,
+				'content' => $content,
+			)
+		);
+	}
+
+	/**
+	 * Validate content type against ContentBlockFactory registry.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array  $content     Content array with 'type' key.
+	 * @param string $prompt_name Prompt name for logging.
+	 *
+	 * @return array Validated content array (may be modified if invalid type).
+	 */
+	private function validate_content_type( array $content, string $prompt_name ): array {
+		$type = $content['type'] ?? null;
+
+		// Check if type is missing.
+		if ( null === $type || '' === $type ) {
+			$this->mcp->error_handler->log(
+				'Missing content type in prompt result, defaulting to text',
+				array(
+					'prompt_name' => $prompt_name,
+				),
+				'warning'
+			);
+
+			return array(
+				'type' => 'text',
+				'text' => isset( $content['text'] ) ? (string) $content['text'] : wp_json_encode( $content, JSON_PRETTY_PRINT ),
+			);
+		}
+
+		// Check if type is valid.
+		if ( ! in_array( $type, self::$valid_content_types, true ) ) {
+			$this->mcp->error_handler->log(
+				'Invalid content type in prompt result, converting to text',
+				array(
+					'prompt_name'  => $prompt_name,
+					'invalid_type' => $type,
+					'valid_types'  => self::$valid_content_types,
+				),
+				'warning'
+			);
+
+			// Convert the entire content to a text representation.
+			$json_content = wp_json_encode( $content, JSON_PRETTY_PRINT );
+			if ( false === $json_content ) {
+				$json_content = '{}';
+			}
+
+			return array(
+				'type' => 'text',
+				'text' => $json_content,
+			);
+		}
+
+		// Type is valid, return content as-is (preserves annotations).
+		return $content;
+	}
+
+	/**
+	 * Validate role value and apply default if invalid.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $role        Role value to validate.
+	 * @param string $prompt_name Prompt name for logging (empty to skip logging).
+	 *
+	 * @return string Valid role value.
+	 */
+	private function validate_role( string $role, string $prompt_name ): string {
+		if ( in_array( $role, self::$valid_roles, true ) ) {
+			return $role;
+		}
+
+		if ( '' !== $prompt_name ) {
+			$this->mcp->error_handler->log(
+				'Invalid role in prompt message, defaulting to user',
+				array(
+					'prompt_name'  => $prompt_name,
+					'invalid_role' => $role,
+					'valid_roles'  => self::$valid_roles,
+				),
+				'warning'
+			);
+		}
+
+		return self::$default_role;
 	}
 }
