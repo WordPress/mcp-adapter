@@ -1,11 +1,12 @@
 <?php
+
 /**
  * Tests for McpValidator class.
  *
  * @package WP\MCP\Tests
  */
 
-declare( strict_types=1 );
+declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Domain\Utils;
 
@@ -16,6 +17,7 @@ use WP\MCP\Tests\TestCase;
  * Test McpValidator functionality.
  */
 final class McpValidatorTest extends TestCase {
+
 
 	// ISO 8601 Timestamp Validation Tests
 
@@ -91,12 +93,14 @@ final class McpValidatorTest extends TestCase {
 	}
 
 	public function test_validate_name_rejects_too_long(): void {
-		$long_name = str_repeat( 'a', 256 );
+		// Default max length is 128 per MCP spec.
+		$long_name = str_repeat( 'a', 129 );
 		$this->assertFalse( McpValidator::validate_name( $long_name ) );
 	}
 
 	public function test_validate_name_accepts_max_length(): void {
-		$max_length_name = str_repeat( 'a', 255 );
+		// Default max length is 128 per MCP spec.
+		$max_length_name = str_repeat( 'a', 128 );
 		$this->assertTrue( McpValidator::validate_name( $max_length_name ) );
 	}
 
@@ -104,15 +108,29 @@ final class McpValidatorTest extends TestCase {
 		$invalid_names = array(
 			'name with spaces',
 			'name@invalid',
-			'name.invalid',
 			'name#invalid',
 			'name$invalid',
 			'name%invalid',
+			'name/invalid',
 		);
 
 		foreach ( $invalid_names as $name ) {
 			$this->assertFalse( McpValidator::validate_name( $name ), "Name '{$name}' should be invalid" );
 		}
+	}
+
+	public function test_validate_name_accepts_dot(): void {
+		// Dots are allowed per MCP 2025-11-25 spec: [A-Za-z0-9_.-]
+		$this->assertTrue( McpValidator::validate_name( 'name.with.dots' ) );
+		$this->assertTrue( McpValidator::validate_name( 'foo.bar' ) );
+		$this->assertTrue( McpValidator::validate_name( 'api.v2.endpoint' ) );
+	}
+
+	public function test_validate_name_accepts_numeric_zero(): void {
+		// Numeric "0" should be valid (matches regex but not empty()).
+		$this->assertTrue( McpValidator::validate_name( '0' ) );
+		$this->assertTrue( McpValidator::validate_name( '123' ) );
+		$this->assertTrue( McpValidator::validate_name( '000' ) );
 	}
 
 	public function test_validate_name_with_custom_max_length(): void {
@@ -123,9 +141,9 @@ final class McpValidatorTest extends TestCase {
 		$this->assertFalse( McpValidator::validate_name( $name_65_chars, 64 ) );
 	}
 
-	// Tool/Prompt Name Validation Tests
+	// Tool/Prompt Name Validation Tests (using validate_name with default 128-char limit)
 
-	public function test_validate_tool_or_prompt_name_with_valid_names(): void {
+	public function test_validate_name_default_128_with_valid_names(): void {
 		$valid_names = array(
 			'tool-name',
 			'prompt_name',
@@ -133,57 +151,42 @@ final class McpValidatorTest extends TestCase {
 		);
 
 		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be valid" );
+			$this->assertTrue( McpValidator::validate_name( $name ), "Name '{$name}' should be valid" );
 		}
 	}
 
-	public function test_validate_tool_or_prompt_name_rejects_invalid(): void {
+	public function test_validate_name_default_128_rejects_invalid(): void {
 		$invalid_names = array(
 			'',
 			'tool with spaces',
 			'tool@invalid',
-			str_repeat( 'a', 256 ),
+			'tool/invalid',
 		);
 
 		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpValidator::validate_tool_or_prompt_name( $name ), "Name '{$name}' should be invalid" );
+			$this->assertFalse( McpValidator::validate_name( $name ), "Name '{$name}' should be invalid" );
 		}
 	}
 
-	// Argument Name Validation Tests
+	public function test_validate_name_default_max_length_128(): void {
+		// MCP 2025-11-25 spec: tool/prompt names max 128 characters (default).
+		$name_128_chars = str_repeat( 'a', 128 );
+		$name_129_chars = str_repeat( 'a', 129 );
 
-	public function test_validate_argument_name_with_valid_names(): void {
-		$valid_names = array(
-			'arg-name',
-			'arg_name',
-			'arg123',
-		);
-
-		foreach ( $valid_names as $name ) {
-			$this->assertTrue( McpValidator::validate_argument_name( $name ), "Name '{$name}' should be valid" );
-		}
+		$this->assertTrue( McpValidator::validate_name( $name_128_chars ), '128 chars should be valid' );
+		$this->assertFalse( McpValidator::validate_name( $name_129_chars ), '129 chars should be invalid' );
 	}
 
-	public function test_validate_argument_name_rejects_too_long(): void {
-		$long_name = str_repeat( 'a', 65 );
-		$this->assertFalse( McpValidator::validate_argument_name( $long_name ) );
+	public function test_validate_name_allows_dot(): void {
+		// MCP 2025-11-25 spec allows dots in tool/prompt names.
+		$this->assertTrue( McpValidator::validate_name( 'foo.bar' ) );
+		$this->assertTrue( McpValidator::validate_name( 'namespace.tool.action' ) );
 	}
 
-	public function test_validate_argument_name_accepts_max_length(): void {
-		$max_length_name = str_repeat( 'a', 64 );
-		$this->assertTrue( McpValidator::validate_argument_name( $max_length_name ) );
-	}
-
-	public function test_validate_argument_name_rejects_invalid(): void {
-		$invalid_names = array(
-			'',
-			'arg with spaces',
-			'arg@invalid',
-		);
-
-		foreach ( $invalid_names as $name ) {
-			$this->assertFalse( McpValidator::validate_argument_name( $name ), "Name '{$name}' should be invalid" );
-		}
+	public function test_validate_name_rejects_slash(): void {
+		// Forward slash is NOT allowed in MCP tool/prompt names.
+		$this->assertFalse( McpValidator::validate_name( 'foo/bar' ) );
+		$this->assertFalse( McpValidator::validate_name( 'namespace/tool' ) );
 	}
 
 	// MIME Type Validation Tests
@@ -219,18 +222,42 @@ final class McpValidatorTest extends TestCase {
 		}
 	}
 
-	public function test_validate_mime_type_with_special_characters(): void {
-		$valid_special_types = array(
+	public function test_validate_mime_type_with_structured_syntax_suffix(): void {
+		// RFC 6839: Structured syntax suffixes like +json, +xml are valid.
+		$valid_suffix_types = array(
 			'application/vnd.api+json',
-			'text/html; charset=utf-8',
+			'image/svg+xml',
+			'application/atom+xml',
+			'application/hal+json',
 		);
 
-		// Note: The regex may not support all special characters, test what's actually supported
-		foreach ( $valid_special_types as $type ) {
-			// This might fail depending on regex implementation
-			$result = McpValidator::validate_mime_type( $type );
-			// Just verify the method doesn't throw an error
-			$this->assertIsBool( $result );
+		foreach ( $valid_suffix_types as $type ) {
+			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
+		}
+	}
+
+	public function test_validate_mime_type_with_vendor_types(): void {
+		// RFC 2045: Vendor-specific types with dots and other characters.
+		$valid_vendor_types = array(
+			'application/vnd.ms-excel',
+			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+			'text/vnd.example.custom',
+		);
+
+		foreach ( $valid_vendor_types as $type ) {
+			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
+		}
+	}
+
+	public function test_validate_mime_type_rejects_parameters(): void {
+		// MIME type parameters (after ;) are not supported by the validator.
+		$types_with_parameters = array(
+			'text/html; charset=utf-8',
+			'text/plain; format=flowed',
+		);
+
+		foreach ( $types_with_parameters as $type ) {
+			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type with parameter '{$type}' should be rejected" );
 		}
 	}
 
@@ -411,7 +438,7 @@ final class McpValidatorTest extends TestCase {
 
 	public function test_validate_resource_uri_accepts_max_length(): void {
 		// Build a URI that's exactly 2048 characters
-		$path         = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
+		$path           = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
 		$max_length_uri = 'http://a.com/' . $path;
 		$this->assertTrue( McpValidator::validate_resource_uri( $max_length_uri ) );
 	}
@@ -453,8 +480,8 @@ final class McpValidatorTest extends TestCase {
 		}
 	}
 
-	public function test_validate_roles_array_rejects_empty_array(): void {
-		$this->assertFalse( McpValidator::validate_roles_array( array() ) );
+	public function test_validate_roles_array_accepts_empty_array(): void {
+		$this->assertTrue( McpValidator::validate_roles_array( array() ) );
 	}
 
 	public function test_validate_roles_array_rejects_invalid_roles(): void {
@@ -574,9 +601,9 @@ final class McpValidatorTest extends TestCase {
 		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => 'user' ) );
 		$this->assertNotEmpty( $errors );
 
-		// Invalid: empty array
+		// Valid: empty array (no audience preference).
 		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array() ) );
-		$this->assertNotEmpty( $errors );
+		$this->assertEmpty( $errors );
 
 		// Invalid: invalid role
 		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array( 'admin' ) ) );
@@ -609,5 +636,335 @@ final class McpValidatorTest extends TestCase {
 		// Invalid: out of range (too high)
 		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 1.5 ) );
 		$this->assertNotEmpty( $errors );
+	}
+
+	// Icon Source Validation Tests
+
+	public function test_validate_icon_src_with_valid_https_url(): void {
+		$this->assertTrue( McpValidator::validate_icon_src( 'https://example.com/icon.png' ) );
+		$this->assertTrue( McpValidator::validate_icon_src( 'https://cdn.example.com/icons/my-icon-48x48.png' ) );
+	}
+
+	public function test_validate_icon_src_with_valid_http_url(): void {
+		$this->assertTrue( McpValidator::validate_icon_src( 'http://example.com/icon.png' ) );
+	}
+
+	public function test_validate_icon_src_with_valid_data_uri(): void {
+		// Minimal valid data URI.
+		$this->assertTrue( McpValidator::validate_icon_src( 'data:image/png;base64,iVBORw0KGgo=' ) );
+		// Data URI without base64 encoding.
+		$this->assertTrue( McpValidator::validate_icon_src( 'data:text/plain,Hello' ) );
+	}
+
+	public function test_validate_icon_src_rejects_empty_string(): void {
+		$this->assertFalse( McpValidator::validate_icon_src( '' ) );
+	}
+
+	public function test_validate_icon_src_rejects_whitespace_only(): void {
+		$this->assertFalse( McpValidator::validate_icon_src( '   ' ) );
+	}
+
+	public function test_validate_icon_src_rejects_relative_paths(): void {
+		$this->assertFalse( McpValidator::validate_icon_src( '/icons/icon.png' ) );
+		$this->assertFalse( McpValidator::validate_icon_src( 'icons/icon.png' ) );
+		$this->assertFalse( McpValidator::validate_icon_src( '../icon.png' ) );
+	}
+
+	public function test_validate_icon_src_rejects_invalid_urls(): void {
+		$this->assertFalse( McpValidator::validate_icon_src( 'ftp://example.com/icon.png' ) );
+		$this->assertFalse( McpValidator::validate_icon_src( 'file:///path/to/icon.png' ) );
+		$this->assertFalse( McpValidator::validate_icon_src( 'just-a-string' ) );
+	}
+
+	public function test_validate_icon_src_rejects_invalid_data_uri(): void {
+		// Data URI without comma separator.
+		$this->assertFalse( McpValidator::validate_icon_src( 'data:image/png' ) );
+	}
+
+	// Icon MIME Type Validation Tests
+
+	public function test_validate_icon_mime_type_with_required_types(): void {
+		// MUST support per MCP spec.
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/png' ) );
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/jpeg' ) );
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/jpg' ) );
+	}
+
+	public function test_validate_icon_mime_type_with_recommended_types(): void {
+		// SHOULD support per MCP spec.
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/svg+xml' ) );
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/webp' ) );
+	}
+
+	public function test_validate_icon_mime_type_case_insensitive(): void {
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'IMAGE/PNG' ) );
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'Image/Jpeg' ) );
+		$this->assertTrue( McpValidator::validate_icon_mime_type( 'IMAGE/SVG+XML' ) );
+	}
+
+	public function test_validate_icon_mime_type_rejects_unsupported_types(): void {
+		$this->assertFalse( McpValidator::validate_icon_mime_type( 'image/gif' ) );
+		$this->assertFalse( McpValidator::validate_icon_mime_type( 'image/bmp' ) );
+		$this->assertFalse( McpValidator::validate_icon_mime_type( 'image/tiff' ) );
+		$this->assertFalse( McpValidator::validate_icon_mime_type( 'text/plain' ) );
+		$this->assertFalse( McpValidator::validate_icon_mime_type( 'application/json' ) );
+	}
+
+	// Icon Size Validation Tests
+
+	public function test_validate_icon_size_with_valid_sizes(): void {
+		$this->assertTrue( McpValidator::validate_icon_size( '48x48' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '96x96' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '192x192' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '16x16' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '512x512' ) );
+	}
+
+	public function test_validate_icon_size_with_any(): void {
+		$this->assertTrue( McpValidator::validate_icon_size( 'any' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( 'ANY' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( 'Any' ) );
+	}
+
+	public function test_validate_icon_size_with_whitespace_trimmed(): void {
+		$this->assertTrue( McpValidator::validate_icon_size( ' 48x48 ' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( ' any ' ) );
+	}
+
+	public function test_validate_icon_size_rejects_empty_string(): void {
+		$this->assertFalse( McpValidator::validate_icon_size( '' ) );
+	}
+
+	public function test_validate_icon_size_rejects_invalid_formats(): void {
+		$this->assertFalse( McpValidator::validate_icon_size( '48' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '48x' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( 'x48' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '48x48x48' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( 'large' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '48px' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '48 x 48' ) );
+	}
+
+	public function test_validate_icon_size_rejects_zero_dimensions(): void {
+		// Zero dimensions are invalid - an icon can't have zero width or height.
+		// phpcs:disable PHPCompatibility.Numbers.RemovedHexadecimalNumericStrings.Found -- These are size strings, not hex numbers.
+		$this->assertFalse( McpValidator::validate_icon_size( '0x0' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '0x48' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '48x0' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '00x00' ) );
+		// phpcs:enable PHPCompatibility.Numbers.RemovedHexadecimalNumericStrings.Found
+	}
+
+	public function test_validate_icon_size_rejects_leading_zeros(): void {
+		// Leading zeros indicate malformed input.
+		$this->assertFalse( McpValidator::validate_icon_size( '048x048' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '048x48' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '48x048' ) );
+		$this->assertFalse( McpValidator::validate_icon_size( '0048x0048' ) );
+	}
+
+	public function test_validate_icon_size_accepts_very_large_dimensions(): void {
+		// Very large dimensions should be valid (though impractical).
+		$this->assertTrue( McpValidator::validate_icon_size( '99999x99999' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '1000000x1000000' ) );
+	}
+
+	public function test_validate_icon_size_accepts_non_square(): void {
+		// Non-square icons are valid.
+		$this->assertTrue( McpValidator::validate_icon_size( '48x96' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '100x50' ) );
+		$this->assertTrue( McpValidator::validate_icon_size( '1920x1080' ) );
+	}
+
+	// Icon Theme Validation Tests
+
+	public function test_validate_icon_theme_with_valid_themes(): void {
+		$this->assertTrue( McpValidator::validate_icon_theme( 'light' ) );
+		$this->assertTrue( McpValidator::validate_icon_theme( 'dark' ) );
+	}
+
+	public function test_validate_icon_theme_case_insensitive(): void {
+		$this->assertTrue( McpValidator::validate_icon_theme( 'LIGHT' ) );
+		$this->assertTrue( McpValidator::validate_icon_theme( 'DARK' ) );
+		$this->assertTrue( McpValidator::validate_icon_theme( 'Light' ) );
+		$this->assertTrue( McpValidator::validate_icon_theme( 'Dark' ) );
+	}
+
+	public function test_validate_icon_theme_with_whitespace_trimmed(): void {
+		$this->assertTrue( McpValidator::validate_icon_theme( ' light ' ) );
+		$this->assertTrue( McpValidator::validate_icon_theme( ' dark ' ) );
+	}
+
+	public function test_validate_icon_theme_rejects_invalid_themes(): void {
+		$this->assertFalse( McpValidator::validate_icon_theme( '' ) );
+		$this->assertFalse( McpValidator::validate_icon_theme( 'auto' ) );
+		$this->assertFalse( McpValidator::validate_icon_theme( 'system' ) );
+		$this->assertFalse( McpValidator::validate_icon_theme( 'high-contrast' ) );
+	}
+
+	// Icon Validation Errors Tests
+
+	public function test_get_icon_validation_errors_with_valid_full_icon(): void {
+		$icon = array(
+			'src'      => 'https://example.com/icon.png',
+			'mimeType' => 'image/png',
+			'sizes'    => array( '48x48', '96x96' ),
+			'theme'    => 'light',
+		);
+
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+		$this->assertEmpty( $errors );
+	}
+
+	public function test_get_icon_validation_errors_with_minimal_icon(): void {
+		// Only src is required.
+		$icon = array( 'src' => 'https://example.com/icon.png' );
+
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+		$this->assertEmpty( $errors );
+	}
+
+	public function test_get_icon_validation_errors_missing_src(): void {
+		$icon   = array( 'mimeType' => 'image/png' );
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'src', $errors[0] );
+	}
+
+	public function test_get_icon_validation_errors_invalid_src(): void {
+		$icon   = array( 'src' => 'not-a-valid-url' );
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+
+		$this->assertNotEmpty( $errors );
+	}
+
+	public function test_get_icon_validation_errors_src_not_string(): void {
+		$icon   = array( 'src' => 123 );
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+
+		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'string', $errors[0] );
+	}
+
+	public function test_get_icon_validation_errors_invalid_mime_type(): void {
+		$icon = array(
+			'src'      => 'https://example.com/icon.gif',
+			'mimeType' => 'image/gif', // Not in allowed list.
+		);
+
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+		$this->assertNotEmpty( $errors );
+	}
+
+	public function test_get_icon_validation_errors_invalid_sizes_not_array(): void {
+		$icon = array(
+			'src'   => 'https://example.com/icon.png',
+			'sizes' => '48x48', // Should be array.
+		);
+
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+		$this->assertNotEmpty( $errors );
+	}
+
+	public function test_get_icon_validation_errors_invalid_size_format(): void {
+		$icon = array(
+			'src'   => 'https://example.com/icon.png',
+			'sizes' => array( '48x48', 'invalid' ),
+		);
+
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+		$this->assertNotEmpty( $errors );
+	}
+
+	public function test_get_icon_validation_errors_invalid_theme(): void {
+		$icon = array(
+			'src'   => 'https://example.com/icon.png',
+			'theme' => 'invalid-theme',
+		);
+
+		$errors = McpValidator::get_icon_validation_errors( $icon );
+		$this->assertNotEmpty( $errors );
+	}
+
+	// Icons Array Validation Tests
+
+	public function test_validate_icons_array_with_valid_icons(): void {
+		$icons = array(
+			array( 'src' => 'https://example.com/icon1.png' ),
+			array(
+				'src'      => 'https://example.com/icon2.png',
+				'mimeType' => 'image/png',
+			),
+		);
+
+		$result = McpValidator::validate_icons_array( $icons, false );
+
+		$this->assertCount( 2, $result['valid'] );
+		$this->assertEmpty( $result['errors'] );
+	}
+
+	public function test_validate_icons_array_filters_invalid_icons(): void {
+		$icons = array(
+			array( 'src' => 'https://example.com/valid.png' ),
+			array( 'src' => 'invalid-url' ),
+			array( 'src' => 'https://example.com/another-valid.png' ),
+		);
+
+		$result = McpValidator::validate_icons_array( $icons, false );
+
+		$this->assertCount( 2, $result['valid'] );
+		$this->assertCount( 1, $result['errors'] );
+		$this->assertEquals( 1, $result['errors'][0]['index'] );
+	}
+
+	public function test_validate_icons_array_rejects_non_array_items(): void {
+		$icons = array(
+			array( 'src' => 'https://example.com/icon.png' ),
+			'not-an-array',
+		);
+
+		$result = McpValidator::validate_icons_array( $icons, false );
+
+		$this->assertCount( 1, $result['valid'] );
+		$this->assertCount( 1, $result['errors'] );
+	}
+
+	public function test_validate_icons_array_empty_array(): void {
+		$result = McpValidator::validate_icons_array( array(), false );
+
+		$this->assertEmpty( $result['valid'] );
+		$this->assertEmpty( $result['errors'] );
+	}
+
+	public function test_validate_icons_array_all_invalid(): void {
+		$icons = array(
+			array( 'src' => 'invalid1' ),
+			array( 'mimeType' => 'image/png' ), // Missing src.
+		);
+
+		$result = McpValidator::validate_icons_array( $icons, false );
+
+		$this->assertEmpty( $result['valid'] );
+		$this->assertCount( 2, $result['errors'] );
+	}
+
+	public function test_validate_icons_array_preserves_valid_icon_data(): void {
+		$icons = array(
+			array(
+				'src'      => 'https://example.com/icon.png',
+				'mimeType' => 'image/png',
+				'sizes'    => array( '48x48' ),
+				'theme'    => 'light',
+			),
+		);
+
+		$result = McpValidator::validate_icons_array( $icons, false );
+
+		$this->assertCount( 1, $result['valid'] );
+		$this->assertEquals( 'https://example.com/icon.png', $result['valid'][0]['src'] );
+		$this->assertEquals( 'image/png', $result['valid'][0]['mimeType'] );
+		$this->assertEquals( array( '48x48' ), $result['valid'][0]['sizes'] );
+		$this->assertEquals( 'light', $result['valid'][0]['theme'] );
 	}
 }

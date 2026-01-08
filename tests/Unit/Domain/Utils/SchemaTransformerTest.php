@@ -146,31 +146,29 @@ final class SchemaTransformerTest extends TestCase {
 		$this->assertEquals( $object_schema, $result['schema'] );
 	}
 
-	public function test_null_schema_returns_empty_object(): void {
+	public function test_null_schema_returns_minimal_object(): void {
 		$result = SchemaTransformer::transform_to_object_schema( null );
 
 		$this->assertIsArray( $result );
 		$this->assertFalse( $result['was_transformed'] );
+		$this->assertNull( $result['wrapper_property'] );
 
 		$schema = $result['schema'];
-		$this->assertEquals( 'object', $schema['type'] );
-		$this->assertArrayHasKey( 'additionalProperties', $schema );
-		$this->assertFalse( $schema['additionalProperties'] );
+		$this->assertEquals( array( 'type' => 'object' ), $schema );
 	}
 
-	public function test_empty_array_schema_returns_empty_object(): void {
+	public function test_empty_array_schema_returns_minimal_object(): void {
 		$result = SchemaTransformer::transform_to_object_schema( array() );
 
 		$this->assertIsArray( $result );
 		$this->assertFalse( $result['was_transformed'] );
+		$this->assertNull( $result['wrapper_property'] );
 
 		$schema = $result['schema'];
-		$this->assertEquals( 'object', $schema['type'] );
-		$this->assertArrayHasKey( 'additionalProperties', $schema );
-		$this->assertFalse( $schema['additionalProperties'] );
+		$this->assertEquals( array( 'type' => 'object' ), $schema );
 	}
 
-	public function test_schema_without_type_passes_through(): void {
+	public function test_schema_without_type_gets_object_type_added(): void {
 		$schema_without_type = array(
 			'properties' => array(
 				'param1' => array( 'type' => 'string' ),
@@ -180,7 +178,12 @@ final class SchemaTransformerTest extends TestCase {
 		$result = SchemaTransformer::transform_to_object_schema( $schema_without_type );
 
 		$this->assertFalse( $result['was_transformed'] );
-		$this->assertEquals( $schema_without_type, $result['schema'] );
+		$this->assertNull( $result['wrapper_property'] );
+
+		// Type should be added to the schema.
+		$this->assertEquals( 'object', $result['schema']['type'] );
+		$this->assertArrayHasKey( 'properties', $result['schema'] );
+		$this->assertEquals( $schema_without_type['properties'], $result['schema']['properties'] );
 	}
 
 	public function test_string_schema_with_enum_preserves_constraints(): void {
