@@ -49,6 +49,14 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 			public static function test_categorize_error( \Throwable $exception ): string {
 				return self::categorize_error( $exception );
 			}
+
+			public static function test_is_sensitive_key( string $key ): bool {
+				return self::is_sensitive_key( $key );
+			}
+
+			public static function test_redact_sensitive_values( string $value ): string {
+				return self::redact_sensitive_values( $value );
+			}
 		};
 	}
 
@@ -66,34 +74,51 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 		$this->assertGreaterThan( 0, $tags['timestamp'] );
 	}
 
-	public function test_sanitize_tags_removes_sensitive_data(): void {
-		$tags_with_sensitive_data = array(
-			'username'      => 'testuser',
-			'user_password' => 'my password is secret',  // Contains 'password' as whole word
-			'bearer_token'  => 'token value here',        // Contains 'token' as whole word
-			'api_key'       => 'key is sensitive',        // Contains 'key' as whole word
-			'user_secret'   => 'secret data',             // Contains 'secret' as whole word
-			'normal_value'  => 'normal_data',             // Should not be redacted
+	public function test_sanitize_tags_redacts_sensitive_keys(): void {
+		// Keys that look sensitive should have their values fully redacted
+		$tags_with_sensitive_keys = array(
+			'username'    => 'testuser',           // Safe key
+			'api_key'     => 'abc123',             // Sensitive key - value should be [REDACTED]
+			'apiKey'      => 'xyz789',             // camelCase sensitive key
+			'API_KEY'     => 'DEF456',             // SCREAMING_CASE sensitive key
+			'authToken'   => 'my-token',           // Sensitive key
+			'normal_data' => 'safe_value',         // Safe key
 		);
 
-		$sanitized = $this->trait_user::test_sanitize_tags( $tags_with_sensitive_data );
+		$sanitized = $this->trait_user::test_sanitize_tags( $tags_with_sensitive_keys );
 
 		$this->assertIsArray( $sanitized );
 		$this->assertEquals( 'testuser', $sanitized['username'] );
-		$this->assertStringContainsString( '[REDACTED]', $sanitized['user_password'] );
-		$this->assertStringContainsString( '[REDACTED]', $sanitized['bearer_token'] );
-		$this->assertStringContainsString( '[REDACTED]', $sanitized['api_key'] );
-		$this->assertStringContainsString( '[REDACTED]', $sanitized['user_secret'] );
-		$this->assertEquals( 'normal_data', $sanitized['normal_value'] );
+		$this->assertEquals( '[REDACTED]', $sanitized['api_key'] );
+		$this->assertEquals( '[REDACTED]', $sanitized['apiKey'] );
+		$this->assertEquals( '[REDACTED]', $sanitized['API_KEY'] );
+		$this->assertEquals( '[REDACTED]', $sanitized['authToken'] );
+		$this->assertEquals( 'safe_value', $sanitized['normal_data'] );
 	}
 
-	public function test_sanitize_tags_limits_length(): void {
-		$tags_with_long_values = array(
-			'long_key_' . str_repeat( 'x', 100 ) => 'value',
-			'normal_key'                         => str_repeat( 'y', 200 ),
+	public function test_sanitize_tags_redacts_sensitive_values(): void {
+		// Values containing sensitive patterns should have those patterns redacted
+		$tags_with_sensitive_values = array(
+			'log_message' => 'User password was reset',           // Contains 'password'
+			'debug_info'  => 'Using bearer token for auth',       // Contains 'bearer' and 'token'
+			'safe_text'   => 'This is normal text',               // No sensitive patterns
 		);
 
-		$sanitized = $this->trait_user::test_sanitize_tags( $tags_with_long_values );
+		$sanitized = $this->trait_user::test_sanitize_tags( $tags_with_sensitive_values );
+
+		$this->assertIsArray( $sanitized );
+		$this->assertStringContainsString( '[REDACTED]', $sanitized['log_message'] );
+		$this->assertStringNotContainsString( 'password', $sanitized['log_message'] );
+		$this->assertStringContainsString( '[REDACTED]', $sanitized['debug_info'] );
+		$this->assertEquals( 'This is normal text', $sanitized['safe_text'] );
+	}
+
+	public function test_sanitize_tags_limits_key_length(): void {
+		$tags_with_long_key = array(
+			'long_key_' . str_repeat( 'x', 100 ) => 'value',
+		);
+
+		$sanitized = $this->trait_user::test_sanitize_tags( $tags_with_long_key );
 
 		$this->assertIsArray( $sanitized );
 
@@ -103,9 +128,19 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 			$this->assertLessThanOrEqual( 64, strlen( $key ) );
 		}
 
-		// Values are not truncated, they maintain their full length
-		$this->assertEquals( 'value', $sanitized[ 'long_key_' . str_repeat( 'x', 55 ) ] ); // First 64 chars of key
-		$this->assertEquals( 200, strlen( $sanitized['normal_key'] ) ); // Value is not truncated
+		$this->assertEquals( 'value', $sanitized[ 'long_key_' . str_repeat( 'x', 55 ) ] );
+	}
+
+	public function test_sanitize_tags_truncates_long_values(): void {
+		$long_value = str_repeat( 'y', 2000 );
+		$tags       = array( 'data' => $long_value );
+
+		$sanitized = $this->trait_user::test_sanitize_tags( $tags );
+
+		$this->assertIsArray( $sanitized );
+		// Value should be truncated to 1024 chars + truncation marker
+		$this->assertStringContainsString( '...[truncated]', $sanitized['data'] );
+		$this->assertLessThan( 2000, strlen( $sanitized['data'] ) );
 	}
 
 	public function test_format_metric_name_adds_mcp_prefix(): void {

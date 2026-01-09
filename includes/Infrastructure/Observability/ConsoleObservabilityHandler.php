@@ -25,8 +25,8 @@ class ConsoleObservabilityHandler implements McpObservabilityHandlerInterface {
 	/**
 	 * Record an event with formatted output.
 	 *
-	 * @param string     $event The event name.
-	 * @param array      $tags Tags to attach.
+	 * @param string $event The event name.
+	 * @param array $tags Tags to attach.
 	 * @param float|null $duration_ms Duration in milliseconds.
 	 *
 	 * @return void

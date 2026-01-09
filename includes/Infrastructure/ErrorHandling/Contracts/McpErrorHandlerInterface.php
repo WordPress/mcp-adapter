@@ -21,7 +21,7 @@ interface McpErrorHandlerInterface {
 	 * Log an error message with optional context and type.
 	 *
 	 * @param string $message The log message.
-	 * @param array  $context Additional context data.
+	 * @param array $context Additional context data.
 	 * @param string $type The log type (e.g., 'error', 'info', 'debug').
 	 *
 	 * @return void

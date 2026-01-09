@@ -21,8 +21,8 @@ interface McpObservabilityHandlerInterface {
 	/**
 	 * Emit a countable event for tracking with optional timing data.
 	 *
-	 * @param string     $event The event name to record.
-	 * @param array      $tags Optional tags to attach to the event.
+	 * @param string $event The event name to record.
+	 * @param array $tags Optional tags to attach to the event.
 	 * @param float|null $duration_ms Optional duration in milliseconds for timing measurements.
 	 *
 	 * @return void
