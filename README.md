@@ -4,6 +4,8 @@ Part of the [**AI Building Blocks for WordPress** initiative](https://make.wordp
 
 The official WordPress package for MCP integration that exposes WordPress abilities as [Model Context Protocol (MCP)](https://modelcontextprotocol.io) tools, resources, and prompts for AI agents.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/WordPress/mcp-adapter)
+
 ## Overview
 
 This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
