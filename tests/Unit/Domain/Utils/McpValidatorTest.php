@@ -18,7 +18,6 @@ use WP\MCP\Tests\TestCase;
  */
 final class McpValidatorTest extends TestCase {
 
-
 	// ISO 8601 Timestamp Validation Tests
 
 	public function test_validate_iso8601_timestamp_with_atom_format(): void {
