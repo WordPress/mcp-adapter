@@ -6,7 +6,7 @@
  * @package WP\MCP\Tests
  */
 
-declare(strict_types=1);
+declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Domain\Utils;
 
