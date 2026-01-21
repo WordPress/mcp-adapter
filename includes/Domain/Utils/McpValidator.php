@@ -20,7 +20,6 @@ use DateTime;
  */
 class McpValidator {
 
-
 	/**
 	 * Allowed MIME types for MCP icons per specification.
 	 *
