@@ -490,7 +490,6 @@ class McpValidator {
 		return $priority_float >= 0.0 && $priority_float <= 1.0;
 	}
 
-
 	/**
 	 * Validate a resource URI format.
 	 *
