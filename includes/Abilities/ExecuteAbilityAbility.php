@@ -158,7 +158,6 @@ final class ExecuteAbilityAbility {
 	 * @param array $input Input parameters containing ability_name and parameters.
 	 *
 	 * @return bool|\WP_Error True if the user has permission to execute the specified ability.
-	 * @phpstan-return bool|\WP_Error
 	 */
 	public static function check_permission( $input = array() ) {
 		$ability_name = $input['ability_name'] ?? '';

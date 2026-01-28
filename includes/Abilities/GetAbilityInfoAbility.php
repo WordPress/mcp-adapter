@@ -136,7 +136,6 @@ final class GetAbilityInfoAbility {
 	 * @param array $input Input parameters containing ability_name.
 	 *
 	 * @return bool|\WP_Error True if the user has permission to get ability info.
-	 * @phpstan-return bool|\WP_Error
 	 */
 	public static function check_permission( $input = array() ) {
 		$ability_name = $input['ability_name'] ?? '';

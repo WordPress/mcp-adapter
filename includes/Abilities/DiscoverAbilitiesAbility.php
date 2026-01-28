@@ -116,7 +116,6 @@ final class DiscoverAbilitiesAbility {
 	 * @param array $input Input parameters (unused for this ability).
 	 *
 	 * @return bool|\WP_Error True if the user has permission to discover abilities.
-	 * @phpstan-return bool|\WP_Error
 	 */
 	public static function check_permission( $input = array() ) {
 		// Validate user authentication and capabilities
