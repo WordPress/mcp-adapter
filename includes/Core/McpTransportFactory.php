@@ -40,7 +40,7 @@ class McpTransportFactory {
 	/**
 	 * Initialize MCP transports for the server.
 	 *
-	 * @param array $mcp_transports Array of MCP transport class names to initialize.
+	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize.
 	 */
 	public function initialize_transports( array $mcp_transports ): void {
 		foreach ( $mcp_transports as $mcp_transport ) {

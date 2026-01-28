@@ -118,12 +118,12 @@ class McpServer {
 	 * @param string $server_name Human-readable server name.
 	 * @param string $server_description Server description.
 	 * @param string $server_version Server version.
-	 * @param array $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
+	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
 	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
 	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
-	 * @param array $tools Optional ability names to register as tools during construction.
-	 * @param array $resources Optional resources to register during construction.
-	 * @param array $prompts Optional prompts to register during construction.
+	 * @param array<string> $tools Optional ability names to register as tools during construction.
+	 * @param array<string> $resources Optional resources to register during construction.
+	 * @param array<string> $prompts Optional prompts to register during construction.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
 	 * @throws \Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
@@ -201,10 +201,10 @@ class McpServer {
 	/**
 	 * Setup component registry and transport factory.
 	 *
-	 * @param array $tools Tools to register.
-	 * @param array $resources Resources to register.
-	 * @param array $prompts Prompts to register.
-	 * @param array $mcp_transports Transport classes to initialize.
+	 * @param array<string> $tools Tools to register.
+	 * @param array<string> $resources Resources to register.
+	 * @param array<string> $prompts Prompts to register.
+	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Transport classes to initialize.
 	 *
 	 * @throws \Exception
 	 */
@@ -229,9 +229,9 @@ class McpServer {
 	/**
 	 * Register initial tools, resources, and prompts.
 	 *
-	 * @param array $tools Tools to register.
-	 * @param array $resources Resources to register.
-	 * @param array $prompts Prompts to register.
+	 * @param array<string> $tools Tools to register.
+	 * @param array<string> $resources Resources to register.
+	 * @param array<string> $prompts Prompts to register.
 	 */
 	private function register_mcp_components( array $tools, array $resources, array $prompts ): void {
 		// Register tools if provided
