@@ -118,16 +118,6 @@ final class DiscoverAbilitiesAbility {
 	 * @return bool|\WP_Error True if the user has permission to discover abilities.
 	 */
 	public static function check_permission( $input = array() ) {
-		// Validate user authentication and capabilities
-		return self::validate_user_access();
-	}
-
-	/**
-	 * Validate user authentication and basic capabilities for discover abilities.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
-	 */
-	private static function validate_user_access() {
 		// Verify caller identity - ensure user is authenticated
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
