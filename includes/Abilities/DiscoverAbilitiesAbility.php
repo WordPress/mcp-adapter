@@ -70,7 +70,9 @@ final class DiscoverAbilitiesAbility {
 	 * Execute the discover abilities functionality.
 	 *
 	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
-	 * before this callback is invoked (see WP_Ability::execute() line 605).
+	 * before this callback is invoked.
+	 *
+	 * @see \WP_Ability::execute()
 	 *
 	 * @param array $input Input parameters (unused for this ability).
 	 *

@@ -92,8 +92,10 @@ final class ExecuteAbilityAbility {
 	 * Execute the ability execution functionality.
 	 *
 	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
-	 * before this callback is invoked (see WP_Ability::execute() line 605). This ensures
-	 * all ability executions are properly authorized by the framework.
+	 * before this callback is invoked. This ensures all ability executions are properly
+	 * authorized by the framework.
+	 *
+	 * @see \WP_Ability::execute()
 	 *
 	 * @param array $input Input parameters containing ability_name and parameters.
 	 *
