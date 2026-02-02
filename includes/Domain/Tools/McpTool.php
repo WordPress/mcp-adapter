@@ -72,11 +72,12 @@ class McpTool {
 	private array $annotations;
 
 	/**
-	 * OpenAI-specific metadata (e.g., outputTemplate for ChatGPT Apps SDK).
+	 * Protocol-level metadata exposed to MCP clients via the _meta field.
 	 *
+	 * @link https://modelcontextprotocol.io/specification/2025-06-18/server/tools#tool-definition
 	 * @var array
 	 */
-	private array $mcp_meta;
+	private array $meta;
 
 	/**
 	 * Internal metadata used by the server (not exposed to MCP clients).
@@ -102,7 +103,7 @@ class McpTool {
 	 * @param string|null $title Optional human-readable name for display.
 	 * @param array|null  $output_schema Optional JSON Schema for output structure.
 	 * @param array       $annotations Optional properties describing tool behavior.
-	 * @param array       $mcp_meta Optional OpenAI-specific metadata (_meta).
+	 * @param array       $meta Optional protocol-level metadata (_meta).
 	 * @param array       $metadata Internal metadata used by the server (not returned to clients).
 	 */
 	public function __construct(
@@ -113,7 +114,7 @@ class McpTool {
 		?string $title = null,
 		?array $output_schema = null,
 		array $annotations = array(),
-		array $mcp_meta = array(),
+		array $meta = array(),
 		array $metadata = array()
 	) {
 		$this->ability       = $ability;
@@ -122,7 +123,7 @@ class McpTool {
 		$this->description   = $description;
 		$this->input_schema  = $input_schema;
 		$this->output_schema = $output_schema;
-		$this->mcp_meta      = $mcp_meta;
+		$this->meta          = $meta;
 		$this->annotations   = $annotations;
 		$this->metadata      = $metadata;
 	}
@@ -193,12 +194,12 @@ class McpTool {
 	}
 
 	/**
-	 * Get the OpenAI-specific metadata (_meta).
+	 * Get the protocol-level metadata (_meta).
 	 *
 	 * @return array
 	 */
-	public function get_mcp_meta(): array {
-		return $this->mcp_meta;
+	public function get_meta(): array {
+		return $this->meta;
 	}
 
 	/**
@@ -360,8 +361,8 @@ class McpTool {
 			$tool_data['annotations'] = $this->annotations;
 		}
 
-		if ( ! empty( $this->mcp_meta ) ) {
-			$tool_data['_meta'] = $this->mcp_meta;
+		if ( ! empty( $this->meta ) ) {
+			$tool_data['_meta'] = $this->meta;
 		}
 
 		return $tool_data;

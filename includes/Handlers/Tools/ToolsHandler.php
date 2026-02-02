@@ -241,7 +241,7 @@ class ToolsHandler {
 			$safe_tool['annotations'] = $tool['annotations'];
 		}
 
-		// HACK: Include _meta for OpenAI ChatGPT Apps SDK support (outputTemplate, etc.)
+		// Include protocol-level metadata if present.
 		if ( isset( $tool['_meta'] ) && is_array( $tool['_meta'] ) ) {
 			$safe_tool['_meta'] = $tool['_meta'];
 		}

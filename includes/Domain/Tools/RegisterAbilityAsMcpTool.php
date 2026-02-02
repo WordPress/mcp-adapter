@@ -111,8 +111,7 @@ class RegisterAbilityAsMcpTool {
 			$tool_data['annotations']['title'] = $label;
 		}
 
-		// HACK: Pass through _meta from ability meta for OpenAI ChatGPT Apps SDK support.
-		// This allows abilities to specify openai/outputTemplate and other OpenAI-specific metadata.
+		// Pass through _meta from ability meta for protocol-level metadata.
 		if ( ! empty( $ability_meta['_meta'] ) && is_array( $ability_meta['_meta'] ) ) {
 			$tool_data['_meta'] = $ability_meta['_meta'];
 		}
