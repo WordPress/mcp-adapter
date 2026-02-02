@@ -72,6 +72,13 @@ class McpTool {
 	private array $annotations;
 
 	/**
+	 * OpenAI-specific metadata (e.g., outputTemplate for ChatGPT Apps SDK).
+	 *
+	 * @var array
+	 */
+	private array $mcp_meta;
+
+	/**
 	 * Internal metadata used by the server (not exposed to MCP clients).
 	 *
 	 * @var array
@@ -95,6 +102,7 @@ class McpTool {
 	 * @param string|null $title Optional human-readable name for display.
 	 * @param array|null  $output_schema Optional JSON Schema for output structure.
 	 * @param array       $annotations Optional properties describing tool behavior.
+	 * @param array       $mcp_meta Optional OpenAI-specific metadata (_meta).
 	 * @param array       $metadata Internal metadata used by the server (not returned to clients).
 	 */
 	public function __construct(
@@ -105,6 +113,7 @@ class McpTool {
 		?string $title = null,
 		?array $output_schema = null,
 		array $annotations = array(),
+		array $mcp_meta = array(),
 		array $metadata = array()
 	) {
 		$this->ability       = $ability;
@@ -113,6 +122,7 @@ class McpTool {
 		$this->description   = $description;
 		$this->input_schema  = $input_schema;
 		$this->output_schema = $output_schema;
+		$this->mcp_meta      = $mcp_meta;
 		$this->annotations   = $annotations;
 		$this->metadata      = $metadata;
 	}
@@ -180,6 +190,15 @@ class McpTool {
 	 */
 	public function get_output_schema(): ?array {
 		return $this->output_schema;
+	}
+
+	/**
+	 * Get the OpenAI-specific metadata (_meta).
+	 *
+	 * @return array
+	 */
+	public function get_mcp_meta(): array {
+		return $this->mcp_meta;
 	}
 
 	/**
@@ -341,6 +360,10 @@ class McpTool {
 			$tool_data['annotations'] = $this->annotations;
 		}
 
+		if ( ! empty( $this->mcp_meta ) ) {
+			$tool_data['_meta'] = $this->mcp_meta;
+		}
+
 		return $tool_data;
 	}
 
@@ -361,6 +384,7 @@ class McpTool {
 			$data['title'] ?? null,
 			$data['outputSchema'] ?? null,
 			$data['annotations'] ?? array(),
+			$data['_meta'] ?? array(),
 			$data['_metadata'] ?? array()
 		);
 		$tool->set_mcp_server( $mcp_server );
@@ -388,7 +412,7 @@ class McpTool {
 			return $this;
 		}
 
-		$context_to_use    = $context ?: "McpTool::{$this->name}";
+		$context_to_use    = $context ? $context : "McpTool::{$this->name}";
 		$validation_result = McpToolValidator::validate_tool_instance( $this, $context_to_use );
 
 		if ( is_wp_error( $validation_result ) ) {

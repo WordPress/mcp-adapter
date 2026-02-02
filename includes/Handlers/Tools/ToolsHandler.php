@@ -241,6 +241,11 @@ class ToolsHandler {
 			$safe_tool['annotations'] = $tool['annotations'];
 		}
 
+		// HACK: Include _meta for OpenAI ChatGPT Apps SDK support (outputTemplate, etc.)
+		if ( isset( $tool['_meta'] ) && is_array( $tool['_meta'] ) ) {
+			$safe_tool['_meta'] = $tool['_meta'];
+		}
+
 		// Note: We deliberately exclude 'callback' and 'permission_callback'
 		// as these are PHP callables that can cause circular references during JSON encoding.
 
