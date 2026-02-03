@@ -17,9 +17,9 @@ use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
-use WP\McpSchema\Server\Resources\DTO\Resource;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * Registry for managing MCP server components (tools, resources, prompts).
@@ -138,7 +138,7 @@ class McpComponentRegistry {
 			$this->add_mcp_tool( $tool_item );
 
 			/** @var \WP\McpSchema\Server\Tools\DTO\Tool $tool_dto */
-			$tool_dto = $tool_item->get_component();
+			$tool_dto = $tool_item->get_protocol_dto();
 			$this->track_registration( 'tool', $tool_dto->getName(), 'success' );
 
 			return;
@@ -172,7 +172,7 @@ class McpComponentRegistry {
 	 */
 	private function add_mcp_tool( McpTool $mcp_tool ): void {
 		/** @var \WP\McpSchema\Server\Tools\DTO\Tool $tool_dto */
-		$tool_dto  = $mcp_tool->get_component();
+		$tool_dto  = $mcp_tool->get_protocol_dto();
 		$tool_name = $tool_dto->getName();
 
 		if ( isset( $this->mcp_tools[ $tool_name ] ) ) {
@@ -277,7 +277,7 @@ class McpComponentRegistry {
 			$this->add_mcp_resource( $resource_item );
 
 			/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
-			$resource_dto = $resource_item->get_component();
+			$resource_dto = $resource_item->get_protocol_dto();
 			$this->track_registration( 'resource', $resource_dto->getUri(), 'success' );
 
 			return;
@@ -312,7 +312,7 @@ class McpComponentRegistry {
 	 */
 	private function add_mcp_resource( McpResource $mcp_resource ): bool {
 		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
-		$resource_dto = $mcp_resource->get_component();
+		$resource_dto = $mcp_resource->get_protocol_dto();
 		$uri          = $resource_dto->getUri();
 
 		if ( isset( $this->mcp_resources[ $uri ] ) ) {
@@ -370,7 +370,7 @@ class McpComponentRegistry {
 			$this->track_registration( 'resource', $ability_name, 'success' );
 		} else {
 			/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
-			$resource_dto = $mcp_resource->get_component();
+			$resource_dto = $mcp_resource->get_protocol_dto();
 			$this->track_registration(
 				'resource',
 				$ability_name,
@@ -416,7 +416,7 @@ class McpComponentRegistry {
 			$this->add_mcp_prompt( $prompt_item );
 
 			/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt_dto */
-			$prompt_dto = $prompt_item->get_component();
+			$prompt_dto = $prompt_item->get_protocol_dto();
 			$this->track_registration( 'prompt', $prompt_dto->getName(), 'success' );
 
 			return;
@@ -466,7 +466,7 @@ class McpComponentRegistry {
 	 */
 	private function add_mcp_prompt( McpPrompt $mcp_prompt ): void {
 		/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt */
-		$prompt      = $mcp_prompt->get_component();
+		$prompt      = $mcp_prompt->get_protocol_dto();
 		$prompt_name = $prompt->getName();
 
 		if ( isset( $this->mcp_prompts[ $prompt_name ] ) ) {
@@ -575,7 +575,7 @@ class McpComponentRegistry {
 	 */
 	public function get_tools(): array {
 		return array_map(
-			static fn( McpTool $mcp_tool ): Tool => $mcp_tool->get_component(),
+			static fn( McpTool $mcp_tool ): ToolDto => $mcp_tool->get_protocol_dto(),
 			$this->mcp_tools
 		);
 	}
@@ -587,7 +587,7 @@ class McpComponentRegistry {
 	 */
 	public function get_resources(): array {
 		return array_map(
-			static fn( McpResource $mcp_resource ): Resource => $mcp_resource->get_component(),
+			static fn( McpResource $mcp_resource ): ResourceDto => $mcp_resource->get_protocol_dto(),
 			$this->mcp_resources
 		);
 	}
@@ -599,7 +599,7 @@ class McpComponentRegistry {
 	 */
 	public function get_prompts(): array {
 		return array_map(
-			static fn( McpPrompt $mcp_prompt ): Prompt => $mcp_prompt->get_component(),
+			static fn( McpPrompt $mcp_prompt ): PromptDto => $mcp_prompt->get_protocol_dto(),
 			$this->mcp_prompts
 		);
 	}

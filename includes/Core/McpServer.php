@@ -18,7 +18,7 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -390,10 +390,10 @@ class McpServer {
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|null
 	 */
-	public function get_prompt( string $prompt_name ): ?Prompt {
+	public function get_prompt( string $prompt_name ): ?PromptDto {
 		$mcp_prompt = $this->component_registry->get_mcp_prompt( $prompt_name );
 
-		return $mcp_prompt ? $mcp_prompt->get_component() : null;
+		return $mcp_prompt ? $mcp_prompt->get_protocol_dto() : null;
 	}
 
 	/**
