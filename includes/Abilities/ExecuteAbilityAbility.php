@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+
 /**
  * Execute Ability - Executes a WordPress ability with provided parameters.
  *
@@ -37,8 +39,8 @@ final class ExecuteAbilityAbility {
 				'description'         => 'Execute a WordPress ability with the provided parameters. This is the primary execution layer that can run any registered ability.',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
-					'type'                 => 'object',
-					'properties'           => array(
+					'type'       => 'object',
+					'properties' => array(
 						'ability_name' => array(
 							'type'        => 'string',
 							'description' => 'The full name of the ability to execute',
@@ -48,15 +50,22 @@ final class ExecuteAbilityAbility {
 							'description' => 'Parameters to pass to the ability',
 						),
 					),
-					'required'             => array( 'ability_name', 'parameters' ),
-					'additionalProperties' => false,
+					'required'   => array( 'ability_name', 'parameters' ),
 				),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
 						'success' => array( 'type' => 'boolean' ),
 						'data'    => array(
-							'type'        => array( 'object', 'array', 'string', 'number', 'integer', 'boolean', 'null' ),
+							'type'        => array(
+								'object',
+								'array',
+								'string',
+								'number',
+								'integer',
+								'boolean',
+								'null',
+							),
 							'description' => 'The result data from the ability execution',
 						),
 						'error'   => array(
@@ -80,6 +89,68 @@ final class ExecuteAbilityAbility {
 	}
 
 	/**
+	 * Execute the ability execution functionality.
+	 *
+	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
+	 * before this callback is invoked. This ensures all ability executions are properly
+	 * authorized by the framework.
+	 *
+	 * @see \WP_Ability::execute()
+	 *
+	 * @param array $input Input parameters containing ability_name and parameters.
+	 *
+	 * @return array Array containing execution results.
+	 */
+	public static function execute( $input = array() ): array {
+		$ability_name = $input['ability_name'] ?? '';
+		// Note: Use null coalescing instead of empty() to preserve empty arrays/objects ({} → [])
+		$parameters = $input['parameters'] ?? null;
+
+		if ( empty( $ability_name ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Ability name is required',
+			);
+		}
+
+		$ability = wp_get_ability( $ability_name );
+
+		if ( ! $ability ) {
+			return array(
+				'success' => false,
+				'error'   => "Ability '{$ability_name}' not found",
+			);
+		}
+
+		// Normalize parameters for ability's schema requirements
+		// Empty {} from MCP is treated as null for abilities without input schema
+		$parameters = AbilityArgumentNormalizer::normalize( $ability, $parameters );
+
+		try {
+			// Execute the ability
+			$result = $ability->execute( $parameters );
+
+			// Check if the result is a WP_Error
+			if ( is_wp_error( $result ) ) {
+				return array(
+					'success' => false,
+					'error'   => $result->get_error_message(),
+				);
+			}
+
+			return array(
+				'success' => true,
+				'data'    => $result,
+			);
+		} catch ( \Throwable $e ) {
+			return array(
+				'success' => false,
+				'error'   => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
 	 * Check permissions for executing abilities.
 	 *
 	 * Validates user capabilities, caller identity, and MCP exposure restrictions.
@@ -87,7 +158,6 @@ final class ExecuteAbilityAbility {
 	 * @param array $input Input parameters containing ability_name and parameters.
 	 *
 	 * @return bool|\WP_Error True if the user has permission to execute the specified ability.
-	 * @phpstan-return bool|\WP_Error
 	 */
 	public static function check_permission( $input = array() ) {
 		$ability_name = $input['ability_name'] ?? '';
@@ -114,8 +184,10 @@ final class ExecuteAbilityAbility {
 			return new \WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
 		}
 
-		// Check if the user has permission to execute the target ability
-		$parameters        = empty( $input['parameters'] ) ? null : $input['parameters'];
+		// Normalize parameters for ability's schema requirements
+		// Empty {} from MCP is treated as null for abilities without input schema
+		$parameters        = $input['parameters'] ?? null;
+		$parameters        = AbilityArgumentNormalizer::normalize( $ability, $parameters );
 		$permission_result = $ability->check_permissions( $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
@@ -132,12 +204,24 @@ final class ExecuteAbilityAbility {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	private static function validate_user_access() {
-		// Verify caller identity - ensure user is authenticated
+		// Verify caller identity - ensure the user is authenticated
 		if ( ! is_user_logged_in() ) {
 			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}
 
-		// Check basic capability requirement - allow customization via filter
+		/**
+		 * Filters the capability required to execute abilities.
+		 *
+		 * This is intentionally set to 'read' as the minimum baseline capability.
+		 * Each ability defines its own permission_callback that enforces the actual
+		 * capability requirements for that specific operation. This filter serves
+		 * only as a gate to prevent completely unauthenticated or capability-less
+		 * users from reaching the ability execution layer.
+		 *
+		 * @since 0.3.0
+		 *
+		 * @param string $capability The required capability. Default 'read'.
+		 */
 		$required_capability = apply_filters( 'mcp_adapter_execute_ability_capability', 'read' );
 		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
 		if ( ! current_user_can( $required_capability ) ) {
@@ -148,76 +232,5 @@ final class ExecuteAbilityAbility {
 		}
 
 		return true;
-	}
-
-	/**
-	 * Execute the ability execution functionality.
-	 *
-	 * Enforces security checks before executing any ability.
-	 *
-	 * @param array $input Input parameters containing ability_name and parameters.
-	 *
-	 * @return array Array containing execution results.
-	 */
-	public static function execute( $input = array() ): array {
-		$ability_name = $input['ability_name'] ?? '';
-		$parameters   = empty( $input['parameters'] ) ? null : $input['parameters'];
-
-		if ( empty( $ability_name ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Ability name is required',
-			);
-		}
-
-		// Enforce security checks before execution
-		// Note: WordPress will have already called check_permission, but we double-check
-		// as an additional security layer for direct method calls
-		$permission_check = self::check_permission( $input );
-		if ( is_wp_error( $permission_check ) ) {
-			return array(
-				'success' => false,
-				'error'   => $permission_check->get_error_message(),
-			);
-		}
-
-		if ( ! $permission_check ) {
-			return array(
-				'success' => false,
-				'error'   => 'Permission denied for ability execution',
-			);
-		}
-
-		$ability = wp_get_ability( $ability_name );
-
-		if ( ! $ability ) {
-			return array(
-				'success' => false,
-				'error'   => "Ability '{$ability_name}' not found",
-			);
-		}
-
-		try {
-			// Execute the ability
-			$result = $ability->execute( $parameters );
-
-			// Check if the result is a WP_Error
-			if ( is_wp_error( $result ) ) {
-				return array(
-					'success' => false,
-					'error'   => $result->get_error_message(),
-				);
-			}
-
-			return array(
-				'success' => true,
-				'data'    => $result,
-			);
-		} catch ( \Throwable $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
-			);
-		}
 	}
 }

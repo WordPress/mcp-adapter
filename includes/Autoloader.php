@@ -9,7 +9,7 @@
  * @package WP\MCP
  */
 
-declare( strict_types = 1 );
+declare( strict_types=1 );
 
 namespace WP\MCP;
 
@@ -51,6 +51,7 @@ final class Autoloader {
 	private static function require_autoloader( string $autoloader_file ): bool {
 		if ( ! is_readable( $autoloader_file ) ) {
 			self::missing_autoloader_notice();
+
 			return false;
 		}
 

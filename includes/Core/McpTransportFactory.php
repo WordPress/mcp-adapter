@@ -40,16 +40,16 @@ class McpTransportFactory {
 	/**
 	 * Initialize MCP transports for the server.
 	 *
-	 * @param array $mcp_transports Array of MCP transport class names to initialize.
+	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize.
 	 */
 	public function initialize_transports( array $mcp_transports ): void {
 		foreach ( $mcp_transports as $mcp_transport ) {
-			// Check if class exists
+			// Check if the class exists
 			if ( ! class_exists( $mcp_transport ) ) {
 				_doing_it_wrong(
 					__FUNCTION__,
 					sprintf(
-						/* translators: %s: Transport class name */
+					/* translators: %s: Transport class name */
 						esc_html__( 'Transport class "%s" does not exist. Make sure the class is properly autoloaded or included.', 'mcp-adapter' ),
 						esc_html( $mcp_transport )
 					),
@@ -68,7 +68,7 @@ class McpTransportFactory {
 				_doing_it_wrong(
 					__FUNCTION__,
 					sprintf(
-						/* translators: %s: Transport class name */
+					/* translators: %s: Transport class name */
 						esc_html__( 'Transport class "%s" must implement McpTransportInterface. Check your transport implementation.', 'mcp-adapter' ),
 						esc_html( $mcp_transport )
 					),
@@ -89,7 +89,7 @@ class McpTransportFactory {
 	}
 
 	/**
-	 * Create transport context with all required dependencies.
+	 * Create the transport context with all required dependencies.
 	 *
 	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
