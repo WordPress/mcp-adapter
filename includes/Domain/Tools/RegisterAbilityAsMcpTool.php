@@ -52,7 +52,7 @@ class RegisterAbilityAsMcpTool {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{tool: ToolDto, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{tool: \WP\McpSchema\Server\Tools\DTO\Tool, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
 	 */

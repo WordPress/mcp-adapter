@@ -54,7 +54,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Clean Resource DTO (protocol-only).
 	 *
-	 * @var ResourceDto
+	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
 	 */
 	private ResourceDto $mcp_resource_dto;
 
@@ -100,7 +100,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param ResourceDto $resource_dto The Resource DTO.
+	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
 	 */
 	private function __construct( ResourceDto $resource_dto ) {
 		$this->mcp_resource_dto = $resource_dto;
@@ -253,7 +253,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return ResourceDto
+	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
 	 */
 	public function get_protocol_dto(): ResourceDto {
 		return $this->mcp_resource_dto;

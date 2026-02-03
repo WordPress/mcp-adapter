@@ -74,7 +74,7 @@ class McpToolValidator {
 	/**
 	 * Validate a Tool DTO against the MCP schema.
 	 *
-	 * @param ToolDto $tool The tool DTO to validate.
+	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The tool DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */

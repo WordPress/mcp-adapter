@@ -102,7 +102,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return PromptDto|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
 	 */
 	public static function make( \WP_Ability $ability ) {
 		$prompt = new self( $ability );
@@ -113,7 +113,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt instance.
 	 *
-	 * @return PromptDto|\WP_Error Prompt DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -435,7 +435,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{prompt: PromptDto, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{prompt: \WP\McpSchema\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
 	 */

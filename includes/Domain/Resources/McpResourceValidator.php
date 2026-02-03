@@ -49,7 +49,7 @@ class McpResourceValidator {
 	/**
 	 * Validate a Resource DTO against the MCP schema.
 	 *
-	 * @param ResourceDto $resource_dto The resource DTO to validate.
+	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The resource DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */

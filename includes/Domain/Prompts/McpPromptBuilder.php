@@ -127,7 +127,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Safe to call multiple times - always returns a fresh DTO based on
 	 * the current (immutable after construction) state.
 	 *
-	 * @return PromptDto The built prompt DTO.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
 	 */
 	public function build(): PromptDto {
 		$argument_dtos = null;

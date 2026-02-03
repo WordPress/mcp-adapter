@@ -50,7 +50,7 @@ class McpPromptValidator {
 	/**
 	 * Validate a Prompt DTO against the MCP schema.
 	 *
-	 * @param PromptDto $prompt The prompt DTO to validate.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */

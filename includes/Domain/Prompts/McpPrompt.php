@@ -63,7 +63,7 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Clean Prompt DTO (protocol-only).
 	 *
-	 * @var PromptDto
+	 * @var \WP\McpSchema\Server\Prompts\DTO\Prompt
 	 */
 	private PromptDto $prompt;
 
@@ -116,7 +116,7 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param PromptDto $prompt The Prompt DTO.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The Prompt DTO.
 	 */
 	private function __construct( PromptDto $prompt ) {
 		$this->prompt = $prompt;
@@ -303,7 +303,7 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return PromptDto
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt
 	 */
 	public function get_protocol_dto(): PromptDto {
 		return $this->prompt;

@@ -56,7 +56,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Clean Tool DTO (protocol-only).
 	 *
-	 * @var ToolDto
+	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
 	 */
 	private ToolDto $tool;
 
@@ -102,7 +102,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param ToolDto $tool The Tool DTO.
+	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
 	 */
 	private function __construct( ToolDto $tool ) {
 		$this->tool = $tool;
@@ -245,7 +245,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return ToolDto
+	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
 	 */
 	public function get_protocol_dto(): ToolDto {
 		return $this->tool;
