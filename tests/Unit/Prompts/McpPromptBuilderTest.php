@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 // Test prompt class
 class TestPrompt extends McpPromptBuilder {
@@ -173,7 +173,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPrompt();
 		$prompt  = $builder->build();
 
-		$this->assertInstanceOf( Prompt::class, $prompt );
+		$this->assertInstanceOf( PromptDto::class, $prompt );
 		$this->assertSame( 'test-prompt', $prompt->getName() );
 		$this->assertSame( 'Test Prompt', $prompt->getTitle() );
 		$this->assertSame( 'A test prompt for unit testing', $prompt->getDescription() );
@@ -243,7 +243,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPromptWithIcons();
 		$prompt  = $builder->build();
 
-		$this->assertInstanceOf( Prompt::class, $prompt );
+		$this->assertInstanceOf( PromptDto::class, $prompt );
 
 		$arr = $prompt->toArray();
 

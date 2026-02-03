@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Validates MCP resources against the Model Context Protocol specification.
@@ -49,11 +49,11 @@ class McpResourceValidator {
 	/**
 	 * Validate a Resource DTO against the MCP schema.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The resource DTO to validate.
+	 * @param ResourceDto $resource_dto The resource DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */
-	public static function validate_resource_dto( Resource $resource_dto ) {
+	public static function validate_resource_dto( ResourceDto $resource_dto ) {
 		$errors = array();
 
 		// Validate URI.
@@ -105,7 +105,7 @@ class McpResourceValidator {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	public static function validate_resource_instance( McpResource $the_resource ) {
-		return self::validate_resource_dto( $the_resource->get_component() );
+		return self::validate_resource_dto( $the_resource->get_protocol_dto() );
 	}
 
 	/**

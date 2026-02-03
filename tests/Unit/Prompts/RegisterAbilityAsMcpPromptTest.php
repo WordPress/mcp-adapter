@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 	final class RegisterAbilityAsMcpPromptTest extends TestCase {
 
@@ -14,7 +14,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$ability = wp_get_ability( 'test/prompt' );
 			$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
 			$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-			$this->assertInstanceOf( Prompt::class, $prompt );
+			$this->assertInstanceOf( PromptDto::class, $prompt );
 			$arr = $prompt->toArray();
 			$this->assertSame( 'test-prompt', $arr['name'] );
 			$this->assertArrayHasKey( 'arguments', $arr );
@@ -71,7 +71,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$built = RegisterAbilityAsMcpPrompt::build( $ability );
 			$this->assertNotWPError( $built );
 			$this->assertIsArray( $built );
-			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 			$prompt = $built['prompt'];
 
 			$arr = $prompt->toArray();
@@ -95,7 +95,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$built = RegisterAbilityAsMcpPrompt::build( $ability );
 			$this->assertNotWPError( $built );
 			$this->assertIsArray( $built );
-			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 			$prompt = $built['prompt'];
 
 			$arr = $prompt->toArray();
@@ -211,7 +211,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 		$prompt = $built['prompt'];
 
 		$arr = $prompt->toArray();
@@ -243,7 +243,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 		$prompt = $built['prompt'];
 
 		$arr = $prompt->toArray();
@@ -295,7 +295,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 		$prompt = $built['prompt'];
 
 		$arr = $prompt->toArray();
@@ -329,7 +329,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$built = RegisterAbilityAsMcpPrompt::build( $ability );
 			$this->assertNotWPError( $built );
 			$this->assertIsArray( $built );
-			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 			$prompt = $built['prompt'];
 
 			$arr = $prompt->toArray();
@@ -364,7 +364,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$built = RegisterAbilityAsMcpPrompt::build( $ability );
 			$this->assertNotWPError( $built );
 			$this->assertIsArray( $built );
-			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 			$prompt = $built['prompt'];
 
 			$arr = $prompt->toArray();
@@ -412,7 +412,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$built = RegisterAbilityAsMcpPrompt::build( $ability );
 			$this->assertNotWPError( $built );
 			$this->assertIsArray( $built );
-			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 			$prompt = $built['prompt'];
 
 			$arr = $prompt->toArray();
@@ -446,7 +446,7 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 			$built = RegisterAbilityAsMcpPrompt::build( $ability );
 			$this->assertNotWPError( $built );
 			$this->assertIsArray( $built );
-			$this->assertInstanceOf( Prompt::class, $built['prompt'] );
+			$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
 			$prompt = $built['prompt'];
 
 			$arr = $prompt->toArray();

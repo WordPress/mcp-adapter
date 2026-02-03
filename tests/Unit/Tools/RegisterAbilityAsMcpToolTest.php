@@ -6,19 +6,19 @@ namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 	/**
 	 * @param \WP_Ability $ability The ability to build into a Tool DTO.
 	 */
-	private function build_tool_from_ability( \WP_Ability $ability ): Tool {
+	private function build_tool_from_ability( \WP_Ability $ability ): ToolDto {
 		$built = RegisterAbilityAsMcpTool::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
 		$this->assertArrayHasKey( 'tool', $built );
-		$this->assertInstanceOf( Tool::class, $built['tool'] );
+		$this->assertInstanceOf( ToolDto::class, $built['tool'] );
 
 		return $built['tool'];
 	}
@@ -224,7 +224,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotNull( $ability, 'Ability test/flat-transformed-tool should be registered' );
 		$built = RegisterAbilityAsMcpTool::build( $ability );
 		$this->assertNotWPError( $built );
-		$this->assertInstanceOf( Tool::class, $built['tool'] );
+		$this->assertInstanceOf( ToolDto::class, $built['tool'] );
 
 		$adapter_meta = $built['adapter_meta'];
 		$this->assertSame( 'test/flat-transformed-tool', $adapter_meta['ability'] );
@@ -269,7 +269,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotWPError( $built );
 
 		$tool = $built['tool'];
-		$this->assertInstanceOf( Tool::class, $tool );
+		$this->assertInstanceOf( ToolDto::class, $tool );
 
 			$data = $tool->toArray();
 			$this->assertArrayHasKey( '_meta', $data );
@@ -411,7 +411,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		$built = RegisterAbilityAsMcpTool::build( $ability );
 		$this->assertNotWPError( $built );
-		$this->assertInstanceOf( Tool::class, $built['tool'] );
+		$this->assertInstanceOf( ToolDto::class, $built['tool'] );
 
 		// Verify input transformation metadata is present.
 		$adapter_meta = $built['adapter_meta'];
@@ -452,7 +452,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		$built = RegisterAbilityAsMcpTool::build( $ability );
 		$this->assertNotWPError( $built );
-		$this->assertInstanceOf( Tool::class, $built['tool'] );
+		$this->assertInstanceOf( ToolDto::class, $built['tool'] );
 
 		$adapter_meta = $built['adapter_meta'];
 		$this->assertSame( 'test/output-only-transformed', $adapter_meta['ability'] );
@@ -506,7 +506,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		$built = RegisterAbilityAsMcpTool::build( $ability );
 		$this->assertNotWPError( $built );
-		$this->assertInstanceOf( Tool::class, $built['tool'] );
+		$this->assertInstanceOf( ToolDto::class, $built['tool'] );
 
 		$adapter_meta = $built['adapter_meta'];
 
@@ -580,7 +580,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotWPError( $built );
 
 		$tool = $built['tool'];
-		$this->assertInstanceOf( Tool::class, $tool );
+		$this->assertInstanceOf( ToolDto::class, $tool );
 
 		$meta = $tool->get_meta();
 		$this->assertIsArray( $meta );
@@ -604,7 +604,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotWPError( $built );
 
 		$tool = $built['tool'];
-		$this->assertInstanceOf( Tool::class, $tool );
+		$this->assertInstanceOf( ToolDto::class, $tool );
 
 		$arr = $tool->toArray();
 
@@ -643,7 +643,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotWPError( $built );
 
 		$tool = $built['tool'];
-		$this->assertInstanceOf( Tool::class, $tool );
+		$this->assertInstanceOf( ToolDto::class, $tool );
 
 		$data = $tool->toArray();
 		$this->assertArrayNotHasKey( '_meta', $data );
@@ -686,7 +686,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotWPError( $built );
 
 		$tool = $built['tool'];
-		$this->assertInstanceOf( Tool::class, $tool );
+		$this->assertInstanceOf( ToolDto::class, $tool );
 
 		$data = $tool->toArray();
 		$this->assertArrayHasKey( '_meta', $data );
@@ -736,7 +736,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertNotWPError( $built );
 
 		$tool = $built['tool'];
-		$this->assertInstanceOf( Tool::class, $tool );
+		$this->assertInstanceOf( ToolDto::class, $tool );
 
 		$data = $tool->toArray();
 		$this->assertArrayNotHasKey( '_meta', $data );

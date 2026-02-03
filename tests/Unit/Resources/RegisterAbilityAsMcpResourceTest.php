@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Resources;
 
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
@@ -14,7 +14,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 			$ability  = wp_get_ability( 'test/resource' );
 			$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
 			$resource = RegisterAbilityAsMcpResource::make( $ability );
-			$this->assertInstanceOf( Resource::class, $resource );
+			$this->assertInstanceOf( ResourceDto::class, $resource );
 			$arr = $resource->toArray();
 			$this->assertSame( 'WordPress://local/resource-1', $arr['uri'] );
 			$this->assertNull( $resource->get_meta() );

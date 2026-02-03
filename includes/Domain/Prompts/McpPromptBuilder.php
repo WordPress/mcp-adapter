@@ -11,7 +11,7 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
@@ -127,9 +127,9 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Safe to call multiple times - always returns a fresh DTO based on
 	 * the current (immutable after construction) state.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
+	 * @return PromptDto The built prompt DTO.
 	 */
-	public function build(): Prompt {
+	public function build(): PromptDto {
 		$argument_dtos = null;
 		if ( ! empty( $this->arguments ) ) {
 			$argument_dtos = array_map(
@@ -172,7 +172,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		return Prompt::fromArray( $prompt_data );
+		return PromptDto::fromArray( $prompt_data );
 	}
 
 	/**

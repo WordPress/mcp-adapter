@@ -14,7 +14,7 @@ use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * RegisterAbilityAsMcpTool class.
@@ -52,7 +52,7 @@ class RegisterAbilityAsMcpTool {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{tool: \WP\McpSchema\Server\Tools\DTO\Tool, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{tool: ToolDto, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
 	 */
@@ -65,7 +65,7 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		try {
-			$tool_dto = Tool::fromArray( $data['tool_data'] );
+			$tool_dto = ToolDto::fromArray( $data['tool_data'] );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
 				'mcp_tool_dto_creation_failed',

@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPromptValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * Tests for McpPromptValidator class.
@@ -20,7 +20,7 @@ final class McpPromptValidatorTest extends TestCase {
 	// =========================================================================
 
 	public function test_validate_prompt_dto_with_valid_prompt(): void {
-		$prompt = Prompt::fromArray(
+		$prompt = PromptDto::fromArray(
 			array(
 				'name' => 'test-prompt',
 			)
@@ -31,7 +31,7 @@ final class McpPromptValidatorTest extends TestCase {
 	}
 
 	public function test_validate_prompt_dto_rejects_invalid_name(): void {
-		$prompt = Prompt::fromArray(
+		$prompt = PromptDto::fromArray(
 			array(
 				'name' => 'invalid/name',
 			)
@@ -44,7 +44,7 @@ final class McpPromptValidatorTest extends TestCase {
 	}
 
 	public function test_validate_prompt_dto_rejects_invalid_icons(): void {
-		$prompt = Prompt::fromArray(
+		$prompt = PromptDto::fromArray(
 			array(
 				'name'  => 'test-prompt',
 				'icons' => array(
@@ -667,7 +667,7 @@ final class McpPromptValidatorTest extends TestCase {
 	// =========================================================================
 
 	public function test_validate_prompt_instance_with_valid_prompt(): void {
-		$mcp_prompt = \WP\MCP\Domain\Prompts\McpPrompt::fromArray(
+		$mcp_prompt = \WP\MCP\Domain\Prompts\McpPromptDto::fromArray(
 			array(
 				'name'    => 'test-prompt',
 				'handler' => function () {
@@ -687,7 +687,7 @@ final class McpPromptValidatorTest extends TestCase {
 		// We cannot create an McpPrompt with invalid name via fromArray
 		// because the Prompt DTO allows any name. Instead, let's test
 		// validate_prompt_dto directly with an invalid name
-		$prompt_dto = Prompt::fromArray( array( 'name' => 'invalid/name' ) );
+		$prompt_dto = PromptDto::fromArray( array( 'name' => 'invalid/name' ) );
 
 		$result = McpPromptValidator::validate_prompt_dto( $prompt_dto );
 		$this->assertWPError( $result );

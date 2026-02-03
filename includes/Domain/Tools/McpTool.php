@@ -14,7 +14,7 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
 
 /**
@@ -40,6 +40,10 @@ use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
  * $tool = McpTool::fromAbility($ability);
  * ```
  *
+ * McpTool wraps a protocol-only ToolDto for MCP serialization. Internal
+ * adapter metadata and execution wiring live on this class and are never
+ * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ *
  * @since n.e.x.t
  */
 final class McpTool implements McpComponentInterface {
@@ -52,9 +56,9 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Clean Tool DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @var ToolDto
 	 */
-	private Tool $tool;
+	private ToolDto $tool;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed tools).
@@ -98,9 +102,9 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
+	 * @param ToolDto $tool The Tool DTO.
 	 */
-	private function __construct( Tool $tool ) {
+	private function __construct( ToolDto $tool ) {
 		$this->tool = $tool;
 	}
 
@@ -162,14 +166,14 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $config['meta'];
 		}
 
-		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and Tool::fromArray() can throw.
+		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
 		try {
 			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
 			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
 				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
 			}
 
-			$tool = Tool::fromArray( $tool_data );
+			$tool = ToolDto::fromArray( $tool_data );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
 				'mcp_tool_dto_creation_failed',
@@ -241,9 +245,9 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @return ToolDto
 	 */
-	public function get_component(): Tool {
+	public function get_protocol_dto(): ToolDto {
 		return $this->tool;
 	}
 

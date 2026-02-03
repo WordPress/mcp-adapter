@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Domain\Tools;
 
 use WP\MCP\Domain\Tools\McpToolValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * Tests for McpToolValidator class.
@@ -20,7 +20,7 @@ final class McpToolValidatorTest extends TestCase {
 	// =========================================================================
 
 	public function test_validate_tool_dto_with_valid_tool(): void {
-		$tool = Tool::fromArray(
+		$tool = ToolDto::fromArray(
 			array(
 				'name'        => 'test-tool',
 				'inputSchema' => array( 'type' => 'object' ),
@@ -32,7 +32,7 @@ final class McpToolValidatorTest extends TestCase {
 	}
 
 	public function test_validate_tool_dto_rejects_invalid_name(): void {
-		$tool = Tool::fromArray(
+		$tool = ToolDto::fromArray(
 			array(
 				'name'        => 'invalid/name',
 				'inputSchema' => array( 'type' => 'object' ),
@@ -46,7 +46,7 @@ final class McpToolValidatorTest extends TestCase {
 	}
 
 	public function test_validate_tool_dto_rejects_invalid_icons(): void {
-		$tool = Tool::fromArray(
+		$tool = ToolDto::fromArray(
 			array(
 				'name'        => 'test-tool',
 				'inputSchema' => array( 'type' => 'object' ),
@@ -66,7 +66,7 @@ final class McpToolValidatorTest extends TestCase {
 	}
 
 	public function test_validate_tool_dto_validates_input_schema(): void {
-		$tool = Tool::fromArray(
+		$tool = ToolDto::fromArray(
 			array(
 				'name'        => 'test-tool',
 				'inputSchema' => array(
@@ -86,7 +86,7 @@ final class McpToolValidatorTest extends TestCase {
 	}
 
 	public function test_validate_tool_dto_validates_output_schema(): void {
-		$tool = Tool::fromArray(
+		$tool = ToolDto::fromArray(
 			array(
 				'name'         => 'test-tool',
 				'inputSchema'  => array( 'type' => 'object' ),

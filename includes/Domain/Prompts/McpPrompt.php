@@ -15,7 +15,7 @@ use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
@@ -47,6 +47,10 @@ use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
  * $prompt = McpPrompt::fromBuilder($builder);
  * ```
  *
+ * McpPrompt wraps a protocol-only PromptDto for MCP serialization. Internal
+ * adapter metadata and execution wiring live on this class and are never
+ * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ *
  * @since n.e.x.t
  */
 final class McpPrompt implements McpComponentInterface {
@@ -59,9 +63,9 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Clean Prompt DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Prompts\DTO\Prompt
+	 * @var PromptDto
 	 */
-	private Prompt $prompt;
+	private PromptDto $prompt;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed prompts).
@@ -112,9 +116,9 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The Prompt DTO.
+	 * @param PromptDto $prompt The Prompt DTO.
 	 */
-	private function __construct( Prompt $prompt ) {
+	private function __construct( PromptDto $prompt ) {
 		$this->prompt = $prompt;
 	}
 
@@ -164,7 +168,7 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		// Create the Prompt DTO - wrap in try-catch since PromptArgument::fromArray() and Prompt::fromArray() can throw.
+		// Create the Prompt DTO - wrap in try-catch since PromptArgument::fromArray() and PromptDto::fromArray() can throw.
 		try {
 			// Process arguments inside try-catch since PromptArgument::fromArray() can throw.
 			if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
@@ -183,7 +187,7 @@ final class McpPrompt implements McpComponentInterface {
 				);
 			}
 
-			$prompt = Prompt::fromArray( $prompt_data );
+			$prompt = PromptDto::fromArray( $prompt_data );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
 				'mcp_prompt_dto_creation_failed',
@@ -299,9 +303,9 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt
+	 * @return PromptDto
 	 */
-	public function get_component(): Prompt {
+	public function get_protocol_dto(): PromptDto {
 		return $this->prompt;
 	}
 

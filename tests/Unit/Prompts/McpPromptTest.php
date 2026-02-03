@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * Tests for McpPrompt array configuration.
@@ -44,9 +44,9 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_component();
+		$dto = $prompt->get_protocol_dto();
 
-		$this->assertInstanceOf( Prompt::class, $dto );
+		$this->assertInstanceOf( PromptDto::class, $dto );
 		$this->assertSame( 'test-array', $dto->getName() );
 		$this->assertSame( 'Test Array Prompt', $dto->getTitle() );
 		$this->assertSame( 'A prompt created from array config', $dto->getDescription() );
@@ -135,7 +135,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_component();
+		$dto = $prompt->get_protocol_dto();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -156,7 +156,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_component();
+		$dto = $prompt->get_protocol_dto();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -204,7 +204,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_component();
+		$dto = $prompt->get_protocol_dto();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -265,7 +265,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_component();
+		$dto = $prompt->get_protocol_dto();
 		$this->assertSame( 'getter-test', $dto->getName() );
 		$this->assertSame( 'Getter Title', $dto->getTitle() );
 		$this->assertSame( 'Getter Description', $dto->getDescription() );
@@ -287,7 +287,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_component();
+		$dto = $prompt->get_protocol_dto();
 		$this->assertSame( 'minimal-test', $dto->getName() );
 		$this->assertNull( $dto->getTitle() );
 		$this->assertNull( $dto->getDescription() );

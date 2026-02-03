@@ -10,7 +10,7 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
@@ -102,7 +102,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
+	 * @return PromptDto|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
 	 */
 	public static function make( \WP_Ability $ability ) {
 		$prompt = new self( $ability );
@@ -113,7 +113,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt instance.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
+	 * @return PromptDto|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -126,7 +126,7 @@ class RegisterAbilityAsMcpPrompt {
 		}
 
 		try {
-			return Prompt::fromArray( $built['prompt_data'] );
+			return PromptDto::fromArray( $built['prompt_data'] );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
 		}
@@ -435,7 +435,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{prompt: \WP\McpSchema\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{prompt: PromptDto, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since n.e.x.t
 	 *
 	 */
@@ -448,7 +448,7 @@ class RegisterAbilityAsMcpPrompt {
 		}
 
 		try {
-			$prompt_dto = Prompt::fromArray( $data['prompt_data'] );
+			$prompt_dto = PromptDto::fromArray( $data['prompt_data'] );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
 				'mcp_prompt_dto_creation_failed',

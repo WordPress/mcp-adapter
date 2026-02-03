@@ -15,7 +15,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Common\Protocol\DTO\Annotations;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Resource component providing unified execution and permission checks.
@@ -38,6 +38,10 @@ use WP\McpSchema\Server\Resources\DTO\Resource;
  * $resource = McpResource::fromAbility($ability);
  * ```
  *
+ * McpResource wraps a protocol-only ResourceDto for MCP serialization. Internal
+ * adapter metadata and execution wiring live on this class and are never
+ * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ *
  * @since n.e.x.t
  */
 final class McpResource implements McpComponentInterface {
@@ -50,9 +54,9 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Clean Resource DTO (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
+	 * @var ResourceDto
 	 */
-	private Resource $mcp_resource_dto;
+	private ResourceDto $mcp_resource_dto;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed resources).
@@ -96,9 +100,9 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
+	 * @param ResourceDto $resource_dto The Resource DTO.
 	 */
-	private function __construct( Resource $resource_dto ) {
+	private function __construct( ResourceDto $resource_dto ) {
 		$this->mcp_resource_dto = $resource_dto;
 	}
 
@@ -169,14 +173,14 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $config['meta'];
 		}
 
-		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and Resource::fromArray() can throw.
+		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
 		try {
 			// Process annotations inside try-catch since Annotations::fromArray() can throw.
 			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
 				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
 			}
 
-			$resource = Resource::fromArray( $resource_data );
+			$resource = ResourceDto::fromArray( $resource_data );
 		} catch ( \Throwable $e ) {
 			return new \WP_Error(
 				'mcp_resource_dto_creation_failed',
@@ -249,9 +253,9 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
+	 * @return ResourceDto
 	 */
-	public function get_component(): Resource {
+	public function get_protocol_dto(): ResourceDto {
 		return $this->mcp_resource_dto;
 	}
 

@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Domain\Resources;
 
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Tests for McpResourceValidator class.
@@ -20,7 +20,7 @@ final class McpResourceValidatorTest extends TestCase {
 	// =========================================================================
 
 	public function test_validate_resource_dto_with_valid_resource(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'  => 'test://resource',
 				'name' => 'test-resource',
@@ -32,7 +32,7 @@ final class McpResourceValidatorTest extends TestCase {
 	}
 
 	public function test_validate_resource_dto_rejects_invalid_uri(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'  => 'not a valid uri',
 				'name' => 'test-resource',
@@ -46,7 +46,7 @@ final class McpResourceValidatorTest extends TestCase {
 	}
 
 	public function test_validate_resource_dto_rejects_invalid_mime_type(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'      => 'test://resource',
 				'name'     => 'test-resource',
@@ -60,7 +60,7 @@ final class McpResourceValidatorTest extends TestCase {
 	}
 
 	public function test_validate_resource_dto_accepts_valid_mime_type(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'      => 'test://resource',
 				'name'     => 'test-resource',
@@ -73,7 +73,7 @@ final class McpResourceValidatorTest extends TestCase {
 	}
 
 	public function test_validate_resource_dto_rejects_invalid_icons(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'   => 'test://resource',
 				'name'  => 'test-resource',
@@ -95,7 +95,7 @@ final class McpResourceValidatorTest extends TestCase {
 	public function test_validate_resource_dto_rejects_invalid_annotation_values(): void {
 		// Note: The DTO validates structure (e.g., audience must be array).
 		// Our validator tests for invalid VALUES within valid structure.
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'         => 'test://resource',
 				'name'        => 'test-resource',
@@ -111,7 +111,7 @@ final class McpResourceValidatorTest extends TestCase {
 	}
 
 	public function test_validate_resource_dto_rejects_invalid_annotation_priority(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'         => 'test://resource',
 				'name'        => 'test-resource',
@@ -127,7 +127,7 @@ final class McpResourceValidatorTest extends TestCase {
 	}
 
 	public function test_validate_resource_dto_accepts_valid_annotations(): void {
-		$resource = Resource::fromArray(
+		$resource = ResourceDto::fromArray(
 			array(
 				'uri'         => 'test://resource',
 				'name'        => 'test-resource',

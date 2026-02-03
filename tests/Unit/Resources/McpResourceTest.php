@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Resources;
 
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 final class McpResourceTest extends TestCase {
 
@@ -19,8 +19,8 @@ final class McpResourceTest extends TestCase {
 		$this->assertNotWPError( $mcp_resource );
 		$this->assertInstanceOf( McpResource::class, $mcp_resource );
 
-		$dto = $mcp_resource->get_component();
-		$this->assertInstanceOf( Resource::class, $dto );
+		$dto = $mcp_resource->get_protocol_dto();
+		$this->assertInstanceOf( ResourceDto::class, $dto );
 
 		$arr = $dto->toArray();
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -77,7 +77,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$dto = $mcp_resource->get_component();
+		$dto = $mcp_resource->get_protocol_dto();
 		$arr = $dto->toArray();
 
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -98,9 +98,9 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$dto = $resource->get_component();
+		$dto = $resource->get_protocol_dto();
 
-		$this->assertInstanceOf( Resource::class, $dto );
+		$this->assertInstanceOf( ResourceDto::class, $dto );
 		$this->assertSame( 'WordPress://local/minimal', $dto->getUri() );
 		// Name defaults to URI when not provided
 		$this->assertSame( 'WordPress://local/minimal', $dto->getName() );
@@ -125,7 +125,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$dto  = $resource->get_component();
+		$dto  = $resource->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertSame( 'WordPress://local/full', $dto->getUri() );

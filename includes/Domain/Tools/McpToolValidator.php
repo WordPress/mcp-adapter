@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * Validates MCP tools against the Model Context Protocol specification.
@@ -68,17 +68,17 @@ class McpToolValidator {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	public static function validate_tool_instance( McpTool $tool, string $context = '' ) {
-		return self::validate_tool_data( $tool->get_component()->toArray(), $context );
+		return self::validate_tool_data( $tool->get_protocol_dto()->toArray(), $context );
 	}
 
 	/**
 	 * Validate a Tool DTO against the MCP schema.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The tool DTO to validate.
+	 * @param ToolDto $tool The tool DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */
-	public static function validate_tool_dto( Tool $tool ) {
+	public static function validate_tool_dto( ToolDto $tool ) {
 		$errors = array();
 
 		// Validate name (required, 1-128 chars, alphanumeric + _.-).

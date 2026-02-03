@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 final class McpToolTest extends TestCase {
 
@@ -45,8 +45,8 @@ final class McpToolTest extends TestCase {
 		$mcp_tool = McpTool::fromAbility( $ability );
 		$this->assertNotWPError( $mcp_tool );
 
-		$dto = $mcp_tool->get_component();
-		$this->assertInstanceOf( Tool::class, $dto );
+		$dto = $mcp_tool->get_protocol_dto();
+		$this->assertInstanceOf( ToolDto::class, $dto );
 
 		$data = $dto->toArray();
 
@@ -177,9 +177,9 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto = $tool->get_component();
+		$dto = $tool->get_protocol_dto();
 
-		$this->assertInstanceOf( Tool::class, $dto );
+		$this->assertInstanceOf( ToolDto::class, $dto );
 		$this->assertSame( 'minimal-tool', $dto->getName() );
 		$this->assertNull( $dto->getTitle() );
 		$this->assertNull( $dto->getDescription() );
@@ -214,7 +214,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_component();
+		$dto  = $tool->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertSame( 'full-featured-tool', $dto->getName() );
@@ -248,7 +248,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_component();
+		$dto  = $tool->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertArrayHasKey( 'annotations', $data );
@@ -269,7 +269,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_component();
+		$dto  = $tool->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertArrayHasKey( 'annotations', $data );
@@ -292,7 +292,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_component();
+		$dto  = $tool->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertSame( 'Custom Annotation Title', $data['annotations']['title'] );
@@ -397,7 +397,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_component();
+		$dto  = $tool->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertSame( 'array-tool', $dto->getName() );
@@ -441,7 +441,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_component();
+		$dto  = $tool->get_protocol_dto();
 		$data = $dto->toArray();
 
 		$this->assertArrayHasKey( '_meta', $data );
