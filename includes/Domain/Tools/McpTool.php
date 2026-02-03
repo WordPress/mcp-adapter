@@ -1,6 +1,7 @@
 <?php
+
 /**
- * WordPress MCP Tool class for representing MCP tools according to the specification.
+ * MCP Tool component.
  *
  * @package McpAdapter
  */
@@ -9,392 +10,406 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
-use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
 
 /**
- * Represents an MCP tool according to the Model Context Protocol specification.
+ * Tool component providing unified execution and permission checks.
  *
- * Tools enable models to interact with external systems, such as querying databases,
- * calling APIs, or performing computations. Each tool is uniquely identified by a name
- * and includes metadata describing its schema.
+ * This class provides multiple flexible ways to create MCP tools:
  *
- * @link https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+ * 1. Array configuration:
+ * ```php
+ * $tool = McpTool::fromArray([
+ *     'name'        => 'uppercase-text',
+ *     'title'       => 'Uppercase Text',
+ *     'description' => 'Converts text to uppercase',
+ *     'inputSchema' => ['type' => 'object', 'properties' => [...]],
+ *     'handler'     => fn($args) => ['result' => strtoupper($args['text'])],
+ *     'permission'  => fn() => true,
+ *     'annotations' => ['readOnlyHint' => true],
+ * ]);
+ * ```
+ *
+ * 2. From WordPress Ability (ability-backed):
+ * ```php
+ * $tool = McpTool::fromAbility($ability);
+ * ```
+ *
+ * McpTool wraps a protocol-only ToolDto for MCP serialization. Internal
+ * adapter metadata and execution wiring live on this class and are never
+ * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ *
+ * @since n.e.x.t
  */
-class McpTool {
+final class McpTool implements McpComponentInterface {
+
+
+	// =========================================================================
+	// Runtime Properties
+	// =========================================================================
 
 	/**
-	 * Ability name for the tool, used for registration.
+	 * Clean Tool DTO (protocol-only).
 	 *
-	 * @var string
+	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
 	 */
-	private string $ability;
+	private ToolDto $tool;
 
 	/**
-	 * Unique identifier for the tool.
+	 * Ability used for execution/permission checks (ability-backed tools).
 	 *
-	 * @var string
+	 * @var \WP_Ability|null
 	 */
-	private string $name;
+	private ?\WP_Ability $ability = null;
 
 	/**
-	 * Optional human-readable name of the tool for display purposes.
+	 * Direct execution handler (callable-backed tools).
 	 *
-	 * @var string|null
+	 * @var callable|null
 	 */
-	private ?string $title;
+	private $handler = null;
 
 	/**
-	 * Human-readable description of functionality.
+	 * Direct permission callback (callable-backed tools).
 	 *
-	 * @var string
+	 * @var callable|null
 	 */
-	private string $description;
+	private $permission_callback = null;
 
 	/**
-	 * JSON Schema defining expected parameters.
+	 * Internal adapter metadata (never exposed to clients).
 	 *
-	 * @var array
+	 * @var array<string, mixed>
 	 */
-	private array $input_schema;
+	private array $adapter_meta = array();
 
 	/**
-	 * Optional JSON Schema defining expected output structure.
+	 * Observability context tags for logging/metrics.
 	 *
-	 * @var array|null
+	 * @var array<string, mixed>
 	 */
-	private ?array $output_schema;
+	private array $observability_context = array();
+
+	// =========================================================================
+	// Constructor
+	// =========================================================================
 
 	/**
-	 * Optional properties describing tool behavior.
+	 * Private constructor - use factory methods.
 	 *
-	 * @var array
+	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
 	 */
-	private array $annotations;
-
-	/**
-	 * Internal metadata used by the server (not exposed to MCP clients).
-	 *
-	 * @var array
-	 */
-	private array $metadata;
-
-	/**
-	 * The MCP server instance this tool belongs to.
-	 *
-	 * @var \WP\MCP\Core\McpServer|null
-	 */
-	private ?McpServer $mcp_server = null;
-
-	/**
-	 * Constructor for McpTool.
-	 *
-	 * @param string      $ability The ability name.
-	 * @param string      $name Unique identifier for the tool.
-	 * @param string      $description Human-readable description of functionality.
-	 * @param array       $input_schema JSON Schema defining expected parameters.
-	 * @param string|null $title Optional human-readable name for display.
-	 * @param array|null  $output_schema Optional JSON Schema for output structure.
-	 * @param array       $annotations Optional properties describing tool behavior.
-	 * @param array       $metadata Internal metadata used by the server (not returned to clients).
-	 */
-	public function __construct(
-		string $ability,
-		string $name,
-		string $description,
-		array $input_schema,
-		?string $title = null,
-		?array $output_schema = null,
-		array $annotations = array(),
-		array $metadata = array()
-	) {
-		$this->ability       = $ability;
-		$this->name          = $name;
-		$this->title         = $title;
-		$this->description   = $description;
-		$this->input_schema  = $input_schema;
-		$this->output_schema = $output_schema;
-		$this->annotations   = $annotations;
-		$this->metadata      = $metadata;
+	private function __construct( ToolDto $tool ) {
+		$this->tool = $tool;
 	}
 
-	/**
-	 * Get the ability name.
-	 *
-	 * @return \WP_Ability|\WP_Error WP_Ability instance on success, WP_Error on failure.
-	 */
-	public function get_ability() {
-		$ability = wp_get_ability( $this->ability );
-		if ( ! $ability ) {
-			return new \WP_Error(
-				'ability_not_found',
-				sprintf(
-					/* translators: %s: ability name */
-					esc_html__( "WordPress ability '%s' does not exist.", 'mcp-adapter' ),
-					esc_html( $this->ability )
-				)
-			);
-		}
-		return $ability;
-	}
+	// =========================================================================
+	// Factory Methods
+	// =========================================================================
 
 	/**
-	 * Get the tool name.
+	 * Create a tool definition from an array configuration.
 	 *
-	 * @return string
+	 * @param array $config The tool configuration array.
+	 *
+	 * @return self|\WP_Error
 	 */
-	public function get_name(): string {
-		return $this->name;
-	}
-
-	/**
-	 * Get the tool title.
-	 *
-	 * @return string|null
-	 */
-	public function get_title(): ?string {
-		return $this->title;
-	}
-
-	/**
-	 * Get the tool description.
-	 *
-	 * @return string
-	 */
-	public function get_description(): string {
-		return $this->description;
-	}
-
-	/**
-	 * Get the input schema.
-	 *
-	 * @return array
-	 */
-	public function get_input_schema(): array {
-		return $this->input_schema;
-	}
-
-	/**
-	 * Get the output schema.
-	 *
-	 * @return array|null
-	 */
-	public function get_output_schema(): ?array {
-		return $this->output_schema;
-	}
-
-	/**
-	 * Get the annotations.
-	 *
-	 * @return array
-	 */
-	public function get_annotations(): array {
-		return $this->annotations;
-	}
-
-	/**
-	 * Get internal metadata for server-side processing.
-	 *
-	 * @return array
-	 */
-	public function get_metadata(): array {
-		return $this->metadata;
-	}
-
-	/**
-	 * Set the tool title.
-	 *
-	 * @param string|null $title The title to set.
-	 *
-	 * @return void
-	 */
-	public function set_title( ?string $title ): void {
-		$this->title = $title;
-	}
-
-	/**
-	 * Set the tool description.
-	 *
-	 * @param string $description The description to set.
-	 *
-	 * @return void
-	 */
-	public function set_description( string $description ): void {
-		$this->description = $description;
-	}
-
-	/**
-	 * Set the input schema.
-	 *
-	 * @param array $input_schema The input schema to set.
-	 *
-	 * @return void
-	 */
-	public function set_input_schema( array $input_schema ): void {
-		$this->input_schema = $input_schema;
-	}
-
-	/**
-	 * Set the output schema.
-	 *
-	 * @param array|null $output_schema The output schema to set.
-	 *
-	 * @return void
-	 */
-	public function set_output_schema( ?array $output_schema ): void {
-		$this->output_schema = $output_schema;
-	}
-
-	/**
-	 * Set the annotations.
-	 *
-	 * @param array $annotations The annotations to set.
-	 *
-	 * @return void
-	 */
-	public function set_annotations( array $annotations ): void {
-		$this->annotations = $annotations;
-	}
-
-	/**
-	 * Set internal metadata.
-	 *
-	 * @param array $metadata Internal metadata values.
-	 *
-	 * @return void
-	 */
-	public function set_metadata( array $metadata ): void {
-		$this->metadata = $metadata;
-	}
-
-	/**
-	 * Add an annotation.
-	 *
-	 * @param string $key The annotation key.
-	 * @param mixed  $value The annotation value.
-	 *
-	 * @return void
-	 */
-	public function add_annotation( string $key, $value ): void {
-		$this->annotations[ $key ] = $value;
-	}
-
-	/**
-	 * Remove an annotation.
-	 *
-	 * @param string $key The annotation key to remove.
-	 *
-	 * @return void
-	 */
-	public function remove_annotation( string $key ): void {
-		unset( $this->annotations[ $key ] );
-	}
-
-	/**
-	 * Get the MCP server instance this tool belongs to.
-	 *
-	 * @return \WP\MCP\Core\McpServer
-	 */
-	public function get_mcp_server(): McpServer {
-		if ( null === $this->mcp_server ) {
-			throw new \RuntimeException( 'MCP server has not been set on this tool instance.' );
+	public static function fromArray( array $config ) {
+		if ( empty( $config['name'] ) ) {
+			return new \WP_Error( 'mcp_tool_missing_name', 'Tool configuration must include a "name" field.' );
 		}
 
-		return $this->mcp_server;
-	}
+		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
+			return new \WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
+		}
 
-	/**
-	 * Set the MCP server instance this tool belongs to.
-	 *
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
-	 *
-	 * @return void
-	 */
-	public function set_mcp_server( McpServer $mcp_server ): void {
-		$this->mcp_server = $mcp_server;
-	}
+		// Prepare input schema - ensure it's an object type for MCP compliance.
+		$input_schema = $config['inputSchema'] ?? array( 'type' => 'object' );
+		if ( ! isset( $input_schema['type'] ) ) {
+			$input_schema['type'] = 'object';
+		}
 
-	/**
-	 * Convert the tool to an array representation according to MCP specification.
-	 *
-	 * @return array
-	 */
-	public function to_array(): array {
-		$input_schema_for_json = empty( $this->input_schema )
-			? array( 'type' => 'object' )
-			: $this->input_schema;
-
+		// Build tool data array.
 		$tool_data = array(
-			'name'        => $this->name,
-			'description' => $this->description,
-			'inputSchema' => $input_schema_for_json,
+			'name'        => $config['name'],
+			'inputSchema' => $input_schema,
 		);
 
-		if ( ! is_null( $this->title ) ) {
-			$tool_data['title'] = $this->title;
+		// Optional fields.
+		if ( isset( $config['title'] ) ) {
+			$tool_data['title'] = $config['title'];
 		}
 
-		if ( ! is_null( $this->output_schema ) ) {
-			$tool_data['outputSchema'] = $this->output_schema;
+		if ( isset( $config['description'] ) ) {
+			$tool_data['description'] = $config['description'];
 		}
 
-		if ( ! empty( $this->annotations ) ) {
-			$tool_data['annotations'] = $this->annotations;
+		if ( isset( $config['outputSchema'] ) && is_array( $config['outputSchema'] ) ) {
+			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		return $tool_data;
-	}
+		// Validate and prepare icons if set.
+		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$tool_data['icons'] = $icons_result['valid'];
+			}
+		}
 
-	/**
-	 * Create an McpTool instance from an array.
-	 *
-	 * @param array     $data Array containing tool data.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
-	 *
-	 * @return self|\WP_Error Returns a new McpTool instance or WP_Error if validation fails.
-	 */
-	public static function from_array( array $data, McpServer $mcp_server ) {
-		$tool = new self(
-			$data['ability'] ?? '',
-			$data['name'] ?? '',
-			$data['description'] ?? '',
-			$data['inputSchema'] ?? array(),
-			$data['title'] ?? null,
-			$data['outputSchema'] ?? null,
-			$data['annotations'] ?? array(),
-			$data['_metadata'] ?? array()
-		);
-		$tool->set_mcp_server( $mcp_server );
+		// Preserve user-provided _meta as-is.
+		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
+			$tool_data['_meta'] = $config['meta'];
+		}
 
-		return $tool->validate( "McpTool::from_array::{$data['name']}" );
-	}
+		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
+		try {
+			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
+			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
+			}
 
-	/**
-	 * Validate the tool according to MCP specification requirements.
-	 * Uses the centralized McpToolValidator for consistent validation.
-	 *
-	 * @param string $context Optional context for error messages.
-	 *
-	 * @return self|\WP_Error Returns the validated tool instance or WP_Error if validation fails.
-	 */
-	public function validate( string $context = '' ) {
-		if ( null === $this->mcp_server ) {
+			$tool = ToolDto::fromArray( $tool_data );
+		} catch ( \Throwable $e ) {
 			return new \WP_Error(
-				'tool_missing_mcp_server',
-				esc_html__( 'MCP server must be set before validating a tool.', 'mcp-adapter' )
+				'mcp_tool_dto_creation_failed',
+				sprintf(
+				/* translators: %s: error message */
+					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
 			);
 		}
 
-		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
-			return $this;
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpToolValidator::validate_tool_dto( $tool );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
 		}
 
-		$context_to_use    = $context ?: "McpTool::{$this->name}";
-		$validation_result = McpToolValidator::validate_tool_instance( $this, $context_to_use );
+		$instance          = new self( $tool );
+		$instance->handler = $config['handler'];
 
-		if ( is_wp_error( $validation_result ) ) {
-			return $validation_result;
+		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
+			$instance->permission_callback = $config['permission'];
 		}
 
-		return $this;
+		$instance->observability_context = array(
+			'component_type' => 'tool',
+			'tool_name'      => $config['name'],
+			'source'         => 'array',
+		);
+
+		return $instance;
+	}
+
+	/**
+	 * Create an ability-backed MCP tool.
+	 *
+	 * @param \WP_Ability $ability WordPress ability.
+	 *
+	 * @return self|\WP_Error
+	 */
+	public static function fromAbility( \WP_Ability $ability ) {
+		$tool_data = RegisterAbilityAsMcpTool::build( $ability );
+		if ( $tool_data instanceof \WP_Error ) {
+			return $tool_data;
+		}
+
+		$instance               = new self( $tool_data['tool'] );
+		$instance->adapter_meta = $tool_data['adapter_meta'];
+		$instance->ability      = $ability;
+
+		$instance->observability_context = array(
+			'component_type' => 'tool',
+			'tool_name'      => $tool_data['tool']->getName(),
+			'ability_name'   => $ability->get_name(),
+			'source'         => 'ability',
+		);
+
+		return $instance;
+	}
+
+	// =========================================================================
+	// McpComponentInterface Implementation
+	// =========================================================================
+
+	/**
+	 * Get the clean protocol DTO for MCP responses.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
+	 */
+	public function get_protocol_dto(): ToolDto {
+		return $this->tool;
+	}
+
+	/**
+	 * Execute the tool.
+	 *
+	 * @param mixed $arguments Tool arguments.
+	 *
+	 * @return mixed
+	 */
+	public function execute( $arguments ) {
+		$args = $this->unwrap_input_if_needed( $arguments );
+
+		if ( null !== $this->ability ) {
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+
+			try {
+				$result = $this->ability->execute( $args );
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_execution_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		} elseif ( null !== $this->handler ) {
+			try {
+				$result = call_user_func( $this->handler, $args );
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_execution_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		} else {
+			return new \WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
+		}
+
+		if ( $result instanceof \WP_Error ) {
+			return $result;
+		}
+
+		$result = $this->wrap_output_if_needed( $result );
+
+		if ( ! is_array( $result ) ) {
+			$result = array( 'result' => $result );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Unwrap tool input arguments when the input schema was transformed (flattened → object wrapper).
+	 *
+	 * @param mixed $arguments Raw tool arguments.
+	 *
+	 * @return mixed
+	 */
+	private function unwrap_input_if_needed( $arguments ) {
+		$is_transformed = true === ( $this->adapter_meta['input_schema_transformed'] ?? false );
+
+		if ( ! $is_transformed ) {
+			return $arguments;
+		}
+
+		$wrapper = $this->adapter_meta['input_schema_wrapper'] ?? 'input';
+		$wrapper = is_string( $wrapper ) && '' !== trim( $wrapper ) ? $wrapper : 'input';
+
+		return is_array( $arguments ) ? ( $arguments[ $wrapper ] ?? null ) : null;
+	}
+
+	/**
+	 * Wrap tool results when the output schema was transformed (flattened → object wrapper).
+	 *
+	 * @param mixed $result Raw result.
+	 *
+	 * @return mixed
+	 */
+	private function wrap_output_if_needed( $result ) {
+		$is_transformed = true === ( $this->adapter_meta['output_schema_transformed'] ?? false );
+
+		if ( ! $is_transformed ) {
+			return $result;
+		}
+
+		$wrapper = $this->adapter_meta['output_schema_wrapper'] ?? 'result';
+		$wrapper = is_string( $wrapper ) && '' !== trim( $wrapper ) ? $wrapper : 'result';
+
+		return array( $wrapper => $result );
+	}
+
+	/**
+	 * Check whether the current request has permission to execute this tool.
+	 *
+	 * @param mixed $arguments Tool arguments.
+	 *
+	 * @return bool|\WP_Error
+	 */
+	public function check_permission( $arguments ) {
+		$args = $this->unwrap_input_if_needed( $arguments );
+
+		// Ability-backed tools delegate to the ability's permission system.
+		if ( null !== $this->ability ) {
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+
+			try {
+				return $this->ability->check_permissions( $args );
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_permission_check_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		// Callable-backed tools use their required permission callback.
+		if ( null !== $this->permission_callback ) {
+			try {
+				$result = call_user_func( $this->permission_callback, $args );
+
+				return $result instanceof \WP_Error ? $result : (bool) $result;
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_permission_check_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		// Defensive fallback: should never reach here if factories are used correctly.
+		return new \WP_Error(
+			'mcp_permission_denied',
+			'Access denied.',
+			array(
+				'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY,
+				'tool_name'      => $this->tool->getName(),
+			)
+		);
+	}
+
+	// =========================================================================
+	// Private Helper Methods
+	// =========================================================================
+
+	/**
+	 * Get internal adapter metadata for this tool.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_adapter_meta(): array {
+		return $this->adapter_meta;
+	}
+
+	/**
+	 * Get observability context tags for logging/metrics.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_observability_context(): array {
+		return $this->observability_context;
 	}
 }

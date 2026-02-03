@@ -1,6 +1,7 @@
 <?php
+
 /**
- * WordPress MCP Resource class for representing MCP resources according to the specification.
+ * MCP Resource component.
  *
  * @package McpAdapter
  */
@@ -9,439 +10,348 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
-use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
+use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
- * Represents an MCP resource according to the Model Context Protocol specification.
+ * Resource component providing unified execution and permission checks.
  *
- * Resources enable models to access external data sources, such as files, databases,
- * or web APIs. Each resource is uniquely identified by a URI and includes metadata
- * describing its content type and structure.
+ * This class supports multiple ways to register resources:
  *
- * @link https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+ * 1. Array configuration:
+ * ```php
+ * $resource = McpResource::fromArray([
+ *     'uri'         => 'WordPress://local/readme',
+ *     'title'       => 'README',
+ *     'description' => 'Example resource',
+ *     'handler'     => fn() => 'Hello',
+ *     'permission'  => fn() => true,
+ * ]);
+ * ```
+ *
+ * 2. From WordPress Ability (ability-backed):
+ * ```php
+ * $resource = McpResource::fromAbility($ability);
+ * ```
+ *
+ * McpResource wraps a protocol-only ResourceDto for MCP serialization. Internal
+ * adapter metadata and execution wiring live on this class and are never
+ * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ *
+ * @since n.e.x.t
  */
-class McpResource {
+final class McpResource implements McpComponentInterface {
+
+
+	// =========================================================================
+	// Runtime Properties
+	// =========================================================================
 
 	/**
-	 * The ability name.
+	 * Clean Resource DTO (protocol-only).
 	 *
-	 * @var string
+	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
 	 */
-	private string $ability;
+	private ResourceDto $mcp_resource_dto;
 
 	/**
-	 * Unique identifier for the resource.
+	 * Ability used for execution/permission checks (ability-backed resources).
 	 *
-	 * @var string
+	 * @var \WP_Ability|null
 	 */
-	private string $uri;
+	private ?\WP_Ability $ability = null;
 
 	/**
-	 * Optional human-readable name of the resource for display purposes.
+	 * Direct execution handler (callable-backed resources).
 	 *
-	 * @var string|null
+	 * @var callable|null
 	 */
-	private ?string $name;
+	private $handler = null;
 
 	/**
-	 * Optional human-readable description of the resource.
+	 * Direct permission callback (callable-backed resources).
 	 *
-	 * @var string|null
+	 * @var callable|null
 	 */
-	private ?string $description;
+	private $permission_callback = null;
 
 	/**
-	 * Optional MIME type of the resource content.
+	 * Internal adapter metadata (never exposed to clients).
 	 *
-	 * @var string|null
+	 * @var array<string, mixed>
 	 */
-	private ?string $mime_type;
+	private array $adapter_meta = array();
 
 	/**
-	 * Text content of the resource (for TextResourceContents).
+	 * Observability context tags for logging/metrics.
 	 *
-	 * @var string|null
+	 * @var array<string, mixed>
 	 */
-	private ?string $text;
+	private array $observability_context = array();
+
+	// =========================================================================
+	// Constructor
+	// =========================================================================
 
 	/**
-	 * Base64-encoded binary content of the resource (for BlobResourceContents).
+	 * Private constructor - use factory methods.
 	 *
-	 * @var string|null
+	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
 	 */
-	private ?string $blob;
-
-	/**
-	 * Optional properties describing resource metadata.
-	 *
-	 * @var array
-	 */
-	private array $annotations;
-
-	/**
-	 * The MCP server instance this resource belongs to.
-	 *
-	 * @var \WP\MCP\Core\McpServer|null
-	 */
-	private ?McpServer $mcp_server = null;
-
-	/**
-	 * Constructor for McpResource.
-	 *
-	 * @param string      $ability The ability name.
-	 * @param string      $uri Unique URI identifier for the resource.
-	 * @param string|null $name Optional human-readable name for display.
-	 * @param string|null $description Optional human-readable description.
-	 * @param string|null $mime_type Optional MIME type of the content.
-	 * @param string|null $text Optional text content (mutually exclusive with blob).
-	 * @param string|null $blob Optional base64-encoded binary content (mutually exclusive with text).
-	 * @param array       $annotations Optional properties describing resource metadata.
-	 */
-	public function __construct(
-		string $ability,
-		string $uri,
-		?string $name = null,
-		?string $description = null,
-		?string $mime_type = null,
-		?string $text = null,
-		?string $blob = null,
-		array $annotations = array()
-	) {
-		$this->ability     = $ability;
-		$this->uri         = $uri;
-		$this->name        = $name;
-		$this->description = $description;
-		$this->mime_type   = $mime_type;
-		$this->text        = $text;
-		$this->blob        = $blob;
-		$this->annotations = $annotations;
+	private function __construct( ResourceDto $resource_dto ) {
+		$this->mcp_resource_dto = $resource_dto;
 	}
 
-	/**
-	 * Get the resource URI.
-	 *
-	 * @return string
-	 */
-	public function get_uri(): string {
-		return $this->uri;
-	}
+	// =========================================================================
+	// Factory Methods
+	// =========================================================================
 
 	/**
-	 * Get the resource name.
+	 * @param array $config The resource configuration array.
 	 *
-	 * @return string|null
+	 * @return self|\WP_Error
 	 */
-	public function get_name(): ?string {
-		return $this->name;
-	}
-
-	/**
-	 * Get the resource description.
-	 *
-	 * @return string|null
-	 */
-	public function get_description(): ?string {
-		return $this->description;
-	}
-
-	/**
-	 * Get the MIME type.
-	 *
-	 * @return string|null
-	 */
-	public function get_mime_type(): ?string {
-		return $this->mime_type;
-	}
-
-	/**
-	 * Get the text content.
-	 *
-	 * @return string|null
-	 */
-	public function get_text(): ?string {
-		return $this->text;
-	}
-
-	/**
-	 * Get the blob content.
-	 *
-	 * @return string|null
-	 */
-	public function get_blob(): ?string {
-		return $this->blob;
-	}
-
-	/**
-	 * Get the annotations.
-	 *
-	 * @return array
-	 */
-	public function get_annotations(): array {
-		return $this->annotations;
-	}
-
-	/**
-	 * Get the ability name.
-	 *
-	 * @return \WP_Ability|\WP_Error WP_Ability instance on success, WP_Error on failure.
-	 */
-	public function get_ability() {
-		$ability = wp_get_ability( $this->ability );
-		if ( ! $ability ) {
-			return new \WP_Error(
-				'ability_not_found',
-				sprintf(
-					/* translators: %s: ability name */
-					esc_html__( "WordPress ability '%s' does not exist.", 'mcp-adapter' ),
-					esc_html( $this->ability )
-				)
-			);
-		}
-		return $ability;
-	}
-
-	/**
-	 * Set the resource name.
-	 *
-	 * @param string|null $name The name to set.
-	 *
-	 * @return void
-	 */
-	public function set_name( ?string $name ): void {
-		$this->name = $name;
-	}
-
-	/**
-	 * Set the resource description.
-	 *
-	 * @param string|null $description The description to set.
-	 *
-	 * @return void
-	 */
-	public function set_description( ?string $description ): void {
-		$this->description = $description;
-	}
-
-	/**
-	 * Set the MIME type.
-	 *
-	 * @param string|null $mime_type The MIME type to set.
-	 *
-	 * @return void
-	 */
-	public function set_mime_type( ?string $mime_type ): void {
-		$this->mime_type = $mime_type;
-	}
-
-	/**
-	 * Set the text content.
-	 *
-	 * @param string|null $text The text content to set.
-	 *
-	 * @return void
-	 */
-	public function set_text( ?string $text ): void {
-		$this->text = $text;
-		// Clear blob content if setting text.
-		if ( is_null( $text ) ) {
-			return;
+	public static function fromArray( array $config ) {
+		if ( empty( $config['uri'] ) ) {
+			return new \WP_Error( 'mcp_resource_missing_uri', 'Resource configuration must include a "uri" field.' );
 		}
 
-		$this->blob = null;
-	}
-
-	/**
-	 * Set the blob content.
-	 *
-	 * @param string|null $blob The base64-encoded blob content to set.
-	 *
-	 * @return void
-	 */
-	public function set_blob( ?string $blob ): void {
-		$this->blob = $blob;
-		// Clear text content if setting blob.
-		if ( is_null( $blob ) ) {
-			return;
+		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
+			return new \WP_Error( 'mcp_resource_missing_handler', 'Resource configuration must include a callable "handler" field.' );
 		}
 
-		$this->text = null;
-	}
+		$uri = trim( $config['uri'] );
 
-	/**
-	 * Set the annotations.
-	 *
-	 * @param array $annotations The annotations to set.
-	 *
-	 * @return void
-	 */
-	public function set_annotations( array $annotations ): void {
-		$this->annotations = $annotations;
-	}
-
-	/**
-	 * Add an annotation.
-	 *
-	 * @param string $key The annotation key.
-	 * @param mixed  $value The annotation value.
-	 *
-	 * @return void
-	 */
-	public function add_annotation( string $key, $value ): void {
-		$this->annotations[ $key ] = $value;
-	}
-
-	/**
-	 * Remove an annotation.
-	 *
-	 * @param string $key The annotation key to remove.
-	 *
-	 * @return void
-	 */
-	public function remove_annotation( string $key ): void {
-		unset( $this->annotations[ $key ] );
-	}
-
-	/**
-	 * Get the MCP server instance this resource belongs to.
-	 *
-	 * @return \WP\MCP\Core\McpServer
-	 */
-	public function get_mcp_server(): McpServer {
-		if ( null === $this->mcp_server ) {
-			throw new \RuntimeException( 'MCP server has not been set on this resource instance.' );
+		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
+			return new \WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
 		}
 
-		return $this->mcp_server;
-	}
+		$name = isset( $config['name'] ) ? trim( $config['name'] ) : $uri;
+		if ( '' === $name ) {
+			return new \WP_Error( 'mcp_resource_missing_name', 'Resource "name" cannot be empty.' );
+		}
 
-	/**
-	 * Set the MCP server instance this resource belongs to.
-	 *
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
-	 *
-	 * @return void
-	 */
-	public function set_mcp_server( McpServer $mcp_server ): void {
-		$this->mcp_server = $mcp_server;
-	}
-
-	/**
-	 * Convert the resource to an array representation according to MCP specification.
-	 *
-	 * @return array
-	 */
-	public function to_array(): array {
 		$resource_data = array(
-			'uri' => $this->uri,
+			'name' => $name,
+			'uri'  => $uri,
 		);
 
-		// Add optional fields only if they have values.
-		if ( ! is_null( $this->name ) ) {
-			$resource_data['name'] = $this->name;
+		if ( isset( $config['title'] ) ) {
+			$resource_data['title'] = $config['title'];
 		}
 
-		if ( ! is_null( $this->description ) ) {
-			$resource_data['description'] = $this->description;
+		if ( isset( $config['description'] ) ) {
+			$resource_data['description'] = $config['description'];
 		}
 
-		if ( ! is_null( $this->mime_type ) ) {
-			$resource_data['mimeType'] = $this->mime_type;
+		// Include mimeType only when valid.
+		if ( isset( $config['mimeType'] ) ) {
+			$mime_type = trim( $config['mimeType'] );
+			if ( '' !== $mime_type && McpValidator::validate_mime_type( $mime_type ) ) {
+				$resource_data['mimeType'] = $mime_type;
+			}
 		}
 
-		if ( ! is_null( $this->text ) ) {
-			$resource_data['text'] = $this->text;
+		// Include size only when > 0.
+		if ( isset( $config['size'] ) && $config['size'] > 0 ) {
+			$resource_data['size'] = $config['size'];
 		}
 
-		if ( ! is_null( $this->blob ) ) {
-			$resource_data['blob'] = $this->blob;
+		// Validate and include icons if set.
+		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
+			if ( ! empty( $icons_result['valid'] ) ) {
+				$resource_data['icons'] = $icons_result['valid'];
+			}
 		}
 
-		if ( ! empty( $this->annotations ) ) {
-			$resource_data['annotations'] = $this->annotations;
+		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
+			$resource_data['_meta'] = $config['meta'];
 		}
 
-		return $resource_data;
-	}
+		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
+		try {
+			// Process annotations inside try-catch since Annotations::fromArray() can throw.
+			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
+			}
 
-	/**
-	 * Convert the resource to JSON representation.
-	 *
-	 * @return string
-	 */
-	public function to_json(): string {
-		$json = wp_json_encode( $this->to_array() );
-		return false !== $json ? $json : '{}';
-	}
-
-	/**
-	 * Create an McpResource instance from an array.
-	 *
-	 * @param array     $data Array containing resource data.
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
-	 *
-	 * @return self|\WP_Error Returns a new McpResource instance or WP_Error if validation fails.
-	 */
-	public static function from_array( array $data, McpServer $mcp_server ) {
-		$resource = new self(
-			$data['ability'] ?? '',
-			$data['uri'] ?? '',
-			$data['name'] ?? null,
-			$data['description'] ?? null,
-			$data['mimeType'] ?? null,
-			$data['text'] ?? null,
-			$data['blob'] ?? null,
-			$data['annotations'] ?? array()
-		);
-
-		$resource->mcp_server = $mcp_server;
-
-		return $resource->validate( "McpResource::from_array::{$data['uri']}" );
-	}
-
-	/**
-	 * Check if this is a text resource.
-	 *
-	 * @return bool
-	 */
-	public function is_text_resource(): bool {
-		return ! is_null( $this->text ) && is_null( $this->blob );
-	}
-
-	/**
-	 * Check if this is a blob resource.
-	 *
-	 * @return bool
-	 */
-	public function is_blob_resource(): bool {
-		return ! is_null( $this->blob ) && is_null( $this->text );
-	}
-
-	/**
-	 * Validate the resource data.
-	 *
-	 * @param string $context Optional context for error messages.
-	 *
-	 * @return \WP\MCP\Domain\Resources\McpResource|\WP_Error Resource instance on success, WP_Error on failure.
-	 */
-	public function validate( string $context = '' ) {
-		if ( null === $this->mcp_server ) {
+			$resource = ResourceDto::fromArray( $resource_data );
+		} catch ( \Throwable $e ) {
 			return new \WP_Error(
-				'resource_missing_mcp_server',
-				esc_html__( 'MCP server must be set before validating a resource.', 'mcp-adapter' )
+				'mcp_resource_dto_creation_failed',
+				sprintf(
+				/* translators: %s: error message */
+					__( 'Failed to create Resource DTO: %s', 'mcp-adapter' ),
+					$e->getMessage()
+				),
+				array( 'exception' => $e )
 			);
 		}
 
-		if ( ! $this->mcp_server->is_mcp_validation_enabled() ) {
-			return $this;
+		// Optional deep validation if enabled.
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		if ( $mcp_validation_enabled ) {
+			$validation_result = McpResourceValidator::validate_resource_dto( $resource );
+			if ( is_wp_error( $validation_result ) ) {
+				return $validation_result;
+			}
 		}
 
-		$context_to_use    = $context ?: "McpResource::{$this->name}";
-		$validation_result = McpResourceValidator::validate_resource_instance( $this, $context_to_use );
+		$instance          = new self( $resource );
+		$instance->handler = $config['handler'];
 
-		if ( is_wp_error( $validation_result ) ) {
-			return $validation_result;
+		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
+			$instance->permission_callback = $config['permission'];
 		}
 
-		return $this;
+		$instance->observability_context = array(
+			'component_type' => 'resource',
+			'resource_uri'   => $uri,
+			'source'         => 'array',
+		);
+
+		return $instance;
+	}
+
+	/**
+	 * Create an ability-backed MCP resource.
+	 *
+	 * @param \WP_Ability $ability WordPress ability.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
+	 *
+	 * @return self|\WP_Error
+	 */
+	public static function fromAbility( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
+		$resource_data = RegisterAbilityAsMcpResource::build( $ability, $error_handler );
+		if ( $resource_data instanceof \WP_Error ) {
+			return $resource_data;
+		}
+
+		$instance               = new self( $resource_data['resource'] );
+		$instance->adapter_meta = $resource_data['adapter_meta'];
+		$instance->ability      = $ability;
+
+		$instance->observability_context = array(
+			'component_type' => 'resource',
+			'resource_uri'   => $resource_data['resource']->getUri(),
+			'ability_name'   => $ability->get_name(),
+			'source'         => 'ability',
+		);
+
+		return $instance;
+	}
+
+	// =========================================================================
+	// McpComponentInterface Implementation
+	// =========================================================================
+
+	/**
+	 * Get the clean protocol DTO for MCP responses.
+	 *
+	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
+	 */
+	public function get_protocol_dto(): ResourceDto {
+		return $this->mcp_resource_dto;
+	}
+
+	/**
+	 * Execute the resource read.
+	 *
+	 * @param mixed $arguments Read arguments (may be empty).
+	 *
+	 * @return mixed
+	 */
+	public function execute( $arguments ) {
+		// Ability-backed resources match existing behavior: no args passed to abilities.
+		if ( null !== $this->ability ) {
+			try {
+				return $this->ability->execute();
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_execution_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		if ( null !== $this->handler ) {
+			try {
+				return call_user_func( $this->handler, $arguments );
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_execution_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		return new \WP_Error( 'mcp_resource_no_handler', 'No resource execution strategy configured.' );
+	}
+
+	/**
+	 * Check whether the current request has permission to read this resource.
+	 *
+	 * @param mixed $arguments Read arguments (may be empty).
+	 *
+	 * @return bool|\WP_Error
+	 */
+	public function check_permission( $arguments ) {
+		// Ability-backed resources match existing behavior: no args passed to abilities.
+		if ( null !== $this->ability ) {
+			try {
+				return $this->ability->check_permissions();
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_permission_check_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		if ( null !== $this->permission_callback ) {
+			try {
+				$result = call_user_func( $this->permission_callback, $arguments );
+
+				return $result instanceof \WP_Error ? $result : (bool) $result;
+			} catch ( \Throwable $throwable ) {
+				return new \WP_Error(
+					'mcp_permission_check_failed',
+					$throwable->getMessage(),
+					array( 'error_type' => get_class( $throwable ) )
+				);
+			}
+		}
+
+		return new \WP_Error(
+			'mcp_permission_denied',
+			'Access denied.',
+			array( 'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY )
+		);
+	}
+
+	/**
+	 * Get internal adapter metadata for this resource.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_adapter_meta(): array {
+		return $this->adapter_meta;
+	}
+
+	/**
+	 * Get observability context tags for logging/metrics.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_observability_context(): array {
+		return $this->observability_context;
 	}
 }

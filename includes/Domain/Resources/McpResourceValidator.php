@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Validates MCP resources against the Model Context Protocol specification.
@@ -17,7 +18,7 @@ use WP\MCP\Domain\Utils\McpValidator;
  * Provides minimal, resource-efficient validation to ensure resources conform
  * to the MCP schema requirements without heavy processing overhead.
  *
- * @link https://modelcontextprotocol.io/specification/2025-06-18/server/resources
+ * @link https://modelcontextprotocol.io/specification/2025-11-25/server/resources
  */
 class McpResourceValidator {
 
@@ -39,7 +40,58 @@ class McpResourceValidator {
 				__( 'Resource validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			return new \WP_Error( 'resource_validation_failed', esc_html( $error_message ) );
+			return new \WP_Error( 'mcp_resource_validation_failed', esc_html( $error_message ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate a Resource DTO against the MCP schema.
+	 *
+	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The resource DTO to validate.
+	 *
+	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
+	 */
+	public static function validate_resource_dto( ResourceDto $resource_dto ) {
+		$errors = array();
+
+		// Validate URI.
+		if ( ! McpValidator::validate_resource_uri( $resource_dto->getUri() ) ) {
+			$errors[] = __( 'Resource URI must be a valid URI string', 'mcp-adapter' );
+		}
+
+		// Validate the MIME type if present.
+		$mime_type = $resource_dto->getMimeType();
+		if ( $mime_type && ! McpValidator::validate_mime_type( $mime_type ) ) {
+			$errors[] = __( 'Resource MIME type is invalid', 'mcp-adapter' );
+		}
+
+		// Validate icons if present.
+		$icons = $resource_dto->getIcons();
+		if ( ! empty( $icons ) ) {
+			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
+			$icons_result = McpValidator::validate_icons_array( $icons_array );
+			$icons_errors = self::format_icon_validation_errors( $icons_result );
+			$errors       = array_merge( $errors, $icons_errors );
+		}
+
+		// Validate annotations if present.
+		$annotations = $resource_dto->getAnnotations();
+		if ( $annotations ) {
+			$annotation_errors = McpValidator::get_annotation_validation_errors( $annotations->toArray() );
+			$errors            = array_merge( $errors, $annotation_errors );
+		}
+
+		if ( ! empty( $errors ) ) {
+			return new \WP_Error(
+				'mcp_resource_validation_failed',
+				sprintf(
+				/* translators: %s: list of validation errors */
+					__( 'Resource validation failed: %s', 'mcp-adapter' ),
+					implode( '; ', $errors )
+				)
+			);
 		}
 
 		return true;
@@ -49,43 +101,32 @@ class McpResourceValidator {
 	 * Validate an McpResource instance against the MCP schema.
 	 *
 	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
-	 * @param string      $context Optional context for error messages.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
-	public static function validate_resource_instance( McpResource $the_resource, string $context = '' ) {
-		$uniqueness_result = self::validate_resource_uniqueness( $the_resource, $context );
-		if ( is_wp_error( $uniqueness_result ) ) {
-			return $uniqueness_result;
-		}
-
-		return self::validate_resource_data( $the_resource->to_array(), $context );
+	public static function validate_resource_instance( McpResource $the_resource ) {
+		return self::validate_resource_dto( $the_resource->get_protocol_dto() );
 	}
 
 	/**
-	 * Get validation error details for debugging purposes.
-	 * This is the core validation method - all other validation methods use this.
+	 * Get validation errors for MCP resource contents.
 	 *
-	 * @param array $resource_data The resource data to validate.
+	 * NOTE: This validates the `resource` object used by:
+	 * - `resources/read` results (`TextResourceContents` / `BlobResourceContents`)
+	 * - `content` blocks of type `resource` (`EmbeddedResource.resource`)
+	 *
+	 * It does NOT validate the `Resource` metadata object returned by `resources/list`.
+	 * For `Resource` DTO validation (resources/list), use validate_resource_dto() instead.
+	 *
+	 * This validator focuses on the MCP-required fields and ignores unknown fields to remain
+	 * forward-compatible with future schema versions.
+	 *
+	 * @param array $resource_data The resource contents object to validate.
 	 *
 	 * @return array Array of validation errors, empty if valid.
 	 */
 	public static function get_validation_errors( array $resource_data ): array {
 		$errors = array();
-
-		// Sanitize string inputs.
-		if ( isset( $resource_data['uri'] ) && is_string( $resource_data['uri'] ) ) {
-			$resource_data['uri'] = trim( $resource_data['uri'] );
-		}
-		if ( isset( $resource_data['name'] ) && is_string( $resource_data['name'] ) ) {
-			$resource_data['name'] = trim( $resource_data['name'] );
-		}
-		if ( isset( $resource_data['description'] ) && is_string( $resource_data['description'] ) ) {
-			$resource_data['description'] = trim( $resource_data['description'] );
-		}
-		if ( isset( $resource_data['mimeType'] ) && is_string( $resource_data['mimeType'] ) ) {
-			$resource_data['mimeType'] = trim( $resource_data['mimeType'] );
-		}
 
 		// Validate the required URI field.
 		if ( empty( $resource_data['uri'] ) || ! is_string( $resource_data['uri'] ) ) {
@@ -94,35 +135,32 @@ class McpResourceValidator {
 			$errors[] = __( 'Resource URI must be a valid URI format', 'mcp-adapter' );
 		}
 
-		// Validate content - must have either text OR blob (but not both).
-		$has_text = ! empty( $resource_data['text'] );
-		$has_blob = ! empty( $resource_data['blob'] );
+		// Validate content: at least one of text/blob must be present and correctly typed.
+		// Use array_key_exists to allow empty strings as valid content.
+		$has_text_key = array_key_exists( 'text', $resource_data );
+		$has_blob_key = array_key_exists( 'blob', $resource_data );
+
+		$has_text = $has_text_key && is_string( $resource_data['text'] );
+		$has_blob = $has_blob_key && is_string( $resource_data['blob'] );
 
 		if ( ! $has_text && ! $has_blob ) {
-			$errors[] = __( 'Resource must have either text or blob content', 'mcp-adapter' );
-		} elseif ( $has_text && $has_blob ) {
-			$errors[] = __( 'Resource cannot have both text and blob content - only one is allowed', 'mcp-adapter' );
+			$errors[] = __( 'Resource contents must include at least one of: text (string) or blob (base64 string)', 'mcp-adapter' );
 		}
 
-		// Validate text content if present.
-		if ( $has_text && ! is_string( $resource_data['text'] ) ) {
-			$errors[] = __( 'Resource text content must be a string', 'mcp-adapter' );
+		if ( $has_text_key && ! is_string( $resource_data['text'] ) ) {
+			$errors[] = __( 'Resource text content must be a string when provided', 'mcp-adapter' );
 		}
 
-		// Validate blob content if present.
-		if ( $has_blob && ! is_string( $resource_data['blob'] ) ) {
-			$errors[] = __( 'Resource blob content must be a string (base64-encoded)', 'mcp-adapter' );
+		if ( $has_blob_key && ! is_string( $resource_data['blob'] ) ) {
+			$errors[] = __( 'Resource blob content must be a string when provided', 'mcp-adapter' );
 		}
 
-		// Validate optional fields if present.
-		if ( isset( $resource_data['name'] ) && ! is_string( $resource_data['name'] ) ) {
-			$errors[] = __( 'Resource name must be a string if provided', 'mcp-adapter' );
+		// Validate blob content if present and typed.
+		if ( $has_blob && ! McpValidator::validate_base64( $resource_data['blob'] ) ) {
+			$errors[] = __( 'Resource blob content must be valid base64-encoded data', 'mcp-adapter' );
 		}
 
-		if ( isset( $resource_data['description'] ) && ! is_string( $resource_data['description'] ) ) {
-			$errors[] = __( 'Resource description must be a string if provided', 'mcp-adapter' );
-		}
-
+		// Validate mimeType if present (optional).
 		if ( isset( $resource_data['mimeType'] ) ) {
 			if ( ! is_string( $resource_data['mimeType'] ) ) {
 				$errors[] = __( 'Resource mimeType must be a string if provided', 'mcp-adapter' );
@@ -131,42 +169,32 @@ class McpResourceValidator {
 			}
 		}
 
-		// Validate annotations structure if present.
-		if ( isset( $resource_data['annotations'] ) ) {
-			if ( ! is_array( $resource_data['annotations'] ) ) {
-				$errors[] = __( 'Resource annotations must be an array if provided', 'mcp-adapter' );
-			} else {
-				$annotation_errors = McpValidator::get_annotation_validation_errors( $resource_data['annotations'] );
-				if ( ! empty( $annotation_errors ) ) {
-					$errors = array_merge( $errors, $annotation_errors );
+		return $errors;
+	}
+
+	/**
+	 * Format icon validation errors from the validation result.
+	 *
+	 * @param array{valid: array, errors: array} $icons_result The result from validate_icons_array.
+	 *
+	 * @return array Array of formatted error messages.
+	 */
+	private static function format_icon_validation_errors( array $icons_result ): array {
+		$errors = array();
+
+		if ( ! empty( $icons_result['errors'] ) ) {
+			foreach ( $icons_result['errors'] as $error_group ) {
+				foreach ( $error_group['errors'] as $error ) {
+					$errors[] = sprintf(
+					/* translators: 1: icon index, 2: error message */
+						__( 'Icon at index %1$d: %2$s', 'mcp-adapter' ),
+						$error_group['index'],
+						$error
+					);
 				}
 			}
 		}
 
 		return $errors;
-	}
-
-	/**
-	 * Validate that the resource is unique within the MCP server.
-	 *
-	 * @param \WP\MCP\Domain\Resources\McpResource $the_resource The resource instance to validate.
-	 * @param string      $context Optional context for error messages.
-	 *
-	 * @return bool|\WP_Error True if unique, WP_Error if the resource URI is not unique.
-	 */
-	public static function validate_resource_uniqueness( McpResource $the_resource, string $context = '' ) {
-		$this_resource_uri = $the_resource->get_uri();
-		$existing_resource = $the_resource->get_mcp_server()->get_resource( $this_resource_uri );
-		if ( $existing_resource ) {
-			$error_message  = $context ? "[{$context}] " : '';
-			$error_message .= sprintf(
-			/* translators: %s: resource URI */
-				__( 'Resource URI \'%s\' is not unique. It already exists in the MCP server.', 'mcp-adapter' ),
-				$this_resource_uri
-			);
-			return new \WP_Error( 'resource_not_unique', esc_html( $error_message ) );
-		}
-
-		return true;
 	}
 }

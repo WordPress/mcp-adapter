@@ -30,11 +30,14 @@ interface McpComponentInterface {
 	/**
 	 * Get the clean protocol DTO for MCP responses.
 	 *
+	 * This DTO is used only for protocol serialization and MUST NOT include
+	 * internal adapter metadata or execution wiring.
+	 *
 	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Protocol-only DTO.
 	 * @since n.e.x.t
 	 *
 	 */
-	public function get_component(): AbstractDataTransferObject;
+	public function get_protocol_dto(): AbstractDataTransferObject;
 
 	/**
 	 * Execute the component using the configured strategy.

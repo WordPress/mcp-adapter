@@ -11,6 +11,7 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * Validates MCP prompts against the Model Context Protocol specification.
@@ -18,7 +19,7 @@ use WP\MCP\Domain\Utils\McpValidator;
  * Provides minimal, resource-efficient validation to ensure prompts conform
  * to the MCP schema requirements without heavy processing overhead.
  *
- * @link https://modelcontextprotocol.io/specification/2025-06-18/server/prompts
+ * @link https://modelcontextprotocol.io/specification/2025-11-25/server/prompts
  */
 class McpPromptValidator {
 
@@ -40,7 +41,49 @@ class McpPromptValidator {
 				__( 'Prompt validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			return new \WP_Error( 'prompt_validation_failed', esc_html( $error_message ) );
+			return new \WP_Error( 'mcp_prompt_validation_failed', esc_html( $error_message ) );
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate a Prompt DTO against the MCP schema.
+	 *
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO to validate.
+	 *
+	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
+	 */
+	public static function validate_prompt_dto( PromptDto $prompt ) {
+		$errors = array();
+
+		// Validate name.
+		if ( ! McpValidator::validate_name( $prompt->getName() ) ) {
+			$errors[] = __( 'Prompt name must be 1-128 characters and contain only [A-Za-z0-9_.-]', 'mcp-adapter' );
+		}
+
+		// Validate icons if present.
+		$icons = $prompt->getIcons();
+		if ( ! empty( $icons ) ) {
+			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
+			$icons_result = McpValidator::validate_icons_array( $icons_array );
+			$icons_errors = self::format_icon_validation_errors( $icons_result );
+			$errors       = array_merge( $errors, $icons_errors );
+		}
+
+		// Validate annotations if present (shared annotations).
+		// Currently Prompt DTO doesn't have annotations field in spec, but if it did, we'd validate here.
+		// BaseMetadata has title and name, handled separately.
+
+		if ( ! empty( $errors ) ) {
+			return new \WP_Error(
+				'mcp_prompt_validation_failed',
+				sprintf(
+				/* translators: %s: list of validation errors */
+					__( 'Prompt validation failed: %s', 'mcp-adapter' ),
+					implode( '; ', $errors )
+				)
+			);
 		}
 
 		return true;
@@ -50,42 +93,13 @@ class McpPromptValidator {
 	 * Validate an McpPrompt instance against the MCP schema.
 	 *
 	 * @param \WP\MCP\Domain\Prompts\McpPrompt $prompt The prompt instance to validate.
-	 * @param string    $context Optional context for error messages.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
-	public static function validate_prompt_instance( McpPrompt $prompt, string $context = '' ) {
-		$uniqueness_result = self::validate_prompt_uniqueness( $prompt, $context );
-		if ( is_wp_error( $uniqueness_result ) ) {
-			return $uniqueness_result;
-		}
-
-		return self::validate_prompt_data( $prompt->to_array(), $context );
+	public static function validate_prompt_instance( McpPrompt $prompt ) {
+		return self::validate_prompt_dto( $prompt->get_protocol_dto() );
 	}
 
-	/**
-	 * Validate that the resource is unique within the MCP server.
-	 *
-	 * @param \WP\MCP\Domain\Prompts\McpPrompt $prompt The resource instance to validate.
-	 * @param string    $context Optional context for error messages.
-	 *
-	 * @return bool|\WP_Error True if unique, WP_Error if the prompt name is not unique.
-	 */
-	public static function validate_prompt_uniqueness( McpPrompt $prompt, string $context = '' ) {
-		$this_prompt_name  = $prompt->get_name();
-		$existing_resource = $prompt->get_mcp_server()->get_prompt( $this_prompt_name );
-		if ( $existing_resource ) {
-			$error_message  = $context ? "[{$context}] " : '';
-			$error_message .= sprintf(
-			/* translators: %s is the prompt name */
-				__( "Prompt name '%s' is not unique. It already exists in the MCP server.", 'mcp-adapter' ),
-				$this_prompt_name
-			);
-			return new \WP_Error( 'prompt_not_unique', esc_html( $error_message ) );
-		}
-
-		return true;
-	}
 
 	/**
 	 * Get validation error details for debugging purposes.
@@ -98,20 +112,9 @@ class McpPromptValidator {
 	public static function get_validation_errors( array $prompt_data ): array {
 		$errors = array();
 
-		// Sanitize string inputs
-		if ( isset( $prompt_data['name'] ) && is_string( $prompt_data['name'] ) ) {
-			$prompt_data['name'] = trim( $prompt_data['name'] );
-		}
-		if ( isset( $prompt_data['title'] ) && is_string( $prompt_data['title'] ) ) {
-			$prompt_data['title'] = trim( $prompt_data['title'] );
-		}
-		if ( isset( $prompt_data['description'] ) && is_string( $prompt_data['description'] ) ) {
-			$prompt_data['description'] = trim( $prompt_data['description'] );
-		}
-
 		// Check required fields
-		if ( empty( $prompt_data['name'] ) || ! is_string( $prompt_data['name'] ) || ! McpValidator::validate_tool_or_prompt_name( $prompt_data['name'] ) ) {
-			$errors[] = __( 'Prompt name is required and must only contain letters, numbers, hyphens (-), and underscores (_), and be 255 characters or less', 'mcp-adapter' );
+		if ( empty( $prompt_data['name'] ) || ! is_string( $prompt_data['name'] ) || ! McpValidator::validate_name( $prompt_data['name'] ) ) {
+			$errors[] = __( 'Prompt name is required and must be 1-128 characters and contain only [A-Za-z0-9_.-]', 'mcp-adapter' );
 		}
 
 		// Check optional fields if present
@@ -128,18 +131,6 @@ class McpPromptValidator {
 			$arguments_errors = self::get_arguments_validation_errors( $prompt_data['arguments'] );
 			if ( ! empty( $arguments_errors ) ) {
 				$errors = array_merge( $errors, $arguments_errors );
-			}
-		}
-
-		// Validate annotations structure if present.
-		if ( isset( $prompt_data['annotations'] ) ) {
-			if ( ! is_array( $prompt_data['annotations'] ) ) {
-				$errors[] = __( 'Prompt annotations must be an array if provided', 'mcp-adapter' );
-			} else {
-				$annotation_errors = McpValidator::get_annotation_validation_errors( $prompt_data['annotations'] );
-				if ( ! empty( $annotation_errors ) ) {
-					$errors = array_merge( $errors, $annotation_errors );
-				}
 			}
 		}
 
@@ -182,11 +173,11 @@ class McpPromptValidator {
 				continue;
 			}
 
-			// Validate argument name format
-			if ( ! McpValidator::validate_argument_name( $argument['name'] ) ) {
+			// Validate argument name format (uses standard 128-char limit per MCP spec).
+			if ( ! McpValidator::validate_name( $argument['name'] ) ) {
 				$errors[] = sprintf(
 				/* translators: %s: argument name */
-					__( 'Prompt argument \'%s\' name must only contain letters, numbers, hyphens (-), and underscores (_), and be 64 characters or less', 'mcp-adapter' ),
+					__( 'Prompt argument \'%s\' name must only contain letters, numbers, hyphens (-), underscores (_), and dots (.), and be 128 characters or less', 'mcp-adapter' ),
 					$argument['name']
 				);
 			}
@@ -277,6 +268,32 @@ class McpPromptValidator {
 	}
 
 	/**
+	 * Format icon validation errors from the validation result.
+	 *
+	 * @param array{valid: array, errors: array} $icons_result The result from validate_icons_array.
+	 *
+	 * @return array Array of formatted error messages.
+	 */
+	private static function format_icon_validation_errors( array $icons_result ): array {
+		$errors = array();
+
+		if ( ! empty( $icons_result['errors'] ) ) {
+			foreach ( $icons_result['errors'] as $error_group ) {
+				foreach ( $error_group['errors'] as $error ) {
+					$errors[] = sprintf(
+					/* translators: 1: icon index, 2: error message */
+						__( 'Icon at index %1$d: %2$s', 'mcp-adapter' ),
+						$error_group['index'],
+						$error
+					);
+				}
+			}
+		}
+
+		return $errors;
+	}
+
+	/**
 	 * Get validation errors for message content.
 	 *
 	 * @param array $content The content to validate.
@@ -302,10 +319,10 @@ class McpPromptValidator {
 
 		switch ( $type ) {
 			case 'text':
-				if ( empty( $content['text'] ) || ! is_string( $content['text'] ) ) {
+				if ( ! isset( $content['text'] ) || ! is_string( $content['text'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
-						__( 'Message %d text content must have a non-empty text field', 'mcp-adapter' ),
+						__( 'Message %d text content must have a text field', 'mcp-adapter' ),
 						$message_index
 					);
 				}
@@ -371,6 +388,85 @@ class McpPromptValidator {
 				}
 				break;
 
+			case 'resource_link':
+				// ResourceLink is a metadata-only reference (same shape as Resource + type discriminator).
+				if ( empty( $content['name'] ) || ! is_string( $content['name'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content must have a name field', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( empty( $content['uri'] ) || ! is_string( $content['uri'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content must have a uri field', 'mcp-adapter' ),
+						$message_index
+					);
+				} elseif ( ! McpValidator::validate_resource_uri( $content['uri'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content uri must be a valid URI format', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['mimeType'] ) ) {
+					if ( ! is_string( $content['mimeType'] ) ) {
+						$errors[] = sprintf(
+						/* translators: %d: message index */
+							__( 'Message %d resource_link content mimeType must be a string if provided', 'mcp-adapter' ),
+							$message_index
+						);
+					} elseif ( ! McpValidator::validate_mime_type( $content['mimeType'] ) ) {
+						$errors[] = sprintf(
+						/* translators: %d: message index */
+							__( 'Message %d resource_link content mimeType must be a valid MIME type format', 'mcp-adapter' ),
+							$message_index
+						);
+					}
+				}
+
+				if ( isset( $content['size'] ) && ! is_int( $content['size'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content size must be an integer if provided', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['title'] ) && ! is_string( $content['title'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content title must be a string if provided', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['description'] ) && ! is_string( $content['description'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content description must be a string if provided', 'mcp-adapter' ),
+						$message_index
+					);
+				}
+
+				if ( isset( $content['icons'] ) ) {
+					if ( ! is_array( $content['icons'] ) ) {
+						$errors[] = sprintf(
+						/* translators: %d: message index */
+							__( 'Message %d resource_link content icons must be an array if provided', 'mcp-adapter' ),
+							$message_index
+						);
+					} else {
+						$icons_result = McpValidator::validate_icons_array( $content['icons'], false );
+						$errors       = array_merge( $errors, self::format_icon_validation_errors( $icons_result ) );
+					}
+				}
+
+				break;
+
 			case 'resource':
 				if ( empty( $content['resource'] ) || ! is_array( $content['resource'] ) ) {
 					$errors[] = sprintf(
@@ -395,7 +491,7 @@ class McpPromptValidator {
 			default:
 				$errors[] = sprintf(
 				/* translators: %1$d: message index, %2$s: content type */
-					__( 'Message %1$d content type \'%2$s\' is not supported. Must be \'text\', \'image\', \'audio\', or \'resource\'', 'mcp-adapter' ),
+					__( 'Message %1$d content type \'%2$s\' is not supported. Must be \'text\', \'image\', \'audio\', \'resource\', or \'resource_link\'', 'mcp-adapter' ),
 					$message_index,
 					$type
 				);
