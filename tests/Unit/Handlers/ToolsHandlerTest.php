@@ -15,7 +15,7 @@ use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * Test ToolsHandler functionality.
@@ -40,7 +40,7 @@ final class ToolsHandlerTest extends TestCase {
 		// Use DTO getter methods instead of toArray()
 		$tools = $result->getTools();
 		$this->assertNotEmpty( $tools );
-		$this->assertContainsOnlyInstancesOf( Tool::class, $tools );
+		$this->assertContainsOnlyInstancesOf( ToolDto::class, $tools );
 	}
 
 	public function test_list_tools_returns_empty_array_when_no_tools(): void {
@@ -64,7 +64,7 @@ final class ToolsHandlerTest extends TestCase {
 		// Use DTO getter methods instead of toArray()
 		$tools = $result->getTools();
 		$this->assertNotEmpty( $tools );
-		$this->assertContainsOnlyInstancesOf( Tool::class, $tools );
+		$this->assertContainsOnlyInstancesOf( ToolDto::class, $tools );
 	}
 
 	public function test_call_tool_missing_name_returns_error(): void {
@@ -339,7 +339,7 @@ final class ToolsHandlerTest extends TestCase {
 		}
 
 		$this->assertNotNull( $tool_entry );
-		$this->assertInstanceOf( Tool::class, $tool_entry );
+		$this->assertInstanceOf( ToolDto::class, $tool_entry );
 
 		$result = $handler->call_tool(
 			array(
@@ -372,7 +372,7 @@ final class ToolsHandlerTest extends TestCase {
 		// Use DTO getter methods instead of toArray()
 		$tools = $result->getTools();
 		$this->assertNotEmpty( $tools );
-		$this->assertContainsOnlyInstancesOf( Tool::class, $tools );
+		$this->assertContainsOnlyInstancesOf( ToolDto::class, $tools );
 
 		$tool = $tools[0];
 		// Tool DTO provides typed access - verify required properties exist via toArray()

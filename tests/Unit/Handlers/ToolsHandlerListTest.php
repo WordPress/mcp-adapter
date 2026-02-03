@@ -7,7 +7,7 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
-use WP\McpSchema\Server\Tools\DTO\Tool;
+use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 final class ToolsHandlerListTest extends TestCase {
 
@@ -36,8 +36,8 @@ final class ToolsHandlerListTest extends TestCase {
 
 		$this->assertNotEmpty( $list_tools );
 		$this->assertNotEmpty( $all_tools );
-		$this->assertContainsOnlyInstancesOf( Tool::class, $list_tools );
-		$this->assertContainsOnlyInstancesOf( Tool::class, $all_tools );
+		$this->assertContainsOnlyInstancesOf( ToolDto::class, $list_tools );
+		$this->assertContainsOnlyInstancesOf( ToolDto::class, $all_tools );
 
 		// Verify Tool DTO structure via toArray() for field checks
 		$tool       = $list_tools[0];

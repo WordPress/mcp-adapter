@@ -9,7 +9,7 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
 use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 final class PromptsHandlerTest extends TestCase {
@@ -24,7 +24,7 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertInstanceOf( ListPromptsResult::class, $result );
 		$prompts = $result->getPrompts();
 		$this->assertNotEmpty( $prompts );
-		$this->assertContainsOnlyInstancesOf( Prompt::class, $prompts );
+		$this->assertContainsOnlyInstancesOf( PromptDto::class, $prompts );
 	}
 
 	public function test_get_prompt_missing_name_returns_error(): void {

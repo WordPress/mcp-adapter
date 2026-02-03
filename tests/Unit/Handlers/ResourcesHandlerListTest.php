@@ -10,7 +10,7 @@ use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 final class ResourcesHandlerListTest extends TestCase {
 
@@ -41,7 +41,7 @@ final class ResourcesHandlerListTest extends TestCase {
 		// Use DTO getter methods
 		$resources = $result->getResources();
 		$this->assertNotEmpty( $resources );
-		$this->assertContainsOnlyInstancesOf( Resource::class, $resources );
+		$this->assertContainsOnlyInstancesOf( ResourceDto::class, $resources );
 
 		// Verify Resource DTO structure via toArray() for field checks
 		$resource_array = $resources[0]->toArray();

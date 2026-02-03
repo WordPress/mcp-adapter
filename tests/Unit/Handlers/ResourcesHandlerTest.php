@@ -15,7 +15,7 @@ use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
 use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
-use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Test ResourcesHandler functionality.
@@ -40,7 +40,7 @@ final class ResourcesHandlerTest extends TestCase {
 		// Use DTO getter methods
 		$resources = $result->getResources();
 		$this->assertNotEmpty( $resources );
-		$this->assertContainsOnlyInstancesOf( Resource::class, $resources );
+		$this->assertContainsOnlyInstancesOf( ResourceDto::class, $resources );
 	}
 
 	public function test_list_resources_returns_empty_array_when_no_resources(): void {

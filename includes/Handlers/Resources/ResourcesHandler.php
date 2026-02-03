@@ -16,6 +16,7 @@ use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
 use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Handles resources-related MCP methods.
@@ -91,7 +92,7 @@ class ResourcesHandler {
 		}
 
 		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource */
-		$resource = $mcp_resource->get_component();
+		$resource = $mcp_resource->get_protocol_dto();
 
 		try {
 			$has_permission = $mcp_resource->check_permission( $request_params );
