@@ -16,7 +16,6 @@ use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
 use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Handles resources-related MCP methods.
