@@ -239,7 +239,7 @@ class ToolsHandler {
 			}
 
 			// Handle image results.
-			if ( isset( $result['type'] ) && 'image' === $result['type'] ) {
+			if ( isset( $result['type'] ) && 'image' === $result['type'] && isset( $result['results'] ) ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? 'image/png';
 
