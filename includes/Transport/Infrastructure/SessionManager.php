@@ -165,7 +165,7 @@ final class SessionManager {
 		 *
 		 * @since 0.3.0
 		 *
-		 * @param int $max_sessions Maximum sessions per user. Default 5.
+		 * @param int $max_sessions Maximum sessions per user. Default 32.
 		 */
 		$max_sessions = (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS );
 
