@@ -54,13 +54,11 @@ class ToolsHandler {
 	 *
 	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
 	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
 	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with all tools.
 	 */
-	public function list_all_tools( $request_id = 0 ): ListToolsResult {
+	public function list_all_tools(): ListToolsResult {
 		// Return the standard tools list.
-		return $this->list_tools( $request_id );
+		return $this->list_tools();
 	}
 
 	/**
@@ -70,11 +68,9 @@ class ToolsHandler {
 	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
 	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with tools list.
 	 */
-	public function list_tools( $request_id = 0 ): ListToolsResult {
+	public function list_tools(): ListToolsResult {
 		$tools = array_values( $this->mcp->get_tools() );
 
 		return ListToolsResult::fromArray(

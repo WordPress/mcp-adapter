@@ -38,11 +38,9 @@ class InitializeHandler {
 	/**
 	 * Handles the initialize request.
 	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
 	 */
-	public function handle( $request_id = 0 ): InitializeResult {
+	public function handle(): InitializeResult {
 		$server_info = Implementation::fromArray(
 			array(
 				'name'    => $this->mcp->get_server_name(),

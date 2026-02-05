@@ -65,11 +65,9 @@ class PromptsHandler {
 	/**
 	 * Handles the prompts/list request.
 	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
 	 * @return \WP\McpSchema\Server\Prompts\DTO\ListPromptsResult Response with prompts list DTO.
 	 */
-	public function list_prompts( $request_id = 0 ): ListPromptsResult {
+	public function list_prompts(): ListPromptsResult {
 		$prompts = array_values( $this->mcp->get_prompts() );
 
 		return ListPromptsResult::fromArray(

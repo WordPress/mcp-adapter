@@ -46,11 +46,9 @@ class ResourcesHandler {
 	 * Returns a ListResourcesResult DTO containing all registered resources.
 	 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
 	 *
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
-	 *
 	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourcesResult Response with resources list.
 	 */
-	public function list_resources( $request_id = 0 ): ListResourcesResult {
+	public function list_resources(): ListResourcesResult {
 		$resources = array_values( $this->mcp->get_resources() );
 
 		return ListResourcesResult::fromArray(

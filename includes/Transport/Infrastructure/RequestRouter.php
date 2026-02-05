@@ -72,13 +72,13 @@ class RequestRouter {
 			'initialize'     => function () use ( $params, $request_id, $http_context, &$new_session_id ) {
 				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $new_session_id );
 			},
-			'ping'           => fn() => $this->context->system_handler->ping( $request_id ),
-			'tools/list'     => fn() => $this->context->tools_handler->list_tools( $request_id ),
-			'tools/list/all' => fn() => $this->context->tools_handler->list_all_tools( $request_id ),
+			'ping'           => fn() => $this->context->system_handler->ping(),
+			'tools/list'     => fn() => $this->context->tools_handler->list_tools(),
+			'tools/list/all' => fn() => $this->context->tools_handler->list_all_tools(),
 			'tools/call'     => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
-			'resources/list' => fn() => $this->context->resources_handler->list_resources( $request_id ),
+			'resources/list' => fn() => $this->context->resources_handler->list_resources(),
 			'resources/read' => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
-			'prompts/list'   => fn() => $this->context->prompts_handler->list_prompts( $request_id ),
+			'prompts/list'   => fn() => $this->context->prompts_handler->list_prompts(),
 			'prompts/get'    => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
 		);
 
@@ -295,7 +295,7 @@ class RequestRouter {
 	 */
 	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
 		// Get the initialize response from the handler (returns InitializeResult DTO).
-		$init_result = $this->context->initialize_handler->handle( $request_id );
+		$init_result = $this->context->initialize_handler->handle();
 
 		// Handle session creation if HTTP context is provided.
 		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
