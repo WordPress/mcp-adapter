@@ -62,7 +62,6 @@ class PromptsHandler {
 		$this->mcp = $mcp;
 	}
 
-
 	/**
 	 * Handles the prompts/list request.
 	 *

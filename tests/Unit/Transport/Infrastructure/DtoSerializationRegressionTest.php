@@ -29,7 +29,7 @@ final class DtoSerializationRegressionTest extends TestCase {
 			'text/plain',
 			null,
 			array(
-				'keep'        => array( 'public' => true ),
+				'keep' => array( 'public' => true ),
 			)
 		);
 
@@ -73,7 +73,7 @@ final class DtoSerializationRegressionTest extends TestCase {
 				'text'     => 'content',
 				'mimeType' => 'text/plain',
 				'_meta'    => array(
-					'keep'        => 'value',
+					'keep' => 'value',
 				),
 			)
 		);
@@ -89,22 +89,22 @@ final class DtoSerializationRegressionTest extends TestCase {
 			)
 		);
 
-			$dto = ReadResourceResult::fromArray(
-				array(
-					'contents' => array( $text, $blob ),
-					'_meta'    => array(
-						'keep' => 'top-meta',
-					),
-				)
-			);
+		$dto = ReadResourceResult::fromArray(
+			array(
+				'contents' => array( $text, $blob ),
+				'_meta'    => array(
+					'keep' => 'top-meta',
+				),
+			)
+		);
 
-			$result = $dto->toArray();
+		$result = $dto->toArray();
 
 		$response = JsonRpcResponseBuilder::create_success_response( 1, $result );
 		$json     = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		$this->assertNotFalse( $json );
 
-			$this->assertStringNotContainsString( '"contents":[{}', $json );
+		$this->assertStringNotContainsString( '"contents":[{}', $json );
 
 		/** @var array<string, mixed> $decoded */
 		$decoded = json_decode( (string) $json, true );

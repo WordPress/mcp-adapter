@@ -43,6 +43,7 @@ class McpTransportContext {
 	 * @param \WP\MCP\Transport\Infrastructure\RequestRouter|null $request_router The request router service.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication.
 	 */
+
 	/**
 	 * The MCP server instance.
 	 *

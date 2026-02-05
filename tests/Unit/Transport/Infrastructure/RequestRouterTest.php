@@ -34,7 +34,7 @@ final class RequestRouterTest extends TestCase {
 	private McpTransportContext $context;
 	private int $test_user_id;
 
-	public function set_up(): void{
+	public function set_up(): void {
 		parent::set_up();
 
 		// Create a test user
@@ -173,10 +173,10 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'content', $result );
 		$this->assertIsArray( $result['content'] );
-			$this->assertNotEmpty( $result['content'] );
-			$this->assertSame( 'text', $result['content'][0]['type'] );
-			$this->assertIsString( $result['content'][0]['text'] );
-			$this->assertStringContainsString( 'mcp_adapter', $result['content'][0]['text'] );
+		$this->assertNotEmpty( $result['content'] );
+		$this->assertSame( 'text', $result['content'][0]['type'] );
+		$this->assertIsString( $result['content'][0]['text'] );
+		$this->assertStringContainsString( 'mcp_adapter', $result['content'][0]['text'] );
 	}
 
 	public function test_route_request_resources_list(): void {
@@ -525,7 +525,7 @@ final class RequestRouterTest extends TestCase {
 
 		$mcp_event = array_filter(
 			$events,
-			function ( $event ) {
+			static function ( $event ) {
 				return 'mcp.request' === $event['event'];
 			}
 		);
@@ -562,7 +562,7 @@ final class RequestRouterTest extends TestCase {
 
 		$mcp_event = array_filter(
 			$events,
-			function ( $event ) {
+			static function ( $event ) {
 				return 'mcp.request' === $event['event'];
 			}
 		);
@@ -596,7 +596,7 @@ final class RequestRouterTest extends TestCase {
 
 		$mcp_event = array_filter(
 			$events,
-			function ( $event ) {
+			static function ( $event ) {
 				return 'mcp.request' === $event['event'];
 			}
 		);
@@ -628,7 +628,7 @@ final class RequestRouterTest extends TestCase {
 
 		$mcp_event = array_filter(
 			$events,
-			function ( $event ) {
+			static function ( $event ) {
 				return 'mcp.request' === $event['event'];
 			}
 		);
@@ -661,7 +661,7 @@ final class RequestRouterTest extends TestCase {
 		// Find error event
 		$error_event = array_filter(
 			$events,
-			function ( $event ) {
+			static function ( $event ) {
 				return 'mcp.request' === $event['event'] && isset( $event['tags']['status'] ) && 'error' === $event['tags']['status'];
 			}
 		);
