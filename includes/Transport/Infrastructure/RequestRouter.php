@@ -341,13 +341,19 @@ class RequestRouter {
 	private function categorize_error( \Throwable $exception ): string {
 		$error_categories = array(
 			\ArgumentCountError::class       => 'arguments',
-			\Error::class                    => 'system',
+			\TypeError::class                => 'type',
 			\InvalidArgumentException::class => 'validation',
 			\LogicException::class           => 'logic',
 			\RuntimeException::class         => 'execution',
-			\TypeError::class                => 'type',
+			\Error::class                    => 'system',
 		);
 
-		return $error_categories[ get_class( $exception ) ] ?? 'unknown';
+		foreach ( $error_categories as $class => $category ) {
+			if ( $exception instanceof $class ) {
+				return $category;
+			}
+		}
+
+		return 'unknown';
 	}
 }
