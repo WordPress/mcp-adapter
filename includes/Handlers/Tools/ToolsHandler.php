@@ -24,6 +24,13 @@ class ToolsHandler {
 	use HandlerHelperTrait;
 
 	/**
+	 * Default MIME type for image results when none is specified.
+	 *
+	 * @var string
+	 */
+	private const DEFAULT_IMAGE_MIME_TYPE = 'image/png';
+
+	/**
 	 * The WordPress MCP instance.
 	 *
 	 * @var \WP\MCP\Core\McpServer
@@ -241,7 +248,7 @@ class ToolsHandler {
 			// Handle image results.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] && isset( $result['results'] ) ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
-				$mime_type  = $result['mimeType'] ?? 'image/png';
+				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
 				return CallToolResult::fromArray(
 					array(
