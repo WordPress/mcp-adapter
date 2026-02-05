@@ -104,7 +104,7 @@ class ToolsHandler {
 		}
 
 		try {
-			$tool_name = (string) $request_params['name'];
+			$tool_name = trim( (string) $request_params['name'] );
 			$args      = $request_params['arguments'] ?? array();
 
 			$mcp_tool = $this->mcp->get_mcp_tool( $tool_name );
