@@ -90,14 +90,14 @@ class ToolsHandler {
 	 * This distinction is critical for LLM self-correction - execution errors are
 	 * visible to the LLM, while protocol errors indicate infrastructure issues.
 	 *
-	 * @param array $message Request message.
+	 * @param array $params Request params.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
 	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
-	public function call_tool( array $message, $request_id = 0 ) {
+	public function call_tool( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
-		$request_params = $this->extract_params( $message );
+		$request_params = $this->extract_params( $params );
 
 		if ( ! isset( $request_params['name'] ) ) {
 			return McpErrorFactory::missing_parameter( $request_id, 'tool name' );
