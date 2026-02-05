@@ -488,9 +488,11 @@ class PromptsHandler {
 				'warning'
 			);
 
+			$text = isset( $content['text'] ) ? (string) $content['text'] : wp_json_encode( $content, JSON_PRETTY_PRINT );
+
 			return array(
 				'type' => 'text',
-				'text' => isset( $content['text'] ) ? (string) $content['text'] : wp_json_encode( $content, JSON_PRETTY_PRINT ),
+				'text' => false === $text ? '{}' : $text,
 			);
 		}
 
