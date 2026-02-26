@@ -33,16 +33,17 @@ class McpTransportContext {
 	/**
 	 * Initialize the transport context.
 	 *
-	 * @param \WP\MCP\Core\McpServer             $mcp_server The MCP server instance.
-	 * @param \WP\MCP\Handlers\Initialize\InitializeHandler     $initialize_handler The initialize handler.
-	 * @param \WP\MCP\Handlers\Tools\ToolsHandler          $tools_handler The tools handler.
-	 * @param \WP\MCP\Handlers\Resources\ResourcesHandler      $resources_handler The resources handler.
-	 * @param \WP\MCP\Handlers\Prompts\PromptsHandler        $prompts_handler The prompts handler.
-	 * @param \WP\MCP\Handlers\System\SystemHandler         $system_handler The system handler.
-	 * @param string                $observability_handler The observability handler class name.
+	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
+	 * @param \WP\MCP\Handlers\Initialize\InitializeHandler $initialize_handler The initialize handler.
+	 * @param \WP\MCP\Handlers\Tools\ToolsHandler $tools_handler The tools handler.
+	 * @param \WP\MCP\Handlers\Resources\ResourcesHandler $resources_handler The resources handler.
+	 * @param \WP\MCP\Handlers\Prompts\PromptsHandler $prompts_handler The prompts handler.
+	 * @param \WP\MCP\Handlers\System\SystemHandler $system_handler The system handler.
+	 * @param string $observability_handler The observability handler class name.
 	 * @param \WP\MCP\Transport\Infrastructure\RequestRouter|null $request_router The request router service.
-	 * @param callable|null         $transport_permission_callback Optional custom permission callback for transport-level authentication.
+	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication.
 	 */
+
 	/**
 	 * The MCP server instance.
 	 *

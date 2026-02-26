@@ -18,7 +18,7 @@ use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 final class TransportRoutingTest extends TestCase {
 
-	public function test_tools_and_prompts_routed_and_cursor_added(): void {
+	public function test_resources_and_prompts_routed(): void {
 		$server = new McpServer(
 			'srv',
 			'mcp/v1',
@@ -40,7 +40,7 @@ final class TransportRoutingTest extends TestCase {
 
 		$res = $transport->test_route_request( 'resources/list', array() );
 		$this->assertArrayHasKey( 'resources', $res );
-		$this->assertArrayHasKey( 'nextCursor', $res );
+		// DTOs handle cursor internally; nextCursor is optional in ListResourcesResult
 
 		$res2 = $transport->test_route_request( 'prompts/list', array() );
 		$this->assertArrayHasKey( 'prompts', $res2 );

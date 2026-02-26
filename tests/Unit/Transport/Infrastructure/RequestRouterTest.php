@@ -22,6 +22,7 @@ use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
+use WP\McpSchema\Common\McpConstants;
 use WP_REST_Request;
 
 /**
@@ -33,7 +34,7 @@ final class RequestRouterTest extends TestCase {
 	private McpTransportContext $context;
 	private int $test_user_id;
 
-	public function set_up(): void{
+	public function set_up(): void {
 		parent::set_up();
 
 		// Create a test user
@@ -51,7 +52,7 @@ final class RequestRouterTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
-			array( 'test/always-allowed' ),
+			array( 'test/always-allowed', 'test/meta-leak' ),
 			array( 'test/resource' ),
 			array( 'test/prompt' )
 		);
@@ -75,7 +76,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -87,7 +88,7 @@ final class RequestRouterTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'protocolVersion', $result );
-		$this->assertEquals( '2025-06-18', $result['protocolVersion'] );
+		$this->assertEquals( McpConstants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
 		$this->assertArrayHasKey( 'serverInfo', $result );
 
 		// Verify observability events (unified event name with status tag)
@@ -115,7 +116,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -140,6 +141,8 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'tools', $result );
 		$this->assertIsArray( $result['tools'] );
+		$this->assertNotEmpty( $result['tools'] );
+		$this->assertContainsOnly( 'array', $result['tools'] );
 	}
 
 	public function test_route_request_tools_call(): void {
@@ -157,13 +160,33 @@ final class RequestRouterTest extends TestCase {
 		$this->assertTrue( isset( $result['content'] ) || isset( $result['error'] ) );
 	}
 
+	public function test_route_request_tools_call_preserves_meta_in_text_content(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-meta-leak',
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertIsArray( $result['content'] );
+		$this->assertNotEmpty( $result['content'] );
+		$this->assertSame( 'text', $result['content'][0]['type'] );
+		$this->assertIsString( $result['content'][0]['text'] );
+		$this->assertStringContainsString( 'mcp_adapter', $result['content'][0]['text'] );
+	}
+
 	public function test_route_request_resources_list(): void {
 		$result = $this->router->route_request( 'resources/list', array(), 1 );
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'resources', $result );
-		$this->assertArrayHasKey( 'nextCursor', $result ); // Cursor compatibility
 		$this->assertIsArray( $result['resources'] );
+		$this->assertNotEmpty( $result['resources'] );
+		$this->assertContainsOnly( 'array', $result['resources'] );
 	}
 
 	public function test_route_request_prompts_list(): void {
@@ -172,6 +195,8 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'prompts', $result );
 		$this->assertIsArray( $result['prompts'] );
+		$this->assertNotEmpty( $result['prompts'] );
+		$this->assertContainsOnly( 'array', $result['prompts'] );
 	}
 
 	public function test_route_request_ping(): void {
@@ -186,6 +211,8 @@ final class RequestRouterTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
+		$this->assertArrayNotHasKey( 'jsonrpc', $result );
+		$this->assertArrayNotHasKey( 'id', $result );
 		$this->assertEquals( McpErrorFactory::METHOD_NOT_FOUND, $result['error']['code'] );
 		$this->assertStringContainsString( 'unknown/method', $result['error']['message'] );
 
@@ -227,34 +254,6 @@ final class RequestRouterTest extends TestCase {
 			}
 		);
 		$this->assertNotEmpty( $error_event );
-	}
-
-	public function test_add_cursor_compatibility(): void {
-		$result_without_cursor = array(
-			'resources' => array(
-				array( 'uri' => 'test://resource1' ),
-				array( 'uri' => 'test://resource2' ),
-			),
-		);
-
-		$result = $this->router->add_cursor_compatibility( $result_without_cursor );
-
-		$this->assertArrayHasKey( 'nextCursor', $result );
-		$this->assertEquals( '', $result['nextCursor'] );
-		$this->assertArrayHasKey( 'resources', $result );
-		$this->assertCount( 2, $result['resources'] );
-	}
-
-	public function test_add_cursor_compatibility_preserves_existing(): void {
-		$result_with_cursor = array(
-			'resources'  => array(),
-			'nextCursor' => 'existing-cursor-value',
-		);
-
-		$result = $this->router->add_cursor_compatibility( $result_with_cursor );
-
-		$this->assertArrayHasKey( 'nextCursor', $result );
-		$this->assertEquals( 'existing-cursor-value', $result['nextCursor'] );
 	}
 
 	public function test_route_request_observability_metrics(): void {
@@ -300,7 +299,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -314,6 +313,8 @@ final class RequestRouterTest extends TestCase {
 		// Verify error response structure (not double-wrapped)
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
+		$this->assertArrayNotHasKey( 'jsonrpc', $result );
+		$this->assertArrayNotHasKey( 'id', $result );
 
 		// The error should be a proper error object with code and message
 		$this->assertArrayHasKey( 'code', $result['error'] );
@@ -341,7 +342,7 @@ final class RequestRouterTest extends TestCase {
 		$result = $this->router->route_request(
 			'initialize',
 			array(
-				'protocolVersion' => '2025-06-18',
+				'protocolVersion' => '2025-11-25',
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -363,6 +364,430 @@ final class RequestRouterTest extends TestCase {
 
 		// Restore user
 		wp_set_current_user( $this->test_user_id );
+	}
+
+	// =========================================================================
+	// Observability Context Resolution Tests
+	// =========================================================================
+
+	public function test_route_request_tools_call_with_empty_tool_name(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => '',
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid tool name
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_tools_call_with_null_tool_name(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => null,
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid tool name
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_tools_call_with_non_string_tool_name(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 12345,
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid tool name
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_prompts_get_with_empty_prompt_name(): void {
+		$result = $this->router->route_request(
+			'prompts/get',
+			array(
+				'name' => '',
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid prompt name
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_prompts_get_with_null_prompt_name(): void {
+		$result = $this->router->route_request(
+			'prompts/get',
+			array(
+				'name' => null,
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid prompt name
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_prompts_get_with_nonexistent_prompt(): void {
+		$result = $this->router->route_request(
+			'prompts/get',
+			array(
+				'name' => 'nonexistent-prompt',
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for nonexistent prompt
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_resources_read_with_empty_uri(): void {
+		$result = $this->router->route_request(
+			'resources/read',
+			array(
+				'uri' => '',
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid uri
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_resources_read_with_null_uri(): void {
+		$result = $this->router->route_request(
+			'resources/read',
+			array(
+				'uri' => null,
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for invalid uri
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_resources_read_with_nonexistent_resource(): void {
+		$result = $this->router->route_request(
+			'resources/read',
+			array(
+				'uri' => 'nonexistent://resource',
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Should return an error for nonexistent resource
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	// =========================================================================
+	// Sanitize Params Tests (via observability events)
+	// =========================================================================
+
+	public function test_route_request_sanitizes_client_info_in_params(): void {
+		DummyObservabilityHandler::reset();
+
+		$this->router->route_request(
+			'initialize',
+			array(
+				'protocolVersion' => '2025-11-25',
+				'clientInfo'      => array(
+					'name'    => 'test-client',
+					'version' => '1.0.0',
+				),
+			),
+			1,
+			'test-transport'
+		);
+
+		// Check that client_name was extracted in sanitized params
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		$mcp_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'];
+			}
+		);
+		$this->assertNotEmpty( $mcp_event );
+
+		$first_event = reset( $mcp_event );
+		$this->assertArrayHasKey( 'tags', $first_event );
+		$this->assertArrayHasKey( 'params', $first_event['tags'] );
+
+		$params = $first_event['tags']['params'];
+		$this->assertArrayHasKey( 'client_name', $params );
+		$this->assertEquals( 'test-client', $params['client_name'] );
+	}
+
+	public function test_route_request_sanitizes_arguments_in_tool_call(): void {
+		DummyObservabilityHandler::reset();
+
+		$this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-always-allowed',
+				'arguments' => array(
+					'arg1' => 'value1',
+					'arg2' => 'value2',
+				),
+			),
+			1,
+			'test-transport'
+		);
+
+		// Check that arguments_count and arguments_keys were extracted
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		$mcp_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'];
+			}
+		);
+		$this->assertNotEmpty( $mcp_event );
+
+		$first_event = reset( $mcp_event );
+		$params      = $first_event['tags']['params'];
+
+		$this->assertArrayHasKey( 'arguments_count', $params );
+		$this->assertEquals( 2, $params['arguments_count'] );
+		$this->assertArrayHasKey( 'arguments_keys', $params );
+		$this->assertContains( 'arg1', $params['arguments_keys'] );
+		$this->assertContains( 'arg2', $params['arguments_keys'] );
+	}
+
+	public function test_route_request_sanitizes_params_extracts_safe_fields(): void {
+		DummyObservabilityHandler::reset();
+
+		$this->router->route_request(
+			'resources/read',
+			array(
+				'uri'       => 'test://resource/path',
+				'sensitive' => 'should-not-appear',
+			),
+			1,
+			'test-transport'
+		);
+
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		$mcp_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'];
+			}
+		);
+		$this->assertNotEmpty( $mcp_event );
+
+		$first_event = reset( $mcp_event );
+		$params      = $first_event['tags']['params'];
+
+		// URI should be extracted (safe field)
+		$this->assertArrayHasKey( 'uri', $params );
+		$this->assertEquals( 'test://resource/path', $params['uri'] );
+
+		// Sensitive field should not be extracted
+		$this->assertArrayNotHasKey( 'sensitive', $params );
+	}
+
+	public function test_route_request_with_empty_params(): void {
+		DummyObservabilityHandler::reset();
+
+		$this->router->route_request(
+			'ping',
+			array(),
+			1,
+			'test-transport'
+		);
+
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		$mcp_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'];
+			}
+		);
+		$this->assertNotEmpty( $mcp_event );
+
+		$first_event = reset( $mcp_event );
+		$this->assertArrayHasKey( 'tags', $first_event );
+		$this->assertArrayHasKey( 'params', $first_event['tags'] );
+		$this->assertEmpty( $first_event['tags']['params'] );
+	}
+
+	// =========================================================================
+	// Error Categorization Tests
+	// =========================================================================
+
+	public function test_route_request_records_error_type_in_observability(): void {
+		DummyObservabilityHandler::reset();
+
+		// Trigger an error by calling a nonexistent tool
+		$this->router->route_request(
+			'tools/call',
+			array( 'name' => 'nonexistent-tool' ),
+			1,
+			'test-transport'
+		);
+
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+
+		// Find error event
+		$error_event = array_filter(
+			$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event'] && isset( $event['tags']['status'] ) && 'error' === $event['tags']['status'];
+			}
+		);
+		$this->assertNotEmpty( $error_event );
+	}
+
+	// =========================================================================
+	// Nested Params Tests
+	// =========================================================================
+
+	public function test_route_request_handles_nested_params_structure(): void {
+		DummyObservabilityHandler::reset();
+
+		// Test with params nested under 'params' key (some clients do this)
+		$this->router->route_request(
+			'tools/call',
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			),
+			1,
+			'test-transport'
+		);
+
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+	}
+
+	public function test_route_request_handles_non_array_nested_params(): void {
+		DummyObservabilityHandler::reset();
+
+		// Test with non-array nested params
+		$this->router->route_request(
+			'tools/call',
+			array(
+				'params' => 'not-an-array',
+				'name'   => 'test-always-allowed',
+			),
+			1,
+			'test-transport'
+		);
+
+		$events = DummyObservabilityHandler::$events;
+		$this->assertNotEmpty( $events );
+	}
+
+	// =========================================================================
+	// Additional Edge Case Tests
+	// =========================================================================
+
+	public function test_route_request_with_null_request_id(): void {
+		$result = $this->router->route_request(
+			'ping',
+			array(),
+			null,
+			'test-transport'
+		);
+
+		$this->assertIsArray( $result );
+		// Ping with null ID should still work
+		$this->assertEmpty( $result );
+	}
+
+	public function test_route_request_with_string_request_id(): void {
+		$result = $this->router->route_request(
+			'ping',
+			array(),
+			'string-request-id',
+			'test-transport'
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertEmpty( $result );
+	}
+
+	public function test_route_request_tools_list_all(): void {
+		$result = $this->router->route_request( 'tools/list/all', array(), 1 );
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'tools', $result );
+		$this->assertIsArray( $result['tools'] );
+	}
+
+	public function test_route_request_with_whitespace_tool_name(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => '   ',
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Whitespace-only tool name should be treated as empty
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_with_whitespace_prompt_name(): void {
+		$result = $this->router->route_request(
+			'prompts/get',
+			array(
+				'name' => '   ',
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Whitespace-only prompt name should be treated as empty
+		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_route_request_with_whitespace_resource_uri(): void {
+		$result = $this->router->route_request(
+			'resources/read',
+			array(
+				'uri' => '   ',
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		// Whitespace-only URI should be treated as empty
+		$this->assertArrayHasKey( 'error', $result );
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {

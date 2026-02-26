@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Domain\Prompts;
 
+use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Prompts\McpPromptValidator;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
@@ -667,7 +668,7 @@ final class McpPromptValidatorTest extends TestCase {
 	// =========================================================================
 
 	public function test_validate_prompt_instance_with_valid_prompt(): void {
-		$mcp_prompt = \WP\MCP\Domain\Prompts\McpPromptDto::fromArray(
+		$mcp_prompt = McpPrompt::fromArray(
 			array(
 				'name'    => 'test-prompt',
 				'handler' => function () {

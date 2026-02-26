@@ -11,49 +11,65 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
+use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
+use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Test ResourcesHandler functionality.
  */
 final class ResourcesHandlerTest extends TestCase {
 
+	public function test_list_resources_returns_dto(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ), array() );
+		$handler = new ResourcesHandler( $server );
+		$result  = $handler->list_resources();
+
+		$this->assertInstanceOf( ListResourcesResult::class, $result );
+	}
+
 	public function test_list_resources_returns_registered_resources(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array( 'test/resource' ), array() );
 		$handler = new ResourcesHandler( $server );
-		$res     = $handler->list_resources();
+		$result  = $handler->list_resources();
 
-		$this->assertArrayHasKey( 'resources', $res );
-		$this->assertNotEmpty( $res['resources'] );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'resources', $res['_metadata']['component_type'] );
-		$this->assertArrayHasKey( 'resources_count', $res['_metadata'] );
+		// Use DTO getter methods
+		$resources = $result->getResources();
+		$this->assertNotEmpty( $resources );
+		$this->assertContainsOnlyInstancesOf( ResourceDto::class, $resources );
 	}
 
 	public function test_list_resources_returns_empty_array_when_no_resources(): void {
 		$server  = $this->makeServer( array(), array(), array() );
 		$handler = new ResourcesHandler( $server );
-		$res     = $handler->list_resources();
+		$result  = $handler->list_resources();
 
-		$this->assertArrayHasKey( 'resources', $res );
-		$this->assertEmpty( $res['resources'] );
-		$this->assertEquals( 0, $res['_metadata']['resources_count'] );
+		// Use DTO getter methods
+		$resources = $result->getResources();
+		$this->assertIsArray( $resources );
+		$this->assertEmpty( $resources );
 	}
 
 	public function test_read_resource_missing_uri_returns_error(): void {
 		$server  = $this->makeServer( array(), array( 'test/resource' ), array() );
 		$handler = new ResourcesHandler( $server );
-		$res     = $handler->read_resource( array( 'params' => array() ) );
+		$result  = $handler->read_resource( array( 'params' => array() ) );
 
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'missing_parameter', $res['_metadata']['failure_reason'] );
+		// Missing uri is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_read_resource_not_found_returns_error(): void {
 		$server  = $this->makeServer( array(), array( 'test/resource' ), array() );
 		$handler = new ResourcesHandler( $server );
-		$res     = $handler->read_resource(
+		$result  = $handler->read_resource(
 			array(
 				'params' => array(
 					'uri' => 'nonexistent://resource',
@@ -61,48 +77,59 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'not_found', $res['_metadata']['failure_reason'] );
-		$this->assertEquals( 'nonexistent://resource', $res['_metadata']['resource_uri'] );
+		// Resource not found is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 	}
 
 	public function test_read_resource_with_wp_error_from_get_ability(): void {
 		wp_set_current_user( 1 );
 
-		// Create a resource with a non-existent ability name
-		$server = $this->makeServer( array(), array(), array() );
-		$resource = new \WP\MCP\Domain\Resources\McpResource(
-			'nonexistent/ability',
-			'WordPress://test/nonexistent-resource',
-			'Test Resource',
-			'Test description'
-		);
-		$resource->set_mcp_server( $server );
-		// Manually add the invalid resource (bypassing normal registration)
-		$registry = $server->get_component_registry();
-		$reflection = new \ReflectionClass( $registry );
-		$resources_property = $reflection->getProperty( 'resources' );
-		$resources_property->setAccessible( true );
-		$resources = $resources_property->getValue( $registry );
-		$resources['WordPress://test/nonexistent-resource'] = $resource;
-		$resources_property->setValue( $registry, $resources );
-
-		$handler = new ResourcesHandler( $server );
-
-		$res = $handler->read_resource(
+		// Register a resource ability, then unregister it after the server is created.
+		// Wrapper-backed execution keeps the ability instance, so runtime lookup is not required.
+		$this->register_ability_in_hook(
+			'test/resource-to-remove',
 			array(
-				'params' => array(
-					'uri' => 'WordPress://test/nonexistent-resource',
+				'label'               => 'Resource To Remove',
+				'description'         => 'A resource whose ability will be removed',
+				'category'            => 'test',
+				'execute_callback'    => static function (): string {
+					return 'ok';
+				},
+				'permission_callback' => static function (): bool {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://test/resource-to-remove',
+					),
 				),
 			)
 		);
 
-		// Should return error
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'ability_retrieval_failed', $res['_metadata']['failure_reason'] );
-		$this->assertEquals( 'ability_not_found', $res['_metadata']['error_code'] );
+		$server  = $this->makeServer( array(), array( 'test/resource-to-remove' ), array() );
+		$handler = new ResourcesHandler( $server );
+
+		// Now unregister the ability after the wrapper was created.
+		wp_unregister_ability( 'test/resource-to-remove' );
+
+		$result = $handler->read_resource(
+			array(
+				'params' => array(
+					'uri' => 'WordPress://test/resource-to-remove',
+				),
+			)
+		);
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+		$contents = $result->getContents();
+		$this->assertNotEmpty( $contents );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( 'ok', $contents[0]->getText() );
 	}
 
 	public function test_read_resource_with_wp_error_from_execute(): void {
@@ -131,14 +158,14 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		$server  = $this->makeServer( array(), array( 'test/wp-error-resource-execute' ), array() );
-		$handler = new ResourcesHandler( $server );
+		$server    = $this->makeServer( array(), array( 'test/wp-error-resource-execute' ), array() );
+		$handler   = new ResourcesHandler( $server );
 		$resources = $server->get_resources();
 		$this->assertNotEmpty( $resources, 'test/wp-error-resource-execute should be registered' );
 
 		$resource_uri = array_keys( $resources )[0];
 
-		$res = $handler->read_resource(
+		$result = $handler->read_resource(
 			array(
 				'params' => array(
 					'uri' => $resource_uri,
@@ -146,11 +173,11 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return error
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'wp_error', $res['_metadata']['failure_reason'] );
-		$this->assertEquals( 'test_error', $res['_metadata']['error_code'] );
+		// WP_Error from execute is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 
 		// Clean up
 		wp_unregister_ability( 'test/wp-error-resource-execute' );
@@ -182,14 +209,14 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		$server  = $this->makeServer( array(), array( 'test/resource-execute-exception' ), array() );
-		$handler = new ResourcesHandler( $server );
+		$server    = $this->makeServer( array(), array( 'test/resource-execute-exception' ), array() );
+		$handler   = new ResourcesHandler( $server );
 		$resources = $server->get_resources();
 		$this->assertNotEmpty( $resources, 'test/resource-execute-exception should be registered' );
 
 		$resource_uri = array_keys( $resources )[0];
 
-		$res = $handler->read_resource(
+		$result = $handler->read_resource(
 			array(
 				'params' => array(
 					'uri' => $resource_uri,
@@ -197,21 +224,15 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		// Should return error
-		$this->assertArrayHasKey( 'error', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'execution_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+		// Exception is a protocol error - returns JSONRPCErrorResponse
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertNotEmpty( $error->getMessage() );
 
 		// Clean up
 		wp_unregister_ability( 'test/resource-execute-exception' );
 	}
-
-	// Note: Testing ability retrieval failure requires complex mocking
-	// that's already covered in integration tests
-
-	// Note: Permission denied scenarios are tested using existing abilities
-	// in the tool handler tests and integration tests
 
 	public function test_read_resource_success_returns_contents(): void {
 		wp_set_current_user( 1 );
@@ -223,7 +244,7 @@ final class ResourcesHandlerTest extends TestCase {
 
 		$resource_uri = array_keys( $resources )[0];
 
-		$res = $handler->read_resource(
+		$result = $handler->read_resource(
 			array(
 				'params' => array(
 					'uri' => $resource_uri,
@@ -231,10 +252,12 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertArrayHasKey( 'contents', $res );
-		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'resource', $res['_metadata']['component_type'] );
-		$this->assertArrayHasKey( 'resource_uri', $res['_metadata'] );
-		$this->assertArrayHasKey( 'ability_name', $res['_metadata'] );
+		// Successful read returns ReadResourceResult DTO
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		// Use DTO getter methods
+		$contents = $result->getContents();
+		$this->assertNotEmpty( $contents );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
 	}
 }

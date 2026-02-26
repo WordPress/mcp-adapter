@@ -8,11 +8,9 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
-use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 final class ErrorResponseConsistencyTest extends TestCase {
 
@@ -57,94 +55,6 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		}
 	}
 
-	public function test_helper_trait_error_methods_produce_consistent_format(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-
-		// Use reflection to access the protected helper methods
-		$reflection = new \ReflectionClass( $tools_handler );
-
-		$invalid_param_method = $reflection->getMethod( 'missing_parameter_error' );
-		$invalid_param_method->setAccessible( true );
-
-		$permission_denied_method = $reflection->getMethod( 'permission_denied_error' );
-		$permission_denied_method->setAccessible( true );
-
-		$internal_error_method = $reflection->getMethod( 'internal_error' );
-		$internal_error_method->setAccessible( true );
-
-		// Test all helper methods - missing_parameter_error uses INVALID_PARAMS error code
-		$invalid_param_error = $invalid_param_method->invoke( $tools_handler, 'test_param', 123 );
-		$permission_error    = $permission_denied_method->invoke( $tools_handler, 'test_resource', 456 );
-		$internal_error      = $internal_error_method->invoke( $tools_handler, 'test_message', 789 );
-
-		$errors = array( $invalid_param_error, $permission_error, $internal_error );
-
-		foreach ( $errors as $error ) {
-			$this->assertArrayHasKey( 'error', $error );
-			$this->assertArrayHasKey( 'code', $error['error'] );
-			$this->assertArrayHasKey( 'message', $error['error'] );
-			// Note: Error codes are now float (from DTOs) for JSON number compatibility
-			$this->assertIsNumeric( $error['error']['code'] );
-			$this->assertIsString( $error['error']['message'] );
-			$this->assertNotEmpty( $error['error']['message'] );
-		}
-	}
-
-	public function test_error_factory_consistency_with_handler_helpers(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-
-		// Use reflection to access helper method
-		$reflection           = new \ReflectionClass( $tools_handler );
-		$invalid_param_method = $reflection->getMethod( 'missing_parameter_error' );
-		$invalid_param_method->setAccessible( true );
-
-		// Test parameter validation error from both factory and helper
-		// Note: missing_parameter() is a convenience wrapper that returns INVALID_PARAMS error code
-		// Factory now returns a DTO, convert it to array for comparison
-		$factory_error = McpErrorFactory::missing_parameter( 100, 'test_param' )->toArray();
-		$helper_error  = $invalid_param_method->invoke( $tools_handler, 'test_param', 100 );
-
-		// Both should have the same structure
-		$this->assertArrayHasKey( 'error', $factory_error );
-		$this->assertArrayHasKey( 'error', $helper_error );
-
-		// Error codes should match (both use INVALID_PARAMS)
-		$this->assertEquals( $factory_error['error']['code'], $helper_error['error']['code'] );
-		$this->assertEquals( (float) McpErrorFactory::INVALID_PARAMS, $factory_error['error']['code'] );
-
-		// Both should contain the parameter name
-		$this->assertStringContainsString( 'test_param', $factory_error['error']['message'] );
-		$this->assertStringContainsString( 'test_param', $helper_error['error']['message'] );
-	}
-
-	public function test_extract_error_helper_works_with_factory_responses(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-
-		// Use reflection to access helper method
-		$reflection           = new \ReflectionClass( $tools_handler );
-		$extract_error_method = $reflection->getMethod( 'extract_error' );
-		$extract_error_method->setAccessible( true );
-
-		// Test with McpErrorFactory response (now returns DTO)
-		$factory_response = McpErrorFactory::tool_not_found( 200, 'test_tool' );
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $factory_response );
-
-		$extracted_error = $extract_error_method->invoke( $tools_handler, $factory_response );
-
-		$this->assertArrayHasKey( 'code', $extracted_error );
-		$this->assertArrayHasKey( 'message', $extracted_error );
-		$this->assertEquals( $factory_response->getError()->toArray(), $extracted_error );
-
-		// Test with plain error array (backwards compatibility)
-		$plain_error     = array(
-			'code'    => 300,
-			'message' => 'Plain error',
-		);
-		$extracted_plain = $extract_error_method->invoke( $tools_handler, $plain_error );
-
-		$this->assertSame( $plain_error, $extracted_plain );
-	}
-
 	public function test_all_handlers_return_errors_in_same_format_for_not_found(): void {
 		$tools_handler     = new ToolsHandler( $this->server );
 		$prompts_handler   = new PromptsHandler( $this->server );
@@ -169,37 +79,6 @@ final class ErrorResponseConsistencyTest extends TestCase {
 			// All "not found" errors should have negative codes (MCP convention).
 			$this->assertLessThan( 0, $error['error']['code'] );
 		}
-	}
-
-	public function test_success_responses_are_consistent(): void {
-		$tools_handler = new ToolsHandler( $this->server );
-
-		// Use reflection to access helper method
-		$reflection     = new \ReflectionClass( $tools_handler );
-		$success_method = $reflection->getMethod( 'create_success_response' );
-		$success_method->setAccessible( true );
-
-		// Test success response formats
-		$array_data   = array(
-			'result' => 'success',
-			'data'   => array( 'id' => 123 ),
-		);
-		$string_data  = 'simple success message';
-		$numeric_data = 42;
-
-		$array_response   = $success_method->invoke( $tools_handler, $array_data );
-		$string_response  = $success_method->invoke( $tools_handler, $string_data );
-		$numeric_response = $success_method->invoke( $tools_handler, $numeric_data );
-
-		$responses = array( $array_response, $string_response, $numeric_response );
-
-		foreach ( $responses as $response ) {
-			$this->assertArrayHasKey( 'result', $response );
-		}
-
-		$this->assertSame( $array_data, $array_response['result'] );
-		$this->assertSame( $string_data, $string_response['result'] );
-		$this->assertSame( $numeric_data, $numeric_response['result'] );
 	}
 
 	public function test_parameter_extraction_consistency_across_handlers(): void {
