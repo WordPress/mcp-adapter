@@ -299,8 +299,11 @@ class RequestRouter {
 	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
 	 */
 	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
+		// Extract client protocol version from params, defaulting to empty string if missing.
+		$client_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] ) ? $params['protocolVersion'] : '';
+
 		// Get the initialize response from the handler (returns InitializeResult DTO).
-		$init_result = $this->context->initialize_handler->handle();
+		$init_result = $this->context->initialize_handler->handle( $client_version );
 
 		// Handle session creation if HTTP context is provided.
 		// InitializeResult DTO never has errors - errors would be thrown as exceptions.

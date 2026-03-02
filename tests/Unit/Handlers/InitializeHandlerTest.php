@@ -30,7 +30,7 @@ final class InitializeHandlerTest extends TestCase {
 		);
 
 		$handler = new InitializeHandler( $server );
-		$result  = $handler->handle();
+		$result  = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
 
 		// Returns InitializeResult DTO.
 		$this->assertInstanceOf( InitializeResult::class, $result );
@@ -64,7 +64,7 @@ final class InitializeHandlerTest extends TestCase {
 		);
 
 		$handler = new InitializeHandler( $server );
-		$result  = $handler->handle();
+		$result  = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
 
 		// Verify that toArray() produces expected structure.
 		$array = $result->toArray();
@@ -115,7 +115,7 @@ final class InitializeHandlerTest extends TestCase {
 		);
 
 		$handler = new InitializeHandler( $server );
-		$result  = $handler->handle();
+		$result  = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
 
 		// Simulate the JSON-RPC response serialization chain.
 		$result_array = $result->toArray();
@@ -153,5 +153,76 @@ final class InitializeHandlerTest extends TestCase {
 		$this->assertFalse( $decoded->capabilities->resources->subscribe );
 		$this->assertFalse( $decoded->capabilities->resources->listChanged );
 		$this->assertFalse( $decoded->capabilities->prompts->listChanged );
+	}
+
+	public function test_handle_withSupportedVersion_negotiatesToClientVersion(): void {
+		$server = new McpServer(
+			'test',
+			'mcp/v1',
+			'/mcp',
+			'Test Server',
+			'Desc',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
+		);
+
+		$handler = new InitializeHandler( $server );
+		$result  = $handler->handle( '2025-06-18' );
+
+		$this->assertInstanceOf( InitializeResult::class, $result );
+		$this->assertSame( '2025-06-18', $result->getProtocolVersion() );
+
+		// Verify other fields are still correct.
+		$this->assertSame( 'Test Server', $result->getServerInfo()->getName() );
+		$this->assertSame( '1.0.0', $result->getServerInfo()->getVersion() );
+		$this->assertSame( 'Desc', $result->getInstructions() );
+	}
+
+	public function test_handle_withUnsupportedVersion_negotiatesToLatest(): void {
+		$server = new McpServer(
+			'test',
+			'mcp/v1',
+			'/mcp',
+			'Test Server',
+			'Desc',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
+		);
+
+		$handler = new InitializeHandler( $server );
+		$result  = $handler->handle( '9999-99-99' );
+
+		$this->assertInstanceOf( InitializeResult::class, $result );
+		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $result->getProtocolVersion() );
+
+		// Verify other fields are still correct.
+		$this->assertSame( 'Test Server', $result->getServerInfo()->getName() );
+	}
+
+	public function test_handle_withEmptyVersion_negotiatesToLatest(): void {
+		$server = new McpServer(
+			'test',
+			'mcp/v1',
+			'/mcp',
+			'Test Server',
+			'Desc',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
+		);
+
+		$handler = new InitializeHandler( $server );
+		$result  = $handler->handle( '' );
+
+		$this->assertInstanceOf( InitializeResult::class, $result );
+		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $result->getProtocolVersion() );
+
+		// Verify other fields are still correct.
+		$this->assertSame( 'Test Server', $result->getServerInfo()->getName() );
 	}
 }
