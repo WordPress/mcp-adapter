@@ -121,6 +121,12 @@ class HttpRequestHandler {
 			}
 		);
 
+		// Per MCP spec 2025-06-18: Notifications return HTTP 202 Accepted with no body.
+		// A null response_body indicates only notifications were processed (no requests with IDs).
+		if ( null === $response_body ) {
+			return new \WP_REST_Response( null, 202 );
+		}
+
 		// Determine HTTP status code based on error type
 		if ( ! $is_batch_request && isset( $response_body['error'] ) ) {
 			$http_status = McpErrorFactory::get_http_status_for_error( $response_body );
@@ -156,6 +162,8 @@ class HttpRequestHandler {
 			return $this->process_jsonrpc_request( $message, $context );
 		}
 
+		// JSON-RPC responses from client (has result/error, no method) also return null.
+		// Per MCP spec: client responses get HTTP 202 Accepted with no body, same as notifications.
 		return null;
 	}
 

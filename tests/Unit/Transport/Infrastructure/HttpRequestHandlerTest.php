@@ -284,7 +284,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 202, $response->get_status() );
 		$this->assertNull( $response->get_data() );
 	}
 
