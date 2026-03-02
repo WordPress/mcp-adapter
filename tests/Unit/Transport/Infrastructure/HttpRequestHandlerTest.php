@@ -486,14 +486,17 @@ final class HttpRequestHandlerTest extends TestCase {
 		$init_context  = new HttpRequestContext( $init_request );
 		$init_response = $this->handler->handle_request( $init_context );
 
+		// Verify initialize succeeded.
+		$data = $init_response->get_data();
+		$this->assertArrayHasKey( 'result', $data, 'Initialize must succeed' );
+
 		// The session header is set via a rest_post_dispatch filter which doesn't
-		// fire automatically in unit tests. Apply the filter manually to populate it.
-		$init_response = apply_filters( 'rest_post_dispatch', $init_response );
-		$headers       = $init_response->get_headers();
+		// fire in unit tests. Read the session ID directly from user meta instead.
+		$sessions = get_user_meta( get_current_user_id(), 'mcp_adapter_sessions', true );
+		$this->assertNotEmpty( $sessions, 'Initialize must create a session in user meta' );
 
-		$this->assertArrayHasKey( 'Mcp-Session-Id', $headers, 'Initialize must create a session' );
-
-		return $headers['Mcp-Session-Id'];
+		// Return the most recently created session ID.
+		return (string) array_key_last( $sessions );
 	}
 
 	private function createPostRequest( array $body ): WP_REST_Request {
