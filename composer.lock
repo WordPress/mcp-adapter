@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "23b92d843fddc9c75ebc03f4931206fa",
+    "content-hash": "1bddfb19e1d512cdedbadf6fba1901d8",
     "packages": [
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "dev-feat/mcp-schema-2025-11-25",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/WordPress/php-mcp-schema.git",
-                "reference": "d31bbf5acc5e3cc9d32e9e17d819e1ca8d18ba76"
+                "reference": "b1003dd4d223ef727f19a3163755163461009289"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/d31bbf5acc5e3cc9d32e9e17d819e1ca8d18ba76",
-                "reference": "d31bbf5acc5e3cc9d32e9e17d819e1ca8d18ba76",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/b1003dd4d223ef727f19a3163755163461009289",
+                "reference": "b1003dd4d223ef727f19a3163755163461009289",
                 "shasum": ""
             },
             "require": {
@@ -41,7 +41,7 @@
                 ]
             },
             "license": [
-                "MIT"
+                "GPL-2.0-or-later"
             ],
             "authors": [
                 {
@@ -59,10 +59,10 @@
                 "schema"
             ],
             "support": {
-                "source": "https://github.com/WordPress/php-mcp-schema/tree/feat/mcp-schema-2025-11-25",
+                "source": "https://github.com/WordPress/php-mcp-schema/tree/v0.1.0",
                 "issues": "https://github.com/WordPress/php-mcp-schema/issues"
             },
-            "time": "2026-01-06T16:27:40+00:00"
+            "time": "2026-03-02T08:25:49+00:00"
         }
     ],
     "packages-dev": [
@@ -3380,8 +3380,7 @@
     ],
     "minimum-stability": "dev",
     "stability-flags": {
-        "phpcompatibility/php-compatibility": 20,
-        "wordpress/php-mcp-schema": 20
+        "phpcompatibility/php-compatibility": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,

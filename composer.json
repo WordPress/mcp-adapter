@@ -75,7 +75,7 @@
 	},
 	"require": {
 		"php": "^7.4 || ^8.0",
-		"wordpress/php-mcp-schema": "dev-feat/mcp-schema-2025-11-25",
+		"wordpress/php-mcp-schema": "^0.1.0",
 		"ext-json": "*"
 	},
 	"require-dev": {
