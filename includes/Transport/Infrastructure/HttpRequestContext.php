@@ -44,6 +44,15 @@ class HttpRequestContext {
 	public ?array $body;
 
 	/**
+	 * The MCP-Protocol-Version header from the request.
+	 *
+	 * @since n.e.x.t.
+	 *
+	 * @var string|null
+	 */
+	public ?string $protocol_version;
+
+	/**
 	 * The Accept header from the request.
 	 *
 	 * @var string|null
@@ -56,10 +65,11 @@ class HttpRequestContext {
 	 * @param \WP_REST_Request<array<string, mixed>> $request The original request object.
 	 */
 	public function __construct( \WP_REST_Request $request ) {
-		$this->request       = $request;
-		$this->method        = $request->get_method();
-		$this->session_id    = $request->get_header( 'Mcp-Session-Id' );
-		$this->accept_header = $request->get_header( 'accept' );
-		$this->body          = 'POST' === $this->method ? $request->get_json_params() : null;
+		$this->request          = $request;
+		$this->method           = $request->get_method();
+		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
+		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
+		$this->accept_header    = $request->get_header( 'accept' );
+		$this->body             = 'POST' === $this->method ? $request->get_json_params() : null;
 	}
 }
