@@ -11,6 +11,7 @@ use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
 use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
+use WP_Error;
 
 final class PromptsHandlerTest extends TestCase {
 
@@ -138,7 +139,7 @@ final class PromptsHandlerTest extends TestCase {
 					),
 				),
 				'execute_callback'    => static function () {
-					return new \WP_Error( 'test_error', 'Test error message' );
+					return new WP_Error( 'test_error', 'Test error message' );
 				},
 				'permission_callback' => static function () {
 					return true;

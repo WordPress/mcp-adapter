@@ -20,6 +20,7 @@ use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP_Error;
 
 /**
  * Registry for managing MCP server components (tools, resources, prompts).
@@ -493,7 +494,7 @@ class McpComponentRegistry {
 		$prompt_name = $builder->get_name();
 
 		$mcp_prompt = McpPrompt::fromBuilder( $builder );
-		if ( $mcp_prompt instanceof \WP_Error ) {
+		if ( $mcp_prompt instanceof WP_Error ) {
 			$this->error_handler->log( $mcp_prompt->get_error_message(), array( "McpPrompt::fromBuilder::{$prompt_name}" ) );
 
 			$this->track_registration(

@@ -12,6 +12,7 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
+use WP_Error;
 
 /**
  * Validates MCP prompts against the Model Context Protocol specification.
@@ -41,7 +42,7 @@ class McpPromptValidator {
 				__( 'Prompt validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			return new \WP_Error( 'mcp_prompt_validation_failed', esc_html( $error_message ) );
+			return new WP_Error( 'mcp_prompt_validation_failed', esc_html( $error_message ) );
 		}
 
 		return true;
@@ -76,7 +77,7 @@ class McpPromptValidator {
 		// BaseMetadata has title and name, handled separately.
 
 		if ( ! empty( $errors ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_prompt_validation_failed',
 				sprintf(
 				/* translators: %s: list of validation errors */

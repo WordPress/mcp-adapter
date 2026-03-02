@@ -16,6 +16,7 @@ use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
 use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP_Error;
 
 /**
  * Test ResourcesHandler functionality.
@@ -143,7 +144,7 @@ final class ResourcesHandlerTest extends TestCase {
 				'description'         => 'Returns WP_Error from execute',
 				'category'            => 'test',
 				'execute_callback'    => static function () {
-					return new \WP_Error( 'test_error', 'Test error message' );
+					return new WP_Error( 'test_error', 'Test error message' );
 				},
 				'permission_callback' => static function () {
 					return true;

@@ -7,6 +7,7 @@ namespace WP\MCP\Tests\Unit\Resources;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP_Error;
 
 final class McpResourceTest extends TestCase {
 
@@ -146,7 +147,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_resource_missing_uri', $result->get_error_code() );
 	}
 
@@ -157,7 +158,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_resource_missing_handler', $result->get_error_code() );
 	}
 
@@ -169,7 +170,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_resource_invalid_uri', $result->get_error_code() );
 	}
 
@@ -267,7 +268,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_resource_dto_creation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'Expected float', $result->get_error_message() );
 	}
@@ -290,7 +291,7 @@ final class McpResourceTest extends TestCase {
 
 		$result = $resource->check_permission( array() );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
 		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );

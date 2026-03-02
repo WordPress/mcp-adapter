@@ -17,6 +17,7 @@ use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use Yoast\PHPUnitPolyfills\TestCases\TestCase as PolyfillsTestCase;
+use WP_Error;
 
 abstract class TestCase extends PolyfillsTestCase {
 
@@ -171,7 +172,7 @@ abstract class TestCase extends PolyfillsTestCase {
 	 * @return void
 	 */
 	public function assertWPError( $actual, string $message = '' ): void {
-		$this->assertInstanceOf( \WP_Error::class, $actual, $message );
+		$this->assertInstanceOf( WP_Error::class, $actual, $message );
 	}
 
 	/**
@@ -183,7 +184,7 @@ abstract class TestCase extends PolyfillsTestCase {
 	 * @return void
 	 */
 	public function assertNotWPError( $actual, string $message = '' ): void {
-		$this->assertNotInstanceOf( \WP_Error::class, $actual, $message );
+		$this->assertNotInstanceOf( WP_Error::class, $actual, $message );
 	}
 
 	/**

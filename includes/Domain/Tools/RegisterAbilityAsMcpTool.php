@@ -15,6 +15,7 @@ use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP_Error;
 
 /**
  * RegisterAbilityAsMcpTool class.
@@ -67,7 +68,7 @@ class RegisterAbilityAsMcpTool {
 		try {
 			$tool_dto = ToolDto::fromArray( $data['tool_data'] );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_tool_dto_creation_failed',
 				sprintf(
 				/* translators: %s: error message */
@@ -226,7 +227,7 @@ class RegisterAbilityAsMcpTool {
 
 		// Validate post-filter (in case filter broke it).
 		if ( ! is_string( $filtered_name ) || ! McpValidator::validate_name( $filtered_name ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_tool_name_filter_invalid',
 				sprintf(
 				/* translators: %s: invalid tool name returned by filter */

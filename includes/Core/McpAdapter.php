@@ -18,6 +18,7 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Servers\DefaultServerFactory;
+use WP_Error;
 
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
@@ -173,7 +174,7 @@ final class McpAdapter {
 
 		// Validate error handler class exists and implements McpErrorHandlerInterface.
 		if ( ! class_exists( $error_handler ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'invalid_error_handler',
 				sprintf(
 					/* translators: %s: error handler class name */
@@ -184,7 +185,7 @@ final class McpAdapter {
 		}
 
 		if ( ! in_array( McpErrorHandlerInterface::class, class_implements( $error_handler ) ?: array(), true ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'invalid_error_handler',
 				sprintf(
 				/* translators: %s: error handler class name */
@@ -201,7 +202,7 @@ final class McpAdapter {
 
 		// Validate observability handler class exists and implements McpObservabilityHandlerInterface.
 		if ( ! class_exists( $observability_handler ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'invalid_observability_handler',
 				sprintf(
 				/* translators: %s: observability handler class name */
@@ -212,7 +213,7 @@ final class McpAdapter {
 		}
 
 		if ( ! in_array( McpObservabilityHandlerInterface::class, class_implements( $observability_handler ) ?: array(), true ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'invalid_observability_handler',
 				sprintf(
 				/* translators: %s: observability handler class name */
@@ -229,7 +230,7 @@ final class McpAdapter {
 				'0.1.0'
 			);
 
-			return new \WP_Error(
+			return new WP_Error(
 				'invalid_timing',
 				esc_html__( 'MCP Server creation must be done during mcp_adapter_init action.', 'mcp-adapter' )
 			);
@@ -246,7 +247,7 @@ final class McpAdapter {
 				'0.1.0'
 			);
 
-			return new \WP_Error(
+			return new WP_Error(
 				'duplicate_server_id',
 				// translators: %s: server ID.
 				sprintf( esc_html__( 'Server with ID "%s" already exists.', 'mcp-adapter' ), esc_html( $server_id ) )
@@ -271,7 +272,7 @@ final class McpAdapter {
 				$transport_permission_callback
 			);
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'server_creation_failed',
 				sprintf(
 					/* translators: 1: server ID, 2: error message */

@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\ExecuteAbilityAbility;
 use WP\MCP\Tests\TestCase;
+use WP_Error;
 
 /**
  * Test ExecuteAbilityAbility functionality.
@@ -97,7 +98,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 
@@ -109,7 +110,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 
@@ -121,7 +122,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
 	}
 
@@ -136,7 +137,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'execute_callback'    => static function () {
 					return array( 'test' => 'result' ); },
 				'permission_callback' => static function () {
-					return new \WP_Error( 'permission_denied', 'Custom permission error' );
+					return new WP_Error( 'permission_denied', 'Custom permission error' );
 				},
 				'meta'                => array(
 					'mcp' => array(
@@ -154,7 +155,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		);
 
 		// WP_Error should be returned as-is
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'permission_denied', $result->get_error_code() );
 		$this->assertEquals( 'Custom permission error', $result->get_error_message() );
 
@@ -173,7 +174,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'authentication_required', $result->get_error_code() );
 
 		// Restore authenticated user for other tests
@@ -204,7 +205,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
 
 		// Clean up
@@ -244,7 +245,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'parameters'   => array(),
 			)
 		);
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_public_mcp', $result->get_error_code() );
 
 		// Clean up
@@ -260,7 +261,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
 	}
 
@@ -338,7 +339,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'description'         => 'Returns WP_Error for execution',
 				'category'            => 'test',
 				'execute_callback'    => static function () {
-					return new \WP_Error( 'execution_failed', 'Custom execution error' );
+					return new WP_Error( 'execution_failed', 'Custom execution error' );
 				},
 				'permission_callback' => static function () {
 					return true; },

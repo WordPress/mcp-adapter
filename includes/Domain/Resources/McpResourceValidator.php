@@ -11,6 +11,7 @@ namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP_Error;
 
 /**
  * Validates MCP resources against the Model Context Protocol specification.
@@ -40,7 +41,7 @@ class McpResourceValidator {
 				__( 'Resource validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			return new \WP_Error( 'mcp_resource_validation_failed', esc_html( $error_message ) );
+			return new WP_Error( 'mcp_resource_validation_failed', esc_html( $error_message ) );
 		}
 
 		return true;
@@ -84,7 +85,7 @@ class McpResourceValidator {
 		}
 
 		if ( ! empty( $errors ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_resource_validation_failed',
 				sprintf(
 				/* translators: %s: list of validation errors */

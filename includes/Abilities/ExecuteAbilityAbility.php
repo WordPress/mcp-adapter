@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Abilities;
 
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP_Error;
 
 /**
  * Execute Ability - Executes a WordPress ability with provided parameters.
@@ -163,7 +164,7 @@ final class ExecuteAbilityAbility {
 		$ability_name = $input['ability_name'] ?? '';
 
 		if ( empty( $ability_name ) ) {
-			return new \WP_Error( 'missing_ability_name', 'Ability name is required' );
+			return new WP_Error( 'missing_ability_name', 'Ability name is required' );
 		}
 
 		// Validate user authentication and capabilities
@@ -181,7 +182,7 @@ final class ExecuteAbilityAbility {
 		// Get the target ability
 		$ability = wp_get_ability( $ability_name );
 		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
+			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
 		}
 
 		// Normalize parameters for ability's schema requirements
@@ -206,7 +207,7 @@ final class ExecuteAbilityAbility {
 	private static function validate_user_access() {
 		// Verify caller identity - ensure the user is authenticated
 		if ( ! is_user_logged_in() ) {
-			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
+			return new WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}
 
 		/**
@@ -225,7 +226,7 @@ final class ExecuteAbilityAbility {
 		$required_capability = apply_filters( 'mcp_adapter_execute_ability_capability', 'read' );
 		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
 		if ( ! current_user_can( $required_capability ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'insufficient_capability',
 				sprintf( 'User lacks required capability: %s', $required_capability )
 			);

@@ -16,6 +16,7 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP_Error;
 
 /**
  * Resource component providing unified execution and permission checks.
@@ -117,22 +118,22 @@ final class McpResource implements McpComponentInterface {
 	 */
 	public static function fromArray( array $config ) {
 		if ( empty( $config['uri'] ) ) {
-			return new \WP_Error( 'mcp_resource_missing_uri', 'Resource configuration must include a "uri" field.' );
+			return new WP_Error( 'mcp_resource_missing_uri', 'Resource configuration must include a "uri" field.' );
 		}
 
 		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
-			return new \WP_Error( 'mcp_resource_missing_handler', 'Resource configuration must include a callable "handler" field.' );
+			return new WP_Error( 'mcp_resource_missing_handler', 'Resource configuration must include a callable "handler" field.' );
 		}
 
 		$uri = trim( $config['uri'] );
 
 		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
-			return new \WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
+			return new WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
 		}
 
 		$name = isset( $config['name'] ) ? trim( $config['name'] ) : $uri;
 		if ( '' === $name ) {
-			return new \WP_Error( 'mcp_resource_missing_name', 'Resource "name" cannot be empty.' );
+			return new WP_Error( 'mcp_resource_missing_name', 'Resource "name" cannot be empty.' );
 		}
 
 		$resource_data = array(
@@ -182,7 +183,7 @@ final class McpResource implements McpComponentInterface {
 
 			$resource = ResourceDto::fromArray( $resource_data );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_resource_dto_creation_failed',
 				sprintf(
 				/* translators: %s: error message */
@@ -228,7 +229,7 @@ final class McpResource implements McpComponentInterface {
 	 */
 	public static function fromAbility( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
 		$resource_data = RegisterAbilityAsMcpResource::build( $ability, $error_handler );
-		if ( $resource_data instanceof \WP_Error ) {
+		if ( $resource_data instanceof WP_Error ) {
 			return $resource_data;
 		}
 
@@ -272,7 +273,7 @@ final class McpResource implements McpComponentInterface {
 			try {
 				return $this->ability->execute();
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -284,7 +285,7 @@ final class McpResource implements McpComponentInterface {
 			try {
 				return call_user_func( $this->handler, $arguments );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -292,7 +293,7 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		return new \WP_Error( 'mcp_resource_no_handler', 'No resource execution strategy configured.' );
+		return new WP_Error( 'mcp_resource_no_handler', 'No resource execution strategy configured.' );
 	}
 
 	/**
@@ -308,7 +309,7 @@ final class McpResource implements McpComponentInterface {
 			try {
 				return $this->ability->check_permissions();
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -320,9 +321,9 @@ final class McpResource implements McpComponentInterface {
 			try {
 				$result = call_user_func( $this->permission_callback, $arguments );
 
-				return $result instanceof \WP_Error ? $result : (bool) $result;
+				return $result instanceof WP_Error ? $result : (bool) $result;
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -330,7 +331,7 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		return new \WP_Error(
+		return new WP_Error(
 			'mcp_permission_denied',
 			'Access denied.',
 			array( 'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY )

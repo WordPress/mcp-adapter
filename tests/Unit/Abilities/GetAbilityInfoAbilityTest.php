@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\GetAbilityInfoAbility;
 use WP\MCP\Tests\TestCase;
+use WP_Error;
 
 /**
  * Test GetAbilityInfoAbility functionality.
@@ -81,7 +82,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 
 		$result = GetAbilityInfoAbility::check_permission( array( 'ability_name' => 'test/always-allowed' ) );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'authentication_required', $result->get_error_code() );
 	}
 
@@ -115,7 +116,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 				'ability_name' => 'test/not-public-info',
 			)
 		);
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'ability_not_public_mcp', $result->get_error_code() );
 
 		// Clean up
@@ -145,7 +146,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
 
 		// Clean up
@@ -156,7 +157,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	public function test_check_permission_with_missing_ability_name(): void {
 		$result = GetAbilityInfoAbility::check_permission( array() );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
 	}
 

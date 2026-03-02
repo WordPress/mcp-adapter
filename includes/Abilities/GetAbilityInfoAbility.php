@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP_Error;
+
 /**
  * Get Ability Info - Get detailed information about a specific WordPress ability.
  *
@@ -141,7 +143,7 @@ final class GetAbilityInfoAbility {
 		$ability_name = $input['ability_name'] ?? '';
 
 		if ( empty( $ability_name ) ) {
-			return new \WP_Error( 'missing_ability_name', 'Ability name is required' );
+			return new WP_Error( 'missing_ability_name', 'Ability name is required' );
 		}
 
 		// Validate user authentication and capabilities
@@ -162,7 +164,7 @@ final class GetAbilityInfoAbility {
 	private static function validate_user_access() {
 		// Verify caller identity - ensure user is authenticated
 		if ( ! is_user_logged_in() ) {
-			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
+			return new WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}
 
 		/**
@@ -178,7 +180,7 @@ final class GetAbilityInfoAbility {
 		$required_capability = apply_filters( 'mcp_adapter_get_ability_info_capability', 'read' );
 		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
 		if ( ! current_user_can( $required_capability ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'insufficient_capability',
 				sprintf( 'User lacks required capability: %s', $required_capability )
 			);

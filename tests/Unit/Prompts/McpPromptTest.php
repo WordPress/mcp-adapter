@@ -7,6 +7,7 @@ namespace WP\MCP\Tests\Unit\Prompts;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
+use WP_Error;
 
 /**
  * Tests for McpPrompt array configuration.
@@ -104,7 +105,7 @@ final class McpPromptTest extends TestCase {
 
 		// Without explicit permission callback, access should be denied.
 		$result = $prompt->check_permission( array() );
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 	}
 
@@ -172,7 +173,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_prompt_missing_name', $result->get_error_code() );
 	}
 
@@ -183,7 +184,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_prompt_missing_handler', $result->get_error_code() );
 	}
 
@@ -314,7 +315,7 @@ final class McpPromptTest extends TestCase {
 
 		$result = $prompt->check_permission( array() );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
 		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );
@@ -376,7 +377,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_prompt_dto_creation_failed', $result->get_error_code() );
 		// PHP 8 throws "Undefined array key 'name'", PHP 7.4 returns NULL triggering "Expected string, got NULL".
 		$message = $result->get_error_message();

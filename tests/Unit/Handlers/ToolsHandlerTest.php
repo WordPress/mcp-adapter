@@ -16,6 +16,7 @@ use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP_Error;
 
 /**
  * Test ToolsHandler functionality.
@@ -111,7 +112,7 @@ final class ToolsHandlerTest extends TestCase {
 				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function () {
-					return new \WP_Error( 'test_error', 'Test error message' );
+					return new WP_Error( 'test_error', 'Test error message' );
 				},
 				'permission_callback' => static function () {
 					return true;
