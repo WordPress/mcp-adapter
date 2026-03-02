@@ -17,7 +17,7 @@ use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 /**
  * Abstract base class for building MCP prompts.
  *
- * @deprecated Use {@see \WP\MCP\Domain\Prompts\McpPrompt} instead for creating prompts.
+ * @deprecated 0.5.0 Use {@see \WP\MCP\Domain\Prompts\McpPrompt} instead for creating prompts.
  *
  * The fluent API or array configuration provided by McpPrompt is simpler
  * and more flexible than subclassing this abstract class:

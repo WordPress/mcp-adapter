@@ -124,6 +124,14 @@ class RequestRouter {
 			}
 
 			// Handlers should only return schema DTOs.
+			$actual_type = is_object( $handler_result ) ? get_class( $handler_result ) : gettype( $handler_result );
+			$this->context->error_handler->log(
+				sprintf( 'Handler for method "%s" returned unexpected type: %s', $method, $actual_type ),
+				array(
+					'method'      => $method,
+					'actual_type' => $actual_type,
+				)
+			);
 			$unexpected_error   = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
 			$result             = array( 'error' => $unexpected_error->getError()->toArray() );
 			$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
