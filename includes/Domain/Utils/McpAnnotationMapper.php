@@ -82,6 +82,12 @@ class McpAnnotationMapper {
 	 * Only includes annotations applicable to the specified feature type.
 	 * Null values are excluded from the result.
 	 *
+	 * Unknown annotation keys (not part of the MCP specification) are passed through
+	 * as-is for tool and resource feature types. MCP clients ignore unrecognized fields,
+	 * so this is protocol-safe and enables domain-specific metadata on annotations.
+	 *
+	 * @since n.e.x.t
+	 *
 	 * @param array  $ability_annotations WordPress ability annotations.
 	 * @param string $feature_type        The MCP feature type ('tool', 'resource', or 'prompt').
 	 *
@@ -113,7 +119,48 @@ class McpAnnotationMapper {
 			$result[ $mcp_field ] = $normalized;
 		}
 
+		// Pass through unknown annotation keys as-is (no normalization).
+		// Prompts are excluded: MCP clients may not expect custom fields on prompts.
+		if ( 'prompt' !== $feature_type ) {
+			$known_keys = self::get_known_annotation_keys();
+			foreach ( $ability_annotations as $key => $value ) {
+				if ( isset( $known_keys[ $key ] ) || null === $value ) {
+					continue;
+				}
+				$result[ $key ] = $value;
+			}
+		}
+
 		return $result;
+	}
+
+	/**
+	 * Get all known annotation keys (MCP fields and WordPress ability property aliases).
+	 *
+	 * Used to identify which keys in the source annotations are "unknown" and should
+	 * be passed through without normalization.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return array<string, true> Map of known keys for fast lookup.
+	 */
+	private static function get_known_annotation_keys(): array {
+		static $known_keys = null;
+
+		if ( null !== $known_keys ) {
+			return $known_keys;
+		}
+
+		$known_keys = array();
+		foreach ( self::$mcp_annotations as $mcp_field => $config ) {
+			$known_keys[ $mcp_field ] = true;
+			if ( null === $config['ability_property'] ) {
+				continue;
+			}
+			$known_keys[ $config['ability_property'] ] = true;
+		}
+
+		return $known_keys;
 	}
 
 	/**

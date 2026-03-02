@@ -58,7 +58,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
 	}
 
-		public function test_empty_annotations_are_not_included(): void {
+		public function test_custom_annotations_pass_through(): void {
 			$ability = wp_get_ability( 'test/resource' );
 			$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
 
@@ -67,8 +67,10 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
 			$arr = $resource->to_array();
 
-			// Verify annotations field is not present when empty.
-			$this->assertArrayNotHasKey( 'annotations', $arr );
+			// Custom annotation fields pass through the mapper.
+			$this->assertArrayHasKey( 'annotations', $arr );
+			$this->assertArrayHasKey( 'group', $arr['annotations'] );
+			$this->assertSame( 'tests', $arr['annotations']['group'] );
 		}
 
 		public function test_get_uri_trims_whitespace_from_meta(): void {

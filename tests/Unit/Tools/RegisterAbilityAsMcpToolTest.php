@@ -61,7 +61,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertFalse( $arr['annotations']['idempotentHint'] );
 	}
 
-	public function test_instructions_field_is_ignored(): void {
+	public function test_instructions_field_passes_through_as_custom_annotation(): void {
 		$ability = wp_get_ability( 'test/with-instructions' );
 		$this->assertNotNull( $ability, 'Ability test/with-instructions should be registered' );
 
@@ -70,11 +70,12 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 
 		$arr = $tool->to_array();
 
-		// Verify instructions field is not in the output.
+		// Custom annotation fields pass through the mapper.
 		$this->assertArrayHasKey( 'annotations', $arr );
-		$this->assertArrayNotHasKey( 'instructions', $arr['annotations'] );
+		$this->assertArrayHasKey( 'instructions', $arr['annotations'] );
+		$this->assertSame( 'These are instructions', $arr['annotations']['instructions'] );
 
-		// Verify other annotations are mapped correctly.
+		// Known annotations are still mapped correctly.
 		$this->assertArrayHasKey( 'readOnlyHint', $arr['annotations'] );
 		$this->assertTrue( $arr['annotations']['readOnlyHint'] );
 	}

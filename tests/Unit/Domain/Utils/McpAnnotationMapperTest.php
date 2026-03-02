@@ -25,7 +25,7 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertEmpty( $result );
 	}
 
-	public function test_map_filters_out_non_mcp_fields(): void {
+	public function test_map_passes_through_unknown_fields(): void {
 		$annotations = array(
 			'customField'  => 'value',
 			'invalidField' => 123,
@@ -35,8 +35,10 @@ final class McpAnnotationMapperTest extends TestCase {
 		$result = McpAnnotationMapper::map( $annotations, 'resource' );
 
 		$this->assertArrayHasKey( 'audience', $result );
-		$this->assertArrayNotHasKey( 'customField', $result );
-		$this->assertArrayNotHasKey( 'invalidField', $result );
+		$this->assertArrayHasKey( 'customField', $result );
+		$this->assertSame( 'value', $result['customField'] );
+		$this->assertArrayHasKey( 'invalidField', $result );
+		$this->assertSame( 123, $result['invalidField'] );
 	}
 
 	public function test_map_includes_valid_fields_for_resource(): void {
@@ -236,5 +238,131 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertArrayHasKey( 'priority', $result );
 		$this->assertArrayHasKey( 'openWorldHint', $result );
 		$this->assertArrayHasKey( 'title', $result );
+	}
+
+	// Custom annotation pass-through tests.
+
+	public function test_map_passes_through_unknown_fields_for_tools(): void {
+		$annotations = array(
+			'readonly'     => true,
+			'x-vendor-tag' => 'my-value',
+			'customMeta'   => array( 'key' => 'val' ),
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayHasKey( 'readOnlyHint', $result );
+		$this->assertArrayHasKey( 'x-vendor-tag', $result );
+		$this->assertSame( 'my-value', $result['x-vendor-tag'] );
+		$this->assertArrayHasKey( 'customMeta', $result );
+		$this->assertSame( array( 'key' => 'val' ), $result['customMeta'] );
+	}
+
+	public function test_map_passes_through_unknown_fields_for_resources(): void {
+		$annotations = array(
+			'audience'     => array( 'user' ),
+			'x-vendor-tag' => 42,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
+
+		$this->assertArrayHasKey( 'audience', $result );
+		$this->assertArrayHasKey( 'x-vendor-tag', $result );
+		$this->assertSame( 42, $result['x-vendor-tag'] );
+	}
+
+	public function test_map_does_not_pass_through_unknown_fields_for_prompts(): void {
+		$annotations = array(
+			'audience'     => array( 'user' ),
+			'x-vendor-tag' => 'should-not-appear',
+			'customMeta'   => 'also-excluded',
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'prompt' );
+
+		$this->assertArrayHasKey( 'audience', $result );
+		$this->assertArrayNotHasKey( 'x-vendor-tag', $result );
+		$this->assertArrayNotHasKey( 'customMeta', $result );
+		$this->assertCount( 1, $result );
+	}
+
+	public function test_map_does_not_pass_through_known_fields_excluded_by_feature_type(): void {
+		$annotations = array(
+			'audience'      => array( 'user' ),
+			'readOnlyHint'  => true,
+			'title'         => 'Tool Title',
+			'x-vendor-tag'  => 'custom',
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
+
+		// Shared annotations should be included.
+		$this->assertArrayHasKey( 'audience', $result );
+
+		// Tool-specific known fields should NOT appear — they are excluded by feature type, not passed through.
+		$this->assertArrayNotHasKey( 'readOnlyHint', $result );
+		$this->assertArrayNotHasKey( 'title', $result );
+
+		// Unknown fields should pass through.
+		$this->assertArrayHasKey( 'x-vendor-tag', $result );
+		$this->assertSame( 'custom', $result['x-vendor-tag'] );
+	}
+
+	public function test_map_excludes_null_unknown_fields(): void {
+		$annotations = array(
+			'x-vendor-tag' => null,
+			'x-other'      => 'present',
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayNotHasKey( 'x-vendor-tag', $result );
+		$this->assertArrayHasKey( 'x-other', $result );
+		$this->assertSame( 'present', $result['x-other'] );
+	}
+
+	public function test_map_handles_mixed_known_and_unknown_fields(): void {
+		$annotations = array(
+			'readonly'      => true,
+			'destructive'   => false,
+			'title'         => 'My Tool',
+			'x-category'    => 'search',
+			'x-deprecated'  => false,
+			'audience'      => array( 'user' ),
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		// Known fields mapped normally.
+		$this->assertArrayHasKey( 'readOnlyHint', $result );
+		$this->assertTrue( $result['readOnlyHint'] );
+		$this->assertArrayHasKey( 'destructiveHint', $result );
+		$this->assertArrayHasKey( 'title', $result );
+		$this->assertArrayHasKey( 'audience', $result );
+
+		// Unknown fields passed through as-is.
+		$this->assertArrayHasKey( 'x-category', $result );
+		$this->assertSame( 'search', $result['x-category'] );
+		$this->assertArrayHasKey( 'x-deprecated', $result );
+		$this->assertFalse( $result['x-deprecated'] );
+
+		// WordPress aliases should NOT appear as separate keys.
+		$this->assertArrayNotHasKey( 'readonly', $result );
+		$this->assertArrayNotHasKey( 'destructive', $result );
+	}
+
+	public function test_map_does_not_pass_through_wordpress_ability_property_aliases(): void {
+		$annotations = array(
+			'readonly'    => true,
+			'destructive' => false,
+			'idempotent'  => true,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'resource' );
+
+		// WordPress aliases are known keys — they should NOT pass through as unknown.
+		$this->assertArrayNotHasKey( 'readonly', $result );
+		$this->assertArrayNotHasKey( 'destructive', $result );
+		$this->assertArrayNotHasKey( 'idempotent', $result );
 	}
 }
