@@ -178,7 +178,7 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertEquals( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+		$this->assertEquals( McpErrorFactory::SESSION_NOT_FOUND, $result['error']['code'] );
 		$this->assertStringContainsString( 'Invalid or expired session', $result['error']['message'] );
 	}
 
