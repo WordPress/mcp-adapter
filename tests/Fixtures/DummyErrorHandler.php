@@ -8,7 +8,7 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 
 class DummyErrorHandler implements McpErrorHandlerInterface {
 
-	/** @var array<int, array{message:string,context:array,type:string}> */
+	/** @var list<array{message:string,context:array,type:string}> */
 	public static array $logs = array();
 
 	public static function reset(): void {

@@ -8,7 +8,7 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 
 final class DummyObservabilityHandler implements McpObservabilityHandlerInterface {
 
-	/** @var array<int, array{event:string,tags:array,duration_ms:?float}> */
+	/** @var list<array{event:string,tags:array,duration_ms:?float}> */
 	public static array $events = array();
 
 	public static function reset(): void {

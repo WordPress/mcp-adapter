@@ -28,14 +28,14 @@ class PromptsHandler {
 	/**
 	 * Valid content types from ContentBlockFactory.
 	 *
-	 * @var array<int, string>
+	 * @var list<string>
 	 */
 	private static $valid_content_types = array( 'text', 'image', 'audio', 'resource_link', 'resource' );
 
 	/**
 	 * Valid role values for PromptMessage.
 	 *
-	 * @var array<int, string>
+	 * @var list<string>
 	 */
 	private static $valid_roles = array( 'user', 'assistant' );
 
