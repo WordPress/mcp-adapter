@@ -107,14 +107,11 @@ class RequestRouter {
 				// we may need to add a deep normalizer at this boundary (before JSON serialization)
 				// to prevent placeholder `{}` objects in client output.
 				$raw_result = $handler_result->toArray();
+				$result     = $raw_result;
 
 				if ( null !== $new_session_id ) {
 					$component_tags['new_session_id'] = $new_session_id;
-				}
-
-				$result = $raw_result;
-				if ( null !== $new_session_id ) {
-					$result['_session_id'] = $new_session_id;
+					$result['_session_id']            = $new_session_id;
 				}
 
 				$tags = array_merge( $common_tags, $component_tags, array( 'status' => 'success' ) );
