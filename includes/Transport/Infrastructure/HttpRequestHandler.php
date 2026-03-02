@@ -183,7 +183,7 @@ class HttpRequestHandler {
 			// Validate MCP-Protocol-Version header for non-initialize requests.
 			$protocol_version_error = $this->validate_protocol_version_header( $context );
 			if ( null !== $protocol_version_error ) {
-				return $protocol_version_error;
+				return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
 			}
 		}
 
@@ -223,14 +223,14 @@ class HttpRequestHandler {
 	 * Validate the MCP-Protocol-Version header on non-initialize requests.
 	 *
 	 * A missing header is accepted (returns null). A header containing a supported
-	 * version is also accepted. An unsupported version returns a JSON-RPC error
-	 * array with code -32000 (server error).
+	 * version is also accepted. An unsupported version returns a JSON-RPC
+	 * invalid-request error payload.
 	 *
 	 * @since n.e.x.t.
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
-	 * @return array|null Null when the header is absent or valid, JSON-RPC error array otherwise.
+	 * @return array|null Null when the header is absent or valid, error payload otherwise.
 	 */
 	private function validate_protocol_version_header( HttpRequestContext $context ): ?array {
 		if ( null === $context->protocol_version ) {
@@ -241,9 +241,8 @@ class HttpRequestHandler {
 			return null;
 		}
 
-		return McpErrorFactory::create_error_response(
-			null,
-			McpErrorFactory::SERVER_ERROR,
+		return McpErrorFactory::create_error(
+			McpErrorFactory::INVALID_REQUEST,
 			sprintf(
 				'Bad Request: Unsupported protocol version: %s (supported versions: %s)',
 				$context->protocol_version,

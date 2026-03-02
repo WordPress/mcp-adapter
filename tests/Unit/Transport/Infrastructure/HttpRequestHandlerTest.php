@@ -422,12 +422,13 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		// SERVER_ERROR (-32000) maps to HTTP 500 via McpErrorFactory::mcp_error_to_http_status().
-		$this->assertEquals( 500, $response->get_status() );
+		// INVALID_REQUEST (-32600) maps to HTTP 400 via McpErrorFactory::mcp_error_to_http_status().
+		$this->assertEquals( 400, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
-		$this->assertEquals( McpErrorFactory::SERVER_ERROR, $data['error']['code'] );
+		$this->assertEquals( 2, $data['id'] );
+		$this->assertEquals( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
 		$this->assertStringContainsString( 'Unsupported protocol version', $data['error']['message'] );
 		$this->assertStringContainsString( '9999-99-99', $data['error']['message'] );
 	}
