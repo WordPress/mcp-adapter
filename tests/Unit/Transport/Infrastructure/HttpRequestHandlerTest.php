@@ -164,7 +164,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 404, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
@@ -210,11 +210,15 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
 
 		$data = $response->get_data();
-		// Should either have result or error (depending on session validation)
+		// Should either have result (200) or session error (404 per MCP spec)
 		$this->assertTrue( isset( $data['result'] ) || isset( $data['error'] ) );
+		if ( isset( $data['error'] ) ) {
+			$this->assertEquals( 404, $response->get_status() );
+		} else {
+			$this->assertEquals( 200, $response->get_status() );
+		}
 	}
 
 	public function test_handle_request_post_batch(): void {
@@ -284,7 +288,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 202, $response->get_status() );
 		$this->assertNull( $response->get_data() );
 	}
 

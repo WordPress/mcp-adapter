@@ -40,6 +40,7 @@ class McpErrorFactory {
 	public const RESOURCE_NOT_FOUND = -32002; // Resource not found
 	public const TOOL_NOT_FOUND     = -32003; // Tool not found
 	public const PROMPT_NOT_FOUND   = -32004; // Prompt not found
+	public const SESSION_NOT_FOUND  = -32005; // Session not found or expired
 	public const PERMISSION_DENIED  = -32008; // Access denied/forbidden
 	public const UNAUTHORIZED       = -32010; // Authentication required
 
@@ -289,6 +290,26 @@ class McpErrorFactory {
 	}
 
 	/**
+	 * Create a session not found error response.
+	 *
+	 * Used when an MCP session ID is invalid or expired. Maps to HTTP 404
+	 * per the MCP specification requirement for invalid/expired sessions.
+	 *
+	 * @param string|int|null $id The request ID.
+	 * @param string $details Optional additional details.
+	 *
+	 * @return \WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	public static function session_not_found( $id, string $details = '' ): JSONRPCErrorResponse {
+		$message = __( 'Session not found', 'mcp-adapter' );
+		if ( $details ) {
+			$message .= ': ' . $details;
+		}
+
+		return self::create_error_response( $id, self::SESSION_NOT_FOUND, $message );
+	}
+
+	/**
 	 * Create a permission denied error response.
 	 *
 	 * @param string|int|null $id The request ID.
@@ -381,6 +402,7 @@ class McpErrorFactory {
 			case self::RESOURCE_NOT_FOUND:
 			case self::TOOL_NOT_FOUND:
 			case self::PROMPT_NOT_FOUND:
+			case self::SESSION_NOT_FOUND:
 			case self::METHOD_NOT_FOUND:
 				return 404;
 

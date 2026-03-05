@@ -150,9 +150,9 @@ final class HttpTransportTest extends TestCase {
 
 		$response = $this->transport->handle_request( $request );
 
-		// Notifications return 200 with null body in JSON-RPC over HTTP
+		// Notifications return HTTP 202 Accepted with no body per MCP spec
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 202, $response->get_status() );
 		$this->assertNull( $response->get_data() );
 	}
 
@@ -468,15 +468,15 @@ final class HttpTransportTest extends TestCase {
 		$response = $this->transport->handle_request( $request );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
 
 		$data = $response->get_data();
-		// Debug: check what we actually get
 		if ( ! isset( $data['result'] ) ) {
-			// If it's an error, that's expected since session might not be properly created
+			// Session not found returns HTTP 404 per MCP spec
+			$this->assertEquals( 404, $response->get_status() );
 			$this->assertArrayHasKey( 'error', $data );
 			$this->assertStringContainsString( 'session', strtolower( $data['error']['message'] ) );
 		} else {
+			$this->assertEquals( 200, $response->get_status() );
 			$this->assertArrayHasKey( 'result', $data );
 		}
 	}
@@ -495,11 +495,11 @@ final class HttpTransportTest extends TestCase {
 		$response = $this->transport->handle_request( $request );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 404, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
-		$this->assertEquals( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+		$this->assertEquals( McpErrorFactory::SESSION_NOT_FOUND, $data['error']['code'] );
 		$this->assertStringContainsString( 'Invalid or expired session', $data['error']['message'] );
 	}
 
