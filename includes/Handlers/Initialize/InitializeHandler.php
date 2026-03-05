@@ -51,21 +51,6 @@ class InitializeHandler {
 	public function handle( string $client_protocol_version ): InitializeResult {
 		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
 
-		/**
-		 * Filters the negotiated MCP protocol version.
-		 *
-		 * @since n.e.x.t.
-		 *
-		 * @param string $negotiated_version       The negotiated protocol version.
-		 * @param string $client_protocol_version   The version requested by the client.
-		 */
-		$negotiated_version = apply_filters( 'mcp_adapter_negotiated_protocol_version', $negotiated_version, $client_protocol_version );
-
-		// Guard against filters returning non-string values.
-		if ( ! is_string( $negotiated_version ) ) {
-			$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
-		}
-
 		$server_info = Implementation::fromArray(
 			array(
 				'name'    => $this->mcp->get_server_name(),
