@@ -16,6 +16,7 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
+use WP\McpSchema\Common\McpConstants;
 
 /**
  * STDIO Server Bridge - Exposes MCP servers via STDIO protocol
@@ -291,9 +292,10 @@ class StdioServerBridge {
 		$json = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 		if ( false === $json ) {
-			// Fallback when JSON encoding fails - use constant for consistency.
+			// Fallback when JSON encoding fails - use constants for consistency.
 			return sprintf(
-				'{"jsonrpc":"2.0","error":{"code":%d,"message":"Internal error"},"id":null}',
+				'{"jsonrpc":"%s","error":{"code":%d,"message":"Internal error"},"id":null}',
+				McpConstants::JSONRPC_VERSION,
 				McpErrorFactory::INTERNAL_ERROR
 			);
 		}

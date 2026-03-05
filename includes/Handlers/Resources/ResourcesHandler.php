@@ -81,7 +81,12 @@ class ResourcesHandler {
 		}
 
 		$uri = $request_params['uri'];
-		$uri = is_string( $uri ) ? trim( $uri ) : '';
+
+		if ( ! is_string( $uri ) ) {
+			return McpErrorFactory::invalid_params( $request_id, 'Parameter "uri" must be a string' );
+		}
+
+		$uri = trim( $uri );
 
 		$mcp_resource = $this->mcp->get_mcp_resource( $uri );
 		if ( ! $mcp_resource ) {
@@ -161,11 +166,19 @@ class ResourcesHandler {
 			// Check if this is an array of content items (has 'uri' or 'text' keys in first item).
 			$first_item = reset( $contents );
 			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) ) ) {
+				// Filter to only array items to prevent TypeError in create_content_dto().
+				$array_items = array_filter(
+					$contents,
+					static function ( $item ): bool {
+						return is_array( $item );
+					}
+				);
+
 				return array_map(
-					function ( $item ) use ( $uri ) {
+					function ( array $item ) use ( $uri ) {
 						return $this->create_content_dto( $item, $uri );
 					},
-					$contents
+					$array_items
 				);
 			}
 		}
