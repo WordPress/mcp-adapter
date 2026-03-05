@@ -11,6 +11,7 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP_Error;
 
 /**
  * Validates MCP tools against the Model Context Protocol specification.
@@ -53,7 +54,7 @@ class McpToolValidator {
 				__( 'Tool validation failed: %s', 'mcp-adapter' ),
 				implode( ', ', $validation_errors )
 			);
-			return new \WP_Error( 'mcp_tool_validation_failed', esc_html( $error_message ) );
+			return new WP_Error( 'mcp_tool_validation_failed', esc_html( $error_message ) );
 		}
 
 		return true;
@@ -132,7 +133,7 @@ class McpToolValidator {
 		}
 
 		if ( ! empty( $errors ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_tool_validation_failed',
 				sprintf(
 				/* translators: %s: list of validation errors */

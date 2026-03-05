@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Utils;
 
+use WP_Error;
+
 /**
  * Utility class for sanitizing names to MCP-valid format.
  *
@@ -97,7 +99,7 @@ class McpNameSanitizer {
 		// Step 6: Final check - only empty is possible failure after sanitization.
 		// Characters are guaranteed valid (replaced), length is handled (truncated).
 		if ( empty( $name ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_name_invalid',
 				sprintf(
 				/* translators: %s: original ability name */

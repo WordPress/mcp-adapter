@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP_Error;
+
 /**
  * Trait McpAbilityHelperTrait
  *
@@ -30,14 +32,14 @@ trait McpAbilityHelperTrait {
 		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
-			return new \WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
+			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
 		}
 
 		$meta          = $ability->get_meta();
 		$is_public_mcp = $meta['mcp']['public'] ?? false;
 
 		if ( ! $is_public_mcp ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'ability_not_public_mcp',
 				sprintf( 'Ability "%s" is not exposed via MCP (mcp.public!=true)', $ability_name )
 			);

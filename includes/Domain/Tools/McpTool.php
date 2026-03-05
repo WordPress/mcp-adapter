@@ -16,6 +16,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
+use WP_Error;
 
 /**
  * Tool component providing unified execution and permission checks.
@@ -121,11 +122,11 @@ final class McpTool implements McpComponentInterface {
 	 */
 	public static function fromArray( array $config ) {
 		if ( empty( $config['name'] ) ) {
-			return new \WP_Error( 'mcp_tool_missing_name', 'Tool configuration must include a "name" field.' );
+			return new WP_Error( 'mcp_tool_missing_name', 'Tool configuration must include a "name" field.' );
 		}
 
 		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
-			return new \WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
+			return new WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
 		}
 
 		// Prepare input schema - ensure it's an object type for MCP compliance.
@@ -175,7 +176,7 @@ final class McpTool implements McpComponentInterface {
 
 			$tool = ToolDto::fromArray( $tool_data );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_tool_dto_creation_failed',
 				sprintf(
 				/* translators: %s: error message */
@@ -220,7 +221,7 @@ final class McpTool implements McpComponentInterface {
 	 */
 	public static function fromAbility( \WP_Ability $ability ) {
 		$tool_data = RegisterAbilityAsMcpTool::build( $ability );
-		if ( $tool_data instanceof \WP_Error ) {
+		if ( $tool_data instanceof WP_Error ) {
 			return $tool_data;
 		}
 
@@ -267,7 +268,7 @@ final class McpTool implements McpComponentInterface {
 			try {
 				$result = $this->ability->execute( $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -277,17 +278,17 @@ final class McpTool implements McpComponentInterface {
 			try {
 				$result = call_user_func( $this->handler, $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
 				);
 			}
 		} else {
-			return new \WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
+			return new WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
 		}
 
-		if ( $result instanceof \WP_Error ) {
+		if ( $result instanceof WP_Error ) {
 			return $result;
 		}
 
@@ -357,7 +358,7 @@ final class McpTool implements McpComponentInterface {
 			try {
 				return $this->ability->check_permissions( $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -370,9 +371,9 @@ final class McpTool implements McpComponentInterface {
 			try {
 				$result = call_user_func( $this->permission_callback, $args );
 
-				return $result instanceof \WP_Error ? $result : (bool) $result;
+				return $result instanceof WP_Error ? $result : (bool) $result;
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -381,7 +382,7 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		// Defensive fallback: should never reach here if factories are used correctly.
-		return new \WP_Error(
+		return new WP_Error(
 			'mcp_permission_denied',
 			'Access denied.',
 			array(

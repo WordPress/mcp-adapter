@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\DiscoverAbilitiesAbility;
 use WP\MCP\Tests\TestCase;
+use WP_Error;
 
 /**
  * Test DiscoverAbilitiesAbility functionality.
@@ -81,7 +82,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 		$result = DiscoverAbilitiesAbility::check_permission( array() );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'authentication_required', $result->get_error_code() );
 	}
 
@@ -142,7 +143,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 		$result = DiscoverAbilitiesAbility::check_permission( array() );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertEquals( 'insufficient_capability', $result->get_error_code() );
 
 		// Clean up

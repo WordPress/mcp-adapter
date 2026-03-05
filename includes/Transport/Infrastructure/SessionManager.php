@@ -10,6 +10,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP_Error;
+
 /**
  * MCP Session Manager
  *
@@ -197,7 +199,7 @@ final class SessionManager {
 	 */
 	public static function get_session( int $user_id, string $session_id ) {
 		if ( ! $user_id || ! $session_id ) {
-			return new \WP_Error( 403, 'Invalid user ID or session ID.' );
+			return new WP_Error( 403, 'Invalid user ID or session ID.' );
 		}
 
 		$sessions = self::get_all_user_sessions( $user_id );

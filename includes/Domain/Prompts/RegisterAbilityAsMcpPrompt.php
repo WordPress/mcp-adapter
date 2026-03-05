@@ -12,6 +12,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
+use WP_Error;
 
 /**
  * Converts WordPress abilities to MCP prompts according to the specification.
@@ -128,7 +129,7 @@ class RegisterAbilityAsMcpPrompt {
 		try {
 			return PromptDto::fromArray( $built['prompt_data'] );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
+			return new WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
 		}
 	}
 
@@ -303,7 +304,7 @@ class RegisterAbilityAsMcpPrompt {
 
 		foreach ( $explicit_arguments as $index => $arg ) {
 			if ( ! is_array( $arg ) ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_prompt_invalid_argument',
 					sprintf(
 					/* translators: 1: argument index, 2: ability name */
@@ -316,7 +317,7 @@ class RegisterAbilityAsMcpPrompt {
 
 			// Validate required 'name' field.
 			if ( ! isset( $arg['name'] ) || ! is_string( $arg['name'] ) || '' === trim( $arg['name'] ) ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_prompt_argument_missing_name',
 					sprintf(
 					/* translators: 1: argument index, 2: ability name */
@@ -450,7 +451,7 @@ class RegisterAbilityAsMcpPrompt {
 		try {
 			$prompt_dto = PromptDto::fromArray( $data['prompt_data'] );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_prompt_dto_creation_failed',
 				sprintf(
 				/* translators: %s: error message */

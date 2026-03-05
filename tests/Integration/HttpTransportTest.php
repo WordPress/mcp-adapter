@@ -23,6 +23,7 @@ use WP\MCP\Transport\HttpTransport;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP_REST_Request;
 use WP_REST_Response;
+use WP_Error;
 
 /**
  * Test MCP HTTP Transport behavior against the MCP 2025-11-25 baseline.
@@ -606,7 +607,7 @@ final class HttpTransportTest extends TestCase {
 				'request_router'                => $this->context->request_router,
 				'error_handler'                 => new DummyErrorHandler(), // Add error_handler
 				'transport_permission_callback' => static function () {
-					return new \WP_Error( 'permission_denied', 'Custom permission error' );
+					return new WP_Error( 'permission_denied', 'Custom permission error' );
 				},
 			)
 		);

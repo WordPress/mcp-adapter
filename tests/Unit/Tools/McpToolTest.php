@@ -7,6 +7,7 @@ namespace WP\MCP\Tests\Unit\Tools;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP_Error;
 
 final class McpToolTest extends TestCase {
 
@@ -346,7 +347,7 @@ final class McpToolTest extends TestCase {
 
 		// Without explicit permission callback, access should be denied.
 		$result = $tool->check_permission( array() );
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 	}
 
@@ -417,7 +418,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_tool_missing_name', $result->get_error_code() );
 	}
 
@@ -428,7 +429,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_tool_missing_handler', $result->get_error_code() );
 	}
 
@@ -500,7 +501,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_tool_dto_creation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'Expected bool', $result->get_error_message() );
 	}
@@ -563,7 +564,7 @@ final class McpToolTest extends TestCase {
 
 		$result = $tool->check_permission( array() );
 
-		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_permission_denied', $result->get_error_code() );
 		$this->assertArrayHasKey( 'failure_reason', $result->get_error_data() );
 		$this->assertSame( 'no_permission_strategy', $result->get_error_data()['failure_reason'] );

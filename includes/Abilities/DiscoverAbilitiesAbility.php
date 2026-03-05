@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP_Error;
+
 /**
  * Discover Abilities - Lists all available WordPress abilities in the system.
  *
@@ -120,7 +122,7 @@ final class DiscoverAbilitiesAbility {
 	public static function check_permission( $input = array() ) {
 		// Verify caller identity - ensure user is authenticated
 		if ( ! is_user_logged_in() ) {
-			return new \WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
+			return new WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
 		}
 
 		/**
@@ -136,7 +138,7 @@ final class DiscoverAbilitiesAbility {
 		$required_capability = apply_filters( 'mcp_adapter_discover_abilities_capability', 'read' );
 		// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is determined dynamically via filter
 		if ( ! current_user_can( $required_capability ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'insufficient_capability',
 				sprintf( 'User lacks required capability: %s', $required_capability )
 			);

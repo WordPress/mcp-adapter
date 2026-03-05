@@ -17,6 +17,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
+use WP_Error;
 
 /**
  * Prompt component providing unified execution and permission checks.
@@ -135,11 +136,11 @@ final class McpPrompt implements McpComponentInterface {
 	 */
 	public static function fromArray( array $config ) {
 		if ( empty( $config['name'] ) ) {
-			return new \WP_Error( 'mcp_prompt_missing_name', 'Prompt configuration must include a "name" field.' );
+			return new WP_Error( 'mcp_prompt_missing_name', 'Prompt configuration must include a "name" field.' );
 		}
 
 		if ( ! isset( $config['handler'] ) || ! is_callable( $config['handler'] ) ) {
-			return new \WP_Error( 'mcp_prompt_missing_handler', 'Prompt configuration must include a callable "handler" field.' );
+			return new WP_Error( 'mcp_prompt_missing_handler', 'Prompt configuration must include a callable "handler" field.' );
 		}
 
 		// Validate and prepare icons if set.
@@ -189,7 +190,7 @@ final class McpPrompt implements McpComponentInterface {
 
 			$prompt = PromptDto::fromArray( $prompt_data );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_prompt_dto_creation_failed',
 				sprintf(
 				/* translators: %s: error message */
@@ -234,7 +235,7 @@ final class McpPrompt implements McpComponentInterface {
 	 */
 	public static function fromAbility( \WP_Ability $ability ) {
 		$prompt_data = RegisterAbilityAsMcpPrompt::build( $ability );
-		if ( $prompt_data instanceof \WP_Error ) {
+		if ( $prompt_data instanceof WP_Error ) {
 			return $prompt_data;
 		}
 
@@ -263,7 +264,7 @@ final class McpPrompt implements McpComponentInterface {
 		try {
 			$prompt = $builder->build();
 		} catch ( \Throwable $throwable ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_prompt_builder_failed',
 				$throwable->getMessage(),
 				array( 'error_type' => get_class( $throwable ) )
@@ -326,7 +327,7 @@ final class McpPrompt implements McpComponentInterface {
 			try {
 				$result = $this->ability->execute( $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -336,7 +337,7 @@ final class McpPrompt implements McpComponentInterface {
 			try {
 				$result = $this->builder->handle( $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -346,17 +347,17 @@ final class McpPrompt implements McpComponentInterface {
 			try {
 				$result = call_user_func( $this->handler, $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_execution_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
 				);
 			}
 		} else {
-			return new \WP_Error( 'mcp_prompt_no_handler', 'No prompt execution strategy configured.' );
+			return new WP_Error( 'mcp_prompt_no_handler', 'No prompt execution strategy configured.' );
 		}
 
-		if ( $result instanceof \WP_Error ) {
+		if ( $result instanceof WP_Error ) {
 			return $result;
 		}
 
@@ -404,7 +405,7 @@ final class McpPrompt implements McpComponentInterface {
 			try {
 				return $this->ability->check_permissions( $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -416,7 +417,7 @@ final class McpPrompt implements McpComponentInterface {
 			try {
 				return $this->builder->has_permission( $args );
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -428,9 +429,9 @@ final class McpPrompt implements McpComponentInterface {
 			try {
 				$result = call_user_func( $this->permission_callback, $args );
 
-				return $result instanceof \WP_Error ? $result : (bool) $result;
+				return $result instanceof WP_Error ? $result : (bool) $result;
 			} catch ( \Throwable $throwable ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'mcp_permission_check_failed',
 					$throwable->getMessage(),
 					array( 'error_type' => get_class( $throwable ) )
@@ -438,7 +439,7 @@ final class McpPrompt implements McpComponentInterface {
 			}
 		}
 
-		return new \WP_Error(
+		return new WP_Error(
 			'mcp_permission_denied',
 			'Access denied.',
 			array( 'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY )

@@ -14,6 +14,7 @@ use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP_Error;
 
 /**
  * Converts WordPress abilities to MCP Resource metadata.
@@ -97,7 +98,7 @@ class RegisterAbilityAsMcpResource {
 		try {
 			return ResourceDto::fromArray( $data );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_resource_schema_invalid',
 				$e->getMessage()
 			);
@@ -233,7 +234,7 @@ class RegisterAbilityAsMcpResource {
 		$uri = $this->get_mcp_meta( 'uri', 'string' );
 
 		if ( null === $uri ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'resource_uri_not_found',
 				sprintf(
 				/* translators: %s: ability name */
@@ -247,7 +248,7 @@ class RegisterAbilityAsMcpResource {
 
 		// Validate URI format (RFC 3986).
 		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'resource_uri_invalid',
 				sprintf(
 				/* translators: 1: ability name, 2: invalid URI */
@@ -271,7 +272,7 @@ class RegisterAbilityAsMcpResource {
 
 		// Validate post-filter.
 		if ( ! is_string( $filtered_uri ) || ! McpValidator::validate_resource_uri( $filtered_uri ) ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_resource_uri_filter_invalid',
 				sprintf(
 				/* translators: %s: invalid URI returned by filter */
@@ -451,7 +452,7 @@ class RegisterAbilityAsMcpResource {
 		try {
 			$resource_dto = ResourceDto::fromArray( $data['resource_data'] );
 		} catch ( \Throwable $e ) {
-			return new \WP_Error(
+			return new WP_Error(
 				'mcp_resource_dto_creation_failed',
 				sprintf(
 				/* translators: %s: error message */
