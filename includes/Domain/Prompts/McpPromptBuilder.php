@@ -71,7 +71,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * The prompt arguments.
 	 *
-	 * @var array<int, array{name: string, title?: string, description?: string, required?: bool}>
+	 * @var list<array{name: string, title?: string, description?: string, required?: bool}>
 	 */
 	protected array $arguments = array();
 
@@ -80,7 +80,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @var array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
+	 * @var list<array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
 	 */
 	protected ?array $icons = null;
 
@@ -205,7 +205,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Get the prompt arguments.
 	 *
-	 * @return array<int, array{name: string, title?: string, description?: string, required?: bool}> The prompt arguments.
+	 * @return list<array{name: string, title?: string, description?: string, required?: bool}> The prompt arguments.
 	 */
 	public function get_arguments(): array {
 		return $this->arguments;
@@ -214,7 +214,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Get the prompt icons.
 	 *
-	 * @return array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
+	 * @return list<array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -232,7 +232,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * - MUST support: image/png, image/jpeg, image/jpg
 	 * - SHOULD support: image/svg+xml, image/webp
 	 *
-	 * @param array<int, array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
+	 * @param list<array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
 	 *
 	 * @return self
 	 * @since n.e.x.t

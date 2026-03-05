@@ -266,7 +266,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get explicit arguments from ability meta.mcp.arguments.
 	 *
-	 * @return array<int,array<string,mixed>>|null Explicit arguments array or null if not defined.
+	 * @return list<array<string,mixed>>|null Explicit arguments array or null if not defined.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -281,7 +281,7 @@ class RegisterAbilityAsMcpPrompt {
 			return null;
 		}
 
-		return $mcp['arguments'];
+		return array_values( $mcp['arguments'] );
 	}
 
 	/**
@@ -293,9 +293,9 @@ class RegisterAbilityAsMcpPrompt {
 	 * - description (string, optional): Human-readable description
 	 * - required (boolean, optional): Whether the argument must be provided
 	 *
-	 * @param array<int,array<string,mixed>> $explicit_arguments User-defined arguments array.
+	 * @param list<array<string,mixed>> $explicit_arguments User-defined arguments array.
 	 *
-	 * @return array<int,\WP\McpSchema\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
+	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
 	 * @since n.e.x.t
 	 *
 	 */
@@ -376,7 +376,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
 	 *
-	 * @return array<int, \WP\McpSchema\Server\Prompts\DTO\PromptArgument> Argument DTO list.
+	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument> Argument DTO list.
 	 * @since n.e.x.t
 	 *
 	 */

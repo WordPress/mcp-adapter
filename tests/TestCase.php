@@ -190,7 +190,7 @@ abstract class TestCase extends PolyfillsTestCase {
 	/**
 	 * Captured `_doing_it_wrong` calls during a test.
 	 *
-	 * @var array<int,array{function:string,message:string,version:string}>
+	 * @var list<array{function:string,message:string,version:string}>
 	 */
 	protected $doing_it_wrong_log = array();
 

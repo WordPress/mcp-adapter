@@ -116,7 +116,7 @@ class McpComponentRegistry {
 	/**
 	 * Register tools to the server.
 	 *
-	 * @param array<int, string|\WP\MCP\Domain\Tools\McpTool> $tools Array of ability names (strings) or McpTool instances.
+	 * @param list<string|\WP\MCP\Domain\Tools\McpTool> $tools Array of ability names (strings) or McpTool instances.
 	 *
 	 * @return void
 	 */
@@ -255,7 +255,7 @@ class McpComponentRegistry {
 	/**
 	 * Register resources to the server.
 	 *
-	 * @param array<int, string|\WP\MCP\Domain\Resources\McpResource> $resources Array of ability names or McpResource instances.
+	 * @param list<string|\WP\MCP\Domain\Resources\McpResource> $resources Array of ability names or McpResource instances.
 	 *
 	 * @return void
 	 */
@@ -394,7 +394,7 @@ class McpComponentRegistry {
 	 * - McpPromptBuilderInterface instance (fluent API or custom builders)
 	 * - Array configuration (converted via McpPrompt::fromArray())
 	 *
-	 * @param array<int, string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Array of prompts to register.
+	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Array of prompts to register.
 	 *
 	 * @return void
 	 */
