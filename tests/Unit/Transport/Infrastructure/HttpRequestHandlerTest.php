@@ -355,7 +355,154 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'Method not allowed', $data['error']['message'] );
 	}
 
+	public function test_handle_request_post_withNoProtocolVersionHeader_acceptsRequest(): void {
+		// Create session first.
+		$session_id = $this->initializeAndGetSessionId();
+
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		// No MCP-Protocol-Version header set.
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayNotHasKey( 'error', $data );
+	}
+
+	public function test_handle_request_post_withSupportedProtocolVersionHeader_acceptsRequest(): void {
+		// Create session first.
+		$session_id = $this->initializeAndGetSessionId();
+
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$request->set_header( 'Mcp-Protocol-Version', '2025-11-25' );
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayNotHasKey( 'error', $data );
+	}
+
+	public function test_handle_request_post_withUnsupportedProtocolVersionHeader_returnsError(): void {
+		// Create session first.
+		$session_id = $this->initializeAndGetSessionId();
+
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$request->set_header( 'Mcp-Protocol-Version', '9999-99-99' );
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		// INVALID_REQUEST (-32600) maps to HTTP 400 via McpErrorFactory::mcp_error_to_http_status().
+		$this->assertEquals( 400, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertEquals( 2, $data['id'] );
+		$this->assertEquals( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+		$this->assertStringContainsString( 'Unsupported protocol version', $data['error']['message'] );
+		$this->assertStringContainsString( '9999-99-99', $data['error']['message'] );
+	}
+
+	public function test_handle_request_post_initialize_skipsProtocolVersionHeaderValidation(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		// Set an unsupported protocol version header — should be ignored for initialize.
+		$request->set_header( 'Mcp-Protocol-Version', '9999-99-99' );
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayNotHasKey( 'error', $data );
+	}
+
 	// Helper methods
+
+	/**
+	 * Initialize a session and return the session ID.
+	 *
+	 * @return string The session ID.
+	 */
+	private function initializeAndGetSessionId(): string {
+		$init_request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		$init_context  = new HttpRequestContext( $init_request );
+		$init_response = $this->handler->handle_request( $init_context );
+
+		// Verify initialize succeeded.
+		$data = $init_response->get_data();
+		$this->assertArrayHasKey( 'result', $data, 'Initialize must succeed' );
+
+		// The session header is set via a rest_post_dispatch filter which doesn't
+		// fire in unit tests. Read the session ID directly from user meta instead.
+		$sessions = get_user_meta( get_current_user_id(), 'mcp_adapter_sessions', true );
+		$this->assertNotEmpty( $sessions, 'Initialize must create a session in user meta' );
+
+		// Return the most recently created session ID.
+		return (string) array_key_last( $sessions );
+	}
 
 	private function createPostRequest( array $body ): WP_REST_Request {
 		$request = new WP_REST_Request( 'POST', '/test-mcp' );

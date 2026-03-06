@@ -10,8 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
-use WP\McpSchema\Common\McpConstants;
 use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
 use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
 
@@ -38,9 +38,19 @@ class InitializeHandler {
 	/**
 	 * Handles the initialize request.
 	 *
+	 * Negotiates the protocol version with the client using McpVersionNegotiator.
+	 * If the client requests a supported version, that version is used. Otherwise
+	 * the server falls back to the latest supported version.
+	 *
+	 * @since n.e.x.t.
+	 *
+	 * @param string $client_protocol_version The protocol version requested by the client.
+	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
 	 */
-	public function handle(): InitializeResult {
+	public function handle( string $client_protocol_version ): InitializeResult {
+		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
+
 		$server_info = Implementation::fromArray(
 			array(
 				'name'    => $this->mcp->get_server_name(),
@@ -65,7 +75,7 @@ class InitializeHandler {
 
 		return InitializeResult::fromArray(
 			array(
-				'protocolVersion' => McpConstants::LATEST_PROTOCOL_VERSION,
+				'protocolVersion' => $negotiated_version,
 				'capabilities'    => $capabilities,
 				'serverInfo'      => $server_info,
 				'instructions'    => $this->mcp->get_server_description(),

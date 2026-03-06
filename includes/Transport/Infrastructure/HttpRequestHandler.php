@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
@@ -186,6 +187,12 @@ class HttpRequestHandler {
 			if ( true !== $session_validation ) {
 				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
 			}
+
+			// Validate MCP-Protocol-Version header for non-initialize requests.
+			$protocol_version_error = $this->validate_protocol_version_header( $context );
+			if ( null !== $protocol_version_error ) {
+				return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
+			}
 		}
 
 		// Route the request through the transport context
@@ -218,6 +225,38 @@ class HttpRequestHandler {
 	 */
 	private function get_transport_name(): string {
 		return 'HTTP';
+	}
+
+	/**
+	 * Validate the MCP-Protocol-Version header on non-initialize requests.
+	 *
+	 * A missing header is accepted (returns null). A header containing a supported
+	 * version is also accepted. An unsupported version returns a JSON-RPC
+	 * invalid-request error payload.
+	 *
+	 * @since n.e.x.t.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
+	 * @return array|null Null when the header is absent or valid, error payload otherwise.
+	 */
+	private function validate_protocol_version_header( HttpRequestContext $context ): ?array {
+		if ( null === $context->protocol_version ) {
+			return null;
+		}
+
+		if ( McpVersionNegotiator::is_supported( $context->protocol_version ) ) {
+			return null;
+		}
+
+		return McpErrorFactory::create_error(
+			McpErrorFactory::INVALID_REQUEST,
+			sprintf(
+				'Bad Request: Unsupported protocol version: %s (supported versions: %s)',
+				$context->protocol_version,
+				implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
+			)
+		)->toArray();
 	}
 
 	/**
