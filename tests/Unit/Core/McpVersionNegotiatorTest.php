@@ -95,6 +95,29 @@ final class McpVersionNegotiatorTest extends TestCase {
 	}
 
 	/**
+	 * Test that SUPPORTED_PROTOCOL_VERSIONS contains exactly the expected set.
+	 *
+	 * This explicit assertion prevents silent test-suite shrinkage: if a version
+	 * is accidentally removed from the constant the data-provider-based tests
+	 * would simply run fewer cases without failing. Locking the list here forces
+	 * a deliberate test update whenever versions are added or removed.
+	 */
+	public function test_supported_versions_containsExactExpectedSet(): void {
+		$expected = array(
+			'2025-11-25',
+			'2025-06-18',
+			'2024-11-05',
+		);
+
+		$this->assertSame(
+			$expected,
+			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
+			'SUPPORTED_PROTOCOL_VERSIONS does not match the expected set. '
+			. 'If a version was intentionally added or removed, update this test.'
+		);
+	}
+
+	/**
 	 * Test that the first element in SUPPORTED_PROTOCOL_VERSIONS is the latest version.
 	 *
 	 * The constant must be ordered newest-first so that index [0] is always
