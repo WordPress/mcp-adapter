@@ -22,6 +22,11 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 - **[Architecture Overview](architecture/overview.md)** - System design and performance considerations
 
+## Migration Guides
+
+- **[Migrating to v0.3.0](migration/v0.3.0.md)** - Breaking changes and upgrade steps for v0.3.0
+- **[Migrating to v0.5.0](migration/v0.5.0.md)** - Breaking changes and upgrade steps for v0.5.0
+
 ## Troubleshooting
 
 - **[Common Issues](troubleshooting/common-issues.md)** - Quick fixes and debugging techniques
@@ -46,6 +51,10 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 ### Custom Authentication
 1. [Transport Permissions](guides/transport-permissions.md) (recommended)
 2. [Custom Transports](guides/custom-transports.md) (advanced)
+
+### Upgrading
+1. [Migrating to v0.5.0](migration/v0.5.0.md)
+2. [Migrating to v0.3.0](migration/v0.3.0.md)
 
 ### Troubleshooting
 1. [Common Issues](troubleshooting/common-issues.md)
