@@ -56,6 +56,56 @@ wp_register_ability('my-plugin/my-ability', [
 ]);
 ```
 
+## Tool Naming
+
+When abilities are registered on a custom server as MCP tools, the adapter must transform the ability name into an MCP-compliant tool name. The MCP specification (2025-11-25) restricts tool names to the characters `A-Za-z0-9_.-` with a maximum length of 128.
+
+WordPress abilities commonly use namespaced names with forward slashes (e.g., `my-plugin/my-tool`), which are not valid in MCP. The adapter handles this automatically via `McpNameSanitizer::sanitize_name()`.
+
+### Registration Name vs MCP Name
+
+The name you pass to `wp_register_ability()` is the **registration name**. The name MCP clients see is the **MCP tool name**, produced by sanitization:
+
+| Registration Name | MCP Tool Name |
+|-------------------|---------------|
+| `my-plugin/my-tool` | `my-plugin-my-tool` |
+| `fluent/get-posts` | `fluent-get-posts` |
+| `café/résumé-tool` | `cafe-resume-tool` |
+
+### Sanitization Pipeline
+
+The full sanitization pipeline applied to tool names:
+
+1. **Trim** whitespace from both ends
+2. **Replace `/` with `-`** (forward slashes are not allowed in MCP names)
+3. **Early return** if the name is already valid after slash replacement
+4. **Transliterate accents** to ASCII equivalents (e.g., `é` → `e`, `ü` → `u`) via WordPress `remove_accents()`
+5. **Replace remaining invalid characters** with `-`
+6. **Collapse consecutive hyphens** into a single `-`
+7. **Trim leading/trailing** hyphens and underscores
+8. **Truncate long names**: if longer than 128 characters, truncate to 115 characters and append `-` plus a 12-character MD5 hash for uniqueness
+9. **Reject empty results**: if nothing remains after sanitization, return a `WP_Error`
+
+### Customizing Tool Names
+
+You can override the sanitized name using the `mcp_adapter_tool_name` filter. The filter receives the sanitized name and the source `WP_Ability` instance:
+
+```php
+add_filter( 'mcp_adapter_tool_name', function ( string $name, \WP_Ability $ability ): string {
+    // Use a custom name for a specific ability.
+    if ( 'my-plugin/legacy-tool' === $ability->get_name() ) {
+        return 'my-legacy-tool';
+    }
+    return $name;
+}, 10, 2 );
+```
+
+The filter result is validated after application — if it returns an invalid MCP name, the tool registration fails with an error.
+
+> **Note:** This naming transformation applies to **tools** registered on custom servers. The default server exposes abilities indirectly through its built-in meta-tools (`mcp-adapter-discover-abilities`, `mcp-adapter-get-ability-info`, `mcp-adapter-execute-ability`), so ability names pass through as-is in that context. Prompts use the same `McpNameSanitizer` logic. Resources use URIs as identifiers and are not affected by tool name sanitization.
+
+For advanced details, see the source: `includes/Domain/Utils/McpNameSanitizer.php`.
+
 ## Input and Output Schemas
 
 The MCP Adapter supports two schema formats for `input_schema` and `output_schema`:
