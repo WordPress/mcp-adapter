@@ -31,6 +31,45 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | wp mcp-adapter serve --u
 wp user list --fields=ID,user_login,roles
 ```
 
+### HTTP Session Errors (Missing or Invalid Mcp-Session-Id)
+
+When using the HTTP REST API, all requests after `initialize` must include the `Mcp-Session-Id` header. Omitting it or sending an invalid value are the most common causes of unexpected errors.
+
+**Symptom: HTTP 400 — "Missing Mcp-Session-Id header"**
+
+The request is missing the `Mcp-Session-Id` header. Every request except `initialize` must include it.
+
+```bash
+# Wrong — no session header
+curl -s -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+
+# Correct — include the session header received from initialize
+curl -s -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: <session-id-from-initialize>" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+**Symptom: "Invalid or expired session" in JSON-RPC error response**
+
+The session ID is not recognized or has exceeded the inactivity timeout. Re-initialize to obtain a new session:
+
+```bash
+# Re-initialize to get a fresh session
+curl -s -D - -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}}'
+```
+
+**Tip:** The default inactivity timeout is 24 hours (`DAY_IN_SECONDS`). If your client is long-lived, keep the session active by sending requests periodically. You can also adjust the timeout with the `mcp_adapter_session_inactivity_timeout` filter.
+
+**Note:** STDIO transport (WP-CLI) does not use HTTP sessions. If you see session errors, verify you are using the correct transport for your use case. See the [HTTP Sessions section](../guides/default-server.md#http-sessions) for the full session flow.
+
 ## Installation Issues
 
 ### Plugin Not Active

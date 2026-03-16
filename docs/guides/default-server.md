@@ -97,6 +97,96 @@ add_filter( 'mcp_adapter_default_server_config', function ( $config ) {
 
 See the [full default configuration](#default-configuration) below for all available keys.
 
+## HTTP Sessions
+
+When using the HTTP REST API transport, MCP clients must follow the session protocol defined by the MCP specification. The STDIO transport (WP-CLI) does not use HTTP sessions — session lifecycle is tied to the WP-CLI process instead.
+
+### Session Flow
+
+Every HTTP client must complete an initialization handshake before sending any other MCP request:
+
+1. **Initialize** — Send a `POST` request with the `initialize` JSON-RPC method. No `Mcp-Session-Id` header is needed for this first request.
+2. **Capture the session ID** — The response includes an `Mcp-Session-Id` header containing a UUID. Store this value.
+3. **Include the header on every subsequent request** — All following `POST`, `GET`, and `DELETE` requests must include the `Mcp-Session-Id` header with the stored value.
+4. **Terminate when done** — Send a `DELETE` request with the `Mcp-Session-Id` header to clean up the session.
+
+### Curl Example
+
+```bash
+# 1. Initialize and capture the session ID
+SESSION_ID=$(curl -s -D - -X POST \
+  "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}}' \
+  | grep -i 'mcp-session-id' | awk '{print $2}' | tr -d '\r')
+
+echo "Session ID: $SESSION_ID"
+
+# 2. Send initialized notification (required by MCP spec)
+curl -s -X POST \
+  "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+
+# 3. Use the session ID for subsequent requests
+curl -s -X POST \
+  "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Content-Type: application/json" \
+  -H "Mcp-Session-Id: $SESSION_ID" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+
+# 4. Terminate the session when done
+curl -s -X DELETE \
+  "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
+  --user "username:application_password" \
+  -H "Mcp-Session-Id: $SESSION_ID"
+```
+
+### Error Cases
+
+| Condition | JSON-RPC Error Code | HTTP Status | Message |
+|-----------|-------------------|-------------|---------|
+| Missing `Mcp-Session-Id` header on a non-initialize request | `-32600` (Invalid Request) | 400 | Missing Mcp-Session-Id header |
+| Invalid or expired session ID | `-32602` (Invalid Params) | 200 | Invalid or expired session |
+| User not authenticated | `-32010` (Unauthorized) | 401 | User not authenticated |
+
+### Session Configuration
+
+Two filters control session behavior:
+
+**`mcp_adapter_session_max_per_user`** — Maximum number of concurrent sessions a single user can have. When the limit is reached the oldest session is automatically evicted. Default: `32`.
+
+```php
+// Allow at most 5 concurrent sessions per user
+add_filter( 'mcp_adapter_session_max_per_user', function () {
+    return 5;
+} );
+```
+
+**`mcp_adapter_session_inactivity_timeout`** — Number of seconds a session can remain idle before it is considered expired. Default: `DAY_IN_SECONDS` (86 400 seconds / 24 hours).
+
+```php
+// Expire sessions after 1 hour of inactivity
+add_filter( 'mcp_adapter_session_inactivity_timeout', function () {
+    return HOUR_IN_SECONDS;
+} );
+```
+
+Sessions are stored in user meta and are cleaned up automatically when a new session is created or an existing session is validated.
+
+### STDIO Transport (WP-CLI)
+
+The STDIO transport used by WP-CLI does not require HTTP sessions. Each `wp mcp-adapter serve` invocation runs as a single process with its own lifecycle, so session management is unnecessary:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | \
+  wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+```
+
 ## Server Configuration
 
 ### Basic Details
