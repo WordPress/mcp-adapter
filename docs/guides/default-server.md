@@ -2,6 +2,101 @@
 
 The MCP Adapter automatically creates a default server that provides core MCP functionality for WordPress abilities. This server acts as a bridge between AI agents and WordPress, allowing them to discover and execute WordPress abilities through the Model Context Protocol.
 
+## Choosing Between Default and Custom Servers
+
+The MCP Adapter supports two approaches for exposing WordPress abilities to AI agents. You can use both at the same time — they serve different purposes.
+
+### Default Server: Layered Discovery
+
+The default server is created automatically when the plugin loads. It exposes three meta-tools that let AI agents dynamically discover and execute any WordPress ability marked with `mcp.public=true` metadata:
+
+1. **`mcp-adapter/discover-abilities`** — Lists all publicly available abilities
+2. **`mcp-adapter/get-ability-info`** — Retrieves the full schema for a specific ability
+3. **`mcp-adapter/execute-ability`** — Executes an ability with provided parameters
+
+The AI agent navigates this layered interface: discover what is available, inspect what it needs, then execute. This keeps the MCP `tools/list` response small (only 3 tool schemas) regardless of how many abilities exist on the site.
+
+The default server also auto-discovers abilities registered with `mcp.public=true` and `mcp.type` set to `resource` or `prompt`, exposing them as MCP resources and prompts alongside the three meta-tools.
+
+**Best for:**
+- General-purpose AI integration where the set of abilities changes over time
+- Sites with many plugins registering abilities — no server reconfiguration needed
+- Scenarios where context window efficiency matters (only 3 tool schemas sent to the AI)
+
+### Custom Server: Direct Tool Registration
+
+A custom server is created explicitly via the `mcp_adapter_init` hook. Each ability you list is registered as a standalone MCP tool, resource, or prompt with its own schema visible directly in `tools/list`:
+
+```php
+add_action( 'mcp_adapter_init', function ( $adapter ) {
+    $adapter->create_server(
+        'content-server',
+        'mcp',
+        'content-server',
+        'Content Server',
+        'Focused content management tools',
+        '1.0.0',
+        array( \WP\MCP\Transport\HttpTransport::class ),
+        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
+        null, // observability handler
+        array( 'my-plugin/create-post', 'my-plugin/update-post' ), // tools
+        array(), // resources
+        array()  // prompts
+    );
+} );
+```
+
+The AI agent sees `my-plugin-create-post` and `my-plugin-update-post` as individual tools with their full input schemas — no discovery step required.
+
+**Best for:**
+- Focused integrations exposing a small, well-defined set of tools
+- Cases where AI agents need dedicated schemas with rich parameter descriptions
+- When you want the AI to call tools directly without the discover-then-execute indirection
+
+### Comparison
+
+| Aspect | Default Server | Custom Server |
+|--------|---------------|---------------|
+| Creation | Automatic on plugin load | Manual via `mcp_adapter_init` hook |
+| Tool visibility | 3 meta-tools; abilities discovered at runtime | Each ability is a separate MCP tool |
+| AI interaction | Discover → Inspect → Execute (3 steps) | Call tool directly (1 step) |
+| Scalability | Unlimited abilities without growing `tools/list` | Each tool adds to `tools/list` response |
+| Schema detail | AI fetches schemas on demand via `get-ability-info` | Full schemas visible immediately |
+| Configuration | Zero-config; abilities opt in with `mcp.public=true` | Explicit ability list per server |
+| Auto-discovery | Resources and prompts with `mcp.public=true` auto-discovered | Only explicitly listed components |
+| Transport | HTTP (REST API) by default; STDIO via WP-CLI | Any transport you configure |
+
+### Disabling the Default Server
+
+If you only want custom servers, disable the default server with the `mcp_adapter_create_default_server` filter. This filter is applied in `McpAdapter::maybe_create_default_server()` before any default abilities or the default server factory are registered:
+
+```php
+add_filter( 'mcp_adapter_create_default_server', '__return_false' );
+```
+
+When disabled, the three built-in meta-tools (`mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, `mcp-adapter/execute-ability`) are not registered and the default server endpoint is not created.
+
+### Extending the Default Server
+
+Use the `mcp_adapter_default_server_config` filter to modify the default server's configuration before it is created. The filter receives the full configuration array and must return an array — it is merged with defaults via `wp_parse_args()`:
+
+```php
+add_filter( 'mcp_adapter_default_server_config', function ( $config ) {
+    // Change the server name
+    $config['server_name'] = 'My Site MCP Server';
+
+    // Add a custom tool alongside the 3 meta-tools
+    $config['tools'][] = 'my-plugin/quick-search';
+
+    // Use a custom error handler
+    $config['error_handler'] = \MyPlugin\CustomErrorHandler::class;
+
+    return $config;
+} );
+```
+
+See the [full default configuration](#default-configuration) below for all available keys.
+
 ## Server Configuration
 
 ### Basic Details
