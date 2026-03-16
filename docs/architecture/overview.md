@@ -42,7 +42,7 @@ This separation ensures that:
 
 `McpComponentInterface` is an internal contract (`@internal`). It is not intended for third-party implementation.
 
-### Integration Layers
+### Supporting Layers
 
 The remaining layers wire the Schema and Adapter layers together:
 
@@ -108,7 +108,7 @@ The `RequestRouter` maps MCP methods to handlers. All handlers return schema DTO
 | `resources/read` | `ResourcesHandler::read_resource()` | `ReadResourceResult` or `JSONRPCErrorResponse` |
 | `prompts/list` | `PromptsHandler::list_prompts()` | `ListPromptsResult` |
 | `prompts/get` | `PromptsHandler::get_prompt()` | `GetPromptResult` or `JSONRPCErrorResponse` |
-| `ping` | `SystemHandler::ping()` | Empty result DTO |
+| `ping` | `SystemHandler::ping()` | `Result` |
 
 Protocol-level errors (tool not found, missing parameters) return `JSONRPCErrorResponse`. Execution-level errors (permission denied, runtime failure) return the appropriate result DTO with `isError: true`.
 
@@ -180,7 +180,7 @@ Factory for creating typed content block DTOs used in tool call results, prompt 
 | Method | Returns | Purpose |
 |--------|---------|---------|
 | `text( $text )` | `TextContent` | Plain text content |
-| `json_text( $data )` | `TextContent` | JSON-encoded data as text |
+| `json_text( $data, $flags )` | `TextContent` | JSON-encoded data as text (flags: `JSON_*` constants) |
 | `image( $data, $mime_type )` | `ImageContent` | Base64-encoded image |
 | `audio( $data, $mime_type )` | `AudioContent` | Base64-encoded audio |
 | `embedded_text_resource( $uri, $text )` | `EmbeddedResource` | Text resource embedded in content |
@@ -227,14 +227,14 @@ interface McpTransportInterface {
 }
 
 interface McpRestTransportInterface extends McpTransportInterface {
-    public function check_permission( WP_REST_Request $request );
+    public function check_permission( WP_REST_Request $request ): bool|\WP_Error;
     public function handle_request( WP_REST_Request $request ): WP_REST_Response;
 }
 ```
 
 ### Built-in Transports
 
-- **HttpTransport**: Recommended (MCP 2025-06-18 Streamable HTTP compliant)
+- **HttpTransport**: Recommended (MCP Streamable HTTP compliant)
 - **STDIO Transport**: Via WP-CLI commands
 
 ### Dependency Injection
@@ -323,7 +323,7 @@ class MyTransport implements McpRestTransportInterface {
             'my-transport'
         );
 
-        return rest_ensure_response( $result );
+        return new WP_REST_Response( $result );
     }
 }
 ```
@@ -357,49 +357,13 @@ class MyObservabilityHandler implements McpObservabilityHandlerInterface {
 }
 ```
 
-## Key Architectural Decisions
+## Design Principles
 
-### Two-Layer DTO Separation
-- Protocol DTOs from `php-mcp-schema` are never modified with adapter-internal fields
-- Adapter metadata lives on `McpComponentInterface` implementations
-- Clean serialization: `get_protocol_dto()->toArray()` always produces spec-compliant output
-
-### Dependency Injection
-- All transports receive dependencies through `McpTransportContext`
-- Handlers receive `McpServer` via constructor injection
-- No global state or static dependencies beyond the `McpAdapter` singleton
-
-### Interface-Based Design
-- All major components implement interfaces
-- Swappable implementations (error handlers, observability, transports)
-- Clean separation of concerns
-
-### Event Emission
-- System emits events rather than storing local counters
-- External systems handle aggregation and analysis
-- Zero memory overhead when observability is disabled
-
-### WordPress Integration
-- Leverages WordPress Abilities API for component definition
-- Uses WordPress REST API for HTTP transport
-- Integrates with WordPress permission system
-
-## Performance Considerations
-
-### Lazy Loading
-- Components created only when needed
-- Validation can be disabled via the `mcp_adapter_validation_enabled` filter (default: disabled)
-- Null object pattern for disabled features (e.g., `NullMcpObservabilityHandler`)
-
-### Caching
-- WordPress object cache integration
-- Component registry caching
-- Ability lookup optimization
-
-### Memory Management
-- No persistent state storage
-- Event emission pattern prevents memory leaks
-- DTO `toArray()` called only at the serialization boundary, not eagerly
+- **Two-layer DTO separation**: Protocol DTOs from `php-mcp-schema` carry no adapter-internal fields; `get_protocol_dto()->toArray()` always produces spec-compliant output
+- **Dependency injection**: All transports receive dependencies through `McpTransportContext`; no global state beyond the `McpAdapter` singleton
+- **Interface-based design**: Error handlers, observability, and transports are all swappable via interfaces
+- **Event emission over counters**: Observability emits events; external systems handle aggregation — zero overhead when disabled
+- **Lazy loading**: Components created only when needed; validation disabled by default via `mcp_adapter_validation_enabled` filter
 
 ## Next Steps
 

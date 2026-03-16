@@ -102,7 +102,7 @@ add_filter( 'mcp_adapter_tool_name', function ( string $name, \WP_Ability $abili
 
 The filter result is validated after application — if it returns an invalid MCP name, the tool registration fails with an error.
 
-> **Note:** This naming transformation applies to **tools** registered on custom servers. The default server exposes abilities indirectly through its built-in meta-tools (`mcp-adapter-discover-abilities`, `mcp-adapter-get-ability-info`, `mcp-adapter-execute-ability`), so ability names pass through as-is in that context. Prompts use the same `McpNameSanitizer` logic. Resources use URIs as identifiers and are not affected by tool name sanitization.
+> **Note:** This naming transformation applies to **tools created from WordPress abilities** (via `McpTool::fromAbility()`). The default server exposes abilities indirectly through its built-in meta-tools (`mcp-adapter-discover-abilities`, `mcp-adapter-get-ability-info`, `mcp-adapter-execute-ability`), so ability names pass through as-is in that context. Prompts use the same `McpNameSanitizer` logic. Resources use URIs as identifiers and are not affected by tool name sanitization.
 
 For advanced details, see the source: `includes/Domain/Utils/McpNameSanitizer.php`.
 

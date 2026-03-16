@@ -118,12 +118,12 @@ SESSION_ID=$(curl -s -D - -X POST \
   "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
   --user "username:application_password" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}}' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}}' \
   | grep -i 'mcp-session-id' | awk '{print $2}' | tr -d '\r')
 
 echo "Session ID: $SESSION_ID"
 
-# 2. Send initialized notification (required by MCP spec)
+# 2. Send initialized notification (tells server the client is ready for requests)
 curl -s -X POST \
   "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
   --user "username:application_password" \
@@ -151,7 +151,7 @@ curl -s -X DELETE \
 | Condition | JSON-RPC Error Code | HTTP Status | Message |
 |-----------|-------------------|-------------|---------|
 | Missing `Mcp-Session-Id` header on a non-initialize request | `-32600` (Invalid Request) | 400 | Missing Mcp-Session-Id header |
-| Invalid or expired session ID | `-32602` (Invalid Params) | 200 | Invalid or expired session |
+| Invalid or expired session ID | `-32602` (Invalid Params) | 200 | Invalid or expired session | <!-- MCP uses HTTP 200 for application-level errors; the error is in the JSON-RPC body -->
 | User not authenticated | `-32010` (Unauthorized) | 401 | User not authenticated |
 
 ### Session Configuration

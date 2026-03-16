@@ -83,6 +83,9 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │   │   # Shared utilities
 │   ├── Utils/
 │   │   ├── McpNameSanitizer.php            # MCP name sanitization
+│   │   ├── McpValidator.php                # MCP name/URI/schema validation
+│   │   ├── McpAnnotationMapper.php         # Annotation mapping from abilities
+│   │   ├── SchemaTransformer.php           # Schema format transformation
 │   │   ├── ContentBlockHelper.php          # Content block DTO factory
 │   │   └── AbilityArgumentNormalizer.php   # Argument normalization
 │   │   # MCP Tools implementation
@@ -129,10 +132,11 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │       ├── ErrorLogMcpObservabilityHandler.php       # Default handler
 │       ├── NullMcpObservabilityHandler.php           # Null object pattern
 │       ├── McpObservabilityHelperTrait.php           # Helper trait
+│       ├── ConsoleObservabilityHandler.php          # Console output handler
 │       └── FailureReason.php                        # Standardized failure reasons
 │
 │   # Transport layer implementations
-├─── Transport/
+├── Transport/
 │   ├── Contracts/
 │   │   ├── McpTransportInterface.php     # Base transport interface
 │   │   └── McpRestTransportInterface.php # REST transport interface

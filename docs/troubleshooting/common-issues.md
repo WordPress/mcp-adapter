@@ -35,7 +35,7 @@ wp user list --fields=ID,user_login,roles
 
 When using the HTTP REST API, all requests after `initialize` must include the `Mcp-Session-Id` header. Omitting it or sending an invalid value are the most common causes of unexpected errors.
 
-**Symptom: HTTP 400 — "Missing Mcp-Session-Id header"**
+**Symptom: JSON-RPC error `-32600` — "Missing Mcp-Session-Id header"**
 
 The request is missing the `Mcp-Session-Id` header. Every request except `initialize` must include it.
 
