@@ -368,9 +368,7 @@ if ( ! in_array(
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 if ( empty( $params['name'] ) ) {
-    return [
-        'error' => McpErrorFactory::missing_parameter( $request_id, 'name' )['error']
-    ];
+    return McpErrorFactory::missing_parameter( $request_id, 'name' );
 }
 ```
 
