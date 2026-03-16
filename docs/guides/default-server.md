@@ -2,11 +2,11 @@
 
 The MCP Adapter automatically creates a default server that provides core MCP functionality for WordPress abilities. This server acts as a bridge between AI agents and WordPress, allowing them to discover and execute WordPress abilities through the Model Context Protocol.
 
-## Choosing Between Default and Custom Servers
+## Choosing between default and custom servers
 
 The MCP Adapter supports two approaches for exposing WordPress abilities to AI agents. You can use both at the same time — they serve different purposes.
 
-### Default Server: Layered Discovery
+### Default server: layered discovery
 
 The default server is created automatically when the plugin loads. It exposes three meta-tools that let AI agents dynamically discover and execute any WordPress ability marked with `mcp.public=true` metadata:
 
@@ -23,7 +23,7 @@ The default server also auto-discovers abilities registered with `mcp.public=tru
 - Sites with many plugins registering abilities — no server reconfiguration needed
 - Scenarios where context window efficiency matters (only 3 tool schemas sent to the AI)
 
-### Custom Server: Direct Tool Registration
+### Custom server: direct tool registration
 
 A custom server is created explicitly via the `mcp_adapter_init` hook. Each ability you list is registered as a standalone MCP tool, resource, or prompt with its own schema visible directly in `tools/list`:
 
@@ -66,7 +66,7 @@ The AI agent sees `my-plugin-create-post` and `my-plugin-update-post` as individ
 | Auto-discovery | Resources and prompts with `mcp.public=true` auto-discovered | Only explicitly listed components |
 | Transport | HTTP (REST API) by default; STDIO via WP-CLI | Any transport you configure |
 
-### Disabling the Default Server
+### Disabling the default server
 
 If you only want custom servers, disable the default server with the `mcp_adapter_create_default_server` filter. This filter is applied in `McpAdapter::maybe_create_default_server()` before any default abilities or the default server factory are registered:
 
@@ -76,7 +76,7 @@ add_filter( 'mcp_adapter_create_default_server', '__return_false' );
 
 When disabled, the three built-in meta-tools (`mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, `mcp-adapter/execute-ability`) are not registered and the default server endpoint is not created.
 
-### Extending the Default Server
+### Extending the default server
 
 Use the `mcp_adapter_default_server_config` filter to modify the default server's configuration before it is created. The filter receives the full configuration array and must return an array — it is merged with defaults via `wp_parse_args()`:
 
@@ -97,11 +97,11 @@ add_filter( 'mcp_adapter_default_server_config', function ( $config ) {
 
 See the [full default configuration](#default-configuration) below for all available keys.
 
-## HTTP Sessions
+## HTTP sessions
 
 When using the HTTP REST API transport, MCP clients must follow the session protocol defined by the MCP specification. The STDIO transport (WP-CLI) does not use HTTP sessions — session lifecycle is tied to the WP-CLI process instead.
 
-### Session Flow
+### Session flow
 
 Every HTTP client must complete an initialization handshake before sending any other MCP request:
 
@@ -110,7 +110,7 @@ Every HTTP client must complete an initialization handshake before sending any o
 3. **Include the header on every subsequent request** — All following `POST`, `GET`, and `DELETE` requests must include the `Mcp-Session-Id` header with the stored value.
 4. **Terminate when done** — Send a `DELETE` request with the `Mcp-Session-Id` header to clean up the session.
 
-### Curl Example
+### Curl example
 
 ```bash
 # 1. Initialize and capture the session ID
@@ -146,7 +146,7 @@ curl -s -X DELETE \
   -H "Mcp-Session-Id: $SESSION_ID"
 ```
 
-### Error Cases
+### Error cases
 
 | Condition | JSON-RPC Error Code | HTTP Status | Message |
 |-----------|-------------------|-------------|---------|
@@ -154,7 +154,7 @@ curl -s -X DELETE \
 | Invalid or expired session ID | `-32602` (Invalid Params) | 200 | Invalid or expired session | <!-- MCP uses HTTP 200 for application-level errors; the error is in the JSON-RPC body -->
 | User not authenticated | `-32010` (Unauthorized) | 401 | User not authenticated |
 
-### Session Configuration
+### Session configuration
 
 Two filters control session behavior:
 
@@ -178,7 +178,7 @@ add_filter( 'mcp_adapter_session_inactivity_timeout', function () {
 
 Sessions are stored in user meta and are cleaned up automatically when a new session is created or an existing session is validated.
 
-### STDIO Transport (WP-CLI)
+### STDIO transport (WP-CLI)
 
 The STDIO transport used by WP-CLI does not require HTTP sessions. Each `wp mcp-adapter serve` invocation runs as a single process with its own lifecycle, so session management is unnecessary:
 

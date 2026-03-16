@@ -2,13 +2,13 @@
 
 Documentation for the WordPress MCP Adapter - transform WordPress abilities into AI-accessible tools, resources, and prompts.
 
-## Getting Started
+## Getting started
 
 - **[Quick Start Guide](getting-started/README.md)** - Get running in minutes with working examples
 - **[Installation Guide](getting-started/installation.md)** - Installation methods (Composer recommended)
 - **[Basic Examples](getting-started/basic-examples.md)** - Complete examples for tools, resources, and prompts
 
-## Implementation Guides
+## Implementation guides
 
 - **[Default Server](guides/default-server.md)** - Understanding the built-in MCP server and core abilities
 - **[Creating Abilities](guides/creating-abilities.md)** - Build tools, resources, and prompts with annotations
@@ -18,11 +18,11 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 - **[Observability](guides/observability.md)** - Metrics tracking and monitoring integration
 - **[CLI Usage](guides/cli-usage.md)** - WP-CLI commands for STDIO transport
 
-## System Design
+## System design
 
 - **[Architecture Overview](architecture/overview.md)** - System design and performance considerations
 
-## Migration Guides
+## Migration guides
 
 - **[Migrating to v0.3.0](migration/v0.3.0.md)** - Breaking changes and upgrade steps for v0.3.0
 - **[Migrating to v0.5.0](migration/v0.5.0.md)** - Breaking changes and upgrade steps for v0.5.0
@@ -36,19 +36,19 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 - **[Contributing Guide](../CONTRIBUTING.md)** - Development setup, coding standards, and contribution workflow
 - **[Testing Guide](guides/testing.md)** - Running and writing tests with wp-env
 
-## Quick Navigation
+## Quick navigation
 
-### New to MCP Adapter
+### New to MCP Adapter?
 1. [Quick Start Guide](getting-started/README.md)
 2. [Default Server](guides/default-server.md)
 3. [Basic Examples](getting-started/basic-examples.md)
 4. [Architecture Overview](architecture/overview.md)
 
-### Build Custom Tools
+### Build custom tools
 1. [Creating Abilities](guides/creating-abilities.md)
 2. [Basic Examples](getting-started/basic-examples.md)
 
-### Custom Authentication
+### Custom authentication
 1. [Transport Permissions](guides/transport-permissions.md) (recommended)
 2. [Custom Transports](guides/custom-transports.md) (advanced)
 

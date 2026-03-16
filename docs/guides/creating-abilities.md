@@ -9,7 +9,7 @@ WordPress abilities can be registered as different MCP components:
 - **Resources**: Provide access to data or content
 - **Prompts**: Generate structured messages for language models
 
-** Full Annotation Support**: All component types support MCP annotations through the ability's `meta.annotations` field to provide behavior hints to MCP clients.
+**Full annotation support**: All component types support MCP annotations through the ability's `meta.annotations` field to provide behavior hints to MCP clients.
 
 ## MCP Exposure
 
@@ -56,7 +56,7 @@ wp_register_ability('my-plugin/my-ability', [
 ]);
 ```
 
-## Tool Naming
+## Tool naming
 
 When abilities are registered on a custom server as MCP tools, the adapter must transform the ability name into an MCP-compliant tool name. The MCP specification (2025-11-25) restricts tool names to the characters `A-Za-z0-9_.-` with a maximum length of 128.
 

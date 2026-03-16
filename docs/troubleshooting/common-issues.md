@@ -31,7 +31,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | wp mcp-adapter serve --u
 wp user list --fields=ID,user_login,roles
 ```
 
-### HTTP Session Errors (Missing or Invalid Mcp-Session-Id)
+### HTTP session errors (missing or invalid Mcp-Session-Id)
 
 When using the HTTP REST API, all requests after `initialize` must include the `Mcp-Session-Id` header. Omitting it or sending an invalid value are the most common causes of unexpected errors.
 
