@@ -4,24 +4,71 @@ This document explains how the MCP Adapter transforms WordPress abilities into M
 
 ## System Architecture
 
-The MCP Adapter uses a layered architecture with clear separation of concerns:
+The MCP Adapter uses a two-layer architecture that separates protocol concerns from WordPress integration:
 
-1. **Transport Layer**: Handles communication protocols (HTTP, STDIO)
-2. **Core Layer**: Manages servers, routing, and component registration  
-3. **Component Layer**: Tools, resources, and prompts
-4. **WordPress Layer**: Abilities API integration
+### Schema Layer (Protocol DTOs)
+
+The Schema Layer is provided by the `php-mcp-schema` package (`WP\McpSchema\` namespace). It contains protocol-only data transfer objects that are safe to expose to MCP clients.
+
+**Key DTOs:**
+
+| Category | Classes |
+|----------|---------|
+| Component definitions | `Tool`, `Resource`, `Prompt`, `PromptArgument`, `ToolAnnotations`, `Annotations` |
+| Result types | `ListToolsResult`, `CallToolResult`, `ListResourcesResult`, `ReadResourceResult`, `ListPromptsResult`, `GetPromptResult` |
+| Content blocks | `TextContent`, `ImageContent`, `AudioContent`, `EmbeddedResource` |
+
+All DTOs extend `AbstractDataTransferObject`, which provides `toArray()` and `fromArray()` methods for serialization. These types carry no execution logic and no adapter-internal metadata.
+
+### Adapter Layer (WordPress Integration)
+
+The Adapter Layer wraps each protocol DTO with execution wiring and WordPress-specific metadata. Domain models `McpTool`, `McpResource`, and `McpPrompt` each implement the `McpComponentInterface` contract:
+
+```php
+interface McpComponentInterface {
+    public function get_protocol_dto(): AbstractDataTransferObject;
+    public function execute( $arguments );
+    public function check_permission( $arguments );
+    public function get_adapter_meta(): array;
+    public function get_observability_context(): array;
+}
+```
+
+This separation ensures that:
+
+- **Protocol DTOs** contain only fields defined by the MCP specification and are serialized directly into responses.
+- **Adapter metadata** (ability references, schema transformation flags, permission callbacks) stays internal and is never exposed to MCP clients.
+- **Observability context** provides structured tags for logging and metrics without polluting DTO `_meta`.
+
+`McpComponentInterface` is an internal contract (`@internal`). It is not intended for third-party implementation.
+
+### Integration Layers
+
+The remaining layers wire the Schema and Adapter layers together:
+
+- **Core:** `McpAdapter` (singleton registry), `McpServer`, `McpComponentRegistry`, `McpTransportFactory`
+- **Handlers:** `InitializeHandler`, `ToolsHandler`, `ResourcesHandler`, `PromptsHandler`, `SystemHandler`
+- **Transport:** `HttpTransport`, STDIO transport, `RequestRouter`
+- **Infrastructure:** Error handling (`McpErrorHandlerInterface`), Observability (`McpObservabilityHandlerInterface`)
 
 ## Core Components
 
 ### McpAdapter (Singleton Registry)
 - **Purpose**: Central registry managing multiple MCP servers
-- **Key Methods**: `create_server()`, `get_servers()`, `instance()`
+- **Key Methods**: `create_server()`, `get_server()`, `get_servers()`, `instance()`
 - **Initialization**: Hooks into `rest_api_init` and fires `mcp_adapter_init` action
 
-### McpServer (Server Instance)  
+### McpServer (Server Instance)
 - **Purpose**: Individual MCP server with specific configuration
-- **Components**: Uses `McpComponentRegistry` to manage tools, resources, prompts
+- **Components**: Uses `McpComponentRegistry` to manage `McpComponentInterface` instances
+- **Typed access**: `get_tools()`, `get_resources()`, `get_prompts()` return component collections
 - **Dependencies**: Error handler, observability handler, transport permission callback
+
+### McpComponentRegistry
+- **Purpose**: Stores and retrieves `McpComponentInterface` instances
+- **Registration**: `register_tools()`, `register_resources()`, `register_prompts()` accept both ability names and `McpComponentInterface` instances
+- **Name sanitization**: Uses `McpNameSanitizer` to normalize tool and prompt names
+- **Validation**: Validates components with `McpValidator` when validation is enabled
 
 ### McpTransportFactory
 - **Purpose**: Creates transport instances with dependency injection
@@ -29,75 +76,145 @@ The MCP Adapter uses a layered architecture with clear separation of concerns:
 - **Validation**: Ensures transport classes implement `McpTransportInterface`
 
 ### RequestRouter
-- **Purpose**: Routes MCP method calls to appropriate handlers
-- **Methods**: Maps method names to handler functions
-- **Observability**: Tracks request metrics and timing
+- **Purpose**: Routes MCP method calls to handlers that return schema DTOs
+- **DTO serialization boundary**: Converts `AbstractDataTransferObject` results to arrays via `toArray()` and `JSONRPCErrorResponse` results to error arrays
+- **Observability**: Extracts per-component context from `McpComponentInterface::get_observability_context()` for request tagging
 
 ## Request Flow
 
-Simple request flow through the system:
-
 ```
-AI Agent → Transport → RequestRouter → Handler → WordPress Ability → Response
+AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Schema DTO --> Response
 ```
 
 ### Detailed Flow
 1. **Transport** receives MCP request and authenticates
 2. **RequestRouter** maps method to appropriate handler
-3. **Handler** finds component (tool/resource/prompt) and validates input
-4. **WordPress Ability** executes with permission checks
-5. **Response** formatted and returned through transport
+3. **Handler** finds the `McpComponentInterface` component, validates input, and invokes execution
+4. **Component** delegates to a WordPress ability or direct callable, returning a result
+5. **Handler** wraps the result in a schema DTO (e.g., `CallToolResult`)
+6. **RequestRouter** calls `toArray()` on the DTO at the serialization boundary
+7. **Transport** wraps the array in a JSON-RPC envelope and returns it
 
 ### Method Routing
 
-The `RequestRouter` maps MCP methods to handlers:
+The `RequestRouter` maps MCP methods to handlers. All handlers return schema DTOs:
 
-```php
-$handlers = [
-    'initialize'          => InitializeHandler,
-    'tools/list'          => ToolsHandler::list_tools(),
-    'tools/call'          => ToolsHandler::call_tool(),
-    'resources/list'      => ResourcesHandler::list_resources(),
-    'resources/read'      => ResourcesHandler::read_resource(),
-    'prompts/list'        => PromptsHandler::list_prompts(),
-    'prompts/get'         => PromptsHandler::get_prompt(),
-    'ping'                => SystemHandler::ping(),
-    'logging/setLevel'    => SystemHandler::set_logging_level(),
-    'completion/complete' => SystemHandler::complete(),
-    'roots/list'          => SystemHandler::list_roots(),
-];
-```
+| Method | Handler | Return Type |
+|--------|---------|-------------|
+| `initialize` | `InitializeHandler::handle()` | `InitializeResult` |
+| `tools/list` | `ToolsHandler::list_tools()` | `ListToolsResult` |
+| `tools/call` | `ToolsHandler::call_tool()` | `CallToolResult` or `JSONRPCErrorResponse` |
+| `resources/list` | `ResourcesHandler::list_resources()` | `ListResourcesResult` |
+| `resources/read` | `ResourcesHandler::read_resource()` | `ReadResourceResult` or `JSONRPCErrorResponse` |
+| `prompts/list` | `PromptsHandler::list_prompts()` | `ListPromptsResult` |
+| `prompts/get` | `PromptsHandler::get_prompt()` | `GetPromptResult` or `JSONRPCErrorResponse` |
+| `ping` | `SystemHandler::ping()` | Empty result DTO |
+
+Protocol-level errors (tool not found, missing parameters) return `JSONRPCErrorResponse`. Execution-level errors (permission denied, runtime failure) return the appropriate result DTO with `isError: true`.
 
 ## Component Creation
 
-### Ability to MCP Component Conversion
+### From WordPress Ability
 
-WordPress abilities are converted to MCP components using factory classes:
-
-```php
-// Tools
-$tool = RegisterAbilityAsMcpTool::make($ability, $server);
-
-// Resources (require 'uri' in ability meta)
-$resource = RegisterAbilityAsMcpResource::make($ability, $server);
-
-// Prompts (support 'arguments' and 'annotations' in ability meta)
-$prompt = RegisterAbilityAsMcpPrompt::make($ability, $server);
-```
-
-### Component Registry
-
-The `McpComponentRegistry` manages component registration:
+WordPress abilities are converted to MCP components using factory methods on each domain model:
 
 ```php
-class McpComponentRegistry {
-    public function register_ability_as_tool(string $ability_name): void;
-    public function register_ability_as_resource(string $ability_name): void;
-    public function register_ability_as_prompt(string $ability_name): void;
-    
-    // Automatic observability tracking for registration events
-}
+// Tool from ability
+$tool = McpTool::fromAbility( $ability );  // Returns McpTool|WP_Error
+
+// Resource from ability
+$resource = McpResource::fromAbility( $ability );  // Returns McpResource|WP_Error
+
+// Prompt from ability
+$prompt = McpPrompt::fromAbility( $ability );  // Returns McpPrompt|WP_Error
 ```
+
+### From Array Configuration
+
+Components can also be created directly without a WordPress ability:
+
+```php
+$tool = McpTool::fromArray( [
+    'name'        => 'my-tool',
+    'title'       => 'My Tool',
+    'description' => 'Does something useful',
+    'inputSchema' => [ 'type' => 'object', 'properties' => [ ... ] ],
+    'handler'     => fn( $args ) => [ 'result' => 'done' ],
+    'permission'  => fn() => current_user_can( 'edit_posts' ),
+    'annotations' => [ 'readOnlyHint' => true ],
+] );
+```
+
+### Protocol DTO Access
+
+Each component exposes its clean protocol DTO for serialization:
+
+```php
+$dto = $tool->get_protocol_dto();  // Returns WP\McpSchema\Server\Tools\DTO\Tool
+$array = $dto->toArray();          // Protocol-safe array for JSON responses
+```
+
+The DTO contains only MCP specification fields. Adapter metadata (ability reference, schema transformation flags) lives on the `McpTool` instance and is never serialized.
+
+## Utility Classes
+
+### McpNameSanitizer
+
+Normalizes component names to MCP-valid format per MCP 2025-11-25 spec.
+
+- **Charset**: `A-Za-z0-9_.-` only
+- **Max length**: 128 characters
+- **Transformations**: `/` to `-`, accent transliteration, invalid character replacement
+- **Truncation**: Long names are truncated with an MD5 hash suffix for uniqueness
+- **Usage**: Applied automatically during tool and prompt registration (not used for resources, which use URIs)
+
+```php
+$name = McpNameSanitizer::sanitize_name( 'my-plugin/action-name' );
+// Returns: 'my-plugin-action-name'
+```
+
+### ContentBlockHelper
+
+Factory for creating typed content block DTOs used in tool call results, prompt messages, and resource contents.
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `text( $text )` | `TextContent` | Plain text content |
+| `json_text( $data )` | `TextContent` | JSON-encoded data as text |
+| `image( $data, $mime_type )` | `ImageContent` | Base64-encoded image |
+| `audio( $data, $mime_type )` | `AudioContent` | Base64-encoded audio |
+| `embedded_text_resource( $uri, $text )` | `EmbeddedResource` | Text resource embedded in content |
+| `embedded_blob_resource( $uri, $blob )` | `EmbeddedResource` | Binary resource embedded in content |
+| `error_text( $message )` | `TextContent` | Semantic alias for error messages |
+| `to_array_list( $blocks )` | `array[]` | Converts content block DTOs to arrays |
+
+### AbilityArgumentNormalizer
+
+Normalizes arguments between MCP clients and WordPress abilities. MCP clients send `{}` (empty object) for tools without arguments, which PHP decodes as `[]` (empty array). Abilities without an input schema expect `null`, not an empty array. This normalizer bridges that gap.
+
+```php
+$args = AbilityArgumentNormalizer::normalize( $ability, $args );
+```
+
+### FailureReason
+
+Provides a centralized, stable vocabulary of failure reason constants for observability events. Categories include:
+
+- **Registration failures**: `ABILITY_NOT_FOUND`, `DUPLICATE_URI`, `ABILITY_CONVERSION_FAILED`
+- **Permission failures**: `PERMISSION_DENIED`, `PERMISSION_CHECK_FAILED`, `NO_PERMISSION_STRATEGY`
+- **Execution failures**: `NOT_FOUND`, `EXECUTION_FAILED`, `EXECUTION_EXCEPTION`
+- **Validation failures**: `MISSING_PARAMETER`, `INVALID_PARAMETER`
+
+### McpValidator
+
+Extended validation for MCP component data per the MCP 2025-11-25 specification:
+
+- `validate_name()` -- Name charset and length validation
+- `validate_resource_uri()` -- URI format per RFC 3986
+- `validate_mime_type()` -- MIME type format validation
+- `validate_icons_array()` -- Icon object validation (src, mimeType, sizes, theme)
+- `get_annotation_validation_errors()` -- Annotation field validation (audience, priority, lastModified)
+- `validate_base64()` -- Base64 content validation
 
 ## Transport Layer
 
@@ -105,57 +222,51 @@ class McpComponentRegistry {
 
 ```php
 interface McpTransportInterface {
-    public function __construct(McpTransportContext $context);
+    public function __construct( McpTransportContext $context );
     public function register_routes(): void;
 }
 
 interface McpRestTransportInterface extends McpTransportInterface {
-    public function check_permission(WP_REST_Request $request);
-    public function handle_request(WP_REST_Request $request): WP_REST_Response;
+    public function check_permission( WP_REST_Request $request );
+    public function handle_request( WP_REST_Request $request ): WP_REST_Response;
 }
 ```
 
 ### Built-in Transports
 
-- **HttpTransport**: Recommended (MCP 2025-06-18 compliant)
+- **HttpTransport**: Recommended (MCP 2025-06-18 Streamable HTTP compliant)
 - **STDIO Transport**: Via WP-CLI commands
 
 ### Dependency Injection
 
-Transports receive all dependencies through `McpTransportContext`:
+Transports and the `RequestRouter` receive all dependencies through `McpTransportContext`, which bundles the server instance, all handlers, the router, error handler, and observability handler.
 
-```php
-class McpTransportContext {
-    public McpServer $mcp_server;
-    public InitializeHandler $initialize_handler;
-    public ToolsHandler $tools_handler;
-    public ResourcesHandler $resources_handler;
-    public PromptsHandler $prompts_handler;
-    public SystemHandler $system_handler;
-    public RequestRouter $request_router;
-    public string $observability_handler;
-    public McpErrorHandlerInterface $error_handler;
-    public $transport_permission_callback;
-}
-```
+### DTO-Aware RequestRouter
+
+The `RequestRouter` is the serialization boundary between typed DTOs and transport-level arrays:
+
+1. It dispatches to the appropriate handler, which returns an `AbstractDataTransferObject` or `JSONRPCErrorResponse`.
+2. For success DTOs, it calls `toArray()` and returns the resulting array.
+3. For error DTOs, it extracts the error object and returns `['error' => ...]`.
+4. The transport wraps the array in the JSON-RPC 2.0 envelope.
 
 ## Error Handling
 
 ### Two-Part System
 
-1. **Error Response Creation**: `McpErrorFactory` creates JSON-RPC error responses
-2. **Error Logging**: `McpErrorHandlerInterface` implementations log errors
+1. **Error Response Creation**: `McpErrorFactory` creates `JSONRPCErrorResponse` DTOs for protocol errors
+2. **Error Logging**: `McpErrorHandlerInterface` implementations log errors for monitoring
 
 ```php
-// Error response (for clients)
-$error_response = McpErrorFactory::tool_not_found($request_id, $tool_name);
+// Protocol error DTO (returned to clients via JSON-RPC)
+$error_response = McpErrorFactory::tool_not_found( $request_id, $tool_name );
 
 // Error logging (for monitoring)
-$error_handler->log('Tool not found', [
+$error_handler->log( 'Tool not found', [
     'tool_name' => $tool_name,
-    'user_id' => get_current_user_id(),
-    'server_id' => $server_id
-], 'error');
+    'user_id'   => get_current_user_id(),
+    'server_id' => $server_id,
+], 'error' );
 ```
 
 ### Built-in Error Handlers
@@ -171,62 +282,15 @@ The system emits events rather than storing counters:
 
 ```php
 interface McpObservabilityHandlerInterface {
-    public static function record_event(string $event, array $tags = []): void;
-    public static function record_timing(string $metric, float $duration_ms, array $tags = []): void;
+    public function record_event( string $event, array $tags = [], ?float $duration_ms = null ): void;
 }
 ```
 
 ### Tracked Events
 
-- **Request events**: `mcp.request.count`, `mcp.request.success`, `mcp.request.error`
+- **Request events**: `mcp.request` with status, method, transport, and duration tags
 - **Component events**: `mcp.component.registered`, `mcp.component.registration_failed`
-- **Tool events**: `mcp.tool.execution_success`, `mcp.tool.execution_failed`
-- **Timing events**: `mcp.request.duration`
-
-## Design Patterns
-
-### Singleton Pattern (McpAdapter)
-
-```php
-class McpAdapter {
-    private static self $instance;
-    
-    public static function instance(): self {
-        if (!isset(self::$instance)) {
-            self::$instance = new self();
-            add_action('rest_api_init', [self::$instance, 'init'], 15);
-        }
-        return self::$instance;
-    }
-}
-```
-
-### Factory Pattern (Component Creation)
-
-```php
-class RegisterAbilityAsMcpTool {
-    public static function make(WP_Ability $ability, McpServer $server): McpTool {
-        // Convert WordPress ability to MCP tool
-        return McpTool::from_array($tool_data, $server);
-    }
-}
-```
-
-### Strategy Pattern (Transport Layer)
-
-Different transport implementations share the same interface:
-
-```php
-class HttpTransport implements McpRestTransportInterface {
-    public function __construct(McpTransportContext $context) {
-        // Dependency injection
-    }
-    
-    public function handle_request(WP_REST_Request $request): WP_REST_Response {
-        // HTTP-specific handling
-    }
-}
-```
+- **Per-component context**: Extracted from `McpComponentInterface::get_observability_context()` and merged into request tags
 
 ## Extension Points
 
@@ -235,30 +299,31 @@ class HttpTransport implements McpRestTransportInterface {
 ```php
 class MyTransport implements McpRestTransportInterface {
     use McpTransportHelperTrait;
-    
+
     private McpTransportContext $context;
-    
-    public function __construct(McpTransportContext $context) {
+
+    public function __construct( McpTransportContext $context ) {
         $this->context = $context;
-        $this->register_routes();
     }
-    
-    public function check_permission(WP_REST_Request $request) {
-        // Custom authentication logic
-        return current_user_can('manage_options');
+
+    public function register_routes(): void {
+        // Register custom REST routes
     }
-    
-    public function handle_request(WP_REST_Request $request): WP_REST_Response {
-        // Route through the injected router
-        $body = $request->get_json_params();
+
+    public function check_permission( WP_REST_Request $request ) {
+        return current_user_can( 'manage_options' );
+    }
+
+    public function handle_request( WP_REST_Request $request ): WP_REST_Response {
+        $body   = $request->get_json_params();
         $result = $this->context->request_router->route_request(
             $body['method'],
             $body['params'] ?? [],
             $body['id'] ?? 0,
-            $this->get_transport_name()
+            'my-transport'
         );
-        
-        return rest_ensure_response($result);
+
+        return rest_ensure_response( $result );
     }
 }
 ```
@@ -267,12 +332,8 @@ class MyTransport implements McpRestTransportInterface {
 
 ```php
 class MyErrorHandler implements McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void {
-        // Send to your monitoring system
-        MyMonitoringSystem::send($message, $context, $type);
-        
-        // Fallback to local logging
-        error_log("[MCP {$type}] {$message}");
+    public function log( string $message, array $context = [], string $type = 'error' ): void {
+        MyMonitoringSystem::send( $message, $context, $type );
     }
 }
 ```
@@ -282,31 +343,31 @@ class MyErrorHandler implements McpErrorHandlerInterface {
 ```php
 class MyObservabilityHandler implements McpObservabilityHandlerInterface {
     use McpObservabilityHelperTrait;
-    
-    public static function record_event(string $event, array $tags = []): void {
-        $formatted_event = self::format_metric_name($event);
-        $merged_tags = self::merge_tags($tags);
-        
-        // Send to your metrics system
-        MyMetricsSystem::counter($formatted_event, 1, $merged_tags);
-    }
-    
-    public static function record_timing(string $metric, float $duration_ms, array $tags = []): void {
-        $formatted_metric = self::format_metric_name($metric);
-        $merged_tags = self::merge_tags($tags);
-        
-        // Send timing data
-        MyMetricsSystem::timing($formatted_metric, $duration_ms, $merged_tags);
+
+    public function record_event( string $event, array $tags = [], ?float $duration_ms = null ): void {
+        $formatted_event = self::format_metric_name( $event );
+        $merged_tags     = self::merge_tags( $tags );
+
+        MyMetricsSystem::counter( $formatted_event, 1, $merged_tags );
+
+        if ( null !== $duration_ms ) {
+            MyMetricsSystem::timing( $formatted_event, $duration_ms, $merged_tags );
+        }
     }
 }
 ```
 
 ## Key Architectural Decisions
 
+### Two-Layer DTO Separation
+- Protocol DTOs from `php-mcp-schema` are never modified with adapter-internal fields
+- Adapter metadata lives on `McpComponentInterface` implementations
+- Clean serialization: `get_protocol_dto()->toArray()` always produces spec-compliant output
+
 ### Dependency Injection
 - All transports receive dependencies through `McpTransportContext`
-- No global state or static dependencies
-- Easy testing and mocking
+- Handlers receive `McpServer` via constructor injection
+- No global state or static dependencies beyond the `McpAdapter` singleton
 
 ### Interface-Based Design
 - All major components implement interfaces
@@ -327,8 +388,8 @@ class MyObservabilityHandler implements McpObservabilityHandlerInterface {
 
 ### Lazy Loading
 - Components created only when needed
-- Validation can be disabled for performance
-- Null object pattern for disabled features
+- Validation can be disabled via the `mcp_adapter_validation_enabled` filter (default: disabled)
+- Null object pattern for disabled features (e.g., `NullMcpObservabilityHandler`)
 
 ### Caching
 - WordPress object cache integration
@@ -338,11 +399,12 @@ class MyObservabilityHandler implements McpObservabilityHandlerInterface {
 ### Memory Management
 - No persistent state storage
 - Event emission pattern prevents memory leaks
-- Configurable validation to reduce overhead
+- DTO `toArray()` called only at the serialization boundary, not eagerly
 
 ## Next Steps
 
-- **[Creating Abilities](../guides/creating-abilities.md)** - Build MCP components
-- **[Custom Transports](../guides/custom-transports.md)** - Specialized protocols
-- **[Error Handling](../guides/error-handling.md)** - Custom error management
-- **[Observability](../guides/observability.md)** - Metrics and monitoring
+- **[Creating Abilities](../guides/creating-abilities.md)** -- Build MCP components from WordPress abilities
+- **[Custom Transports](../guides/custom-transports.md)** -- Implement specialized transport protocols
+- **[Error Handling](../guides/error-handling.md)** -- Custom error management
+- **[Observability](../guides/observability.md)** -- Metrics and monitoring
+- **[v0.5.0 Migration Guide](../migration/v0.5.0.md)** -- Upgrading from previous versions
