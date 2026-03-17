@@ -31,6 +31,11 @@ class SchemaTransformer {
 	 * @return array<string,mixed> Array containing 'schema', 'was_transformed' (bool), and 'wrapper_property' when transformed.
 	 */
 	public static function transform_to_object_schema( ?array $schema, string $wrapper_key = 'input' ): array {
+		// Convert any objects to arrays and strip empty properties.
+		// Abilities may contain objects from JSON decode cycles. Empty properties must be removed
+		// because MCP expects properties to be a JSON object, and PHP serializes empty arrays as [].
+		$schema = self::normalize( $schema );
+
 		// Handle null or empty schema - return minimal valid MCP object schema.
 		if ( empty( $schema ) ) {
 			return array(
@@ -89,5 +94,45 @@ class SchemaTransformer {
 			),
 			'required'   => array( $wrapper_key ),
 		);
+	}
+
+	/**
+	 * Convert objects to arrays and strip empty properties.
+	 *
+	 * @param array<string,mixed>|null $schema The schema to normalize.
+	 *
+	 * @return array<string,mixed>|null The normalized schema.
+	 */
+	private static function normalize( ?array $schema ): ?array {
+		if ( null === $schema ) {
+			return null;
+		}
+
+		$schema = self::convert_objects_to_arrays( $schema );
+
+		if ( array_key_exists( 'properties', $schema ) && is_array( $schema['properties'] ) && empty( $schema['properties'] ) ) {
+			unset( $schema['properties'] );
+		}
+
+		return $schema;
+	}
+
+	/**
+	 * Recursively convert objects to arrays.
+	 *
+	 * @param mixed $value The value to convert.
+	 *
+	 * @return mixed The converted value.
+	 */
+	private static function convert_objects_to_arrays( $value ) {
+		if ( is_object( $value ) ) {
+			$value = (array) $value;
+		}
+
+		if ( is_array( $value ) ) {
+			return array_map( array( self::class, 'convert_objects_to_arrays' ), $value );
+		}
+
+		return $value;
 	}
 }
