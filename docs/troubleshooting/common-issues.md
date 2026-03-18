@@ -63,7 +63,7 @@ The session ID is not recognized or has exceeded the inactivity timeout. Re-init
 curl -s -D - -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
   --user "username:application_password" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}}'
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}}'
 ```
 
 **Tip:** The default inactivity timeout is 24 hours (`DAY_IN_SECONDS`). If your client is long-lived, keep the session active by sending requests periodically. You can also adjust the timeout with the `mcp_adapter_session_inactivity_timeout` filter.

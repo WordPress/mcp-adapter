@@ -227,7 +227,7 @@ interface McpTransportInterface {
 }
 
 interface McpRestTransportInterface extends McpTransportInterface {
-    public function check_permission( WP_REST_Request $request ): bool|\WP_Error;
+    public function check_permission( WP_REST_Request $request );
     public function handle_request( WP_REST_Request $request ): WP_REST_Response;
 }
 ```

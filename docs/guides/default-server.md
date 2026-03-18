@@ -10,9 +10,11 @@ The MCP Adapter supports two approaches for exposing WordPress abilities to AI a
 
 The default server is created automatically when the plugin loads. It exposes three meta-tools that let AI agents dynamically discover and execute any WordPress ability marked with `mcp.public=true` metadata:
 
-1. **`mcp-adapter/discover-abilities`** — Lists all publicly available abilities
-2. **`mcp-adapter/get-ability-info`** — Retrieves the full schema for a specific ability
-3. **`mcp-adapter/execute-ability`** — Executes an ability with provided parameters
+1. **`mcp-adapter-discover-abilities`** — Lists all publicly available abilities
+2. **`mcp-adapter-get-ability-info`** — Retrieves the full schema for a specific ability
+3. **`mcp-adapter-execute-ability`** — Executes an ability with provided parameters
+
+> **Note:** These are the MCP tool names that AI agents use when calling `tools/call`. The underlying WordPress abilities are registered with `/` separators (e.g., `mcp-adapter/discover-abilities`), but `McpNameSanitizer` converts `/` to `-` during registration so that tool names comply with the MCP specification character set. See [Tool naming](creating-abilities.md#tool-naming) for details.
 
 The AI agent navigates this layered interface: discover what is available, inspect what it needs, then execute. This keeps the MCP `tools/list` response small (only 3 tool schemas) regardless of how many abilities exist on the site.
 
@@ -107,7 +109,7 @@ Every HTTP client must complete an initialization handshake before sending any o
 
 1. **Initialize** — Send a `POST` request with the `initialize` JSON-RPC method. No `Mcp-Session-Id` header is needed for this first request.
 2. **Capture the session ID** — The response includes an `Mcp-Session-Id` header containing a UUID. Store this value.
-3. **Include the header on every subsequent request** — All following `POST`, `GET`, and `DELETE` requests must include the `Mcp-Session-Id` header with the stored value.
+3. **Include the header on every subsequent request** — All following `POST` and `DELETE` requests must include the `Mcp-Session-Id` header with the stored value. (The MCP specification also requires the header on `GET` requests for SSE streaming, but SSE is not yet implemented — `GET` currently returns `405 Method Not Allowed`.)
 4. **Terminate when done** — Send a `DELETE` request with the `Mcp-Session-Id` header to clean up the session.
 
 ### Curl example
@@ -192,7 +194,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | \
 ### Basic Details
 - **Server ID**: `mcp-adapter-default-server`
 - **Endpoint**: `/wp-json/mcp/mcp-adapter-default-server`
-- **Transport**: HTTP (MCP 2025-06-18 compliant)
+- **Transport**: HTTP (MCP Streamable HTTP compliant)
 - **Authentication**: Requires logged-in WordPress user with `read` capability (customizable via filters)
 
 ### Default Configuration
