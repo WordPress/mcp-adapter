@@ -351,7 +351,7 @@ final class HttpRequestHandlerTest extends TestCase {
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
-		$this->assertEquals( McpErrorFactory::INTERNAL_ERROR, $data['error']['code'] );
+		$this->assertEquals( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
 		$this->assertStringContainsString( 'Method not allowed', $data['error']['message'] );
 	}
 

@@ -62,7 +62,7 @@ class HttpRequestHandler {
 
 		// Method not allowed
 		return new \WP_REST_Response(
-			McpErrorFactory::internal_error( null, 'Method not allowed' )->toArray(),
+			McpErrorFactory::invalid_request( null, 'Method not allowed' )->toArray(),
 			405
 		);
 	}
