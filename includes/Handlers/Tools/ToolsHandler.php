@@ -163,7 +163,38 @@ class ToolsHandler {
 				);
 			}
 
+			/**
+			 * Filters tool arguments before execution.
+			 *
+			 * Use this filter to transform arguments, inject context, add rate
+			 * limiting, or perform additional permission checks before a tool runs.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param array                        $args      The tool arguments.
+			 * @param string                       $tool_name The tool name being called.
+			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 */
+			$args = apply_filters( 'mcp_adapter_tool_call_pre', $args, $tool_name, $mcp_tool, $this->mcp );
+
 			$result = $mcp_tool->execute( $args );
+
+			/**
+			 * Filters the tool execution result before response assembly.
+			 *
+			 * Use this filter for result transformation, PII redaction,
+			 * audit logging, or content enrichment.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param mixed                        $result    The raw execution result.
+			 * @param array                        $args      The tool arguments used.
+			 * @param string                       $tool_name The tool name that was called.
+			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 */
+			$result = apply_filters( 'mcp_adapter_tool_call_post', $result, $args, $tool_name, $mcp_tool, $this->mcp );
 
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(

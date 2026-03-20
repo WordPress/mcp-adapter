@@ -169,6 +169,66 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( base64_encode( 'blob-bytes' ), $resource->getBlob() ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
+	public function test_call_tool_applies_pre_filter(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$received_args = null;
+		$filter        = static function ( array $args, string $tool_name ) use ( &$received_args ): array {
+			$received_args = $args;
+			$args['injected_by_filter'] = true;
+
+			return $args;
+		};
+		add_filter( 'mcp_adapter_tool_call_pre', $filter, 10, 2 );
+
+		$handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array( 'key' => 'value' ),
+				),
+			)
+		);
+
+		$this->assertIsArray( $received_args );
+		$this->assertSame( 'value', $received_args['key'] );
+
+		remove_filter( 'mcp_adapter_tool_call_pre', $filter );
+	}
+
+	public function test_call_tool_applies_post_filter(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function ( $result ) {
+			if ( is_array( $result ) ) {
+				$result['filtered'] = true;
+			}
+
+			return $result;
+		};
+		add_filter( 'mcp_adapter_tool_call_post', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			)
+		);
+
+		// The post filter modifies the raw result before DTO assembly.
+		// Verify the filter was applied by checking structuredContent.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$structured = $result->getStructuredContent();
+		$this->assertNotNull( $structured );
+		$this->assertTrue( $structured['filtered'] );
+
+		remove_filter( 'mcp_adapter_tool_call_post', $filter );
+	}
+
 	public function test_tool_call_preserves_meta_in_text_and_structured_content(): void {
 		$server  = $this->makeServer( array( 'test/meta-leak' ) );
 		$handler = new ToolsHandler( $server );
