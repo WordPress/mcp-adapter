@@ -73,6 +73,19 @@ class ToolsHandler {
 	public function list_tools(): ListToolsResult {
 		$tools = array_values( $this->mcp->get_tools() );
 
+		/**
+		 * Filters the list of tools before returning to the client.
+		 *
+		 * Use this filter to hide tools per user/role, add dynamic tools,
+		 * or reorder the tools list.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
+		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
+		 */
+		$tools = apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp );
+
 		return ListToolsResult::fromArray(
 			array(
 				'tools' => $tools,

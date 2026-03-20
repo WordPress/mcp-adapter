@@ -49,6 +49,26 @@ final class ResourcesHandlerListTest extends TestCase {
 		$this->assertArrayHasKey( 'name', $resource_array );
 	}
 
+	public function test_list_resources_applies_resources_list_filter(): void {
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		// Verify resources exist before filtering.
+		$before = $handler->list_resources();
+		$this->assertNotEmpty( $before->getResources() );
+
+		$filter = static function (): array {
+			return array();
+		};
+		add_filter( 'mcp_adapter_resources_list', $filter );
+
+		$result = $handler->list_resources();
+		$this->assertInstanceOf( ListResourcesResult::class, $result );
+		$this->assertEmpty( $result->getResources() );
+
+		remove_filter( 'mcp_adapter_resources_list', $filter );
+	}
+
 	public function test_list_resources_does_not_call_ability_execute(): void {
 		wp_set_current_user( 1 );
 

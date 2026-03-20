@@ -70,6 +70,19 @@ class PromptsHandler {
 	public function list_prompts(): ListPromptsResult {
 		$prompts = array_values( $this->mcp->get_prompts() );
 
+		/**
+		 * Filters the list of prompts before returning to the client.
+		 *
+		 * Use this filter to filter prompts by context, add dynamic prompts,
+		 * or reorder the prompts list.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts Array of Prompt DTOs.
+		 * @param \WP\MCP\Core\McpServer                         $server  The MCP server instance.
+		 */
+		$prompts = apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp );
+
 		return ListPromptsResult::fromArray(
 			array(
 				'prompts' => $prompts,

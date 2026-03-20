@@ -51,6 +51,19 @@ class ResourcesHandler {
 	public function list_resources(): ListResourcesResult {
 		$resources = array_values( $this->mcp->get_resources() );
 
+		/**
+		 * Filters the list of resources before returning to the client.
+		 *
+		 * Use this filter to filter resources by context, add dynamic resources,
+		 * or reorder the resources list.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
+		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
+		 */
+		$resources = apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp );
+
 		return ListResourcesResult::fromArray(
 			array(
 				'resources' => $resources,

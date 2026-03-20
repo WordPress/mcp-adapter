@@ -28,6 +28,22 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertContainsOnlyInstancesOf( PromptDto::class, $prompts );
 	}
 
+	public function test_list_prompts_applies_prompts_list_filter(): void {
+		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
+		$handler = new PromptsHandler( $server );
+
+		$filter = static function (): array {
+			return array();
+		};
+		add_filter( 'mcp_adapter_prompts_list', $filter );
+
+		$result = $handler->list_prompts();
+		$this->assertInstanceOf( ListPromptsResult::class, $result );
+		$this->assertEmpty( $result->getPrompts() );
+
+		remove_filter( 'mcp_adapter_prompts_list', $filter );
+	}
+
 	public function test_get_prompt_missing_name_returns_error(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
 		$handler = new PromptsHandler( $server );

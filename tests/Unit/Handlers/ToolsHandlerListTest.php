@@ -22,6 +22,23 @@ final class ToolsHandlerListTest extends TestCase {
 		$this->assertInstanceOf( ListToolsResult::class, $result );
 	}
 
+	public function test_list_tools_applies_tools_list_filter(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// Register a filter that removes all tools.
+		$filter = static function (): array {
+			return array();
+		};
+		add_filter( 'mcp_adapter_tools_list', $filter );
+
+		$result = $handler->list_tools();
+		$this->assertInstanceOf( ListToolsResult::class, $result );
+		$this->assertEmpty( $result->getTools() );
+
+		remove_filter( 'mcp_adapter_tools_list', $filter );
+	}
+
 	public function test_list_and_list_all_only_include_json_safe_fields(): void {
 		// Use makeServer helper to properly set up the server with registered abilities.
 		$server = $this->makeServer( array( 'test/always-allowed' ) );
