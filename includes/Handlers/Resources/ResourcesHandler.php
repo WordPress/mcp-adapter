@@ -117,7 +117,38 @@ class ResourcesHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
+			/**
+			 * Filters resource parameters before execution.
+			 *
+			 * Use this filter for access control, caching lookups,
+			 * or parameter normalization before a resource is read.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param array                                $params       The request parameters.
+			 * @param string                               $uri          The resource URI.
+			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
+			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
+			 */
+			$request_params = apply_filters( 'mcp_adapter_resource_read_pre', $request_params, $uri, $mcp_resource, $this->mcp );
+
 			$contents = $mcp_resource->execute( $request_params );
+
+			/**
+			 * Filters the resource contents after execution.
+			 *
+			 * Use this filter for content transformation, caching storage,
+			 * PII redaction, or audit logging.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param mixed                                $contents     The raw resource contents.
+			 * @param array                                $params       The request parameters used.
+			 * @param string                               $uri          The resource URI.
+			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
+			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
+			 */
+			$contents = apply_filters( 'mcp_adapter_resource_read_post', $contents, $request_params, $uri, $mcp_resource, $this->mcp );
 
 			// Handle WP_Error objects returned by McpResource execution.
 			if ( is_wp_error( $contents ) ) {

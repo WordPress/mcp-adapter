@@ -155,6 +155,54 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertSame( 'WordPress://local/resource-plain-string', $contents[0]->getUri() );
 	}
 
+	public function test_read_resource_applies_pre_filter(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$received_params = null;
+		$filter          = static function ( array $params, string $uri ) use ( &$received_params ): array {
+			$received_params = $params;
+
+			return $params;
+		};
+		add_filter( 'mcp_adapter_resource_read_pre', $filter, 10, 2 );
+
+		$handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		$this->assertIsArray( $received_params );
+
+		remove_filter( 'mcp_adapter_resource_read_pre', $filter );
+	}
+
+	public function test_read_resource_applies_post_filter(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter_was_called = false;
+		$filter            = static function ( $contents ) use ( &$filter_was_called ) {
+			$filter_was_called = true;
+
+			return $contents;
+		};
+		add_filter( 'mcp_adapter_resource_read_post', $filter );
+
+		$handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		$this->assertTrue( $filter_was_called );
+
+		remove_filter( 'mcp_adapter_resource_read_post', $filter );
+	}
+
 	public function test_read_resource_wraps_non_array_result_as_json(): void {
 		wp_set_current_user( 1 );
 
