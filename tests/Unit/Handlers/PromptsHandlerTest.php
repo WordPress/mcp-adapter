@@ -244,7 +244,7 @@ final class PromptsHandlerTest extends TestCase {
 		wp_unregister_ability( 'test/prompt-execute-exception' );
 	}
 
-	public function test_get_prompt_applies_pre_filter(): void {
+	public function test_pre_prompt_get_filter_can_modify_arguments(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 
@@ -254,7 +254,7 @@ final class PromptsHandlerTest extends TestCase {
 
 			return $arguments;
 		};
-		add_filter( 'mcp_adapter_prompt_get_pre', $filter, 10, 2 );
+		add_filter( 'mcp_adapter_pre_prompt_get', $filter, 10, 2 );
 
 		$handler->get_prompt(
 			array(
@@ -268,10 +268,37 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertIsArray( $received_args );
 		$this->assertSame( 'value', $received_args['key'] );
 
-		remove_filter( 'mcp_adapter_prompt_get_pre', $filter );
+		remove_filter( 'mcp_adapter_pre_prompt_get', $filter );
 	}
 
-	public function test_get_prompt_applies_post_filter(): void {
+	public function test_pre_prompt_get_filter_can_short_circuit_with_wp_error(): void {
+		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
+		$handler = new PromptsHandler( $server );
+
+		$filter = static function () {
+			return new \WP_Error( 'blocked', 'Prompt access blocked' );
+		};
+		add_filter( 'mcp_adapter_pre_prompt_get', $filter );
+
+		$result = $handler->get_prompt(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			)
+		);
+
+		// Short-circuit returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertStringContainsString( 'Prompt access blocked', $error->getMessage() );
+
+		remove_filter( 'mcp_adapter_pre_prompt_get', $filter );
+	}
+
+	public function test_prompt_get_result_filter_can_modify_result(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 
@@ -281,7 +308,7 @@ final class PromptsHandlerTest extends TestCase {
 
 			return $result;
 		};
-		add_filter( 'mcp_adapter_prompt_get_post', $filter );
+		add_filter( 'mcp_adapter_prompt_get_result', $filter );
 
 		$handler->get_prompt(
 			array(
@@ -294,7 +321,7 @@ final class PromptsHandlerTest extends TestCase {
 
 		$this->assertTrue( $filter_was_called );
 
-		remove_filter( 'mcp_adapter_prompt_get_post', $filter );
+		remove_filter( 'mcp_adapter_prompt_get_result', $filter );
 	}
 
 	// Note: Error path testing for prompts is covered by integration tests

@@ -155,7 +155,7 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertSame( 'WordPress://local/resource-plain-string', $contents[0]->getUri() );
 	}
 
-	public function test_read_resource_applies_pre_filter(): void {
+	public function test_pre_resource_read_filter_can_modify_params(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array( 'test/resource' ) );
 		$handler = new ResourcesHandler( $server );
@@ -166,7 +166,7 @@ final class ResourcesHandlerReadTest extends TestCase {
 
 			return $params;
 		};
-		add_filter( 'mcp_adapter_resource_read_pre', $filter, 10, 2 );
+		add_filter( 'mcp_adapter_pre_resource_read', $filter, 10, 2 );
 
 		$handler->read_resource(
 			array(
@@ -176,10 +176,35 @@ final class ResourcesHandlerReadTest extends TestCase {
 
 		$this->assertIsArray( $received_params );
 
-		remove_filter( 'mcp_adapter_resource_read_pre', $filter );
+		remove_filter( 'mcp_adapter_pre_resource_read', $filter );
 	}
 
-	public function test_read_resource_applies_post_filter(): void {
+	public function test_pre_resource_read_filter_can_short_circuit_with_wp_error(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return new \WP_Error( 'blocked', 'Resource access blocked' );
+		};
+		add_filter( 'mcp_adapter_pre_resource_read', $filter );
+
+		$result = $handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		// Short-circuit returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertStringContainsString( 'Resource access blocked', $error->getMessage() );
+
+		remove_filter( 'mcp_adapter_pre_resource_read', $filter );
+	}
+
+	public function test_resource_read_result_filter_can_modify_contents(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array( 'test/resource' ) );
 		$handler = new ResourcesHandler( $server );
@@ -190,7 +215,7 @@ final class ResourcesHandlerReadTest extends TestCase {
 
 			return $contents;
 		};
-		add_filter( 'mcp_adapter_resource_read_post', $filter );
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
 
 		$handler->read_resource(
 			array(
@@ -200,7 +225,7 @@ final class ResourcesHandlerReadTest extends TestCase {
 
 		$this->assertTrue( $filter_was_called );
 
-		remove_filter( 'mcp_adapter_resource_read_post', $filter );
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
 	}
 
 	public function test_read_resource_wraps_non_array_result_as_json(): void {

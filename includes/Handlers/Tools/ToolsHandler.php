@@ -164,10 +164,10 @@ class ToolsHandler {
 			}
 
 			/**
-			 * Filters tool arguments before execution.
+			 * Filters tool arguments before execution, or short-circuits execution entirely.
 			 *
-			 * Use this filter to transform arguments, inject context, add rate
-			 * limiting, or perform additional permission checks before a tool runs.
+			 * Return the (optionally modified) arguments array to proceed with execution,
+			 * or return a WP_Error to block execution and return an error to the client.
 			 *
 			 * @since n.e.x.t
 			 *
@@ -176,7 +176,18 @@ class ToolsHandler {
 			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
 			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
 			 */
-			$args = apply_filters( 'mcp_adapter_tool_call_pre', $args, $tool_name, $mcp_tool, $this->mcp );
+			$args = apply_filters( 'mcp_adapter_pre_tool_call', $args, $tool_name, $mcp_tool, $this->mcp );
+
+			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( is_wp_error( $args ) ) {
+				return CallToolResult::fromArray(
+					array(
+						'content'           => array( ContentBlockHelper::text( $args->get_error_message() ) ),
+						'structuredContent' => null,
+						'isError'           => true,
+					)
+				);
+			}
 
 			$result = $mcp_tool->execute( $args );
 
@@ -194,7 +205,7 @@ class ToolsHandler {
 			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
 			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
 			 */
-			$result = apply_filters( 'mcp_adapter_tool_call_post', $result, $args, $tool_name, $mcp_tool, $this->mcp );
+			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp );
 
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(

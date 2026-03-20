@@ -133,10 +133,10 @@ class PromptsHandler {
 			}
 
 			/**
-			 * Filters prompt arguments before execution.
+			 * Filters prompt arguments before execution, or short-circuits execution entirely.
 			 *
-			 * Use this filter for argument normalization, context injection,
-			 * or additional validation before a prompt is built.
+			 * Return the (optionally modified) arguments array to proceed with execution,
+			 * or return a WP_Error to block execution and return an error to the client.
 			 *
 			 * @since n.e.x.t
 			 *
@@ -145,7 +145,12 @@ class PromptsHandler {
 			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.
 			 * @param \WP\MCP\Core\McpServer             $server      The MCP server instance.
 			 */
-			$arguments = apply_filters( 'mcp_adapter_prompt_get_pre', $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+			$arguments = apply_filters( 'mcp_adapter_pre_prompt_get', $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+
+			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( is_wp_error( $arguments ) ) {
+				return McpErrorFactory::permission_denied( $request_id, $arguments->get_error_message() );
+			}
 
 			$result = $mcp_prompt->execute( $arguments );
 
@@ -163,7 +168,7 @@ class PromptsHandler {
 			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.
 			 * @param \WP\MCP\Core\McpServer             $server      The MCP server instance.
 			 */
-			$result = apply_filters( 'mcp_adapter_prompt_get_post', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+			$result = apply_filters( 'mcp_adapter_prompt_get_result', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
 
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(

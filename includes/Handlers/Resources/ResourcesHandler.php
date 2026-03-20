@@ -118,10 +118,10 @@ class ResourcesHandler {
 			}
 
 			/**
-			 * Filters resource parameters before execution.
+			 * Filters resource parameters before execution, or short-circuits execution entirely.
 			 *
-			 * Use this filter for access control, caching lookups,
-			 * or parameter normalization before a resource is read.
+			 * Return the (optionally modified) parameters array to proceed with execution,
+			 * or return a WP_Error to block execution and return an error to the client.
 			 *
 			 * @since n.e.x.t
 			 *
@@ -130,7 +130,12 @@ class ResourcesHandler {
 			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
 			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
 			 */
-			$request_params = apply_filters( 'mcp_adapter_resource_read_pre', $request_params, $uri, $mcp_resource, $this->mcp );
+			$request_params = apply_filters( 'mcp_adapter_pre_resource_read', $request_params, $uri, $mcp_resource, $this->mcp );
+
+			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( is_wp_error( $request_params ) ) {
+				return McpErrorFactory::internal_error( $request_id, $request_params->get_error_message() );
+			}
 
 			$contents = $mcp_resource->execute( $request_params );
 
@@ -148,7 +153,7 @@ class ResourcesHandler {
 			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
 			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
 			 */
-			$contents = apply_filters( 'mcp_adapter_resource_read_post', $contents, $request_params, $uri, $mcp_resource, $this->mcp );
+			$contents = apply_filters( 'mcp_adapter_resource_read_result', $contents, $request_params, $uri, $mcp_resource, $this->mcp );
 
 			// Handle WP_Error objects returned by McpResource execution.
 			if ( is_wp_error( $contents ) ) {
