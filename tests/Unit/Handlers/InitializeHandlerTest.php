@@ -225,4 +225,33 @@ final class InitializeHandlerTest extends TestCase {
 		// Verify other fields are still correct.
 		$this->assertSame( 'Test Server', $result->getServerInfo()->getName() );
 	}
+
+	public function test_handle_applies_initialize_response_filter(): void {
+		$server = new McpServer(
+			'test',
+			'mcp/v1',
+			'/mcp',
+			'Test Server',
+			'Original instructions',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
+		);
+
+		$filter = static function ( InitializeResult $result ): InitializeResult {
+			$data                 = $result->toArray();
+			$data['instructions'] = 'Custom instructions';
+
+			return InitializeResult::fromArray( $data );
+		};
+		add_filter( 'mcp_adapter_initialize_response', $filter );
+
+		$handler = new InitializeHandler( $server );
+		$result  = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
+
+		$this->assertSame( 'Custom instructions', $result->getInstructions() );
+
+		remove_filter( 'mcp_adapter_initialize_response', $filter );
+	}
 }
