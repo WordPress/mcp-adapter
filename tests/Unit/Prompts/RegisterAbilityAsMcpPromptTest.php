@@ -591,4 +591,42 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 			$this->assertArrayHasKey( 'vendor_info', $arr['_meta'] );
 			$this->assertSame( 'test-value', $arr['_meta']['vendor_info']['custom_data'] );
 		}
+
+	// =========================================================================
+	// mcp_adapter_prompt_name Filter Tests
+	// =========================================================================
+
+	public function test_prompt_name_filter_can_customize_name(): void {
+		$filter_callback = static function ( string $name ): string {
+			return 'custom-prompt-name';
+		};
+		add_filter( 'mcp_adapter_prompt_name', $filter_callback );
+
+		$ability = wp_get_ability( 'test/prompt' );
+		$this->assertNotNull( $ability );
+
+		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertNotWPError( $prompt );
+
+		$arr = $prompt->toArray();
+		$this->assertSame( 'custom-prompt-name', $arr['name'] );
+
+		remove_filter( 'mcp_adapter_prompt_name', $filter_callback );
+	}
+
+	public function test_prompt_name_filter_with_invalid_result_returns_wp_error(): void {
+		$filter_callback = static function (): string {
+			return 'invalid name with spaces';
+		};
+		add_filter( 'mcp_adapter_prompt_name', $filter_callback );
+
+		$ability = wp_get_ability( 'test/prompt' );
+		$this->assertNotNull( $ability );
+
+		$result = RegisterAbilityAsMcpPrompt::make( $ability );
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_prompt_name_filter_invalid', $result->get_error_code() );
+
+		remove_filter( 'mcp_adapter_prompt_name', $filter_callback );
+	}
 	}
