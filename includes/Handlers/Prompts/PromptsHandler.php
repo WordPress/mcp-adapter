@@ -132,7 +132,39 @@ class PromptsHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
+			/**
+			 * Filters prompt arguments before execution.
+			 *
+			 * Use this filter for argument normalization, context injection,
+			 * or additional validation before a prompt is built.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param array                              $arguments   The prompt arguments.
+			 * @param string                             $prompt_name The prompt name being retrieved.
+			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.
+			 * @param \WP\MCP\Core\McpServer             $server      The MCP server instance.
+			 */
+			$arguments = apply_filters( 'mcp_adapter_prompt_get_pre', $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+
 			$result = $mcp_prompt->execute( $arguments );
+
+			/**
+			 * Filters the prompt execution result before normalization.
+			 *
+			 * Use this filter for message transformation, context injection,
+			 * content enrichment, or audit logging.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param mixed                              $result      The raw execution result.
+			 * @param array                              $arguments   The prompt arguments used.
+			 * @param string                             $prompt_name The prompt name.
+			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.
+			 * @param \WP\MCP\Core\McpServer             $server      The MCP server instance.
+			 */
+			$result = apply_filters( 'mcp_adapter_prompt_get_post', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(
 					'Prompt execution returned WP_Error',

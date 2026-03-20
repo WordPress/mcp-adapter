@@ -244,6 +244,59 @@ final class PromptsHandlerTest extends TestCase {
 		wp_unregister_ability( 'test/prompt-execute-exception' );
 	}
 
+	public function test_get_prompt_applies_pre_filter(): void {
+		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
+		$handler = new PromptsHandler( $server );
+
+		$received_args = null;
+		$filter        = static function ( array $arguments, string $prompt_name ) use ( &$received_args ): array {
+			$received_args = $arguments;
+
+			return $arguments;
+		};
+		add_filter( 'mcp_adapter_prompt_get_pre', $filter, 10, 2 );
+
+		$handler->get_prompt(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array( 'key' => 'value' ),
+				),
+			)
+		);
+
+		$this->assertIsArray( $received_args );
+		$this->assertSame( 'value', $received_args['key'] );
+
+		remove_filter( 'mcp_adapter_prompt_get_pre', $filter );
+	}
+
+	public function test_get_prompt_applies_post_filter(): void {
+		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
+		$handler = new PromptsHandler( $server );
+
+		$filter_was_called = false;
+		$filter            = static function ( $result ) use ( &$filter_was_called ) {
+			$filter_was_called = true;
+
+			return $result;
+		};
+		add_filter( 'mcp_adapter_prompt_get_post', $filter );
+
+		$handler->get_prompt(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			)
+		);
+
+		$this->assertTrue( $filter_was_called );
+
+		remove_filter( 'mcp_adapter_prompt_get_post', $filter );
+	}
+
 	// Note: Error path testing for prompts is covered by integration tests
 	// and the existing basic error tests above.
 
