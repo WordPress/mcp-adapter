@@ -277,4 +277,26 @@ final class ResourcesHandlerReadTest extends TestCase {
 		// Clean up.
 		wp_unregister_ability( 'test/resource-object-result' );
 	}
+
+	public function test_read_resource_with_throwing_result_filter_triggers_catch_block(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			throw new \RuntimeException( 'Filter exploded' );
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertStringContainsString( 'Failed to read resource', $result->getError()->getMessage() );
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+	}
 }
