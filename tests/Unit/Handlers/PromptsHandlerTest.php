@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Prompts\PromptsHandler;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
@@ -930,5 +931,28 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertEquals( 'some value', $decoded['value'] );
 
 		wp_unregister_ability( 'test/invalid-content-prompt' );
+	}
+
+	public function test_list_prompts_withFilterReturningNonArray_fallsBackToOriginal(): void {
+		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
+		$handler = new PromptsHandler( $server );
+
+		$filter = static function (): string {
+			return 'not an array';
+		};
+		add_filter( 'mcp_adapter_prompts_list', $filter );
+
+		DummyErrorHandler::reset();
+		$result = $handler->list_prompts();
+
+		$this->assertInstanceOf( ListPromptsResult::class, $result );
+		$this->assertNotEmpty( $result->getPrompts() );
+
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$last_log = end( DummyErrorHandler::$logs );
+		$this->assertSame( 'warning', $last_log['type'] );
+		$this->assertStringContainsString( 'mcp_adapter_prompts_list', $last_log['context']['filter'] );
+
+		remove_filter( 'mcp_adapter_prompts_list', $filter );
 	}
 }

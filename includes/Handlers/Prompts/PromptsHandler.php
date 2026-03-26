@@ -81,7 +81,12 @@ class PromptsHandler {
 		 * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts Array of Prompt DTOs.
 		 * @param \WP\MCP\Core\McpServer                         $server  The MCP server instance.
 		 */
-		$prompts = apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp );
+		$prompts = $this->validate_filtered_list(
+			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp ),
+			$prompts,
+			'mcp_adapter_prompts_list',
+			$this->mcp->error_handler
+		);
 
 		return ListPromptsResult::fromArray(
 			array(

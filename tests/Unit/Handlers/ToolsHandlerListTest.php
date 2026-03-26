@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
@@ -69,5 +70,30 @@ final class ToolsHandlerListTest extends TestCase {
 		$tool_all       = $all_tools[0];
 		$tool_all_array = $tool_all->toArray();
 		$this->assertArrayHasKey( 'name', $tool_all_array );
+	}
+
+	public function test_list_tools_withFilterReturningNonArray_fallsBackToOriginal(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function (): string {
+			return 'not an array';
+		};
+		add_filter( 'mcp_adapter_tools_list', $filter );
+
+		DummyErrorHandler::reset();
+		$result = $handler->list_tools();
+
+		// Should fall back to the original unfiltered list.
+		$this->assertInstanceOf( ListToolsResult::class, $result );
+		$this->assertNotEmpty( $result->getTools() );
+
+		// Should have logged a warning.
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$last_log = end( DummyErrorHandler::$logs );
+		$this->assertSame( 'warning', $last_log['type'] );
+		$this->assertStringContainsString( 'mcp_adapter_tools_list', $last_log['context']['filter'] );
+
+		remove_filter( 'mcp_adapter_tools_list', $filter );
 	}
 }

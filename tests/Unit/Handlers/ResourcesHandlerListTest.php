@@ -157,4 +157,27 @@ final class ResourcesHandlerListTest extends TestCase {
 		$this->assertArrayNotHasKey( 'text', $resource_array );
 		$this->assertArrayNotHasKey( 'blob', $resource_array );
 	}
+
+	public function test_list_resources_withFilterReturningNonArray_fallsBackToOriginal(): void {
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function (): string {
+			return 'not an array';
+		};
+		add_filter( 'mcp_adapter_resources_list', $filter );
+
+		DummyErrorHandler::reset();
+		$result = $handler->list_resources();
+
+		$this->assertInstanceOf( ListResourcesResult::class, $result );
+		$this->assertNotEmpty( $result->getResources() );
+
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$last_log = end( DummyErrorHandler::$logs );
+		$this->assertSame( 'warning', $last_log['type'] );
+		$this->assertStringContainsString( 'mcp_adapter_resources_list', $last_log['context']['filter'] );
+
+		remove_filter( 'mcp_adapter_resources_list', $filter );
+	}
 }

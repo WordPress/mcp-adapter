@@ -62,7 +62,12 @@ class ResourcesHandler {
 		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
 		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
 		 */
-		$resources = apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp );
+		$resources = $this->validate_filtered_list(
+			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp ),
+			$resources,
+			'mcp_adapter_resources_list',
+			$this->mcp->error_handler
+		);
 
 		return ListResourcesResult::fromArray(
 			array(

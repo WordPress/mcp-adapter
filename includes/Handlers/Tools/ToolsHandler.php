@@ -84,7 +84,12 @@ class ToolsHandler {
 		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
 		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
 		 */
-		$tools = apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp );
+		$tools = $this->validate_filtered_list(
+			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),
+			$tools,
+			'mcp_adapter_tools_list',
+			$this->mcp->error_handler
+		);
 
 		return ListToolsResult::fromArray(
 			array(
