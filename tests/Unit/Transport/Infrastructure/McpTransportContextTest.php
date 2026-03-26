@@ -130,14 +130,14 @@ final class McpTransportContextTest extends TestCase {
 	}
 
 	/**
-	 * Test that error_handler can be omitted without error.
+	 * Test that error_handler defaults to the server's error handler when omitted.
 	 */
-	public function test_construct_withoutErrorHandler_doesNotThrow(): void {
+	public function test_construct_withoutErrorHandler_defaultsToServerErrorHandler(): void {
 		$properties = $this->build_required_properties();
 
 		$context = new McpTransportContext( $properties );
 
-		$this->assertInstanceOf( McpTransportContext::class, $context );
+		$this->assertSame( $this->server->get_error_handler(), $context->error_handler );
 	}
 
 	/**

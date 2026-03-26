@@ -159,10 +159,8 @@ class McpTransportContext {
 		$this->system_handler        = $properties['system_handler'];
 		$this->observability_handler = $properties['observability_handler'];
 
-		// Assign optional properties.
-		if ( isset( $properties['error_handler'] ) ) {
-			$this->error_handler = $properties['error_handler'];
-		}
+		// Assign optional properties (error_handler defaults to the server's handler).
+		$this->error_handler = $properties['error_handler'] ?? $properties['mcp_server']->get_error_handler();
 
 		$this->transport_permission_callback = $properties['transport_permission_callback'] ?? null;
 
@@ -188,7 +186,6 @@ class McpTransportContext {
 		if ( ! empty( $unknown_keys ) ) {
 			throw new \InvalidArgumentException(
 				sprintf(
-					/* translators: 1: comma-separated list of unknown property names, 2: comma-separated list of allowed property names */
 					'Unknown properties provided to McpTransportContext: %1$s. Allowed properties: %2$s.',
 					esc_html( implode( ', ', $unknown_keys ) ),
 					esc_html( implode( ', ', $allowed_keys ) )
@@ -201,7 +198,6 @@ class McpTransportContext {
 		if ( ! empty( $missing_keys ) ) {
 			throw new \InvalidArgumentException(
 				sprintf(
-					/* translators: %s: comma-separated list of missing required property names */
 					'Missing required properties for McpTransportContext: %s.',
 					esc_html( implode( ', ', $missing_keys ) )
 				)
