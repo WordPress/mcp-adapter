@@ -310,6 +310,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
 		$error = $result->getError();
 		$this->assertNotNull( $error );
+		$this->assertSame( -32602, $error->getCode() );
 		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
 	}
 
@@ -329,6 +330,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
 		$error = $result->getError();
 		$this->assertNotNull( $error );
+		$this->assertSame( -32602, $error->getCode() );
 		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
 	}
 
