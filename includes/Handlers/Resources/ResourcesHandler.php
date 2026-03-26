@@ -147,7 +147,7 @@ class ResourcesHandler {
 			 *
 			 * @since n.e.x.t
 			 *
-			 * @param mixed                                $contents     The raw resource contents.
+			 * @param mixed|\WP_Error                      $contents     The raw resource contents (may be WP_Error).
 			 * @param array                                $params       The request parameters used.
 			 * @param string                               $uri          The resource URI.
 			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.

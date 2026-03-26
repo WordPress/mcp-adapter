@@ -162,7 +162,7 @@ class PromptsHandler {
 			 *
 			 * @since n.e.x.t
 			 *
-			 * @param mixed                              $result      The raw execution result.
+			 * @param mixed|\WP_Error                    $result      The raw execution result (may be WP_Error).
 			 * @param array                              $arguments   The prompt arguments used.
 			 * @param string                             $prompt_name The prompt name.
 			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.

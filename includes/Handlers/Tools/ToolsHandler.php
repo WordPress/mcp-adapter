@@ -187,7 +187,7 @@ class ToolsHandler {
 			 *
 			 * @since n.e.x.t
 			 *
-			 * @param mixed                        $result    The raw execution result.
+			 * @param mixed|\WP_Error              $result    The raw execution result (may be WP_Error).
 			 * @param array                        $args      The tool arguments used.
 			 * @param string                       $tool_name The tool name that was called.
 			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
