@@ -77,6 +77,17 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │
 │   # Business logic and MCP components
 ├── Domain/
+│   │   # Shared contracts
+│   ├── Contracts/
+│   │   └── McpComponentInterface.php       # Contract for MCP components
+│   │   # Shared utilities
+│   ├── Utils/
+│   │   ├── McpNameSanitizer.php            # MCP name sanitization
+│   │   ├── McpValidator.php                # MCP name/URI/schema validation
+│   │   ├── McpAnnotationMapper.php         # Annotation mapping from abilities
+│   │   ├── SchemaTransformer.php           # Schema format transformation
+│   │   ├── ContentBlockHelper.php          # Content block DTO factory
+│   │   └── AbilityArgumentNormalizer.php   # Argument normalization
 │   │   # MCP Tools implementation
 │   ├── Tools/
 │   │   ├── McpTool.php                   # Base tool class
@@ -120,10 +131,12 @@ For detailed information about MCP components, see the [Model Context Protocol s
 │       │   └── McpObservabilityHandlerInterface.php  # Observability interface
 │       ├── ErrorLogMcpObservabilityHandler.php       # Default handler
 │       ├── NullMcpObservabilityHandler.php           # Null object pattern
-│       └── McpObservabilityHelperTrait.php           # Helper trait
+│       ├── McpObservabilityHelperTrait.php           # Helper trait
+│       ├── ConsoleObservabilityHandler.php          # Console output handler
+│       └── FailureReason.php                        # Standardized failure reasons
 │
 │   # Transport layer implementations
-├─── Transport/
+├── Transport/
 │   ├── Contracts/
 │   │   ├── McpTransportInterface.php     # Base transport interface
 │   │   └── McpRestTransportInterface.php # REST transport interface
@@ -170,6 +183,7 @@ Individual server management with comprehensive configuration:
 
 - **PHP**: >= 7.4
 - **[WordPress Abilities API](https://github.com/WordPress/abilities-api)**: For ability registration and management
+- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (^0.1.0): Typed DTOs for MCP protocol types (MCP 2025-11-25)
 
 ### WordPress Abilities API Integration
 
@@ -493,6 +507,10 @@ See the [Error Handling Guide](docs/guides/error-handling.md) for detailed imple
 The MCP Adapter includes built-in observability for tracking metrics and events. You can implement custom observability handlers to integrate with monitoring systems, analytics platforms, or performance tracking tools.
 
 See the [Observability Guide](docs/guides/observability.md) for detailed metrics tracking and custom handler implementation.
+
+## Migration
+
+- [Migration Guide: v0.5.0](docs/migration/v0.5.0.md) — Breaking changes and upgrade instructions
 
 ## License
 [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html)

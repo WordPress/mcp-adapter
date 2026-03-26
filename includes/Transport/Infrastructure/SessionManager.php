@@ -179,7 +179,7 @@ final class SessionManager {
 		 *
 		 * @since 0.3.0
 		 *
-		 * @param int $timeout Inactivity timeout in seconds. Default 3600 (1 hour).
+		 * @param int $timeout Inactivity timeout in seconds. Default DAY_IN_SECONDS (86400 / 24 hours).
 		 */
 		$inactivity_timeout = (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT );
 
