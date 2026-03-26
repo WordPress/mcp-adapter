@@ -70,6 +70,24 @@ class PromptsHandler {
 	public function list_prompts(): ListPromptsResult {
 		$prompts = array_values( $this->mcp->get_prompts() );
 
+		/**
+		 * Filters the list of prompts before returning to the client.
+		 *
+		 * Use this filter to filter prompts by context, add dynamic prompts,
+		 * or reorder the prompts list.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts Array of Prompt DTOs.
+		 * @param \WP\MCP\Core\McpServer                         $server  The MCP server instance.
+		 */
+		$prompts = $this->validate_filtered_list(
+			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp ),
+			$prompts,
+			'mcp_adapter_prompts_list',
+			$this->mcp->error_handler
+		);
+
 		return ListPromptsResult::fromArray(
 			array(
 				'prompts' => $prompts,
@@ -119,7 +137,44 @@ class PromptsHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
+			/**
+			 * Filters prompt arguments before execution, or short-circuits execution entirely.
+			 *
+			 * Return the (optionally modified) arguments array to proceed with execution,
+			 * or return a WP_Error to block execution and return an error to the client.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param array                              $arguments   The prompt arguments.
+			 * @param string                             $prompt_name The prompt name being retrieved.
+			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.
+			 * @param \WP\MCP\Core\McpServer             $server      The MCP server instance.
+			 */
+			$arguments = apply_filters( 'mcp_adapter_pre_prompt_get', $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+
+			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( is_wp_error( $arguments ) ) {
+				return McpErrorFactory::permission_denied( $request_id, $arguments->get_error_message() );
+			}
+
 			$result = $mcp_prompt->execute( $arguments );
+
+			/**
+			 * Filters the prompt execution result before normalization.
+			 *
+			 * Use this filter for message transformation, context injection,
+			 * content enrichment, or audit logging.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param mixed|\WP_Error                    $result      The raw execution result (may be WP_Error).
+			 * @param array                              $arguments   The prompt arguments used.
+			 * @param string                             $prompt_name The prompt name.
+			 * @param \WP\MCP\Domain\Prompts\McpPrompt   $mcp_prompt  The MCP prompt instance.
+			 * @param \WP\MCP\Core\McpServer             $server      The MCP server instance.
+			 */
+			$result = apply_filters( 'mcp_adapter_prompt_get_result', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(
 					'Prompt execution returned WP_Error',

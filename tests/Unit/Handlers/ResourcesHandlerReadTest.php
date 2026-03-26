@@ -155,6 +155,79 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertSame( 'WordPress://local/resource-plain-string', $contents[0]->getUri() );
 	}
 
+	public function test_pre_resource_read_filter_can_modify_params(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$received_params = null;
+		$filter          = static function ( array $params, string $uri ) use ( &$received_params ): array {
+			$received_params = $params;
+
+			return $params;
+		};
+		add_filter( 'mcp_adapter_pre_resource_read', $filter, 10, 2 );
+
+		$handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		$this->assertIsArray( $received_params );
+
+		remove_filter( 'mcp_adapter_pre_resource_read', $filter );
+	}
+
+	public function test_pre_resource_read_filter_can_short_circuit_with_wp_error(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return new \WP_Error( 'blocked', 'Resource access blocked' );
+		};
+		add_filter( 'mcp_adapter_pre_resource_read', $filter );
+
+		$result = $handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		// Short-circuit returns JSONRPCErrorResponse.
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertStringContainsString( 'Resource access blocked', $error->getMessage() );
+
+		remove_filter( 'mcp_adapter_pre_resource_read', $filter );
+	}
+
+	public function test_resource_read_result_filter_can_modify_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter_was_called = false;
+		$filter            = static function ( $contents ) use ( &$filter_was_called ) {
+			$filter_was_called = true;
+
+			return $contents;
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$handler->read_resource(
+			array(
+				'params' => array( 'uri' => 'WordPress://local/resource-1' ),
+			)
+		);
+
+		$this->assertTrue( $filter_was_called );
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+	}
+
 	public function test_read_resource_wraps_non_array_result_as_json(): void {
 		wp_set_current_user( 1 );
 

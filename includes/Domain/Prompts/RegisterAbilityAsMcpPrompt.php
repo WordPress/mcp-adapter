@@ -8,6 +8,7 @@
 
 namespace WP\MCP\Domain\Prompts;
 
+use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
@@ -211,9 +212,13 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 */
 	private function get_data() {
-		$ability_name = trim( $this->ability->get_name() );
-		$prompt_data  = array(
-			'name' => str_replace( '/', '-', $ability_name ),
+		$prompt_name = $this->resolve_prompt_name();
+		if ( is_wp_error( $prompt_name ) ) {
+			return $prompt_name;
+		}
+
+		$prompt_data = array(
+			'name' => $prompt_name,
 		);
 
 		// Add optional title from ability label.
@@ -425,6 +430,48 @@ class RegisterAbilityAsMcpPrompt {
 		}
 
 		return $arguments;
+	}
+
+	/**
+	 * Resolve the MCP prompt name from ability.
+	 *
+	 * Sanitizes the ability name to MCP-valid format, applies filter, and validates result.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return string|\WP_Error Valid prompt name or error.
+	 */
+	private function resolve_prompt_name() {
+		// Sanitize ability name to MCP-valid format.
+		$sanitized_name = McpNameSanitizer::sanitize_name( $this->ability->get_name() );
+
+		if ( is_wp_error( $sanitized_name ) ) {
+			return $sanitized_name;
+		}
+
+		/**
+		 * Filters the MCP prompt name derived from an ability.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param string      $name    The sanitized prompt name.
+		 * @param \WP_Ability $ability The source ability instance.
+		 */
+		$filtered_name = apply_filters( 'mcp_adapter_prompt_name', $sanitized_name, $this->ability );
+
+		// Validate post-filter (in case filter broke it).
+		if ( ! is_string( $filtered_name ) || ! McpValidator::validate_name( $filtered_name ) ) {
+			return new WP_Error(
+				'mcp_prompt_name_filter_invalid',
+				sprintf(
+					/* translators: %s: invalid prompt name returned by filter */
+					__( 'Filter returned invalid MCP prompt name: %s', 'mcp-adapter' ),
+					is_string( $filtered_name ) ? $filtered_name : gettype( $filtered_name )
+				)
+			);
+		}
+
+		return $filtered_name;
 	}
 
 	/**

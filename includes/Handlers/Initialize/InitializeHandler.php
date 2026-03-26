@@ -73,7 +73,7 @@ class InitializeHandler {
 			)
 		);
 
-		return InitializeResult::fromArray(
+		$result = InitializeResult::fromArray(
 			array(
 				'protocolVersion' => $negotiated_version,
 				'capabilities'    => $capabilities,
@@ -81,5 +81,20 @@ class InitializeHandler {
 				'instructions'    => $this->mcp->get_server_description(),
 			)
 		);
+
+		/**
+		 * Filters the initialize response before returning to the client.
+		 *
+		 * Use this filter to modify server capabilities, instructions, or
+		 * other initialization data dynamically. To modify the result, call
+		 * `$result->toArray()`, change the data, and return
+		 * `InitializeResult::fromArray( $modified_data )`.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
+		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
+		 */
+		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );
 	}
 }

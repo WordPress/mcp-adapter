@@ -51,6 +51,24 @@ class ResourcesHandler {
 	public function list_resources(): ListResourcesResult {
 		$resources = array_values( $this->mcp->get_resources() );
 
+		/**
+		 * Filters the list of resources before returning to the client.
+		 *
+		 * Use this filter to filter resources by context, add dynamic resources,
+		 * or reorder the resources list.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
+		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
+		 */
+		$resources = $this->validate_filtered_list(
+			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp ),
+			$resources,
+			'mcp_adapter_resources_list',
+			$this->mcp->error_handler
+		);
+
 		return ListResourcesResult::fromArray(
 			array(
 				'resources' => $resources,
@@ -104,7 +122,43 @@ class ResourcesHandler {
 				return McpErrorFactory::permission_denied( $request_id, $error_message );
 			}
 
+			/**
+			 * Filters resource parameters before execution, or short-circuits execution entirely.
+			 *
+			 * Return the (optionally modified) parameters array to proceed with execution,
+			 * or return a WP_Error to block execution and return an error to the client.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param array                                $params       The request parameters.
+			 * @param string                               $uri          The resource URI.
+			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
+			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
+			 */
+			$request_params = apply_filters( 'mcp_adapter_pre_resource_read', $request_params, $uri, $mcp_resource, $this->mcp );
+
+			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( is_wp_error( $request_params ) ) {
+				return McpErrorFactory::internal_error( $request_id, $request_params->get_error_message() );
+			}
+
 			$contents = $mcp_resource->execute( $request_params );
+
+			/**
+			 * Filters the resource contents after execution.
+			 *
+			 * Use this filter for content transformation, caching storage,
+			 * PII redaction, or audit logging.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param mixed|\WP_Error                      $contents     The raw resource contents (may be WP_Error).
+			 * @param array                                $params       The request parameters used.
+			 * @param string                               $uri          The resource URI.
+			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
+			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
+			 */
+			$contents = apply_filters( 'mcp_adapter_resource_read_result', $contents, $request_params, $uri, $mcp_resource, $this->mcp );
 
 			// Handle WP_Error objects returned by McpResource execution.
 			if ( is_wp_error( $contents ) ) {

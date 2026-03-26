@@ -73,6 +73,24 @@ class ToolsHandler {
 	public function list_tools(): ListToolsResult {
 		$tools = array_values( $this->mcp->get_tools() );
 
+		/**
+		 * Filters the list of tools before returning to the client.
+		 *
+		 * Use this filter to hide tools per user/role, add dynamic tools,
+		 * or reorder the tools list.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
+		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
+		 */
+		$tools = $this->validate_filtered_list(
+			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),
+			$tools,
+			'mcp_adapter_tools_list',
+			$this->mcp->error_handler
+		);
+
 		return ListToolsResult::fromArray(
 			array(
 				'tools' => $tools,
@@ -141,16 +159,46 @@ class ToolsHandler {
 					);
 				}
 
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $error_message ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $error_message );
+			}
+
+			/**
+			 * Filters tool arguments before execution, or short-circuits execution entirely.
+			 *
+			 * Return the (optionally modified) arguments array to proceed with execution,
+			 * or return a WP_Error to block execution and return an error to the client.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param array                        $args      The tool arguments.
+			 * @param string                       $tool_name The tool name being called.
+			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 */
+			$args = apply_filters( 'mcp_adapter_pre_tool_call', $args, $tool_name, $mcp_tool, $this->mcp );
+
+			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( is_wp_error( $args ) ) {
+				return $this->create_error_result( $args->get_error_message() );
 			}
 
 			$result = $mcp_tool->execute( $args );
+
+			/**
+			 * Filters the tool execution result before response assembly.
+			 *
+			 * Use this filter for result transformation, PII redaction,
+			 * audit logging, or content enrichment.
+			 *
+			 * @since n.e.x.t
+			 *
+			 * @param mixed|\WP_Error              $result    The raw execution result (may be WP_Error).
+			 * @param array                        $args      The tool arguments used.
+			 * @param string                       $tool_name The tool name that was called.
+			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 */
+			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp );
 
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->error_handler->log(
@@ -163,13 +211,7 @@ class ToolsHandler {
 					)
 				);
 
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $result->get_error_message() ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $result->get_error_message() );
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
@@ -181,13 +223,7 @@ class ToolsHandler {
 				&& is_string( $result['error'] )
 				&& '' !== trim( $result['error'] )
 			) {
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $result['error'] ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $result['error'] );
 			}
 
 			// Successful tool execution - build CallToolResult DTO.
@@ -279,5 +315,24 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
+	}
+
+	/**
+	 * Create an error CallToolResult from a message string.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $message The error message.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult
+	 */
+	private function create_error_result( string $message ): CallToolResult {
+		return CallToolResult::fromArray(
+			array(
+				'content'           => array( ContentBlockHelper::text( $message ) ),
+				'structuredContent' => null,
+				'isError'           => true,
+			)
+		);
 	}
 }

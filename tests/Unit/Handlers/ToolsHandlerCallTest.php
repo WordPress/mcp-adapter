@@ -169,6 +169,93 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( base64_encode( 'blob-bytes' ), $resource->getBlob() ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
+	public function test_pre_tool_call_filter_can_modify_arguments(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$received_args = null;
+		$filter        = static function ( array $args, string $tool_name ) use ( &$received_args ): array {
+			$received_args = $args;
+			$args['injected_by_filter'] = true;
+
+			return $args;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call', $filter, 10, 2 );
+
+		$handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array( 'key' => 'value' ),
+				),
+			)
+		);
+
+		$this->assertIsArray( $received_args );
+		$this->assertSame( 'value', $received_args['key'] );
+
+		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+	}
+
+	public function test_pre_tool_call_filter_can_short_circuit_with_wp_error(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function () {
+			return new \WP_Error( 'blocked', 'Rate limit exceeded' );
+		};
+		add_filter( 'mcp_adapter_pre_tool_call', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			)
+		);
+
+		// Short-circuit returns CallToolResult with isError=true.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertTrue( $result->getIsError() );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertStringContainsString( 'Rate limit exceeded', $content[0]->getText() );
+
+		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+	}
+
+	public function test_tool_call_result_filter_can_modify_result(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function ( $result ) {
+			if ( is_array( $result ) ) {
+				$result['filtered'] = true;
+			}
+
+			return $result;
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			)
+		);
+
+		// The result filter modifies the raw result before DTO assembly.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$structured = $result->getStructuredContent();
+		$this->assertNotNull( $structured );
+		$this->assertTrue( $structured['filtered'] );
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+	}
+
 	public function test_tool_call_preserves_meta_in_text_and_structured_content(): void {
 		$server  = $this->makeServer( array( 'test/meta-leak' ) );
 		$handler = new ToolsHandler( $server );
