@@ -594,6 +594,18 @@ final class HttpTransportTest extends TestCase {
 	}
 
 	public function test_permission_callback_returning_wp_error(): void {
+		// Create a mock error handler that captures log messages
+		$mock_error_handler = $this->getMockBuilder( DummyErrorHandler::class )
+			->onlyMethods( array( 'log' ) )
+			->getMock();
+
+		$mock_error_handler->expects( $this->once() )
+			->method( 'log' )
+			->with(
+				$this->stringContains( 'Permission callback returned WP_Error: Custom permission error' ),
+				$this->equalTo( array( 'HttpTransport::check_permission' ) )
+			);
+
 		// Test with custom permission callback that returns WP_Error
 		$context_with_permission = new McpTransportContext(
 			array(
@@ -605,7 +617,7 @@ final class HttpTransportTest extends TestCase {
 				'system_handler'                => $this->context->system_handler,
 				'observability_handler'         => $this->context->observability_handler,
 				'request_router'                => $this->context->request_router,
-				'error_handler'                 => new DummyErrorHandler(), // Add error_handler
+				'error_handler'                 => $mock_error_handler,
 				'transport_permission_callback' => static function () {
 					return new WP_Error( 'permission_denied', 'Custom permission error' );
 				},
@@ -623,11 +635,10 @@ final class HttpTransportTest extends TestCase {
 			)
 		);
 
-		// Should fall back to default permission check when WP_Error is returned
+		// Should deny access (fail-closed) when WP_Error is returned
+		wp_set_current_user( 1 );
 		$permission_result = $transport_with_permission->check_permission( $request );
-
-		// Since we're user ID 1 (admin), default permission check should pass
-		$this->assertTrue( $permission_result );
+		$this->assertFalse( $permission_result, 'Should deny access when callback returns WP_Error' );
 	}
 
 	public function test_permission_with_different_user_capabilities(): void {
@@ -796,10 +807,10 @@ final class HttpTransportTest extends TestCase {
 			)
 		);
 
-		// Should fall back to default permission check when exception is thrown
+		// Should deny access (fail-closed) when exception is thrown
 		wp_set_current_user( 1 );
 		$permission_result = $transport_with_permission->check_permission( $request );
-		$this->assertTrue( $permission_result, 'Should fall back to default permission check' );
+		$this->assertFalse( $permission_result, 'Should deny access when callback throws exception' );
 	}
 
 	public function test_permission_denied_logging(): void {

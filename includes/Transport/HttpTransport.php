@@ -90,15 +90,18 @@ class HttpTransport implements McpRestTransportInterface {
 					return $result;
 				}
 
-				// Log the error and fall back to default permission
+				// Log the error and deny access (fail-closed)
 				$this->request_handler->transport_context->error_handler->log(
 					'Permission callback returned WP_Error: ' . $result->get_error_message(),
 					array( 'HttpTransport::check_permission' )
 				);
-				// Fall through to default permission check
+
+				return false;
 			} catch ( \Throwable $e ) {
-				// Log the error using the error handler, and fall back to default permission
+				// Log the error and deny access (fail-closed)
 				$this->request_handler->transport_context->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
+
+				return false;
 			}
 		}
 
@@ -106,8 +109,7 @@ class HttpTransport implements McpRestTransportInterface {
 		 * Filters the default user capability required for MCP transport access.
 		 *
 		 * This filter is only applied when no custom transport permission callback
-		 * is provided or when the custom callback fails. The capability is checked
-		 * using current_user_can().
+		 * is provided. The capability is checked using current_user_can().
 		 *
 		 * @since 0.3.0
 		 *
