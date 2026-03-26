@@ -154,13 +154,7 @@ class ToolsHandler {
 					);
 				}
 
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $error_message ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $error_message );
 			}
 
 			/**
@@ -180,13 +174,7 @@ class ToolsHandler {
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $args->get_error_message() ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $args->get_error_message() );
 			}
 
 			$result = $mcp_tool->execute( $args );
@@ -218,13 +206,7 @@ class ToolsHandler {
 					)
 				);
 
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $result->get_error_message() ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $result->get_error_message() );
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
@@ -236,13 +218,7 @@ class ToolsHandler {
 				&& is_string( $result['error'] )
 				&& '' !== trim( $result['error'] )
 			) {
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array( ContentBlockHelper::text( $result['error'] ) ),
-						'structuredContent' => null,
-						'isError'           => true,
-					)
-				);
+				return $this->create_error_result( $result['error'] );
 			}
 
 			// Successful tool execution - build CallToolResult DTO.
@@ -334,5 +310,24 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
+	}
+
+	/**
+	 * Create an error CallToolResult from a message string.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $message The error message.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult
+	 */
+	private function create_error_result( string $message ): CallToolResult {
+		return CallToolResult::fromArray(
+			array(
+				'content'           => array( ContentBlockHelper::text( $message ) ),
+				'structuredContent' => null,
+				'isError'           => true,
+			)
+		);
 	}
 }
