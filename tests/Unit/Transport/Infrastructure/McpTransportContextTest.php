@@ -49,7 +49,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that providing all required keys creates a valid context.
 	 */
-	public function test_construct_withAllRequiredKeys_createsContext(): void {
+	public function test_construct_with_all_required_keys_creates_context(): void {
 		$properties = $this->build_required_properties();
 
 		$context = new McpTransportContext( $properties );
@@ -67,7 +67,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that request_router is auto-created when not provided.
 	 */
-	public function test_construct_withoutRequestRouter_createsRouterAutomatically(): void {
+	public function test_construct_without_request_router_creates_router_automatically(): void {
 		$properties = $this->build_required_properties();
 
 		$context = new McpTransportContext( $properties );
@@ -78,7 +78,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that request_router is used when explicitly provided.
 	 */
-	public function test_construct_withRequestRouter_usesProvidedRouter(): void {
+	public function test_construct_with_request_router_uses_provided_router(): void {
 		$properties = $this->build_required_properties();
 		// Create a context first to get a RequestRouter instance.
 		$temp_context               = new McpTransportContext( $properties );
@@ -93,7 +93,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that transport_permission_callback defaults to null when not provided.
 	 */
-	public function test_construct_withoutPermissionCallback_defaultsToNull(): void {
+	public function test_construct_without_permission_callback_defaults_to_null(): void {
 		$properties = $this->build_required_properties();
 
 		$context = new McpTransportContext( $properties );
@@ -104,7 +104,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that transport_permission_callback is assigned when provided.
 	 */
-	public function test_construct_withPermissionCallback_assignsCallback(): void {
+	public function test_construct_with_permission_callback_assigns_callback(): void {
 		$properties = $this->build_required_properties();
 		$callback   = static function () {
 			return true;
@@ -119,7 +119,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that error_handler is assigned when provided.
 	 */
-	public function test_construct_withErrorHandler_assignsHandler(): void {
+	public function test_construct_with_error_handler_assigns_handler(): void {
 		$properties                   = $this->build_required_properties();
 		$error_handler                = new DummyErrorHandler();
 		$properties['error_handler']  = $error_handler;
@@ -132,7 +132,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that error_handler defaults to the server's error handler when omitted.
 	 */
-	public function test_construct_withoutErrorHandler_defaultsToServerErrorHandler(): void {
+	public function test_construct_without_error_handler_defaults_to_server_error_handler(): void {
 		$properties = $this->build_required_properties();
 
 		$context = new McpTransportContext( $properties );
@@ -143,7 +143,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that missing a single required key throws InvalidArgumentException.
 	 */
-	public function test_construct_withMissingRequiredKey_throwsException(): void {
+	public function test_construct_with_missing_required_key_throws_exception(): void {
 		$properties = $this->build_required_properties();
 		unset( $properties['tools_handler'] );
 
@@ -156,7 +156,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that missing multiple required keys lists all missing keys.
 	 */
-	public function test_construct_withMultipleMissingRequiredKeys_listsAllMissing(): void {
+	public function test_construct_with_multiple_missing_required_keys_lists_all_missing(): void {
 		$properties = $this->build_required_properties();
 		unset( $properties['mcp_server'], $properties['system_handler'] );
 
@@ -169,7 +169,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that providing an unknown key throws InvalidArgumentException.
 	 */
-	public function test_construct_withUnknownKey_throwsException(): void {
+	public function test_construct_with_unknown_key_throws_exception(): void {
 		$properties                = $this->build_required_properties();
 		$properties['typo_server'] = 'some_value';
 
@@ -182,7 +182,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that providing multiple unknown keys lists all unknown keys.
 	 */
-	public function test_construct_withMultipleUnknownKeys_listsAllUnknown(): void {
+	public function test_construct_with_multiple_unknown_keys_lists_all_unknown(): void {
 		$properties            = $this->build_required_properties();
 		$properties['foo']     = 'bar';
 		$properties['baz_qux'] = 'quux';
@@ -196,7 +196,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that an empty array throws InvalidArgumentException for missing required keys.
 	 */
-	public function test_construct_withEmptyArray_throwsException(): void {
+	public function test_construct_with_empty_array_throws_exception(): void {
 		$this->expectException( InvalidArgumentException::class );
 		$this->expectExceptionMessage( 'Missing required properties for McpTransportContext' );
 
@@ -206,7 +206,7 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Test that all optional keys can be provided alongside required keys.
 	 */
-	public function test_construct_withAllKeys_createsContext(): void {
+	public function test_construct_with_all_keys_creates_context(): void {
 		$properties                                  = $this->build_required_properties();
 		$properties['error_handler']                 = new DummyErrorHandler();
 		$properties['transport_permission_callback'] = static function () {
