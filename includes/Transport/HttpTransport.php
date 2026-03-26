@@ -86,8 +86,8 @@ class HttpTransport implements McpRestTransportInterface {
 
 				// Handle WP_Error returns
 				if ( ! is_wp_error( $result ) ) {
-					// Return boolean result directly
-					return $result;
+					// Cast to bool to match return type while preserving truthy/falsy semantics.
+					return (bool) $result;
 				}
 
 				// Log the error and deny access (fail-closed)
