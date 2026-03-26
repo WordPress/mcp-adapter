@@ -217,11 +217,10 @@ class RegisterAbilityAsMcpTool {
 		/**
 		 * Filters the MCP tool name derived from an ability.
 		 *
-		 * @param string $name The sanitized tool name.
-		 * @param \WP_Ability $ability The source ability instance.
-		 *
 		 * @since n.e.x.t
 		 *
+		 * @param string $name The sanitized tool name.
+		 * @param \WP_Ability $ability The source ability instance.
 		 */
 		$filtered_name = apply_filters( 'mcp_adapter_tool_name', $sanitized_name, $this->ability );
 

@@ -24,7 +24,7 @@ use WP_Error;
  * - Requires proper WordPress capability checks for secure operation
  * - Caller identity verification is enforced through WordPress authentication
  *
- * @see https://github.com/your-repo/mcp-adapter/docs/security.md for detailed security configuration
+ * @see https://github.com/WordPress/mcp-adapter/docs/security.md for detailed security configuration
  */
 final class ExecuteAbilityAbility {
 	use McpAbilityHelperTrait;

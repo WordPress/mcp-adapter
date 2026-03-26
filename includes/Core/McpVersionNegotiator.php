@@ -17,7 +17,7 @@ namespace WP\MCP\Core;
  *
  * This is a Core layer class — no WordPress function calls.
  *
- * @since n.e.x.t.
+ * @since n.e.x.t
  */
 final class McpVersionNegotiator {
 
@@ -39,7 +39,7 @@ final class McpVersionNegotiator {
 	 * If the client-requested version is in the supported list it is echoed
 	 * back verbatim. Otherwise the latest supported version is returned.
 	 *
-	 * @since n.e.x.t.
+	 * @since n.e.x.t
 	 *
 	 * @param string $client_version The protocol version requested by the client.
 	 *
@@ -56,7 +56,7 @@ final class McpVersionNegotiator {
 	/**
 	 * Check whether a given version string is supported.
 	 *
-	 * @since n.e.x.t.
+	 * @since n.e.x.t
 	 *
 	 * @param string $version The protocol version to check.
 	 *

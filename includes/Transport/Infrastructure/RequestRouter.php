@@ -147,7 +147,7 @@ class RequestRouter {
 				array(
 					'status'         => 'error',
 					'error_type'     => get_class( $exception ),
-					'error_category' => $this->categorize_error( $exception ),
+					'error_category' => McpObservabilityHelperTrait::categorize_error( $exception ),
 				)
 			);
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
@@ -337,31 +337,5 @@ class RequestRouter {
 	 */
 	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
 		return McpErrorFactory::method_not_found( $request_id, $method );
-	}
-
-	/**
-	 * Categorize an exception into a general error category.
-	 *
-	 * @param \Throwable $exception The exception to categorize.
-	 *
-	 * @return string
-	 */
-	private function categorize_error( \Throwable $exception ): string {
-		$error_categories = array(
-			\ArgumentCountError::class       => 'arguments',
-			\TypeError::class                => 'type',
-			\InvalidArgumentException::class => 'validation',
-			\LogicException::class           => 'logic',
-			\RuntimeException::class         => 'execution',
-			\Error::class                    => 'system',
-		);
-
-		foreach ( $error_categories as $class => $category ) {
-			if ( $exception instanceof $class ) {
-				return $category;
-			}
-		}
-
-		return 'unknown';
 	}
 }

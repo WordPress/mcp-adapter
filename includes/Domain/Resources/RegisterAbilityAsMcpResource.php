@@ -262,11 +262,10 @@ class RegisterAbilityAsMcpResource {
 		/**
 		 * Filters the MCP resource URI derived from an ability.
 		 *
-		 * @param string $uri The validated resource URI.
-		 * @param \WP_Ability $ability The source ability instance.
-		 *
 		 * @since n.e.x.t
 		 *
+		 * @param string $uri The validated resource URI.
+		 * @param \WP_Ability $ability The source ability instance.
 		 */
 		$filtered_uri = apply_filters( 'mcp_adapter_resource_uri', $uri, $this->ability );
 
@@ -410,11 +409,10 @@ class RegisterAbilityAsMcpResource {
 		 *
 		 * Unlike tools, resource names have no charset restrictions.
 		 *
-		 * @param string $name The resource name.
-		 * @param \WP_Ability $ability The source ability instance.
-		 *
 		 * @since n.e.x.t
 		 *
+		 * @param string $name The resource name.
+		 * @param \WP_Ability $ability The source ability instance.
 		 */
 		$filtered_name = apply_filters( 'mcp_adapter_resource_name', $name, $this->ability );
 

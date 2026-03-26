@@ -324,6 +324,13 @@ class McpServer {
 		return $this->observability_handler;
 	}
 
+	/**
+	 * Get the error handler instance.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
+	 */
 	public function get_error_handler(): McpErrorHandlerInterface {
 		return $this->error_handler;
 	}

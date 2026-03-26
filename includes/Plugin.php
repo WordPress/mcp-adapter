@@ -37,6 +37,8 @@ final class Plugin {
 			/**
 			 * Fires after the main plugin class has been initialized.
 			 *
+			 * @since 0.1.0
+			 *
 			 * @param self $instance The main plugin class instance.
 			 */
 			do_action( 'wp_mcp_init', self::$instance );

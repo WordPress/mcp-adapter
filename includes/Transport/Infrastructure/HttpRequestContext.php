@@ -46,7 +46,7 @@ class HttpRequestContext {
 	/**
 	 * The MCP-Protocol-Version header from the request.
 	 *
-	 * @since n.e.x.t.
+	 * @since n.e.x.t
 	 *
 	 * @var string|null
 	 */

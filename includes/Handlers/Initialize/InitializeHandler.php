@@ -42,7 +42,7 @@ class InitializeHandler {
 	 * If the client requests a supported version, that version is used. Otherwise
 	 * the server falls back to the latest supported version.
 	 *
-	 * @since n.e.x.t.
+	 * @since n.e.x.t
 	 *
 	 * @param string $client_protocol_version The protocol version requested by the client.
 	 *

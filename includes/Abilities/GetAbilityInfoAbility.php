@@ -22,7 +22,7 @@ use WP_Error;
  * - Only abilities with mcp.public=true metadata can be queried via default MCP server.
  * - Requires proper WordPress capability checks for secure operation
  *
- * @see https://github.com/your-repo/mcp-adapter/docs/security.md for detailed security configuration
+ * @see https://github.com/WordPress/mcp-adapter/docs/security.md for detailed security configuration
  */
 final class GetAbilityInfoAbility {
 	use McpAbilityHelperTrait;

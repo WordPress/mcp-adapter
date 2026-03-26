@@ -18,6 +18,7 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
  * Centralizes request routing logic to eliminate duplication and provide
  * consistent request handling across transport implementations.
  *
+ * @internal
  */
 class HttpRequestHandler {
 
@@ -234,7 +235,7 @@ class HttpRequestHandler {
 	 * version is also accepted. An unsupported version returns a JSON-RPC
 	 * invalid-request error payload.
 	 *
-	 * @since n.e.x.t.
+	 * @since n.e.x.t
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
