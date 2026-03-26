@@ -31,18 +31,32 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 class McpTransportContext {
 
 	/**
-	 * Initialize the transport context.
+	 * Required property keys for the constructor array.
 	 *
-	 * @param \WP\MCP\Core\McpServer $mcp_server The MCP server instance.
-	 * @param \WP\MCP\Handlers\Initialize\InitializeHandler $initialize_handler The initialize handler.
-	 * @param \WP\MCP\Handlers\Tools\ToolsHandler $tools_handler The tools handler.
-	 * @param \WP\MCP\Handlers\Resources\ResourcesHandler $resources_handler The resources handler.
-	 * @param \WP\MCP\Handlers\Prompts\PromptsHandler $prompts_handler The prompts handler.
-	 * @param \WP\MCP\Handlers\System\SystemHandler $system_handler The system handler.
-	 * @param string $observability_handler The observability handler class name.
-	 * @param \WP\MCP\Transport\Infrastructure\RequestRouter|null $request_router The request router service.
-	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication.
+	 * @var list<string>
 	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
+	private const REQUIRED_KEYS = array(
+		'mcp_server',
+		'initialize_handler',
+		'tools_handler',
+		'resources_handler',
+		'prompts_handler',
+		'system_handler',
+		'observability_handler',
+	);
+
+	/**
+	 * Optional property keys for the constructor array.
+	 *
+	 * @var list<string>
+	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
+	private const OPTIONAL_KEYS = array(
+		'request_router',
+		'transport_permission_callback',
+		'error_handler',
+	);
 
 	/**
 	 * The MCP server instance.
@@ -128,18 +142,70 @@ class McpTransportContext {
 	 *   error_handler?: \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 * } $properties Properties to set on the context.
 	 * Note: request_router is optional and will be auto-created if not provided.
+	 *
+	 * @throws \InvalidArgumentException If required keys are missing or unknown keys are present.
+	 *
+	 * @since n.e.x.t
 	 */
 	public function __construct( array $properties ) {
-		foreach ( $properties as $name => $value ) {
-			$this->$name = $value;
+		$this->validate_properties( $properties );
+
+		// Assign required properties.
+		$this->mcp_server            = $properties['mcp_server'];
+		$this->initialize_handler    = $properties['initialize_handler'];
+		$this->tools_handler         = $properties['tools_handler'];
+		$this->resources_handler     = $properties['resources_handler'];
+		$this->prompts_handler       = $properties['prompts_handler'];
+		$this->system_handler        = $properties['system_handler'];
+		$this->observability_handler = $properties['observability_handler'];
+
+		// Assign optional properties.
+		if ( isset( $properties['error_handler'] ) ) {
+			$this->error_handler = $properties['error_handler'];
 		}
 
-		// If request_router is provided, we're done
-		if ( isset( $properties['request_router'] ) ) {
-			return;
+		$this->transport_permission_callback = $properties['transport_permission_callback'] ?? null;
+
+		// Create request_router if not provided.
+		$this->request_router = $properties['request_router'] ?? new RequestRouter( $this );
+	}
+
+	/**
+	 * Validate that the properties array contains all required keys and no unknown keys.
+	 *
+	 * @param array<string, mixed> $properties Properties to validate.
+	 *
+	 * @throws \InvalidArgumentException If required keys are missing or unknown keys are present.
+	 *
+	 * @since n.e.x.t
+	 */
+	private function validate_properties( array $properties ): void {
+		$provided_keys = array_keys( $properties );
+		$allowed_keys  = array_merge( self::REQUIRED_KEYS, self::OPTIONAL_KEYS );
+
+		// Check for unknown keys.
+		$unknown_keys = array_diff( $provided_keys, $allowed_keys );
+		if ( ! empty( $unknown_keys ) ) {
+			throw new \InvalidArgumentException(
+				sprintf(
+					/* translators: 1: comma-separated list of unknown property names, 2: comma-separated list of allowed property names */
+					'Unknown properties provided to McpTransportContext: %1$s. Allowed properties: %2$s.',
+					esc_html( implode( ', ', $unknown_keys ) ),
+					esc_html( implode( ', ', $allowed_keys ) )
+				)
+			);
 		}
 
-		// Create request_router if not provided
-		$this->request_router = new RequestRouter( $this );
+		// Check for missing required keys.
+		$missing_keys = array_diff( self::REQUIRED_KEYS, $provided_keys );
+		if ( ! empty( $missing_keys ) ) {
+			throw new \InvalidArgumentException(
+				sprintf(
+					/* translators: %s: comma-separated list of missing required property names */
+					'Missing required properties for McpTransportContext: %s.',
+					esc_html( implode( ', ', $missing_keys ) )
+				)
+			);
+		}
 	}
 }
