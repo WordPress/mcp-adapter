@@ -114,6 +114,10 @@ class PromptsHandler {
 		$prompt_name = (string) $request_params['name'];
 		$prompt_name = trim( $prompt_name );
 
+		if ( isset( $request_params['arguments'] ) && ! is_array( $request_params['arguments'] ) ) {
+			return McpErrorFactory::invalid_params( $request_id, 'arguments must be an object' );
+		}
+
 		$mcp_prompt = $this->mcp->get_mcp_prompt( $prompt_name );
 
 		if ( ! $mcp_prompt ) {
@@ -154,7 +158,7 @@ class PromptsHandler {
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $arguments ) ) {
-				return McpErrorFactory::permission_denied( $request_id, $arguments->get_error_message() );
+				return McpErrorFactory::internal_error( $request_id, $arguments->get_error_message() );
 			}
 
 			$result = $mcp_prompt->execute( $arguments );

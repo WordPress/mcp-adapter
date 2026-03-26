@@ -293,4 +293,77 @@ final class ToolsHandlerCallTest extends TestCase {
 			$this->assertArrayHasKey( 'mcp_adapter', $structured['_meta'] );
 			$this->assertArrayHasKey( 'mcp_adapter', $structured['nested']['_meta'] );
 		}
+
+	public function test_call_tool_withStringArguments_returnsInvalidParamsError(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => 'invalid',
+				),
+			),
+			1
+		);
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
+	}
+
+	public function test_call_tool_withIntegerArguments_returnsInvalidParamsError(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => 42,
+				),
+			),
+			1
+		);
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
+	}
+
+	public function test_call_tool_withNullArguments_succeeds(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => null,
+				),
+			),
+			1
+		);
+
+		// null arguments should default to empty array and succeed.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertFalse( (bool) $result->getIsError() );
+	}
+
+	public function test_call_tool_withMissingArguments_succeeds(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array(
+					'name' => 'test-always-allowed',
+				),
+			),
+			1
+		);
+
+		// Missing arguments should default to empty array and succeed.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertFalse( (bool) $result->getIsError() );
+	}
 }

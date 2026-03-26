@@ -124,6 +124,10 @@ class ToolsHandler {
 			return McpErrorFactory::missing_parameter( $request_id, 'tool name' );
 		}
 
+		if ( isset( $request_params['arguments'] ) && ! is_array( $request_params['arguments'] ) ) {
+			return McpErrorFactory::invalid_params( $request_id, 'arguments must be an object' );
+		}
+
 		try {
 			$tool_name = trim( (string) $request_params['name'] );
 			$args      = $request_params['arguments'] ?? array();
