@@ -234,7 +234,7 @@ final class DefaultServerFactoryTest extends TestCase {
 
 		$server = $this->adapter->get_server( 'mcp-adapter-default-server' );
 		$this->assertNotNull( $server );
-		$this->assertInstanceOf( ErrorLogMcpErrorHandler::class, $server->error_handler );
+		$this->assertInstanceOf( ErrorLogMcpErrorHandler::class, $server->get_error_handler() );
 	}
 
 	public function test_create_uses_default_observability_handler(): void {
@@ -249,7 +249,7 @@ final class DefaultServerFactoryTest extends TestCase {
 
 		$server = $this->adapter->get_server( 'mcp-adapter-default-server' );
 		$this->assertNotNull( $server );
-		$this->assertInstanceOf( NullMcpObservabilityHandler::class, $server->observability_handler );
+		$this->assertInstanceOf( NullMcpObservabilityHandler::class, $server->get_observability_handler() );
 	}
 }
 

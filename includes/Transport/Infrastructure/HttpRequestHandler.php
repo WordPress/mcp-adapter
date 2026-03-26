@@ -27,7 +27,7 @@ class HttpRequestHandler {
 	 *
 	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	public McpTransportContext $transport_context;
+	private McpTransportContext $transport_context;
 
 	/**
 	 * Constructor.
@@ -36,6 +36,17 @@ class HttpRequestHandler {
 	 */
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->transport_context = $transport_context;
+	}
+
+	/**
+	 * Get the transport context.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
+	 */
+	public function get_transport_context(): McpTransportContext {
+		return $this->transport_context;
 	}
 
 	/**
@@ -88,7 +99,7 @@ class HttpRequestHandler {
 
 			return $this->process_mcp_messages( $context );
 		} catch ( \Throwable $exception ) {
-			$this->transport_context->mcp_server->error_handler->log(
+			$this->transport_context->mcp_server->get_error_handler()->log(
 				'Unexpected error in handle_mcp_request',
 				array(
 					'transport' => static::class,

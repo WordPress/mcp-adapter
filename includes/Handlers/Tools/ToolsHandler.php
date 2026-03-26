@@ -88,7 +88,7 @@ class ToolsHandler {
 			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),
 			$tools,
 			'mcp_adapter_tools_list',
-			$this->mcp->error_handler
+			$this->mcp->get_error_handler()
 		);
 
 		return ListToolsResult::fromArray(
@@ -134,7 +134,7 @@ class ToolsHandler {
 
 			$mcp_tool = $this->mcp->get_mcp_tool( $tool_name );
 			if ( ! $mcp_tool ) {
-				$this->mcp->error_handler->log(
+				$this->mcp->get_error_handler()->log(
 					'Tool not found',
 					array(
 						'tool_name' => $tool_name,
@@ -151,7 +151,7 @@ class ToolsHandler {
 				if ( is_wp_error( $permission ) ) {
 					$error_message = $permission->get_error_message();
 
-					$this->mcp->error_handler->log(
+					$this->mcp->get_error_handler()->log(
 						'Tool permission check failed',
 						array(
 							'tool_name'      => $tool_name,
@@ -205,7 +205,7 @@ class ToolsHandler {
 			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp );
 
 			if ( is_wp_error( $result ) ) {
-				$this->mcp->error_handler->log(
+				$this->mcp->get_error_handler()->log(
 					'Tool execution returned WP_Error',
 					array(
 						'tool_name'     => $tool_name,
@@ -309,7 +309,7 @@ class ToolsHandler {
 				)
 			);
 		} catch ( \Throwable $exception ) {
-			$this->mcp->error_handler->log(
+			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
 				array(
 					'tool'      => $request_params['name'],

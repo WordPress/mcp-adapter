@@ -80,8 +80,8 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 			DummyObservabilityHandler::class,
 		);
 
-		$this->assertInstanceOf( McpErrorHandlerInterface::class, $server->error_handler );
-		$this->assertInstanceOf( DummyErrorHandler::class, $server->error_handler );
+		$this->assertInstanceOf( McpErrorHandlerInterface::class, $server->get_error_handler() );
+		$this->assertInstanceOf( DummyErrorHandler::class, $server->get_error_handler() );
 	}
 
 	public function test_handlers_return_consistent_error_format(): void {

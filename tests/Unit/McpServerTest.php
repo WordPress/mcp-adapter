@@ -46,8 +46,8 @@ final class McpServerTest extends TestCase {
 			NullMcpObservabilityHandler::class,
 		);
 
-		$this->assertInstanceOf( \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface::class, $server->error_handler );
-		$this->assertInstanceOf( \WP\MCP\Tests\Fixtures\DummyErrorHandler::class, $server->error_handler );
+		$this->assertInstanceOf( \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface::class, $server->get_error_handler() );
+		$this->assertInstanceOf( \WP\MCP\Tests\Fixtures\DummyErrorHandler::class, $server->get_error_handler() );
 	}
 
 	public function test_constructor_falls_back_to_null_error_handler(): void {
@@ -63,7 +63,7 @@ final class McpServerTest extends TestCase {
 			NullMcpObservabilityHandler::class,
 		);
 
-		$this->assertInstanceOf( NullMcpErrorHandler::class, $server->error_handler );
+		$this->assertInstanceOf( NullMcpErrorHandler::class, $server->get_error_handler() );
 	}
 
 	public function test_constructor_without_tools_does_not_register_system_tools(): void {

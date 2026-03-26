@@ -29,14 +29,14 @@ class McpServer {
 	 *
 	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 */
-	public McpErrorHandlerInterface $error_handler;
+	private McpErrorHandlerInterface $error_handler;
 
 	/**
 	 * Observability handler instance.
 	 *
 	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
 	 */
-	public McpObservabilityHandlerInterface $observability_handler;
+	private McpObservabilityHandlerInterface $observability_handler;
 
 	/**
 	 * Server ID.

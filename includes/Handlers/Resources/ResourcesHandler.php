@@ -66,7 +66,7 @@ class ResourcesHandler {
 			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp ),
 			$resources,
 			'mcp_adapter_resources_list',
-			$this->mcp->error_handler
+			$this->mcp->get_error_handler()
 		);
 
 		return ListResourcesResult::fromArray(
@@ -162,7 +162,7 @@ class ResourcesHandler {
 
 			// Handle WP_Error objects returned by McpResource execution.
 			if ( is_wp_error( $contents ) ) {
-				$this->mcp->error_handler->log(
+				$this->mcp->get_error_handler()->log(
 					'Resource execution returned WP_Error object',
 					array(
 						'uri'           => $uri,
@@ -186,7 +186,7 @@ class ResourcesHandler {
 				)
 			);
 		} catch ( \Throwable $exception ) {
-			$this->mcp->error_handler->log(
+			$this->mcp->get_error_handler()->log(
 				'Error reading resource',
 				array(
 					'uri'       => $uri,

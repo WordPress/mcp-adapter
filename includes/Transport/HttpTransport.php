@@ -52,7 +52,7 @@ class HttpTransport implements McpRestTransportInterface {
 	 */
 	public function register_routes(): void {
 		// Get server info from request handler's transport context
-		$server = $this->request_handler->transport_context->mcp_server;
+		$server = $this->request_handler->get_transport_context()->mcp_server;
 
 		// Single endpoint for MCP communication (POST, GET reserved for SSE, DELETE for session termination).
 		// Do not remove GET: it is part of the MCP HTTP transport shape and will be implemented (SSE) in a future iteration.
@@ -78,7 +78,7 @@ class HttpTransport implements McpRestTransportInterface {
 		$context = new HttpRequestContext( $request );
 
 		// Check permission using callback or default
-		$transport_context = $this->request_handler->transport_context;
+		$transport_context = $this->request_handler->get_transport_context();
 
 		if ( null !== $transport_context->transport_permission_callback ) {
 			try {
@@ -91,7 +91,7 @@ class HttpTransport implements McpRestTransportInterface {
 				}
 
 				// Log the error and deny access (fail-closed)
-				$this->request_handler->transport_context->error_handler->log(
+				$this->request_handler->get_transport_context()->error_handler->log(
 					'Permission callback returned WP_Error: ' . $result->get_error_message(),
 					array( 'HttpTransport::check_permission' )
 				);
@@ -99,7 +99,7 @@ class HttpTransport implements McpRestTransportInterface {
 				return false;
 			} catch ( \Throwable $e ) {
 				// Log the error and deny access (fail-closed)
-				$this->request_handler->transport_context->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
+				$this->request_handler->get_transport_context()->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
 
 				return false;
 			}
@@ -127,7 +127,7 @@ class HttpTransport implements McpRestTransportInterface {
 
 		if ( ! $user_has_capability ) {
 			$user_id = get_current_user_id();
-			$this->request_handler->transport_context->error_handler->log(
+			$this->request_handler->get_transport_context()->error_handler->log(
 				sprintf( 'Permission denied for MCP API access. User ID %d does not have capability "%s"', $user_id, $user_capability ),
 				array( 'HttpTransport::check_permission' )
 			);
