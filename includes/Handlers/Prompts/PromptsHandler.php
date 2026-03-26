@@ -30,21 +30,21 @@ class PromptsHandler {
 	 *
 	 * @var list<string>
 	 */
-	private static $valid_content_types = array( 'text', 'image', 'audio', 'resource_link', 'resource' );
+	private static array $valid_content_types = array( 'text', 'image', 'audio', 'resource_link', 'resource' );
 
 	/**
 	 * Valid role values for PromptMessage.
 	 *
 	 * @var list<string>
 	 */
-	private static $valid_roles = array( 'user', 'assistant' );
+	private static array $valid_roles = array( 'user', 'assistant' );
 
 	/**
 	 * Default role for messages when not specified.
 	 *
 	 * @var string
 	 */
-	private static $default_role = 'user';
+	private static string $default_role = 'user';
 
 	/**
 	 * The WordPress MCP instance.
@@ -85,7 +85,7 @@ class PromptsHandler {
 			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp ),
 			$prompts,
 			'mcp_adapter_prompts_list',
-			$this->mcp->error_handler
+			$this->mcp->get_error_handler()
 		);
 
 		return ListPromptsResult::fromArray(
@@ -180,7 +180,7 @@ class PromptsHandler {
 			$result = apply_filters( 'mcp_adapter_prompt_get_result', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
 
 			if ( is_wp_error( $result ) ) {
-				$this->mcp->error_handler->log(
+				$this->mcp->get_error_handler()->log(
 					'Prompt execution returned WP_Error',
 					array(
 						'prompt_name'   => $prompt_name,
@@ -194,7 +194,7 @@ class PromptsHandler {
 
 			return $this->normalize_result_to_dto( $result, $prompt, $prompt_name );
 		} catch ( \Throwable $e ) {
-			$this->mcp->error_handler->log(
+			$this->mcp->get_error_handler()->log(
 				'Prompt execution failed',
 				array(
 					'prompt_name' => $prompt_name,
@@ -278,7 +278,7 @@ class PromptsHandler {
 
 		foreach ( $result['messages'] as $index => $message ) {
 			if ( ! is_array( $message ) ) {
-				$this->mcp->error_handler->log(
+				$this->mcp->get_error_handler()->log(
 					'Invalid message structure in prompt result, skipping',
 					array(
 						'prompt_name'   => $prompt_name,
@@ -450,7 +450,7 @@ class PromptsHandler {
 		string $prompt_name
 	): GetPromptResult {
 		// Log observability event for fallback normalization.
-		$this->mcp->observability_handler->record_event(
+		$this->mcp->get_observability_handler()->record_event(
 			'prompt_result_fallback_normalization',
 			array(
 				'prompt_name' => $prompt_name,
@@ -536,7 +536,7 @@ class PromptsHandler {
 
 		// Check if type is missing.
 		if ( null === $type || '' === $type ) {
-			$this->mcp->error_handler->log(
+			$this->mcp->get_error_handler()->log(
 				'Missing content type in prompt result, defaulting to text',
 				array(
 					'prompt_name' => $prompt_name,
@@ -554,7 +554,7 @@ class PromptsHandler {
 
 		// Check if type is valid.
 		if ( ! in_array( $type, self::$valid_content_types, true ) ) {
-			$this->mcp->error_handler->log(
+			$this->mcp->get_error_handler()->log(
 				'Invalid content type in prompt result, converting to text',
 				array(
 					'prompt_name'  => $prompt_name,
@@ -596,7 +596,7 @@ class PromptsHandler {
 		}
 
 		if ( '' !== $prompt_name ) {
-			$this->mcp->error_handler->log(
+			$this->mcp->get_error_handler()->log(
 				'Invalid role in prompt message, defaulting to user',
 				array(
 					'prompt_name'  => $prompt_name,

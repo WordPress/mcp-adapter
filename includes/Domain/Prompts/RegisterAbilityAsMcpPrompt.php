@@ -6,6 +6,8 @@
  * @package McpAdapter
  */
 
+declare( strict_types=1 );
+
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Utils\McpNameSanitizer;
