@@ -934,7 +934,7 @@ final class PromptsHandlerTest extends TestCase {
 		wp_unregister_ability( 'test/invalid-content-prompt' );
 	}
 
-	public function test_get_prompt_withStringArguments_returnsInvalidParamsError(): void {
+	public function test_get_prompt_with_string_arguments_returns_invalid_params_error(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->get_prompt(
@@ -953,7 +953,7 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
 	}
 
-	public function test_get_prompt_withIntegerArguments_returnsInvalidParamsError(): void {
+	public function test_get_prompt_with_integer_arguments_returns_invalid_params_error(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->get_prompt(
@@ -972,7 +972,7 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
 	}
 
-	public function test_get_prompt_withNullArguments_succeeds(): void {
+	public function test_get_prompt_with_null_arguments_succeeds(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->get_prompt(
@@ -988,7 +988,7 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertInstanceOf( GetPromptResult::class, $result );
 	}
 
-	public function test_get_prompt_withMissingArguments_succeeds(): void {
+	public function test_get_prompt_with_missing_arguments_succeeds(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->get_prompt(
@@ -1003,7 +1003,7 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertInstanceOf( GetPromptResult::class, $result );
 	}
 
-	public function test_list_prompts_withFilterReturningNonArray_fallsBackToOriginal(): void {
+	public function test_list_prompts_with_filter_returning_non_array_falls_back_to_original(): void {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 

@@ -294,7 +294,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			$this->assertArrayHasKey( 'mcp_adapter', $structured['nested']['_meta'] );
 		}
 
-	public function test_call_tool_withStringArguments_returnsInvalidParamsError(): void {
+	public function test_call_tool_with_string_arguments_returns_invalid_params_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool(
@@ -313,7 +313,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
 	}
 
-	public function test_call_tool_withIntegerArguments_returnsInvalidParamsError(): void {
+	public function test_call_tool_with_integer_arguments_returns_invalid_params_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool(
@@ -332,7 +332,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
 	}
 
-	public function test_call_tool_withNullArguments_succeeds(): void {
+	public function test_call_tool_with_null_arguments_succeeds(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool(
@@ -350,7 +350,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
 
-	public function test_call_tool_withMissingArguments_succeeds(): void {
+	public function test_call_tool_with_missing_arguments_succeeds(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool(
