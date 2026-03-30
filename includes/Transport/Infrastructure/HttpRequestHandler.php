@@ -27,7 +27,7 @@ class HttpRequestHandler {
 	 *
 	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
-	private McpTransportContext $transport_context;
+	public McpTransportContext $transport_context;
 
 	/**
 	 * Constructor.
@@ -64,7 +64,7 @@ class HttpRequestHandler {
 
 		// Handle GET requests (reserved for SSE streaming; currently not implemented).
 		if ( 'GET' === $context->method ) {
-			return $this->handle_sse_request( $context );
+			return $this->handle_sse_request();
 		}
 
 		// Handle DELETE requests (session termination)
@@ -307,11 +307,9 @@ class HttpRequestHandler {
 	/**
 	 * Handle GET requests (SSE streaming).
 	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
 	 * @return \WP_REST_Response SSE response.
 	 */
-	private function handle_sse_request( HttpRequestContext $context ): \WP_REST_Response {
+	private function handle_sse_request(): \WP_REST_Response {
 		// SSE streaming not yet implemented - return HTTP 405 with no body
 		return new \WP_REST_Response( null, 405 );
 	}
