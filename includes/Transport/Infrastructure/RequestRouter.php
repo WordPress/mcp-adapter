@@ -95,9 +95,10 @@ class RequestRouter {
 			if ( $handler_result instanceof JSONRPCErrorResponse ) {
 				// Normalize to transport-level shape: only the JSON-RPC error object.
 				// The JSON-RPC envelope is created by the transport boundary.
-				$result             = array( 'error' => $handler_result->getError()->toArray() );
-				$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-				$tags['error_code'] = $handler_result->getError()->getCode();
+				$result                 = array( 'error' => $handler_result->getError()->toArray() );
+				$tags                   = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
+				$tags['error_code']     = $handler_result->getError()->getCode();
+				$tags['failure_reason'] = $handler_result->getError()->getMessage();
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;

@@ -228,6 +228,11 @@ final class RequestRouterTest extends TestCase {
 			}
 		);
 		$this->assertNotEmpty( $error_event );
+
+		// Verify failure_reason is captured for protocol errors.
+		$error_event_data = array_values( $error_event )[0];
+		$this->assertArrayHasKey( 'failure_reason', $error_event_data['tags'], 'Protocol error should include failure_reason in observability tags.' );
+		$this->assertStringContainsString( 'unknown/method', $error_event_data['tags']['failure_reason'] );
 	}
 
 	public function test_route_request_handles_handler_exceptions(): void {
