@@ -184,12 +184,15 @@ Individual server management with comprehensive configuration:
 ### Required Dependencies
 
 - **PHP**: >= 7.4
-- **[WordPress Abilities API](https://github.com/WordPress/abilities-api)**: For ability registration and management
+- **WordPress**: >= 6.8 (6.9+ recommended; 7.0+ includes the MCP Adapter in core)
+- **[WordPress Abilities API](https://make.wordpress.org/core/2025/11/10/abilities-api-in-wordpress-6-9/)**: Included in WordPress core since 6.9. For WordPress 6.8, install the [Abilities API plugin](https://github.com/WordPress/abilities-api) separately (note: the plugin repository was archived in February 2026).
 - **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (^0.1.0): Typed DTOs for MCP protocol types (MCP 2025-11-25)
 
 ### WordPress Abilities API Integration
 
-This adapter requires the [WordPress Abilities API](https://github.com/WordPress/abilities-api), which provides:
+Since WordPress 6.9, the [Abilities API](https://make.wordpress.org/core/2025/11/10/abilities-api-in-wordpress-6-9/) is a core API and does not require a separate plugin. WordPress 7.0 further expands the API with a [client-side JavaScript counterpart](https://make.wordpress.org/core/2026/03/24/client-side-abilities-api-in-wordpress-7-0/) for browser-based abilities.
+
+The Abilities API provides:
 
 - Standardized ability registration (`wp_register_ability()`)
 - Ability retrieval and management (`wp_get_ability()`)
@@ -204,10 +207,10 @@ This adapter requires the [WordPress Abilities API](https://github.com/WordPress
 The MCP Adapter is designed to be installed as a Composer package. This is the primary and recommended installation method:
 
 ```bash
-composer require wordpress/abilities-api wordpress/mcp-adapter
+composer require wordpress/mcp-adapter
 ```
 
-This will automatically install both the WordPress Abilities API and MCP Adapter as dependencies in your project.
+> **Note:** On WordPress 6.8, you must also install the Abilities API separately: `composer require wordpress/abilities-api wordpress/mcp-adapter`. On WordPress 6.9+, the Abilities API is built into core and does not need to be installed. On WordPress 7.0+, the MCP Adapter itself is bundled in core and Composer installation is only needed if you want to pin a specific version or use it as a library dependency.
 
 #### Using Jetpack Autoloader (Highly Recommended)
 
@@ -266,13 +269,14 @@ This will give you the latest development version from the `trunk` branch with a
   "$schema": "https://schemas.wp.org/trunk/wp-env.json",
   // ... other config ...
   "plugins": [
-    "WordPress/abilities-api",
     "WordPress/mcp-adapter",
     // ... other plugins ...
   ],
   // ... more config ...
 }
 ```
+
+> **Note:** On WordPress 6.8, also add `"WordPress/abilities-api"` to the plugins array. On WordPress 6.9+, the Abilities API is included in core.
 
 ### Using MCP Adapter in Your Plugin
 
@@ -294,10 +298,11 @@ McpAdapter::instance();
 
 ## Basic Usage
 
-The MCP Adapter automatically creates a default server that exposes all registered WordPress abilities through a layered architecture. This provides immediate MCP functionality without requiring manual server configuration.
+The MCP Adapter automatically creates a default server that exposes registered WordPress abilities through a layered architecture. This provides immediate MCP functionality without requiring manual server configuration.
 
 **How it works:**
-- All WordPress abilities registered via `wp_register_ability()` are automatically available
+- WordPress abilities registered via `wp_register_ability()` with the `meta.mcp.public` flag set to `true` are available on the default server
+- Alternatively, abilities can be explicitly listed when creating a [custom MCP server](#creating-custom-mcp-servers), which does not require the `meta.mcp.public` flag
 - The default server supports both HTTP and STDIO transports with MCP 2025-06-18 compliance
 - Abilities are exposed as tools, resources, or prompts based on their characteristics
 - Built-in error handling and observability are included
@@ -353,25 +358,31 @@ add_action( 'wp_abilities_api_init', function() {
         },
         'permission_callback' => function() {
             return current_user_can( 'read' );
-        }
+        },
+        'meta' => [
+            'mcp' => [
+                'public' => true, // Required for default MCP server access
+            ],
+        ],
     ]);
 });
 
-// The ability is automatically available via the default MCP server
-// No additional configuration needed!
+// The ability is now available via the default MCP server.
+// Without the meta.mcp.public flag, abilities are only accessible
+// through custom MCP servers that explicitly list them.
 ```
 
 </details>
 
-For detailed information about creating WordPress abilities, see the [WordPress Abilities API documentation](https://github.com/WordPress/abilities-api).
+For detailed information about creating WordPress abilities, see the [Abilities API developer documentation](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/).
 
 ### Connecting to MCP Servers
 
 The MCP Adapter supports multiple connection methods. Here are examples for connecting with MCP clients:
 
-#### STDIO Transport (Testing Only)
+#### STDIO Transport (Local Development)
 
-For testing purposes only, you can interact directly with MCP servers using WP-CLI commands:
+For local development and testing, you can interact directly with MCP servers using WP-CLI commands:
 
 ```bash
 # List all available MCP servers
@@ -386,7 +397,9 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapt
 
 #### MCP Client Configuration
 
-Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to connect to your WordPress MCP servers:
+Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to connect to your WordPress MCP servers.
+
+> **WordPress.com users:** WordPress.com includes [built-in MCP support](https://developer.wordpress.com/docs/mcp/) with OAuth 2.1 authentication. No additional plugin installation or proxy configuration is required.
 
 <details>
 <summary><strong>STDIO Transport Configuration for local sites (click to expand)</strong></summary>
@@ -422,6 +435,8 @@ Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to co
 
 <details>
 <summary><strong>HTTP Transport via Proxy (click to expand)</strong></summary>
+
+The [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automattic/mcp-wordpress-remote) proxy runs locally and translates STDIO-based MCP communication from AI clients into HTTP REST API calls that WordPress understands. Authentication uses [WordPress Application Passwords](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/).
 
 ```json
 {
@@ -513,6 +528,7 @@ See the [Observability Guide](docs/guides/observability.md) for detailed metrics
 ## Migration
 
 - [Migration Guide: v0.5.0](docs/migration/v0.5.0.md) — Breaking changes and upgrade instructions
+- [Migration Guide: v0.3.0](docs/migration/v0.3.0.md) — Transport, observability, and hook name changes
 
 ## License
 [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html)
