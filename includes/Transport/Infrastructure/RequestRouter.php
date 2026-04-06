@@ -13,6 +13,7 @@ use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\McpObservabilityHelperTrait;
 use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -114,7 +115,12 @@ class RequestRouter {
 					$result['_session_id']            = $new_session_id;
 				}
 
-				$tags = array_merge( $common_tags, $component_tags, array( 'status' => 'success' ) );
+				$status = 'success';
+				if ( $handler_result instanceof CallToolResult && true === $handler_result->getIsError() ) {
+					$status = 'error';
+				}
+
+				$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;

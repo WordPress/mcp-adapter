@@ -52,7 +52,7 @@ final class RequestRouterTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
-			array( 'test/always-allowed', 'test/meta-leak' ),
+			array( 'test/always-allowed', 'test/meta-leak', 'test/permission-denied' ),
 			array( 'test/resource' ),
 			array( 'test/prompt' )
 		);
@@ -364,6 +364,69 @@ final class RequestRouterTest extends TestCase {
 
 		// Restore user
 		wp_set_current_user( $this->test_user_id );
+	}
+
+	// =========================================================================
+	// CallToolResult isError Observability Tests
+	// =========================================================================
+
+	public function test_route_request_tools_call_with_is_error_true_records_error_status(): void {
+		DummyObservabilityHandler::reset();
+
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-permission-denied',
+				'arguments' => array(),
+			),
+			1,
+			'test-transport'
+		);
+
+		$this->assertIsArray( $result );
+		// CallToolResult with isError=true should still have content (not an error key).
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertArrayHasKey( 'isError', $result );
+		$this->assertTrue( $result['isError'] );
+
+		// Verify observability records status as 'error'.
+		$error_event = array_filter(
+			DummyObservabilityHandler::$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'error' === $event['tags']['status'];
+			}
+		);
+		$this->assertNotEmpty( $error_event, 'CallToolResult with isError=true should be recorded with status "error".' );
+	}
+
+	public function test_route_request_tools_call_with_is_error_false_records_success_status(): void {
+		DummyObservabilityHandler::reset();
+
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-always-allowed',
+				'arguments' => array(),
+			),
+			1,
+			'test-transport'
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'content', $result );
+
+		// Verify observability records status as 'success'.
+		$success_event = array_filter(
+			DummyObservabilityHandler::$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'success' === $event['tags']['status'];
+			}
+		);
+		$this->assertNotEmpty( $success_event, 'CallToolResult with isError=false/null should be recorded with status "success".' );
 	}
 
 	// =========================================================================
