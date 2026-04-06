@@ -207,6 +207,8 @@ final class RequestRouterTest extends TestCase {
 	}
 
 	public function test_route_request_unknown_method(): void {
+		DummyObservabilityHandler::reset();
+
 		$result = $this->router->route_request( 'unknown/method', array(), 1 );
 
 		$this->assertIsArray( $result );
