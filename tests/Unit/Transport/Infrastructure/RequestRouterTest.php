@@ -399,6 +399,12 @@ final class RequestRouterTest extends TestCase {
 			}
 		);
 		$this->assertNotEmpty( $error_event, 'CallToolResult with isError=true should be recorded with status "error".' );
+
+		// Verify failure_reason is captured in observability tags.
+		$error_event_data = array_values( $error_event )[0];
+		$this->assertArrayHasKey( 'failure_reason', $error_event_data['tags'], 'isError response should include failure_reason in observability tags.' );
+		$this->assertIsString( $error_event_data['tags']['failure_reason'] );
+		$this->assertNotEmpty( $error_event_data['tags']['failure_reason'] );
 	}
 
 	public function test_route_request_tools_call_with_is_error_false_records_success_status(): void {

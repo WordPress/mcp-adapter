@@ -12,6 +12,7 @@ namespace WP\MCP\Transport\Infrastructure;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\McpObservabilityHelperTrait;
 use WP\McpSchema\Common\AbstractDataTransferObject;
+use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 
@@ -118,6 +119,13 @@ class RequestRouter {
 				$status = 'success';
 				if ( $handler_result instanceof CallToolResult && true === $handler_result->getIsError() ) {
 					$status = 'error';
+
+					if ( ! isset( $component_tags['failure_reason'] ) ) {
+						$content = $handler_result->getContent();
+						if ( isset( $content[0] ) && $content[0] instanceof TextContent ) {
+							$component_tags['failure_reason'] = $content[0]->getText();
+						}
+					}
 				}
 
 				$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
