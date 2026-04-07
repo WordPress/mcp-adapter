@@ -52,7 +52,7 @@ final class RequestRouterTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
-			array( 'test/always-allowed', 'test/meta-leak' ),
+			array( 'test/always-allowed', 'test/meta-leak', 'test/permission-denied' ),
 			array( 'test/resource' ),
 			array( 'test/prompt' )
 		);
@@ -207,6 +207,8 @@ final class RequestRouterTest extends TestCase {
 	}
 
 	public function test_route_request_unknown_method(): void {
+		DummyObservabilityHandler::reset();
+
 		$result = $this->router->route_request( 'unknown/method', array(), 1 );
 
 		$this->assertIsArray( $result );
@@ -228,6 +230,11 @@ final class RequestRouterTest extends TestCase {
 			}
 		);
 		$this->assertNotEmpty( $error_event );
+
+		// Verify failure_reason is captured for protocol errors.
+		$error_event_data = array_values( $error_event )[0];
+		$this->assertArrayHasKey( 'failure_reason', $error_event_data['tags'], 'Protocol error should include failure_reason in observability tags.' );
+		$this->assertStringContainsString( 'unknown/method', $error_event_data['tags']['failure_reason'] );
 	}
 
 	public function test_route_request_handles_handler_exceptions(): void {
@@ -364,6 +371,75 @@ final class RequestRouterTest extends TestCase {
 
 		// Restore user
 		wp_set_current_user( $this->test_user_id );
+	}
+
+	// =========================================================================
+	// CallToolResult isError Observability Tests
+	// =========================================================================
+
+	public function test_route_request_tools_call_with_is_error_true_records_error_status(): void {
+		DummyObservabilityHandler::reset();
+
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-permission-denied',
+				'arguments' => array(),
+			),
+			1,
+			'test-transport'
+		);
+
+		$this->assertIsArray( $result );
+		// CallToolResult with isError=true should still have content (not an error key).
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertArrayHasKey( 'isError', $result );
+		$this->assertTrue( $result['isError'] );
+
+		// Verify observability records status as 'error'.
+		$error_event = array_filter(
+			DummyObservabilityHandler::$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'error' === $event['tags']['status'];
+			}
+		);
+		$this->assertNotEmpty( $error_event, 'CallToolResult with isError=true should be recorded with status "error".' );
+
+		// Verify failure_reason is captured in observability tags.
+		$error_event_data = array_values( $error_event )[0];
+		$this->assertArrayHasKey( 'failure_reason', $error_event_data['tags'], 'isError response should include failure_reason in observability tags.' );
+		$this->assertIsString( $error_event_data['tags']['failure_reason'] );
+		$this->assertNotEmpty( $error_event_data['tags']['failure_reason'] );
+	}
+
+	public function test_route_request_tools_call_with_is_error_false_records_success_status(): void {
+		DummyObservabilityHandler::reset();
+
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-always-allowed',
+				'arguments' => array(),
+			),
+			1,
+			'test-transport'
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'content', $result );
+
+		// Verify observability records status as 'success'.
+		$success_event = array_filter(
+			DummyObservabilityHandler::$events,
+			static function ( $event ) {
+				return 'mcp.request' === $event['event']
+					&& isset( $event['tags']['status'] )
+					&& 'success' === $event['tags']['status'];
+			}
+		);
+		$this->assertNotEmpty( $success_event, 'CallToolResult with isError=false/null should be recorded with status "success".' );
 	}
 
 	// =========================================================================

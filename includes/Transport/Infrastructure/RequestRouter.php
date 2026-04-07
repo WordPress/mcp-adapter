@@ -12,7 +12,9 @@ namespace WP\MCP\Transport\Infrastructure;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\McpObservabilityHelperTrait;
 use WP\McpSchema\Common\AbstractDataTransferObject;
+use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -93,9 +95,10 @@ class RequestRouter {
 			if ( $handler_result instanceof JSONRPCErrorResponse ) {
 				// Normalize to transport-level shape: only the JSON-RPC error object.
 				// The JSON-RPC envelope is created by the transport boundary.
-				$result             = array( 'error' => $handler_result->getError()->toArray() );
-				$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-				$tags['error_code'] = $handler_result->getError()->getCode();
+				$result                 = array( 'error' => $handler_result->getError()->toArray() );
+				$tags                   = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
+				$tags['error_code']     = $handler_result->getError()->getCode();
+				$tags['failure_reason'] = $handler_result->getError()->getMessage();
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;
@@ -114,7 +117,19 @@ class RequestRouter {
 					$result['_session_id']            = $new_session_id;
 				}
 
-				$tags = array_merge( $common_tags, $component_tags, array( 'status' => 'success' ) );
+				$status = 'success';
+				if ( $handler_result instanceof CallToolResult && true === $handler_result->getIsError() ) {
+					$status = 'error';
+
+					if ( ! isset( $component_tags['failure_reason'] ) ) {
+						$content = $handler_result->getContent();
+						if ( isset( $content[0] ) && $content[0] instanceof TextContent ) {
+							$component_tags['failure_reason'] = $content[0]->getText();
+						}
+					}
+				}
+
+				$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;
