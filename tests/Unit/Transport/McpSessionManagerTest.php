@@ -368,4 +368,37 @@ final class McpSessionManagerTest extends TestCase {
 		$sessions_after = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertArrayHasKey( $expired_session_id, $sessions_after );
 	}
+
+	/**
+	 * Test session stays alive when inactivity timeout is less than default throttle interval
+	 */
+	public function test_validation_clamps_throttle_when_inactivity_timeout_is_low(): void {
+		// Set inactivity timeout to 30s (less than the default 60s throttle)
+		add_filter(
+			'mcp_adapter_session_inactivity_timeout',
+			static function () {
+				return 30;
+			}
+		);
+
+		$session_id = SessionManager::create_session( $this->test_user_id, array() );
+		$this->assertIsString( $session_id );
+
+		// Backdate last_activity by 16s (more than half of 30s timeout = clamped interval of 15s)
+		$sessions                                 = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$sessions[ $session_id ]['last_activity'] = time() - 16;
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+
+		// Validate — should succeed AND update last_activity because 16s > clamped interval (15s)
+		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
+		$this->assertTrue( $is_valid );
+
+		$sessions_after = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$this->assertGreaterThan(
+			$sessions[ $session_id ]['last_activity'],
+			$sessions_after[ $session_id ]['last_activity']
+		);
+
+		remove_all_filters( 'mcp_adapter_session_inactivity_timeout' );
+	}
 }

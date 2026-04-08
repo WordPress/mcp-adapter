@@ -203,10 +203,16 @@ final class SessionManager {
 		 */
 		$activity_update_interval = (int) apply_filters( 'mcp_adapter_session_activity_update_interval', self::DEFAULT_ACTIVITY_UPDATE_INTERVAL );
 
+		// Clamp: interval must be less than inactivity timeout to prevent
+		// sessions from expiring despite active use.
+		if ( $activity_update_interval >= $inactivity_timeout ) {
+			$activity_update_interval = (int) ( $inactivity_timeout / 2 );
+		}
+
 		return array(
 			'max_sessions'             => $max_sessions,
 			'inactivity_timeout'       => $inactivity_timeout,
-			'activity_update_interval' => $activity_update_interval,
+			'activity_update_interval' => max( 0, $activity_update_interval ),
 		);
 	}
 
