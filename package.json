@@ -12,8 +12,8 @@
 	},
 	"devDependencies": {
 		"@wordpress/env": "^10.29.0",
-		"@wordpress/scripts": "^30.22.0",
-		"@wordpress/prettier-config": "^4.29.0"
+		"@wordpress/scripts": "^31.8.0",
+		"@wordpress/prettier-config": "^4.43.0"
 	},
 	"files": [
 		"includes",
