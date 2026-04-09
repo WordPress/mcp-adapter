@@ -304,7 +304,7 @@ The MCP Adapter automatically creates a default server that exposes registered W
 - WordPress abilities registered via `wp_register_ability()` with the `meta.mcp.public` flag set to `true` are discoverable and executable on the default server via its built-in adapter tools
 - On the default server, public abilities are accessed through `mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, and `mcp-adapter/execute-ability` rather than being auto-registered individually in `tools/list`
 - Alternatively, abilities can be explicitly listed when creating a [custom MCP server](#creating-custom-mcp-servers); in that case, they can be exposed directly as MCP tools, resources, or prompts without requiring the `meta.mcp.public` flag
-- The default server supports both HTTP and STDIO transports with MCP 2025-06-18 compliance
+- The default server supports both HTTP and STDIO transports with MCP protocol version negotiation, including 2025-06-18 and 2025-11-25
 - Built-in error handling and observability are included
 - Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
 - Access via STDIO: `wp mcp-adapter serve --server=mcp-adapter-default-server`
