@@ -327,7 +327,7 @@ class McpServer {
 	/**
 	 * Get the error handler instance.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @return \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
 	 */

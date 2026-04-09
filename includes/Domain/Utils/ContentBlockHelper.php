@@ -29,7 +29,7 @@ use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
  * ContentBlockInterface. These DTOs are used in tool call results, prompt messages,
  * and resource contents throughout the MCP protocol.
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 final class ContentBlockHelper {
 

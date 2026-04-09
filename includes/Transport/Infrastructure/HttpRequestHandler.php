@@ -41,7 +41,7 @@ class HttpRequestHandler {
 	/**
 	 * Get the transport context.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
 	 */
@@ -246,7 +246,7 @@ class HttpRequestHandler {
 	 * version is also accepted. An unsupported version returns a JSON-RPC
 	 * invalid-request error payload.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *

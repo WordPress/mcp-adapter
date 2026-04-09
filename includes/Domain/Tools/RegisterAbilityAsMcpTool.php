@@ -54,7 +54,7 @@ class RegisterAbilityAsMcpTool {
 	 * @param \WP_Ability $ability The ability.
 	 *
 	 * @return array{tool: \WP\McpSchema\Server\Tools\DTO\Tool, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function build( \WP_Ability $ability ) {
@@ -99,7 +99,7 @@ class RegisterAbilityAsMcpTool {
 	 * Build Tool DTO data and adapter metadata.
 	 *
 	 * @return array{tool_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function build_tool_data() {
@@ -203,7 +203,7 @@ class RegisterAbilityAsMcpTool {
 	 * Sanitizes the ability name to MCP-valid format, applies filter, and validates result.
 	 *
 	 * @return string|\WP_Error Valid tool name or error.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function resolve_tool_name() {
@@ -217,7 +217,7 @@ class RegisterAbilityAsMcpTool {
 		/**
 		 * Filters the MCP tool name derived from an ability.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param string $name The sanitized tool name.
 		 * @param \WP_Ability $ability The source ability instance.

@@ -14,7 +14,7 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\McpConstants;
 
 /**
- * @since n.e.x.t.
+ * @since 0.5.0
  */
 final class McpVersionNegotiatorTest extends TestCase {
 

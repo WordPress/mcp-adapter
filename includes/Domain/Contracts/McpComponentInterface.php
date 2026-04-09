@@ -23,7 +23,7 @@ use WP\McpSchema\Common\AbstractDataTransferObject;
  *
  * @internal
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 interface McpComponentInterface {
 
@@ -34,7 +34,7 @@ interface McpComponentInterface {
 	 * internal adapter metadata or execution wiring.
 	 *
 	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Protocol-only DTO.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function get_protocol_dto(): AbstractDataTransferObject;
@@ -49,7 +49,7 @@ interface McpComponentInterface {
 	 * @param mixed $arguments Component arguments (typically an associative array).
 	 *
 	 * @return mixed Execution result.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function execute( $arguments );
@@ -64,7 +64,7 @@ interface McpComponentInterface {
 	 * @param mixed $arguments Component arguments (typically an associative array).
 	 *
 	 * @return bool|\WP_Error True when permitted, false or WP_Error otherwise.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function check_permission( $arguments );
@@ -75,7 +75,7 @@ interface McpComponentInterface {
 	 * This metadata MUST NOT be stored on protocol DTOs and MUST NOT be exposed to MCP clients.
 	 *
 	 * @return array<string, mixed> Internal metadata.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function get_adapter_meta(): array;
@@ -86,7 +86,7 @@ interface McpComponentInterface {
 	 * This replaces legacy approaches that derived observability tags from DTO `_meta`.
 	 *
 	 * @return array<string, mixed> Observability tags (component_type, source, etc.).
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function get_observability_context(): array;

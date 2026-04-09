@@ -42,7 +42,7 @@ class InitializeHandler {
 	 * If the client requests a supported version, that version is used. Otherwise
 	 * the server falls back to the latest supported version.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param string $client_protocol_version The protocol version requested by the client.
 	 *
@@ -90,7 +90,7 @@ class InitializeHandler {
 		 * `$result->toArray()`, change the data, and return
 		 * `InitializeResult::fromArray( $modified_data )`.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
 		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.

@@ -197,7 +197,7 @@ final class SessionManager {
 		 * `last_activity` if at least this many seconds have elapsed since
 		 * the last write.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param int $interval Minimum seconds between writes. Default 60.
 		 */

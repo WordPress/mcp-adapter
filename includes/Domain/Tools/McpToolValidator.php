@@ -26,7 +26,7 @@ class McpToolValidator {
 	/**
 	 * Valid task support values for tool execution.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var array<string>
 	 */

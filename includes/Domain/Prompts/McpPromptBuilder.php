@@ -78,7 +78,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * The prompt icons for UI display.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var list<array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}>|null
 	 */
@@ -90,7 +90,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Use this to attach purpose-specific metadata that MCP clients can consume.
 	 * Keys are passed through unchanged.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var array<string, mixed>
 	 */
@@ -103,7 +103,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * idempotent behavior. Subclasses should NOT override this constructor;
 	 * instead, implement the configure() method.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 */
 	final public function __construct() {
 		$this->configure();
@@ -215,7 +215,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Get the prompt icons.
 	 *
 	 * @return list<array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> The prompt icons.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function get_icons(): array {
@@ -235,7 +235,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * @param list<array{src: string, mimeType?: string, sizes?: array<string>, theme?: string}> $icons Array of icon definitions.
 	 *
 	 * @return self
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	protected function set_icons( array $icons ): self {
@@ -248,7 +248,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Get the additional metadata.
 	 *
 	 * @return array<string, mixed> The additional metadata.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public function get_meta(): array {
@@ -263,7 +263,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
 	 *
 	 * @return self
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	protected function set_meta( array $meta ): self {

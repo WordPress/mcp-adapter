@@ -49,7 +49,7 @@ use WP_Error;
  *     )
  * );
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 class RegisterAbilityAsMcpPrompt {
 
@@ -63,7 +63,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Tracks whether input_schema was transformed from flattened to object format.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var bool
 	 */
@@ -72,7 +72,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * The wrapper property name used when transforming flattened schemas.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var string|null
 	 */
@@ -86,7 +86,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * - 'schema': Arguments were auto-converted from ability.input_schema
 	 * - null: No arguments present
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var string|null
 	 */
@@ -118,7 +118,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * Get the MCP prompt instance.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function get_prompt() {
@@ -140,7 +140,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * Build Prompt DTO data and adapter metadata.
 	 *
 	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function build_prompt_data() {
@@ -210,7 +210,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * This follows the `mcp.*` override pattern used elsewhere (mcp.uri, mcp.icons, mcp.annotations).
 	 *
 	 * @return array<string,mixed>|\WP_Error Prompt data array, or WP_Error if explicit arguments are invalid.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function get_data() {
@@ -274,7 +274,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * Get explicit arguments from ability meta.mcp.arguments.
 	 *
 	 * @return list<array<string,mixed>>|null Explicit arguments array or null if not defined.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function get_explicit_arguments(): ?array {
@@ -303,7 +303,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * @param list<array<string,mixed>> $explicit_arguments User-defined arguments array.
 	 *
 	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function convert_explicit_arguments( array $explicit_arguments ) {
@@ -384,7 +384,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
 	 *
 	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument> Argument DTO list.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function convert_input_schema_to_arguments( array $input_schema ): array {
@@ -439,7 +439,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * Sanitizes the ability name to MCP-valid format, applies filter, and validates result.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @return string|\WP_Error Valid prompt name or error.
 	 */
@@ -454,7 +454,7 @@ class RegisterAbilityAsMcpPrompt {
 		/**
 		 * Filters the MCP prompt name derived from an ability.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param string      $name    The sanitized prompt name.
 		 * @param \WP_Ability $ability The source ability instance.
@@ -486,7 +486,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * @param \WP_Ability $ability The ability.
 	 *
 	 * @return array{prompt: \WP\McpSchema\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function build( \WP_Ability $ability ) {

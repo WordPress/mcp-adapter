@@ -45,7 +45,7 @@ use WP_Error;
  * adapter metadata and execution wiring live on this class and are never
  * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 final class McpTool implements McpComponentInterface {
 

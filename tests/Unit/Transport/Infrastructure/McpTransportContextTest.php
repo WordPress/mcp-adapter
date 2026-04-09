@@ -25,7 +25,7 @@ use WP\MCP\Transport\Infrastructure\RequestRouter;
 /**
  * Test McpTransportContext constructor validation.
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 final class McpTransportContextTest extends TestCase {
 

@@ -35,11 +35,11 @@ use WP_Error;
  * - 'mcp.icons' (array): Array of icon objects for UI display
  * - 'mcp._meta' (array): User-provided metadata to pass through
  *
- * Note: Top-level meta keys 'uri', 'mimeType', 'annotations' are deprecated as of n.e.x.t.
+ * Note: Top-level meta keys 'uri', 'mimeType', 'annotations' are deprecated as of 0.5.0.
  * They still work for backward compatibility but will trigger a `_doing_it_wrong` notice.
  * Use 'mcp.uri', 'mcp.mimeType', 'mcp.annotations' instead.
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 class RegisterAbilityAsMcpResource {
 
@@ -126,7 +126,7 @@ class RegisterAbilityAsMcpResource {
 	 * Build Resource DTO data and adapter metadata.
 	 *
 	 * @return array{resource_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	private function build_resource_data() {
@@ -262,7 +262,7 @@ class RegisterAbilityAsMcpResource {
 		/**
 		 * Filters the MCP resource URI derived from an ability.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param string $uri The validated resource URI.
 		 * @param \WP_Ability $ability The source ability instance.
@@ -377,7 +377,7 @@ class RegisterAbilityAsMcpResource {
 	 */
 	private function log_deprecation( string $method, string $message, array $context = array() ): void {
 		// WordPress standard deprecation notice (appears as X-WP-DoingItWrong header in REST API).
-		_doing_it_wrong( esc_html( $method ), esc_html( $message ), 'n.e.x.t' );
+		_doing_it_wrong( esc_html( $method ), esc_html( $message ), '0.5.0' );
 
 		// Also log via McpErrorHandler for debug.log visibility.
 		if ( ! $this->error_handler ) {
@@ -409,7 +409,7 @@ class RegisterAbilityAsMcpResource {
 		 *
 		 * Unlike tools, resource names have no charset restrictions.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param string $name The resource name.
 		 * @param \WP_Ability $ability The source ability instance.
@@ -436,7 +436,7 @@ class RegisterAbilityAsMcpResource {
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
 	 *
 	 * @return array{resource: \WP\McpSchema\Server\Resources\DTO\Resource, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function build( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {

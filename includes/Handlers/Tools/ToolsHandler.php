@@ -79,7 +79,7 @@ class ToolsHandler {
 		 * Use this filter to hide tools per user/role, add dynamic tools,
 		 * or reorder the tools list.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
 		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
@@ -172,7 +172,7 @@ class ToolsHandler {
 			 * Return the (optionally modified) arguments array to proceed with execution,
 			 * or return a WP_Error to block execution and return an error to the client.
 			 *
-			 * @since n.e.x.t
+			 * @since 0.5.0
 			 *
 			 * @param array                        $args      The tool arguments.
 			 * @param string                       $tool_name The tool name being called.
@@ -194,7 +194,7 @@ class ToolsHandler {
 			 * Use this filter for result transformation, PII redaction,
 			 * audit logging, or content enrichment.
 			 *
-			 * @since n.e.x.t
+			 * @since 0.5.0
 			 *
 			 * @param mixed|\WP_Error              $result    The raw execution result (may be WP_Error).
 			 * @param array                        $args      The tool arguments used.
@@ -324,7 +324,7 @@ class ToolsHandler {
 	/**
 	 * Create an error CallToolResult from a message string.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param string $message The error message.
 	 *

@@ -36,7 +36,7 @@ trait HandlerHelperTrait {
 	 * and falls back to the original unfiltered array to prevent
 	 * downstream type errors.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param mixed                    $filtered    The value returned by apply_filters.
 	 * @param array                    $original    The original unfiltered array.
