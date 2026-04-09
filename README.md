@@ -367,7 +367,10 @@ add_action( 'wp_abilities_api_init', function() {
     ]);
 });
 
-// The ability is now available via the default MCP server.
+// With the meta.mcp.public flag, the ability is exposed through the default MCP server.
+// In the default server configuration, discover it via `discover-abilities`
+// and invoke it via `mcp-adapter/execute-ability` rather than expecting
+// it to appear as its own entry in `tools/list`.
 // Without the meta.mcp.public flag, abilities are only accessible
 // through custom MCP servers that explicitly list them.
 ```
