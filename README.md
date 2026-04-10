@@ -313,6 +313,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/get-posts', [
         'label' => 'Get Posts',
         'description' => 'Retrieve WordPress posts with optional filtering',
+        'category' => 'site',
         'input_schema' => [
             'type' => 'object',
             'properties' => [
