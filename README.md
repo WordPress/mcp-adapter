@@ -184,13 +184,13 @@ Individual server management with comprehensive configuration:
 ### Required Dependencies
 
 - **PHP**: >= 7.4
-- **WordPress**: >= 6.8 (6.9+ recommended; 7.0+ includes the MCP Adapter in core)
+- **WordPress**: >= 6.8 (6.9+ recommended)
 - **[WordPress Abilities API](https://make.wordpress.org/core/2025/11/10/abilities-api-in-wordpress-6-9/)**: Included in WordPress core since 6.9. For WordPress 6.8, install the [Abilities API plugin](https://github.com/WordPress/abilities-api) separately (note: the plugin repository was archived in February 2026).
 - **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (^0.1.0): Typed DTOs for MCP protocol types (MCP 2025-11-25)
 
 ### WordPress Abilities API Integration
 
-Since WordPress 6.9, the [Abilities API](https://make.wordpress.org/core/2025/11/10/abilities-api-in-wordpress-6-9/) is a core API and does not require a separate plugin. WordPress 7.0 further expands the API with a [client-side JavaScript counterpart](https://make.wordpress.org/core/2026/03/24/client-side-abilities-api-in-wordpress-7-0/) for browser-based abilities.
+Since WordPress 6.9, the [Abilities API](https://make.wordpress.org/core/2025/11/10/abilities-api-in-wordpress-6-9/) is a core API and does not require a separate plugin.
 
 The Abilities API provides:
 
@@ -210,7 +210,7 @@ The MCP Adapter is designed to be installed as a Composer package. This is the p
 composer require wordpress/mcp-adapter
 ```
 
-> **Note:** On WordPress 6.8, you must also install the Abilities API separately: `composer require wordpress/abilities-api wordpress/mcp-adapter`. On WordPress 6.9+, the Abilities API is built into core and does not need to be installed. On WordPress 7.0+, the MCP Adapter itself is bundled in core and Composer installation is only needed if you want to pin a specific version or use it as a library dependency.
+> **Note:** On WordPress 6.8, you must also install the Abilities API separately: `composer require wordpress/abilities-api wordpress/mcp-adapter`. On WordPress 6.9+, the Abilities API is built into core and does not need to be installed.
 
 #### Using Jetpack Autoloader (Highly Recommended)
 
@@ -304,7 +304,7 @@ The MCP Adapter automatically creates a default server that exposes registered W
 - WordPress abilities registered via `wp_register_ability()` with the `meta.mcp.public` flag set to `true` are discoverable and executable on the default server via its built-in adapter tools
 - On the default server, public abilities are accessed through `mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, and `mcp-adapter/execute-ability` rather than being auto-registered individually in `tools/list`
 - Alternatively, abilities can be explicitly listed when creating a [custom MCP server](#creating-custom-mcp-servers); in that case, they can be exposed directly as MCP tools, resources, or prompts without requiring the `meta.mcp.public` flag
-- The default server supports both HTTP and STDIO transports with MCP protocol version negotiation, including 2025-06-18 and 2025-11-25
+- The default server supports both HTTP and STDIO transports and supports multiple MCP protocol versions
 - Built-in error handling and observability are included
 - Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
 - Access via STDIO: `wp mcp-adapter serve --server=mcp-adapter-default-server`
