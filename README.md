@@ -402,8 +402,6 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapt
 
 Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to connect to your WordPress MCP servers.
 
-> **WordPress.com users:** WordPress.com includes [built-in MCP support](https://developer.wordpress.com/docs/mcp/) with OAuth 2.1 authentication. No additional plugin installation or proxy configuration is required.
-
 <details>
 <summary><strong>STDIO Transport Configuration for local sites (click to expand)</strong></summary>
 
