@@ -19,6 +19,13 @@ namespace WP\MCP\Domain\Utils;
  */
 class SchemaTransformer {
 	/**
+	 * No-op property placeholder for tools without input fields.
+	 *
+	 * @var string
+	 */
+	private const NOOP_PROPERTY = '_mcp_noop';
+
+	/**
 	 * Transform a schema to MCP-compatible object format.
 	 *
 	 * If the schema is already an object type, it is returned unchanged.
@@ -39,8 +46,10 @@ class SchemaTransformer {
 		// Handle null or empty schema - return minimal valid MCP object schema.
 		if ( empty( $schema ) ) {
 			return array(
-				'schema'           => array(
-					'type' => 'object',
+				'schema'           => self::ensure_object_properties(
+					array(
+						'type' => 'object',
+					)
 				),
 				'was_transformed'  => false,
 				'wrapper_property' => null,
@@ -52,7 +61,7 @@ class SchemaTransformer {
 			$schema['type'] = 'object';
 
 			return array(
-				'schema'           => $schema,
+				'schema'           => self::ensure_object_properties( $schema ),
 				'was_transformed'  => false,
 				'wrapper_property' => null,
 			);
@@ -61,7 +70,7 @@ class SchemaTransformer {
 		// If already an object type, return as-is
 		if ( 'object' === $schema['type'] ) {
 			return array(
-				'schema'           => $schema,
+				'schema'           => self::ensure_object_properties( $schema ),
 				'was_transformed'  => false,
 				'wrapper_property' => null,
 			);
@@ -73,6 +82,34 @@ class SchemaTransformer {
 			'was_transformed'  => true,
 			'wrapper_property' => $wrapper_key,
 		);
+	}
+
+	/**
+	 * Ensure an object schema has properties.
+	 *
+	 * If the schema already has non-empty properties, it is returned unchanged.
+	 * Otherwise, it injects a no-op placeholder property to ensure the schema
+	 * is a valid JSON object with at least one property.
+	 *
+	 * @param array<string,mixed> $schema The object schema.
+	 *
+	 * @return array<string,mixed> The schema with properties ensured.
+	 */
+	private static function ensure_object_properties( array $schema ): array {
+		if ( ! isset( $schema['properties'] ) || ! is_array( $schema['properties'] ) || empty( $schema['properties'] ) ) {
+			$schema['properties'] = array(
+				self::NOOP_PROPERTY => array(
+					'type'        => 'string',
+					'description' => 'Optional no-op placeholder for parameterless tools.',
+				),
+			);
+		}
+
+		if ( ! isset( $schema['required'] ) || ! is_array( $schema['required'] ) ) {
+			$schema['required'] = array();
+		}
+
+		return $schema;
 	}
 
 	/**
