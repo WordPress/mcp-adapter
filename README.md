@@ -127,6 +127,10 @@ The MCP Adapter automatically creates a default server that exposes registered W
 - Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
 - Access via STDIO: `wp mcp-adapter serve --server=mcp-adapter-default-server`
 
+### Settings page
+
+Administrators can opt registered abilities into the default MCP server without writing PHP at **Settings → MCP Adapter**. The page lists every ability currently registered on the site and persists the selection in the `mcp_adapter_public_abilities` option. The same `wp_register_ability_args` filter is applied behind the scenes, so the developer flow above (setting `meta.mcp.public = true` directly at registration) remains the canonical path. The settings page is positioned for site owners who don't write PHP.
+
 <details>
 <summary><strong>Create a new ability (click to expand)</strong></summary>
 
