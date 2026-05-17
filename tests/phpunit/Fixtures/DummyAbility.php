@@ -25,38 +25,6 @@ final class DummyAbility {
 	}
 
 	/**
-	 * Registers all dummy abilities for testing.
-	 *
-	 * Sets up action hooks to register category and abilities at the correct times:
-	 * - Category registration during 'wp_abilities_api_categories_init'
-	 * - Abilities registration during 'wp_abilities_api_init'
-	 *
-	 * Then fires the hooks if they haven't been fired yet.
-	 * Does not check if abilities already exist - if they do, test isolation has failed.
-	 *
-	 * @return void
-	 */
-	public static function register_all(): void {
-		// Hook category registration to the proper action
-		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_category' ) );
-
-		// Fire categories init hook if not already fired
-		if ( ! did_action( 'wp_abilities_api_categories_init' ) ) {
-			do_action( 'wp_abilities_api_categories_init' );
-		}
-
-		// Hook abilities registration to the proper action
-		add_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
-
-		// Fire abilities init hook if not already fired
-		if ( did_action( 'wp_abilities_api_init' ) ) {
-			return;
-		}
-
-		do_action( 'wp_abilities_api_init' );
-	}
-
-	/**
 	 * Registers all the dummy abilities.
 	 *
 	 * This method should be called during the 'wp_abilities_api_init' action.
@@ -1684,87 +1652,6 @@ final class DummyAbility {
 				),
 			)
 		);
-	}
-
-	/**
-	 * Unregisters all dummy abilities and the test category.
-	 *
-	 * Also removes the action hooks to prevent duplicate registrations.
-	 * Does not check if abilities/category exist - if they don't, test setup has failed.
-	 *
-	 * @return void
-	 */
-	public static function unregister_all(): void {
-		// Remove action hooks to prevent re-registration
-		remove_action( 'wp_abilities_api_categories_init', array( self::class, 'register_category' ) );
-		remove_action( 'wp_abilities_api_init', array( self::class, 'register_abilities' ) );
-
-		// Unregister all abilities
-		$names = array(
-			'test/always-allowed',
-			'test/permission-denied',
-			'test/permission-exception',
-			'test/execute-exception',
-			'test/image',
-			'test/resource',
-			'test/prompt',
-			'test/annotated-ability',
-			'test/null-annotations',
-			'test/with-instructions',
-			'test/mcp-native',
-			'test/no-annotations',
-			'test/all-null-annotations',
-			'test/resource-with-annotations',
-			'test/resource-partial-annotations',
-			'test/resource-invalid-annotations',
-			'test/prompt-with-annotations',
-			'test/prompt-partial-annotations',
-			'test/prompt-invalid-annotations',
-			'test/prompt-flattened-string',
-			'test/prompt-flattened-array',
-			'test/prompt-with-titles',
-			'test/prompt-mixed-required',
-			'test/prompt-empty-object',
-			'test/prompt-no-schema',
-			'test/resource-whitespace-uri',
-			'test/embedded-text-resource',
-			'test/embedded-blob-resource',
-			'test/meta-leak',
-			'test/with-icons',
-			'test/with-mixed-icons',
-			'test/with-custom-meta',
-			'test/with-icons-and-meta',
-			'test/resource-new-meta',
-			'test/resource-invalid-uri',
-			'test/resource-invalid-mimetype',
-			'test/resource-with-size',
-			'test/resource-invalid-annotations-new-meta',
-			'test/resource-mixed-annotations',
-			'test/resource-with-icons',
-			'test/resource-missing-uri',
-			'test/resource-valid-mimetype',
-			'test/resource-blob-content',
-			'test/resource-multiple-contents',
-			'test/resource-text-with-mimetype',
-			'test/resource-plain-string',
-			'test/prompt-explicit-args',
-			'test/prompt-explicit-args-override',
-			'test/prompt-empty-explicit-args',
-			'test/prompt-invalid-explicit-args-no-name',
-			'test/prompt-invalid-explicit-args-not-array',
-			'test/prompt-explicit-args-all-fields',
-			'test/prompt-with-icons',
-			'test/prompt-with-mixed-icons',
-			'test/prompt-with-custom-meta',
-			'test/prompt-with-icons-and-meta',
-		);
-
-		foreach ( $names as $name ) {
-			wp_unregister_ability( $name );
-		}
-
-		// Clean up the test category
-		wp_unregister_ability_category( 'test' );
 	}
 
 	/**

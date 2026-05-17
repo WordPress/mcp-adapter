@@ -12,9 +12,9 @@ See [CONTRIBUTING.md](../../CONTRIBUTING.md#prerequisites) for full setup requir
 
 ## Test Layout
 
-- `tests/Unit/*`: fast unit tests for pure PHP logic and MCP handlers
-- `tests/Integration/*`: WordPress-integration tests that exercise filters, permissions, routing, and transport layers
-- `tests/Fixtures/*`: test doubles (dummy error/observability handlers, abilities, transport)
+- `tests/phpunit/Unit/*`: fast unit tests for pure PHP logic and MCP handlers
+- `tests/phpunit/Integration/*`: WordPress-integration tests that exercise filters, permissions, routing, and transport layers
+- `tests/phpunit/Fixtures/*`: test doubles (dummy error/observability handlers, abilities, transport)
 
 ## Running Tests
 
@@ -49,7 +49,7 @@ You can pass PHPUnit arguments to the test script using `--`:
 npm run test:php -- --filter test_execute_with_public_mcp_filtering
 
 # Run a specific test file
-npm run test:php -- tests/Unit/Handlers/ToolsHandlerCallTest.php
+npm run test:php -- tests/phpunit/Unit/Handlers/ToolsHandlerCallTest.php
 
 # Run tests matching a pattern
 npm run test:php -- --filter "Tools.*"
@@ -75,12 +75,12 @@ Coverage reports will be generated:
 
 The test suite includes fixtures for verifying observability and error handling:
 
-**DummyObservabilityHandler** (`tests/Fixtures/DummyObservabilityHandler.php`)
+**DummyObservabilityHandler** (`tests/phpunit/Fixtures/DummyObservabilityHandler.php`)
 - Captures `record_event()` calls with event names, tags, and optional timing data
 - Stores events in `$events` array for test assertions
 - Used to verify that requests, successes, errors, and timings are properly tracked
 
-**DummyErrorHandler** (`tests/Fixtures/DummyErrorHandler.php`)
+**DummyErrorHandler** (`tests/phpunit/Fixtures/DummyErrorHandler.php`)
 - Captures `log()` calls with messages, context, and error types
 - Stores logs in `$logs` array for test assertions
 - Used to verify error handling and logging behavior
@@ -89,9 +89,9 @@ Tests verify that error responses adhere to JSON-RPC 2.0 format: `{ jsonrpc, id,
 
 ## Writing New Tests
 
-- Place unit tests under `tests/Unit/.../*Test.php`
-- Place integration tests under `tests/Integration/.../*Test.php`
-- Use fixtures in `tests/Fixtures` or create your own test doubles
+- Place unit tests under `tests/phpunit/Unit/.../*Test.php`
+- Place integration tests under `tests/phpunit/Integration/.../*Test.php`
+- Use fixtures in `tests/phpunit/Fixtures` or create your own test doubles
 - Follow the Arrange-Act-Assert (AAA) pattern
 - Mock external dependencies using PHPUnit mocks
 - Test files should mirror the source structure with a `Test.php` suffix

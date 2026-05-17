@@ -46,7 +46,7 @@
 	"autoload-dev": {
 		"psr-4": {
 			"WP\\MCP\\Tests\\": [
-				"tests/"
+				"tests/phpunit/"
 			]
 		}
 	},

@@ -9,17 +9,13 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests;
 
-use WP\MCP\Abilities\DiscoverAbilitiesAbility;
-use WP\MCP\Abilities\ExecuteAbilityAbility;
-use WP\MCP\Abilities\GetAbilityInfoAbility;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
-use Yoast\PHPUnitPolyfills\TestCases\TestCase as PolyfillsTestCase;
-use WP_Error;
+use WP_UnitTestCase;
 
-abstract class TestCase extends PolyfillsTestCase {
+abstract class TestCase extends WP_UnitTestCase {
 
 	/**
 	 * Set up before each test class to ensure abilities are registered.
@@ -61,54 +57,8 @@ abstract class TestCase extends PolyfillsTestCase {
 		// Use DummyAbility to register test category
 		add_action( 'wp_abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
 
-		// Ensure categories API is initialized first
-		if ( ! did_action( 'wp_abilities_api_categories_init' ) ) {
-			do_action( 'wp_abilities_api_categories_init' );
-		}
-
 		// Use DummyAbility to register test abilities
 		add_action( 'wp_abilities_api_init', array( DummyAbility::class, 'register_abilities' ) );
-
-		// Register the default MCP abilities inside the hook
-		add_action(
-			'wp_abilities_api_init',
-			static function () {
-				// Only register if they don't already exist to prevent duplicates
-				if ( ! wp_get_ability( 'mcp-adapter/discover-abilities' ) ) {
-					DiscoverAbilitiesAbility::register();
-				}
-				if ( ! wp_get_ability( 'mcp-adapter/get-ability-info' ) ) {
-					GetAbilityInfoAbility::register();
-				}
-				if ( ! wp_get_ability( 'mcp-adapter/execute-ability' ) ) {
-					ExecuteAbilityAbility::register();
-				}
-			}
-		);
-
-		// Ensure abilities API is initialized so MCP abilities can be registered
-		if ( ! did_action( 'wp_abilities_api_init' ) ) {
-			do_action( 'wp_abilities_api_init' );
-		}
-	}
-
-	/**
-	 * Clean up after each test class finishes.
-	 *
-	 * Note: We intentionally do NOT unregister test abilities here.
-	 * Test fixtures from DummyAbility are designed to persist for the entire
-	 * test suite run. This is necessary because WordPress hooks
-	 * (wp_abilities_api_init, wp_abilities_api_categories_init) can only be fired
-	 * once during the test suite execution. Re-registering between test classes
-	 * would fail since the hooks have already been executed.
-	 *
-	 * This approach differs from abilities-api's test pattern, which registers
-	 * fixtures per-test in set_up(). We use per-class registration with global
-	 * persistence because our DummyAbility fixtures are designed as stable,
-	 * reusable test helpers that don't interfere with test isolation.
-	 */
-	public static function tear_down_after_class(): void {
-		parent::tear_down_after_class();
 	}
 
 	/**
@@ -161,30 +111,6 @@ abstract class TestCase extends PolyfillsTestCase {
 			$resources,
 			$prompts,
 		);
-	}
-
-	/**
-	 * Asserts that the given value is an instance of WP_Error.
-	 *
-	 * @param mixed  $actual  The value to check.
-	 * @param string $message Optional. Message to display when the assertion fails.
-	 *
-	 * @return void
-	 */
-	public function assertWPError( $actual, string $message = '' ): void {
-		$this->assertInstanceOf( WP_Error::class, $actual, $message );
-	}
-
-	/**
-	 * Asserts that the given value is not an instance of WP_Error.
-	 *
-	 * @param mixed  $actual  The value to check.
-	 * @param string $message Optional. Message to display when the assertion fails.
-	 *
-	 * @return void
-	 */
-	public function assertNotWPError( $actual, string $message = '' ): void {
-		$this->assertNotInstanceOf( WP_Error::class, $actual, $message );
 	}
 
 	/**
@@ -241,37 +167,5 @@ abstract class TestCase extends PolyfillsTestCase {
 
 		// Clean up the callback to prevent duplicate registrations if hook fires again
 		remove_action( 'wp_abilities_api_init', $callback, 999 );
-	}
-
-	/**
-	 * Asserts that `_doing_it_wrong` was triggered for the expected function.
-	 *
-	 * @param string      $the_method         Function name expected to trigger `_doing_it_wrong`.
-	 * @param string|null $message_contains Optional. String that should be contained in the error message.
-	 *
-	 * @return void
-	 */
-	protected function assertDoingItWrongTriggered( string $the_method, ?string $message_contains = null ): void {
-		foreach ( $this->doing_it_wrong_log as $entry ) {
-			if ( $the_method === $entry['function'] ) {
-				// If message check is specified, verify it contains the expected text.
-				if ( null !== $message_contains && false === strpos( $entry['message'], $message_contains ) ) {
-					continue;
-				}
-				return;
-			}
-		}
-
-		if ( null !== $message_contains ) {
-			$this->fail(
-				sprintf(
-					'Failed asserting that _doing_it_wrong() was triggered for %s with message containing "%s".',
-					$the_method,
-					$message_contains
-				)
-			);
-		} else {
-			$this->fail( sprintf( 'Failed asserting that _doing_it_wrong() was triggered for %s.', $the_method ) );
-		}
 	}
 }
