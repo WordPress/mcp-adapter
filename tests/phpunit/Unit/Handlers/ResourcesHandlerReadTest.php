@@ -239,7 +239,10 @@ final class ResourcesHandlerReadTest extends TestCase {
 				'description'         => 'Returns an object result',
 				'category'            => 'test',
 				'execute_callback'    => static function () {
-					return array( 'status' => 'ok', 'count' => 42 );
+					return array(
+						'status' => 'ok',
+						'count'  => 42,
+					);
 				},
 				'permission_callback' => static function () {
 					return true;

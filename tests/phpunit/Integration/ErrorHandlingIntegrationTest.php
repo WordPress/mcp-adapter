@@ -136,7 +136,7 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 			'method'  => 'test',
 			'id'      => 1,
 		);
-		$result = McpErrorFactory::validate_jsonrpc_message( $invalid_message );
+		$result          = McpErrorFactory::validate_jsonrpc_message( $invalid_message );
 		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
 		$this->assertNotNull( $result->getError() );
 

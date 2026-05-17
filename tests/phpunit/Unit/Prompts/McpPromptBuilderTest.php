@@ -312,9 +312,9 @@ final class McpPromptBuilderTest extends TestCase {
 	// User _meta Tests (MCP 2025-11-25)
 	// =========================================================================
 
-		public function test_builder_with_meta_includes_meta_in_prompt(): void {
-			$builder = new TestPromptWithMeta();
-			$prompt  = $builder->build();
+	public function test_builder_with_meta_includes_meta_in_prompt(): void {
+		$builder = new TestPromptWithMeta();
+		$prompt  = $builder->build();
 
 		$arr = $prompt->toArray();
 
@@ -327,19 +327,19 @@ final class McpPromptBuilderTest extends TestCase {
 		$this->assertTrue( $arr['_meta']['custom_vendor']['feature_flag'] );
 		$this->assertSame( '2.0', $arr['_meta']['custom_vendor']['version'] );
 
-			// Verify another_key is preserved.
-			$this->assertArrayHasKey( 'another_key', $arr['_meta'] );
-			$this->assertSame( 'some-value', $arr['_meta']['another_key'] );
-		}
+		// Verify another_key is preserved.
+		$this->assertArrayHasKey( 'another_key', $arr['_meta'] );
+		$this->assertSame( 'some-value', $arr['_meta']['another_key'] );
+	}
 
-		public function test_builder_without_user_meta_has_no_meta_field(): void {
-			$builder = new TestPrompt();
-			$prompt  = $builder->build();
+	public function test_builder_without_user_meta_has_no_meta_field(): void {
+		$builder = new TestPrompt();
+		$prompt  = $builder->build();
 
-			$arr = $prompt->toArray();
+		$arr = $prompt->toArray();
 
-			$this->assertArrayNotHasKey( '_meta', $arr );
-		}
+		$this->assertArrayNotHasKey( '_meta', $arr );
+	}
 
 	public function test_get_meta_returns_configured_meta(): void {
 		$builder = new TestPromptWithMeta();
@@ -381,7 +381,7 @@ final class McpPromptBuilderTest extends TestCase {
 			$this->assertArrayHasKey( '_meta', $arr );
 			$this->assertArrayHasKey( 'vendor_data', $arr['_meta'] );
 			$this->assertSame( 'value', $arr['_meta']['vendor_data']['key'] );
-		}
+	}
 
 	public function test_builder_with_icons_can_be_registered_with_server(): void {
 		$server = $this->makeServer( array(), array(), array( TestPromptWithIcons::class ) );
@@ -463,7 +463,7 @@ final class McpPromptBuilderTest extends TestCase {
 
 		// Verify argument names are correct (no duplicates).
 		$args      = $prompt->getArguments();
-		$arg_names = array_map( fn( $arg ) => $arg->getName(), $args );
+		$arg_names = array_map( static fn( $arg ) => $arg->getName(), $args );
 		$this->assertSame( array( 'code', 'language', 'focus' ), $arg_names );
 	}
 

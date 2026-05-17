@@ -73,11 +73,11 @@ final class McpAnnotationMapperTest extends TestCase {
 
 	public function test_map_includes_tool_specific_fields(): void {
 		$annotations = array(
-			'readonly'     => true,
-			'destructive'  => false,
-			'idempotent'   => true,
+			'readonly'      => true,
+			'destructive'   => false,
+			'idempotent'    => true,
 			'openWorldHint' => false,
-			'title'        => 'Tool Title',
+			'title'         => 'Tool Title',
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'tool' );
@@ -176,10 +176,10 @@ final class McpAnnotationMapperTest extends TestCase {
 	 */
 	public function test_map_excludes_all_fields_for_prompt(): void {
 		$annotations = array(
-			'readonly'    => true,
-			'title'       => 'Some Title',
-			'priority'    => 0.5,
-			'audience'    => array( 'user' ),
+			'readonly' => true,
+			'title'    => 'Some Title',
+			'priority' => 0.5,
+			'audience' => array( 'user' ),
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'prompt' );
@@ -264,11 +264,11 @@ final class McpAnnotationMapperTest extends TestCase {
 	public function test_map_excludes_shared_annotations_from_tools(): void {
 		// Per MCP 2025-11-25 spec, ToolAnnotations does NOT include shared Annotations fields.
 		$annotations = array(
-			'audience'      => array( 'user' ),        // Shared annotation - NOT for tools
-			'lastModified'  => '2024-01-15T10:30:00Z', // Shared annotation - NOT for tools
-			'priority'      => 0.5,                     // Shared annotation - NOT for tools
-			'readOnlyHint'  => true,                    // Tool annotation - should be included
-			'title'         => 'Test Title',           // Tool annotation - should be included
+			'audience'     => array( 'user' ),        // Shared annotation - NOT for tools
+			'lastModified' => '2024-01-15T10:30:00Z', // Shared annotation - NOT for tools
+			'priority'     => 0.5,                     // Shared annotation - NOT for tools
+			'readOnlyHint' => true,                    // Tool annotation - should be included
+			'title'        => 'Test Title',           // Tool annotation - should be included
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'tool' );

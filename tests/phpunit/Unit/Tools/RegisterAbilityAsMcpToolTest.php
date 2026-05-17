@@ -572,7 +572,7 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertContains( 'https://example.com/another-valid.svg', $srcs );
 	}
 
-		public function test_custom_meta_is_passed_through(): void {
+	public function test_custom_meta_is_passed_through(): void {
 		$ability = wp_get_ability( 'test/with-custom-meta' );
 		$this->assertNotNull( $ability, 'Ability test/with-custom-meta should be registered' );
 
@@ -593,10 +593,10 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertArrayHasKey( 'another_vendor', $meta );
 		$this->assertSame( 'some-value', $meta['another_vendor'] );
 
-			$this->assertSame( 'test/with-custom-meta', $built['adapter_meta']['ability'] );
-		}
+		$this->assertSame( 'test/with-custom-meta', $built['adapter_meta']['ability'] );
+	}
 
-		public function test_icons_and_meta_can_coexist(): void {
+	public function test_icons_and_meta_can_coexist(): void {
 		$ability = wp_get_ability( 'test/with-icons-and-meta' );
 		$this->assertNotNull( $ability, 'Ability test/with-icons-and-meta should be registered' );
 
@@ -614,12 +614,12 @@ final class RegisterAbilityAsMcpToolTest extends TestCase {
 		$this->assertSame( 'https://example.com/combined-icon.png', $arr['icons'][0]['src'] );
 		$this->assertSame( array( '48x48' ), $arr['icons'][0]['sizes'] );
 
-			// Verify custom _meta exists (internal adapter metadata is not exposed here).
-			$meta = $tool->get_meta();
-			$this->assertArrayHasKey( 'vendor_info', $meta );
-			$this->assertSame( 'test-value', $meta['vendor_info']['custom_data'] );
-			$this->assertSame( 'test/with-icons-and-meta', $built['adapter_meta']['ability'] );
-		}
+		// Verify custom _meta exists (internal adapter metadata is not exposed here).
+		$meta = $tool->get_meta();
+		$this->assertArrayHasKey( 'vendor_info', $meta );
+		$this->assertSame( 'test-value', $meta['vendor_info']['custom_data'] );
+		$this->assertSame( 'test/with-icons-and-meta', $built['adapter_meta']['ability'] );
+	}
 
 	public function test_tool_without_icons_has_no_icons_field(): void {
 		// Use an existing ability that doesn't have icons defined.

@@ -236,4 +236,3 @@ final class McpAdapterErrorHandlingTest extends TestCase {
 		$this->assertNotNull( $server );
 	}
 }
-

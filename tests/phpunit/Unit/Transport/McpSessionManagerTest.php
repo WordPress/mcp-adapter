@@ -333,7 +333,7 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertIsString( $session_id );
 
 		// Record the last_activity right after creation
-		$sessions_before = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$sessions_before   = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$original_activity = $sessions_before[ $session_id ]['last_activity'];
 
 		// Validate immediately (within the 60s throttle window)
@@ -356,7 +356,7 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertIsString( $expired_session_id );
 
 		// Backdate one session to make it expired
-		$sessions                                          = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $expired_session_id ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 );
 		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
 

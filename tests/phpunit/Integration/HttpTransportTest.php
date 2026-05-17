@@ -21,9 +21,9 @@ use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\HttpTransport;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP_Error;
 use WP_REST_Request;
 use WP_REST_Response;
-use WP_Error;
 
 /**
  * Test MCP HTTP Transport behavior against the MCP 2025-11-25 baseline.
