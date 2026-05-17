@@ -146,6 +146,7 @@ final class McpAdapterErrorHandlingTest extends TestCase {
 	public function test_create_server_returns_wp_error_when_called_outside_mcp_adapter_init(): void {
 		// Don't mock being inside mcp_adapter_init - call it directly
 
+		$this->setExpectedIncorrectUsage( 'create_server' );
 		$result = $this->adapter->create_server(
 			'test-server',
 			'mcp/v1',
@@ -185,6 +186,7 @@ final class McpAdapterErrorHandlingTest extends TestCase {
 		$this->assertNotWPError( $first_result );
 
 		// Try to create second server with same ID
+		$this->setExpectedIncorrectUsage( 'create_server' );
 		$second_result = $this->adapter->create_server(
 			'duplicate-id',
 			'mcp/v1',

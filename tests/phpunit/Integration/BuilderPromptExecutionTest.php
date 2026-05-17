@@ -111,6 +111,7 @@ final class BuilderPromptExecutionTest extends TestCase {
 
 	public function test_mixed_ability_and_builder_prompts(): void {
 		// Register both builder and ability-based prompts
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$server = $this->makeServer(
 			array(),
 			array(),

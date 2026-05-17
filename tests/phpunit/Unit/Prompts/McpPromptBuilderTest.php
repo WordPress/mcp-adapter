@@ -221,6 +221,7 @@ final class McpPromptBuilderTest extends TestCase {
 
 	public function test_mixed_registration_abilities_and_builders(): void {
 		// This should work with mixed registration (though abilities won't exist in test)
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$server = $this->makeServer(
 			array(),
 			array(),

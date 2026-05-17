@@ -132,6 +132,7 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_tools_with_invalid_ability(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$this->registry->register_tools( array( 'nonexistent/ability' ) );
 
 		$tools = $this->registry->get_tools();
@@ -216,6 +217,7 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_resources_with_invalid_ability(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$this->registry->register_resources( array( 'nonexistent/resource' ) );
 
 		$resources = $this->registry->get_resources();
@@ -300,6 +302,7 @@ final class McpComponentRegistryTest extends TestCase {
 	}
 
 	public function test_register_prompts_with_invalid_ability(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$this->registry->register_prompts( array( 'nonexistent/prompt' ) );
 
 		$prompts = $this->registry->get_prompts();

@@ -266,25 +266,6 @@ final class DummyAbility {
 			)
 		);
 
-		// Resource ability with extra whitespace around URI for normalization tests
-		wp_register_ability(
-			'test/resource-whitespace-uri',
-			array(
-				'label'               => 'Resource With Whitespace URI',
-				'description'         => 'Resource whose URI includes leading/trailing spaces',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return 'content';
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'uri' => '  WordPress://local/resource-whitespace  ',
-				),
-			)
-		);
-
 		// Prompt ability with arguments
 		wp_register_ability(
 			'test/prompt',
@@ -453,89 +434,6 @@ final class DummyAbility {
 						'readonly'    => null,
 						'destructive' => null,
 						'idempotent'  => null,
-					),
-				),
-			)
-		);
-
-		// Resource with annotations
-		wp_register_ability(
-			'test/resource-with-annotations',
-			array(
-				'label'               => 'Resource With Annotations',
-				'description'         => 'A resource with MCP annotations',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return 'content';
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'uri'         => 'WordPress://local/resource-annotated',
-					'annotations' => array(
-						'audience'     => array( 'user', 'assistant' ),
-						'lastModified' => '2024-01-15T10:30:00Z',
-						'priority'     => 0.8,
-					),
-					'mcp'         => array(
-						'public' => true,
-						'type'   => 'resource',
-					),
-				),
-			)
-		);
-
-		// Resource with partial annotations
-		wp_register_ability(
-			'test/resource-partial-annotations',
-			array(
-				'label'               => 'Resource Partial Annotations',
-				'description'         => 'A resource with only some annotations',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return 'content';
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'uri'         => 'WordPress://local/resource-partial',
-					'annotations' => array(
-						'priority' => 0.5,
-					),
-					'mcp'         => array(
-						'public' => true,
-						'type'   => 'resource',
-					),
-				),
-			)
-		);
-
-		// Resource with invalid annotations (should be filtered)
-		wp_register_ability(
-			'test/resource-invalid-annotations',
-			array(
-				'label'               => 'Resource Invalid Annotations',
-				'description'         => 'A resource with invalid annotations',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return 'content';
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'uri'         => 'WordPress://local/resource-invalid',
-					'annotations' => array(
-						'audience'     => array( 'invalid-role' ), // Invalid role
-						'lastModified' => 'not-a-date',            // Invalid date
-						'priority'     => 2.0,                      // Out of range
-						'invalidField' => 'should-be-filtered',    // Unknown field
-					),
-					'mcp'         => array(
-						'public' => true,
-						'type'   => 'resource',
 					),
 				),
 			)
@@ -1058,62 +956,6 @@ final class DummyAbility {
 						'type'   => 'resource',
 						'uri'    => 'WordPress://local/resource-with-size',
 						'size'   => 2048,
-					),
-				),
-			)
-		);
-
-		// Resource with INVALID annotations in new meta structure (for validation testing)
-		// All annotations should be dropped with _doing_it_wrong notice
-		wp_register_ability(
-			'test/resource-invalid-annotations-new-meta',
-			array(
-				'label'               => 'Resource Invalid Annotations New Meta',
-				'description'         => 'A resource with invalid annotations using new meta structure',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return 'content';
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'mcp' => array(
-						'public'      => true,
-						'type'        => 'resource',
-						'uri'         => 'WordPress://local/resource-invalid-annotations-new',
-						'annotations' => array(
-							'audience'     => array( 'admin', 'superuser' ), // Invalid roles (should be 'user' or 'assistant')
-							'lastModified' => 'yesterday',                   // Invalid ISO 8601 timestamp
-							'priority'     => 2.5,                           // Out of range (should be 0.0-1.0)
-						),
-					),
-				),
-			)
-		);
-
-		// Resource with MIXED valid/invalid annotations - should drop ALL because one is invalid
-		wp_register_ability(
-			'test/resource-mixed-annotations',
-			array(
-				'label'               => 'Resource Mixed Annotations',
-				'description'         => 'A resource with one valid and one invalid annotation',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return 'content';
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'mcp' => array(
-						'public'      => true,
-						'type'        => 'resource',
-						'uri'         => 'WordPress://local/resource-mixed-annotations',
-						'annotations' => array(
-							'priority'     => 0.5,                           // Valid
-							'lastModified' => 'not-valid-timestamp',         // Invalid - should cause ALL to be dropped
-						),
 					),
 				),
 			)

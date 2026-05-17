@@ -249,15 +249,10 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertSame(
 			array(
 				'test/resource',
-				'test/resource-with-annotations',
-				'test/resource-partial-annotations',
-				'test/resource-invalid-annotations',
 				'test/resource-new-meta',
 				'test/resource-invalid-uri',
 				'test/resource-invalid-mimetype',
 				'test/resource-with-size',
-				'test/resource-invalid-annotations-new-meta',
-				'test/resource-mixed-annotations',
 				'test/resource-with-icons',
 				'test/resource-missing-uri',
 				'test/resource-valid-mimetype',
@@ -334,6 +329,83 @@ final class McpAdapterConfigTest extends TestCase {
 		$this->assertNotNull( $server );
 		$this->assertSame( 'Second Modified Name', $server->get_server_name() );
 		$this->assertSame( 'v3.0.0', $server->get_server_version() );
+	}
+
+	public function test_discovery_includes_old_meta_resource_but_excludes_non_public(): void {
+		// Register an old-meta resource (uri at meta top-level, mcp.public=true).
+		$this->register_ability_in_hook(
+			'test/resource-old-meta-discoverable',
+			array(
+				'label'               => 'Old Meta Discoverable Resource',
+				'description'         => 'Resource using old meta format with mcp.public=true',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => 'WordPress://local/resource-old-meta',
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
+
+		// Register a non-public resource (mcp.public missing entirely).
+		$this->register_ability_in_hook(
+			'test/resource-non-public',
+			array(
+				'label'               => 'Non-Public Resource',
+				'description'         => 'Resource without mcp.public flag',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'type' => 'resource',
+					),
+				),
+			)
+		);
+
+		$received_config = null;
+
+		add_filter(
+			'mcp_adapter_default_server_config',
+			static function ( $defaults ) use ( &$received_config ) {
+				$received_config = $defaults;
+				return $defaults;
+			}
+		);
+
+		// Mock being inside mcp_adapter_init.
+		global $wp_current_filter;
+		$wp_current_filter[] = 'mcp_adapter_init';
+
+		// Old-meta 'uri' key triggers a deprecation notice during resource conversion.
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_mcp_meta' );
+		$this->adapter->init();
+
+		array_pop( $wp_current_filter );
+
+		$this->assertNotNull( $received_config );
+
+		// Old-meta resource should be discovered (has mcp.public=true, mcp.type=resource).
+		$this->assertContains( 'test/resource-old-meta-discoverable', $received_config['resources'] );
+		// Non-public resource should NOT be discovered (missing mcp.public).
+		$this->assertNotContains( 'test/resource-non-public', $received_config['resources'] );
+
+		// Cleanup.
+		wp_unregister_ability( 'test/resource-old-meta-discoverable' );
+		wp_unregister_ability( 'test/resource-non-public' );
 	}
 
 	public function test_default_server_factory_handles_wp_error_from_create_server(): void {

@@ -41,9 +41,7 @@ final class McpTransportContextTest extends TestCase {
 	 */
 	public function set_up(): void {
 		parent::set_up();
-		$this->server = $this->makeServer(
-			array( 'test-dummy/echo-tool' ),
-		);
+		$this->server = $this->makeServer();
 	}
 
 	/**
