@@ -12,6 +12,9 @@ namespace WP\MCP\Transport\Infrastructure;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Handles HTTP request routing and processing for MCP transports.
  *
