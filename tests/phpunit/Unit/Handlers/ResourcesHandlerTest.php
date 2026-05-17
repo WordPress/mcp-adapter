@@ -150,10 +150,10 @@ final class ResourcesHandlerTest extends TestCase {
 					return true;
 				},
 				'meta'                => array(
-					'uri' => 'WordPress://test/wp-error-resource',
 					'mcp' => array(
 						'public' => true,
 						'type'   => 'resource',
+						'uri'    => 'WordPress://test/wp-error-resource',
 					),
 				),
 			)
@@ -201,10 +201,10 @@ final class ResourcesHandlerTest extends TestCase {
 					return true;
 				},
 				'meta'                => array(
-					'uri' => 'WordPress://test/resource-exception',
 					'mcp' => array(
 						'public' => true,
 						'type'   => 'resource',
+						'uri'    => 'WordPress://test/resource-exception',
 					),
 				),
 			)

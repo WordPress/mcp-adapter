@@ -62,7 +62,7 @@ final class HttpTransportTest extends TestCase {
 			array( HttpTransport::class ),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
-			array( 'test/tool' ),
+			array( 'test/always-allowed' ),
 			array( 'test/resource' ),
 			array( 'test/prompt' )
 		);

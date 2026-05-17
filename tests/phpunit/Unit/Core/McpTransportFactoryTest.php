@@ -84,6 +84,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_nonexistent_class(): void {
 		// This should trigger _doing_it_wrong but not throw exception
+		$this->setExpectedIncorrectUsage( 'initialize_transports' );
 		$this->transport_factory->initialize_transports( array( 'NonExistentTransportClass' ) );
 
 		// If we get here without exception, the method handled the nonexistent class gracefully
@@ -93,6 +94,7 @@ final class McpTransportFactoryTest extends TestCase {
 	public function test_initialize_transports_with_invalid_interface(): void {
 		// This should trigger _doing_it_wrong but not throw exception
 		// The method logs the error and continues processing other transports
+		$this->setExpectedIncorrectUsage( 'initialize_transports' );
 		$this->transport_factory->initialize_transports( array( \stdClass::class ) );
 
 		// If we get here without exception, the method handled the invalid interface gracefully
@@ -114,6 +116,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_mixed_validity(): void {
 		// Mix valid and invalid transports
+		$this->setExpectedIncorrectUsage( 'initialize_transports' );
 		$this->transport_factory->initialize_transports(
 			array(
 				'NonExistentClass',

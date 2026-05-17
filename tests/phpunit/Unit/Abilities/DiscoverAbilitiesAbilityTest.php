@@ -23,13 +23,12 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	 *
 	 * @var int
 	 */
-	private static $user_id;
+	private int $user_id;
 
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-
+	public function set_up(): void {
+		parent::set_up();
 		// Create a test user for authentication tests
-		self::$user_id = wp_insert_user(
+		$this->user_id = self::factory()->user->create(
 			array(
 				'user_login' => 'testuser',
 				'user_pass'  => 'testpass',
@@ -37,25 +36,13 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 				'role'       => 'administrator',
 			)
 		);
-	}
-
-	public static function tear_down_after_class(): void {
-		// Clean up test user
-		if ( self::$user_id ) {
-			wp_delete_user( self::$user_id );
-		}
-		parent::tear_down_after_class();
-	}
-
-	public function set_up(): void {
-		parent::set_up();
-		// Set current user for each test
-		wp_set_current_user( self::$user_id );
+		wp_set_current_user( $this->user_id );
 	}
 
 	public function tear_down(): void {
 		// Reset current user after each test
 		wp_set_current_user( 0 );
+		wp_delete_user( $this->user_id );
 		parent::tear_down();
 	}
 
@@ -148,7 +135,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 		// Clean up
 		wp_delete_user( $limited_user_id );
-		wp_set_current_user( self::$user_id );
+		wp_set_current_user( $this->user_id );
 	}
 
 	public function test_execute_returns_abilities_list(): void {

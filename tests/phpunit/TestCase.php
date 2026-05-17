@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests;
 
+use WP\MCP\Core\McpAdapter;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
@@ -35,52 +36,24 @@ abstract class TestCase extends WP_UnitTestCase {
 	public static function set_up_before_class(): void {
 		parent::set_up_before_class();
 
-		// Register mcp-adapter category during the proper hook
-		add_action(
-			'wp_abilities_api_categories_init',
-			static function () {
-				$categories_registry = \WP_Ability_Categories_Registry::get_instance();
-				if ( $categories_registry->is_registered( 'mcp-adapter' ) ) {
-					return;
-				}
+		// Register plugin's default category and abilities via the same methods
+		// the production code uses. We hook them the same way McpAdapter::maybe_create_default_server()
+		// does, so if the hooks haven't fired yet they'll be picked up automatically.
+		$adapter = McpAdapter::instance();
+		add_action( 'wp_abilities_api_categories_init', array( $adapter, 'register_default_category' ) );
+		add_action( 'wp_abilities_api_init', array( $adapter, 'register_default_abilities' ) );
 
-				wp_register_ability_category(
-					'mcp-adapter',
-					array(
-						'label'       => 'MCP Adapter',
-						'description' => 'Abilities for the MCP Adapter',
-					)
-				);
-			}
-		);
-
-		// Use DummyAbility to register test category
+		// Use DummyAbility to register test category and abilities.
 		add_action( 'wp_abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
-
-		// Use DummyAbility to register test abilities
 		add_action( 'wp_abilities_api_init', array( DummyAbility::class, 'register_abilities' ) );
-	}
-
-	/**
-	 * Set up before each test.
-	 *
-	 * Sets up `_doing_it_wrong` capturing for all tests.
-	 */
-	public function set_up(): void {
-		parent::set_up();
-		$this->doing_it_wrong_log = array();
-		add_action( 'doing_it_wrong_run', array( $this, 'record_doing_it_wrong' ), 10, 3 );
 	}
 
 	/**
 	 * Clean up after each test.
 	 *
-	 * This method resets the state of test handlers to ensure test isolation.
-	 * Automatically resets DummyErrorHandler and DummyObservabilityHandler between tests.
+	 * Resets DummyErrorHandler and DummyObservabilityHandler between tests.
 	 */
 	public function tear_down(): void {
-		remove_action( 'doing_it_wrong_run', array( $this, 'record_doing_it_wrong' ) );
-		$this->doing_it_wrong_log = array();
 		DummyErrorHandler::reset();
 		DummyObservabilityHandler::reset();
 		parent::tear_down();
@@ -114,30 +87,6 @@ abstract class TestCase extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Captured `_doing_it_wrong` calls during a test.
-	 *
-	 * @var list<array{function:string,message:string,version:string}>
-	 */
-	protected $doing_it_wrong_log = array();
-
-	/**
-	 * Records `_doing_it_wrong` calls for later assertions.
-	 *
-	 * @param string $the_method Function name flagged by `_doing_it_wrong`.
-	 * @param string $message    Message supplied to `_doing_it_wrong`.
-	 * @param string $version    Version string supplied to `_doing_it_wrong`.
-	 *
-	 * @return void
-	 */
-	public function record_doing_it_wrong( string $the_method, string $message, string $version ): void {
-		$this->doing_it_wrong_log[] = array(
-			'function' => $the_method,
-			'message'  => $message,
-			'version'  => $version,
-		);
-	}
-
-	/**
 	 * Registers an ability inside the wp_abilities_api_init hook.
 	 *
 	 * This helper ensures abilities are registered during the hook execution,
@@ -149,23 +98,21 @@ abstract class TestCase extends WP_UnitTestCase {
 	 * @return void
 	 */
 	protected function register_ability_in_hook( string $name, array $args ): void {
-		// If we're already inside the hook, register directly
+		// If already registered, skip to avoid duplicate-registration _doing_it_wrong.
+		if ( wp_has_ability( $name ) ) {
+			return;
+		}
+
+		// If we're already inside the hook, register directly.
 		if ( doing_action( 'wp_abilities_api_init' ) ) {
 			wp_register_ability( $name, $args );
 			return;
 		}
 
-		// Create a callback that registers the ability
-		$callback = static function () use ( $name, $args ) {
-			wp_register_ability( $name, $args );
-		};
-
-		// Add the callback to the hook
-		add_action( 'wp_abilities_api_init', $callback, 999 );
-
-		do_action( 'wp_abilities_api_init' );
-
-		// Clean up the callback to prevent duplicate registrations if hook fires again
-		remove_action( 'wp_abilities_api_init', $callback, 999 );
+		// Spoof hook context to register ability without triggering _doing_it_wrong.
+		global $wp_current_filter;
+		$wp_current_filter[] = 'wp_abilities_api_init';
+		wp_register_ability( $name, $args );
+		array_pop( $wp_current_filter );
 	}
 }

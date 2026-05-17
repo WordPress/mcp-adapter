@@ -23,13 +23,11 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	 *
 	 * @var int
 	 */
-	private static $user_id;
+	private $user_id;
 
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
-
-		// Create a test user for authentication tests
-		self::$user_id = wp_insert_user(
+	public function set_up(): void {
+		parent::set_up();
+		$this->user_id = $this->factory()->user->create(
 			array(
 				'user_login' => 'testuser',
 				'user_pass'  => 'testpass',
@@ -37,20 +35,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				'role'       => 'administrator',
 			)
 		);
-	}
-
-	public static function tear_down_after_class(): void {
-		// Clean up test user
-		if ( self::$user_id ) {
-			wp_delete_user( self::$user_id );
-		}
-		parent::tear_down_after_class();
-	}
-
-	public function set_up(): void {
-		parent::set_up();
 		// Set current user for each test
-		wp_set_current_user( self::$user_id );
+		wp_set_current_user( $this->user_id );
 	}
 
 	public function tear_down(): void {
@@ -115,6 +101,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	public function test_check_permission_with_nonexistent_ability(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$result = ExecuteAbilityAbility::check_permission(
 			array(
 				'ability_name' => 'nonexistent/ability',
@@ -178,7 +165,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertEquals( 'authentication_required', $result->get_error_code() );
 
 		// Restore authenticated user for other tests
-		wp_set_current_user( self::$user_id );
+		wp_set_current_user( $this->user_id );
 	}
 
 	public function test_check_permission_requires_capability(): void {
@@ -210,7 +197,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 		// Clean up
 		wp_delete_user( $limited_user_id );
-		wp_set_current_user( self::$user_id );
+		wp_set_current_user( $this->user_id );
 	}
 
 	public function test_check_permission_with_public_mcp_metadata(): void {
@@ -254,6 +241,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 
 	public function test_check_permission_with_nonexistent_ability_for_mcp_check(): void {
 		// Test with an ability that doesn't exist (should fail at MCP exposure check)
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$result = ExecuteAbilityAbility::check_permission(
 			array(
 				'ability_name' => 'nonexistent/test-ability',
@@ -315,6 +303,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_nonexistent_ability(): void {
+		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$result = ExecuteAbilityAbility::execute(
 			array(
 				'ability_name' => 'nonexistent/ability',

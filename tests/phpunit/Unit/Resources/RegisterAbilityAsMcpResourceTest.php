@@ -21,9 +21,36 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 	}
 
 	public function test_annotations_are_mapped_to_mcp_format(): void {
-		$ability = wp_get_ability( 'test/resource-with-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/resource-with-annotations should be registered' );
+		$this->register_ability_in_hook(
+			'test/resource-with-annotations',
+			array(
+				'label'               => 'Resource With Annotations',
+				'description'         => 'A resource with MCP annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri'         => 'WordPress://local/resource-annotated',
+					'annotations' => array(
+						'audience'     => array( 'user', 'assistant' ),
+						'lastModified' => '2024-01-15T10:30:00Z',
+						'priority'     => 0.8,
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
 
+		$ability = wp_get_ability( 'test/resource-with-annotations' );
+
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_mcp_meta' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
@@ -41,12 +68,40 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertContains( 'assistant', $arr['annotations']['audience'] );
 		$this->assertSame( '2024-01-15T10:30:00Z', $arr['annotations']['lastModified'] );
 		$this->assertSame( 0.8, $arr['annotations']['priority'] );
+
+		// Cleanup.
+		wp_unregister_ability( 'test/resource-with-annotations' );
 	}
 
 	public function test_partial_annotations_are_included(): void {
-		$ability = wp_get_ability( 'test/resource-partial-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/resource-partial-annotations should be registered' );
+		$this->register_ability_in_hook(
+			'test/resource-partial-annotations',
+			array(
+				'label'               => 'Resource Partial Annotations',
+				'description'         => 'A resource with only some annotations',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri'         => 'WordPress://local/resource-partial',
+					'annotations' => array(
+						'priority' => 0.5,
+					),
+					'mcp'         => array(
+						'public' => true,
+						'type'   => 'resource',
+					),
+				),
+			)
+		);
 
+		$ability = wp_get_ability( 'test/resource-partial-annotations' );
+
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_mcp_meta' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
@@ -58,6 +113,9 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertSame( 0.5, $arr['annotations']['priority'] );
 		$this->assertArrayNotHasKey( 'audience', $arr['annotations'] );
 		$this->assertArrayNotHasKey( 'lastModified', $arr['annotations'] );
+
+		// Cleanup.
+		wp_unregister_ability( 'test/resource-partial-annotations' );
 	}
 
 	public function test_empty_annotations_are_not_included(): void {
@@ -74,14 +132,35 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 	}
 
 	public function test_get_uri_trims_whitespace_from_meta(): void {
-		$ability = wp_get_ability( 'test/resource-whitespace-uri' );
-		$this->assertNotNull( $ability, 'Ability test/resource-whitespace-uri should be registered' );
+		$this->register_ability_in_hook(
+			'test/resource-whitespace-uri',
+			array(
+				'label'               => 'Resource With Whitespace URI',
+				'description'         => 'Resource whose URI includes leading/trailing spaces',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'uri' => '  WordPress://local/resource-whitespace  ',
+				),
+			)
+		);
 
+		$ability = wp_get_ability( 'test/resource-whitespace-uri' );
+
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_mcp_meta' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
 		$arr = $resource->toArray();
 		$this->assertSame( 'WordPress://local/resource-whitespace', $arr['uri'] );
+
+		// Cleanup.
+		wp_unregister_ability( 'test/resource-whitespace-uri' );
 	}
 
 	public function test_new_meta_structure_maps_all_fields(): void {
@@ -232,8 +311,34 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 	}
 
 	public function test_invalid_annotations_are_dropped_with_doing_it_wrong(): void {
+		$this->register_ability_in_hook(
+			'test/resource-invalid-annotations-new-meta',
+			array(
+				'label'               => 'Resource Invalid Annotations New Meta',
+				'description'         => 'A resource with invalid annotations using new meta structure',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'      => true,
+						'type'        => 'resource',
+						'uri'         => 'WordPress://local/resource-invalid-annotations-new',
+						'annotations' => array(
+							'audience'     => array( 'admin', 'superuser' ), // Invalid roles (should be 'user' or 'assistant')
+							'lastModified' => 'yesterday',                   // Invalid ISO 8601 timestamp
+							'priority'     => 2.5,                           // Out of range (should be 0.0-1.0)
+						),
+					),
+				),
+			)
+		);
+
 		$ability = wp_get_ability( 'test/resource-invalid-annotations-new-meta' );
-		$this->assertNotNull( $ability, 'Ability test/resource-invalid-annotations-new-meta should be registered' );
 
 		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_data' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
@@ -245,12 +350,41 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
 		// Annotations should NOT be present (all dropped due to validation errors).
 		$this->assertArrayNotHasKey( 'annotations', $arr );
+
+		// Cleanup.
+		wp_unregister_ability( 'test/resource-invalid-annotations-new-meta' );
 	}
 
 	public function test_mixed_valid_invalid_annotations_drops_all(): void {
-		$ability = wp_get_ability( 'test/resource-mixed-annotations' );
-		$this->assertNotNull( $ability, 'Ability test/resource-mixed-annotations should be registered' );
+		$this->register_ability_in_hook(
+			'test/resource-mixed-annotations',
+			array(
+				'label'               => 'Resource Mixed Annotations',
+				'description'         => 'A resource with one valid and one invalid annotation',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public'      => true,
+						'type'        => 'resource',
+						'uri'         => 'WordPress://local/resource-mixed-annotations',
+						'annotations' => array(
+							'priority'     => 0.5,                           // Valid
+							'lastModified' => 'not-valid-timestamp',         // Invalid - should cause ALL to be dropped
+						),
+					),
+				),
+			)
+		);
 
+		$ability = wp_get_ability( 'test/resource-mixed-annotations' );
+
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_data' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 
 		// Resource should still be created successfully.
@@ -262,8 +396,8 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		// This is because we drop all if ANY are invalid.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
 
-		// Verify _doing_it_wrong was triggered.
-		$this->assertDoingItWrongTriggered( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_data' );
+		// Cleanup.
+		wp_unregister_ability( 'test/resource-mixed-annotations' );
 	}
 
 	public function test_valid_annotations_are_preserved(): void {
