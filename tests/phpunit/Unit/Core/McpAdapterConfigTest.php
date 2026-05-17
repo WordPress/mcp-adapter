@@ -350,14 +350,12 @@ final class McpAdapterConfigTest extends TestCase {
 		global $wp_current_filter;
 		$wp_current_filter[] = 'mcp_adapter_init';
 
-		// Call DefaultServerFactory::create() directly to test error handling
+		// Call DefaultServerFactory::create() directly to test error handling4
+		$this->setExpectedIncorrectUsage( \WP\MCP\Servers\DefaultServerFactory::class . '::create' );
 		\WP\MCP\Servers\DefaultServerFactory::create();
 
 		// Clean up the filter mock
 		array_pop( $wp_current_filter );
-
-		// Verify _doing_it_wrong was called by DefaultServerFactory
-		$this->assertDoingItWrongTriggered( 'WP\MCP\Servers\DefaultServerFactory::create' );
 
 		// Verify server was not created due to error
 		$server = $this->adapter->get_server( 'mcp-adapter-default-server' );

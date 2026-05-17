@@ -29,6 +29,7 @@ final class DeveloperErrorsTest extends TestCase {
 
 	public function test_creating_server_outside_mcp_adapter_init_triggers_doing_it_wrong(): void {
 		// Try to create server outside of mcp_adapter_init
+		$this->setExpectedIncorrectUsage( 'create_server' );
 		$result = $this->adapter->create_server(
 			'test-server',
 			'mcp/v1',
@@ -44,9 +45,6 @@ final class DeveloperErrorsTest extends TestCase {
 		// Should return WP_Error
 		$this->assertWPError( $result );
 		$this->assertSame( 'invalid_timing', $result->get_error_code() );
-
-		// Verify _doing_it_wrong was called
-		$this->assertDoingItWrongTriggered( 'create_server', 'mcp_adapter_init' );
 	}
 
 	public function test_duplicate_server_id_triggers_doing_it_wrong(): void {
@@ -71,6 +69,7 @@ final class DeveloperErrorsTest extends TestCase {
 		$this->assertNotWPError( $first_result );
 
 		// Try to create second server with same ID
+		$this->setExpectedIncorrectUsage( 'create_server' );
 		$second_result = $this->adapter->create_server(
 			'duplicate-id',
 			'mcp/v1',
@@ -89,9 +88,6 @@ final class DeveloperErrorsTest extends TestCase {
 		// Second server should return WP_Error
 		$this->assertWPError( $second_result );
 		$this->assertSame( 'duplicate_server_id', $second_result->get_error_code() );
-
-		// Verify _doing_it_wrong was called for duplicate ID
-		$this->assertDoingItWrongTriggered( 'create_server', 'already exists' );
 	}
 
 	public function test_transport_factory_with_nonexistent_class_triggers_doing_it_wrong(): void {
@@ -110,11 +106,8 @@ final class DeveloperErrorsTest extends TestCase {
 		$factory = new McpTransportFactory( $server );
 
 		// Try to initialize with nonexistent transport class
+		$this->setExpectedIncorrectUsage( 'initialize_transports' );
 		$factory->initialize_transports( array( 'NonExistentTransportClass' ) );
-
-		// Verify _doing_it_wrong was called
-		$this->assertNotEmpty( $this->doing_it_wrong_log, 'Expected _doing_it_wrong to be called' );
-		$this->assertDoingItWrongTriggered( 'initialize_transports', 'does not exist' );
 	}
 
 	public function test_transport_factory_with_invalid_interface_triggers_doing_it_wrong(): void {
@@ -133,48 +126,8 @@ final class DeveloperErrorsTest extends TestCase {
 		$factory = new McpTransportFactory( $server );
 
 		// Try to initialize with class that doesn't implement McpTransportInterface
+		$this->setExpectedIncorrectUsage( 'initialize_transports' );
 		$factory->initialize_transports( array( \stdClass::class ) );
-
-		// Verify _doing_it_wrong was called
-		$this->assertNotEmpty( $this->doing_it_wrong_log, 'Expected _doing_it_wrong to be called' );
-		$this->assertDoingItWrongTriggered( 'initialize_transports', 'must implement' );
-	}
-
-	public function test_doing_it_wrong_messages_are_helpful_for_developers(): void {
-		// Test various error scenarios
-
-		// 1. Server creation outside hook
-		$this->adapter->create_server(
-			'test',
-			'mcp/v1',
-			'/mcp',
-			'Test',
-			'Test',
-			'1.0.0',
-			array( DummyTransport::class ),
-			NullMcpErrorHandler::class
-		);
-
-		// 2. Transport with wrong interface
-		$server = new McpServer(
-			'test-server',
-			'mcp/v1',
-			'/mcp',
-			'Test Server',
-			'Test Description',
-			'1.0.0',
-			array(),
-			NullMcpErrorHandler::class,
-			NullMcpObservabilityHandler::class
-		);
-
-		$factory = new McpTransportFactory( $server );
-		$factory->initialize_transports( array( \stdClass::class ) );
-
-		// Verify _doing_it_wrong calls were made
-		$this->assertNotEmpty( $this->doing_it_wrong_log, 'Expected _doing_it_wrong calls to be captured' );
-		$this->assertDoingItWrongTriggered( 'create_server' );
-		$this->assertDoingItWrongTriggered( 'initialize_transports' );
 	}
 
 	public function test_no_doing_it_wrong_when_everything_is_correct(): void {
@@ -200,8 +153,5 @@ final class DeveloperErrorsTest extends TestCase {
 
 		// Should succeed without WP_Error
 		$this->assertNotWPError( $result );
-
-		// Should be no _doing_it_wrong calls
-		$this->assertEmpty( $this->doing_it_wrong_log );
 	}
 }

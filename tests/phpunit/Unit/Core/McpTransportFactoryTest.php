@@ -27,7 +27,7 @@ use WP\MCP\Transport\Infrastructure\McpTransportContext;
  */
 final class McpTransportFactoryTest extends TestCase {
 
-	private McpTransportFactory $factory;
+	private McpTransportFactory $transport_factory;
 	private McpServer $server;
 
 	public function set_up(): void {
@@ -45,11 +45,11 @@ final class McpTransportFactoryTest extends TestCase {
 			DummyObservabilityHandler::class
 		);
 
-		$this->factory = new McpTransportFactory( $this->server );
+		$this->transport_factory = new McpTransportFactory( $this->server );
 	}
 
 	public function test_create_transport_context(): void {
-		$context = $this->factory->create_transport_context();
+		$context = $this->transport_factory->create_transport_context();
 
 		$this->assertInstanceOf( McpTransportContext::class, $context );
 
@@ -76,7 +76,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_valid_transport(): void {
 		// This should not throw an exception
-		$this->factory->initialize_transports( array( DummyTransport::class ) );
+		$this->transport_factory->initialize_transports( array( DummyTransport::class ) );
 
 		// If we get here, the transport was successfully initialized
 		$this->assertTrue( true );
@@ -84,7 +84,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_nonexistent_class(): void {
 		// This should trigger _doing_it_wrong but not throw exception
-		$this->factory->initialize_transports( array( 'NonExistentTransportClass' ) );
+		$this->transport_factory->initialize_transports( array( 'NonExistentTransportClass' ) );
 
 		// If we get here without exception, the method handled the nonexistent class gracefully
 		$this->assertTrue( true );
@@ -93,7 +93,7 @@ final class McpTransportFactoryTest extends TestCase {
 	public function test_initialize_transports_with_invalid_interface(): void {
 		// This should trigger _doing_it_wrong but not throw exception
 		// The method logs the error and continues processing other transports
-		$this->factory->initialize_transports( array( \stdClass::class ) );
+		$this->transport_factory->initialize_transports( array( \stdClass::class ) );
 
 		// If we get here without exception, the method handled the invalid interface gracefully
 		$this->assertTrue( true );
@@ -101,7 +101,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_multiple_transports(): void {
 		// Test with multiple valid transports
-		$this->factory->initialize_transports(
+		$this->transport_factory->initialize_transports(
 			array(
 				DummyTransport::class,
 				DummyTransport::class, // Same transport twice should work
@@ -114,7 +114,7 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_mixed_validity(): void {
 		// Mix valid and invalid transports
-		$this->factory->initialize_transports(
+		$this->transport_factory->initialize_transports(
 			array(
 				'NonExistentClass',
 				DummyTransport::class, // This should still work
@@ -127,15 +127,15 @@ final class McpTransportFactoryTest extends TestCase {
 
 	public function test_initialize_transports_with_empty_array(): void {
 		// Empty array should not cause issues
-		$this->factory->initialize_transports( array() );
+		$this->transport_factory->initialize_transports( array() );
 
 		// If we get here, empty array was handled gracefully
 		$this->assertTrue( true );
 	}
 
 	public function test_create_transport_context_creates_fresh_handlers(): void {
-		$context1 = $this->factory->create_transport_context();
-		$context2 = $this->factory->create_transport_context();
+		$context1 = $this->transport_factory->create_transport_context();
+		$context2 = $this->transport_factory->create_transport_context();
 
 		// Contexts should be different instances
 		$this->assertNotSame( $context1, $context2 );

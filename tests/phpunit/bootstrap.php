@@ -8,7 +8,9 @@
  * phpcs:disable WordPressVIPMinimum.Files.IncludingFile.UsingVariable
  */
 
-define( 'TESTS_REPO_ROOT_DIR', dirname( __DIR__ ) );
+declare( strict_types = 1 );
+
+define( 'TESTS_REPO_ROOT_DIR', dirname( __DIR__, 2 ) );
 
 // Set custom debug log location for tests.
 define( 'WP_DEBUG_LOG_FILE', TESTS_REPO_ROOT_DIR . '/tests/_output/debug.log' );
@@ -38,10 +40,8 @@ require_once $_test_root . '/includes/functions.php';
 tests_add_filter(
 	'muplugins_loaded',
 	static function (): void {
-		// Load the abilities API, next to the MCP adapter.
-		require_once dirname( __DIR__, 2 ) . '/abilities-api/abilities-api.php';
-		// Load the MCP adapter.
-		require_once dirname( __DIR__ ) . '/mcp-adapter.php';
+		// Require ( to bypass require_once ).
+		require TESTS_REPO_ROOT_DIR . '/mcp-adapter.php';
 	}
 );
 

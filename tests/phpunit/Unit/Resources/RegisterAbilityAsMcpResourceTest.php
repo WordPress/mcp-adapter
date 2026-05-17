@@ -235,6 +235,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$ability = wp_get_ability( 'test/resource-invalid-annotations-new-meta' );
 		$this->assertNotNull( $ability, 'Ability test/resource-invalid-annotations-new-meta should be registered' );
 
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_data' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 
 		// Resource should still be created successfully (graceful degradation).
@@ -244,9 +245,6 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
 		// Annotations should NOT be present (all dropped due to validation errors).
 		$this->assertArrayNotHasKey( 'annotations', $arr );
-
-		// Verify _doing_it_wrong was triggered.
-		$this->assertDoingItWrongTriggered( 'WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource::get_data' );
 	}
 
 	public function test_mixed_valid_invalid_annotations_drops_all(): void {

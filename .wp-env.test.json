@@ -3,7 +3,7 @@
 	"testsEnvironment": false,
 	"port": 8889,
 	"core": null,
-	"plugins": [ "WordPress/abilities-api", "./." ],
+	"plugins": [ "./." ],
 	"config": {
 		"FS_METHOD": "direct",
 		"WP_DEBUG": true,
