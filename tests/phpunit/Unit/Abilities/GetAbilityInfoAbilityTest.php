@@ -193,7 +193,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 		// Check if output schema is included when available
 		$ability = wp_get_ability( 'test/always-allowed' );
 		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
-		
+
 		$output_schema = $ability->get_output_schema();
 
 		if ( empty( $output_schema ) ) {
@@ -217,7 +217,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 		// Check if meta is included when available
 		$ability = wp_get_ability( 'test/always-allowed' );
 		$this->assertNotNull( $ability, 'Ability test/always-allowed should be registered' );
-		
+
 		$meta = $ability->get_meta();
 
 		if ( empty( $meta ) ) {
@@ -264,7 +264,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	public function test_ability_has_correct_input_schema(): void {
 		$ability = wp_get_ability( 'mcp-adapter/get-ability-info' );
 		$this->assertNotNull( $ability, 'Ability mcp-adapter/get-ability-info should be registered' );
-		
+
 		$input_schema = $ability->get_input_schema();
 
 		$this->assertIsArray( $input_schema );
@@ -277,7 +277,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	public function test_ability_has_correct_output_schema(): void {
 		$ability = wp_get_ability( 'mcp-adapter/get-ability-info' );
 		$this->assertNotNull( $ability, 'Ability mcp-adapter/get-ability-info should be registered' );
-		
+
 		$output_schema = $ability->get_output_schema();
 
 		$this->assertIsArray( $output_schema );
@@ -298,7 +298,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	public function test_ability_has_correct_annotations(): void {
 		$ability = wp_get_ability( 'mcp-adapter/get-ability-info' );
 		$this->assertNotNull( $ability, 'Ability mcp-adapter/get-ability-info should be registered' );
-		
+
 		$meta = $ability->get_meta();
 
 		$this->assertIsArray( $meta );

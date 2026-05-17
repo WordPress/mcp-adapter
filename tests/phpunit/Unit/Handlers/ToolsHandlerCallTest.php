@@ -175,7 +175,7 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		$received_args = null;
 		$filter        = static function ( array $args, string $tool_name ) use ( &$received_args ): array {
-			$received_args = $args;
+			$received_args              = $args;
 			$args['injected_by_filter'] = true;
 
 			return $args;
@@ -292,7 +292,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			$this->assertArrayHasKey( '_meta', $structured );
 			$this->assertArrayHasKey( 'mcp_adapter', $structured['_meta'] );
 			$this->assertArrayHasKey( 'mcp_adapter', $structured['nested']['_meta'] );
-		}
+	}
 
 	public function test_call_tool_with_string_arguments_returns_invalid_params_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );

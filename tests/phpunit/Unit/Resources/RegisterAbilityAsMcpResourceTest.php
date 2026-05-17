@@ -10,15 +10,15 @@ use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
-		public function test_make_builds_resource_from_ability(): void {
-			$ability  = wp_get_ability( 'test/resource' );
-			$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
-			$resource = RegisterAbilityAsMcpResource::make( $ability );
-			$this->assertInstanceOf( ResourceDto::class, $resource );
-			$arr = $resource->toArray();
-			$this->assertSame( 'WordPress://local/resource-1', $arr['uri'] );
-			$this->assertNull( $resource->get_meta() );
-		}
+	public function test_make_builds_resource_from_ability(): void {
+		$ability = wp_get_ability( 'test/resource' );
+		$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
+		$this->assertInstanceOf( ResourceDto::class, $resource );
+		$arr = $resource->toArray();
+		$this->assertSame( 'WordPress://local/resource-1', $arr['uri'] );
+		$this->assertNull( $resource->get_meta() );
+	}
 
 	public function test_annotations_are_mapped_to_mcp_format(): void {
 		$ability = wp_get_ability( 'test/resource-with-annotations' );

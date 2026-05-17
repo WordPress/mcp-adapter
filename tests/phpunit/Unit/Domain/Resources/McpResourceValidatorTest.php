@@ -182,8 +182,8 @@ final class McpResourceValidatorTest extends TestCase {
 
 	public function test_get_validation_errors_with_valid_resource_data(): void {
 		$resource_data = array(
-			'uri'         => 'test://resource',
-			'text'        => 'Content',
+			'uri'  => 'test://resource',
+			'text' => 'Content',
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
@@ -328,8 +328,8 @@ final class McpResourceValidatorTest extends TestCase {
 
 	public function test_get_validation_errors_reports_multiple_errors(): void {
 		$resource_data = array(
-			'uri'         => 'invalid uri',
-			'mimeType'    => 'invalid-mime',
+			'uri'      => 'invalid uri',
+			'mimeType' => 'invalid-mime',
 			// Missing text/blob content
 		);
 

@@ -17,7 +17,7 @@ final class RegistrationValidationTest extends TestCase {
 		add_filter( 'mcp_adapter_validation_enabled', '__return_true' );
 
 		// Force an invalid name that sanitizer won't fix (because it's post-sanitization filter)
-		$invalid_name_callback = fn() => 'invalid name';
+		$invalid_name_callback = static fn() => 'invalid name';
 		add_filter( 'mcp_adapter_tool_name', $invalid_name_callback );
 
 		$ability_name = 'test/invalid-mcp-tool';
@@ -28,8 +28,8 @@ final class RegistrationValidationTest extends TestCase {
 				'description'         => 'A tool with invalid MCP name',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => fn() => array( 'ok' => true ),
-				'permission_callback' => fn() => true,
+				'execute_callback'    => static fn() => array( 'ok' => true ),
+				'permission_callback' => static fn() => true,
 			)
 		);
 
@@ -73,8 +73,8 @@ final class RegistrationValidationTest extends TestCase {
 				'description'         => 'A tool for testing disabled validation',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => fn() => array( 'ok' => true ),
-				'permission_callback' => fn() => true,
+				'execute_callback'    => static fn() => array( 'ok' => true ),
+				'permission_callback' => static fn() => true,
 			)
 		);
 

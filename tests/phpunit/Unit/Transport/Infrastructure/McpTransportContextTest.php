@@ -81,8 +81,8 @@ final class McpTransportContextTest extends TestCase {
 	public function test_construct_with_request_router_uses_provided_router(): void {
 		$properties = $this->build_required_properties();
 		// Create a context first to get a RequestRouter instance.
-		$temp_context               = new McpTransportContext( $properties );
-		$router                     = $temp_context->request_router;
+		$temp_context                 = new McpTransportContext( $properties );
+		$router                       = $temp_context->request_router;
 		$properties['request_router'] = $router;
 
 		$context = new McpTransportContext( $properties );
@@ -105,8 +105,8 @@ final class McpTransportContextTest extends TestCase {
 	 * Test that transport_permission_callback is assigned when provided.
 	 */
 	public function test_construct_with_permission_callback_assigns_callback(): void {
-		$properties = $this->build_required_properties();
-		$callback   = static function () {
+		$properties                                  = $this->build_required_properties();
+		$callback                                    = static function () {
 			return true;
 		};
 		$properties['transport_permission_callback'] = $callback;
@@ -120,9 +120,9 @@ final class McpTransportContextTest extends TestCase {
 	 * Test that error_handler is assigned when provided.
 	 */
 	public function test_construct_with_error_handler_assigns_handler(): void {
-		$properties                   = $this->build_required_properties();
-		$error_handler                = new DummyErrorHandler();
-		$properties['error_handler']  = $error_handler;
+		$properties                  = $this->build_required_properties();
+		$error_handler               = new DummyErrorHandler();
+		$properties['error_handler'] = $error_handler;
 
 		$context = new McpTransportContext( $properties );
 

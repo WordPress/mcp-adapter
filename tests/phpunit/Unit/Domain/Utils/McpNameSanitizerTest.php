@@ -11,7 +11,6 @@ namespace WP\MCP\Tests\Unit\Domain\Utils;
 
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Tests\TestCase;
-use WP_Error;
 
 /**
  * Test McpNameSanitizer functionality.

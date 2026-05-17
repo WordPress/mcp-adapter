@@ -671,7 +671,7 @@ final class McpPromptValidatorTest extends TestCase {
 		$mcp_prompt = McpPrompt::fromArray(
 			array(
 				'name'    => 'test-prompt',
-				'handler' => function () {
+				'handler' => static function () {
 					return array( 'messages' => array() );
 				},
 			)
