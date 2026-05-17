@@ -25,7 +25,7 @@ The MCP Adapter uses `wp-env` to provide a containerized WordPress environment w
 First, ensure the wp-env environment is running:
 
 ```bash
-npm run wp-env start
+npm run wp-env:test start
 ```
 
 This starts a WordPress instance at http://localhost:8888 with all required dependencies.
@@ -61,7 +61,7 @@ To generate code coverage reports, restart the environment with Xdebug coverage 
 
 ```bash
 # Enable coverage mode
-npm run wp-env start -- --xdebug=coverage
+npm run wp-env:test start -- --xdebug=coverage
 
 # Run tests (coverage will be generated)
 npm run test:php
@@ -126,18 +126,18 @@ If wp-env fails to start:
 
 ```bash
 # Stop and clean the environment
-npm run wp-env stop
-npm run wp-env clean
+npm run wp-env:test stop
+npm run wp-env:test clean
 
 # Restart
-npm run wp-env start
+npm run wp-env:test start
 ```
 
 ### Test Failures
 
 - **Class not found**: This typically occurs after adding new classes, pulling changes, or switching branches. Regenerate the Composer autoloader to resolve:
   ```bash
-  npm run wp-env run tests-cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload
+  npm run wp-env:test run --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload
   ```
   The `--env-cwd` flag sets the working directory inside the Docker container to ensure Composer operates on the plugin's `composer.json`.
 
@@ -148,7 +148,7 @@ npm run wp-env start
 
 - WordPress site: http://localhost:8888
 - Admin dashboard: http://localhost:8888/wp-admin/ (admin/password)
-- Run WP-CLI commands: `npm run wp-env run tests-cli YOUR_COMMAND`
+- Run WP-CLI commands: `npm run wp-env:test run --env-cwd=wp-content/plugins/mcp-adapter/ YOUR_COMMAND`
 
 ## Continuous Integration
 

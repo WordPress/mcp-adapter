@@ -6,19 +6,20 @@
 >
 	<description>Sniffs for the MCP Adapter plugin</description>
 
-	<!-- What to scan: include any root-level PHP files, and the /includes folder -->
+	<!-- What to scan: include any root-level PHP files and any folders that contain PHP -->
 	<file>./includes/</file>
 	<file>./mcp-adapter.php</file>
 
 	<!-- These are excluded from the above paths.-->
 	<exclude-pattern>**/build/**</exclude-pattern>
+	<exclude-pattern>**/_output/**</exclude-pattern>
 	<exclude-pattern>**/node_modules/**</exclude-pattern>
 	<exclude-pattern>**/vendor/**</exclude-pattern>
 
-	<!-- How to scan: include CLI args so you don't need to pass them manually -->
-	<!-- Usage instructions: https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Usage -->
-	<!-- Annotated ruleset:
-	https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Annotated-ruleset.xml -->
+	<!--
+		How to scan: include CLI args so you don't need to pass them manually
+		Usage instructions: https://github.com/PHPCSStandards/PHP_CodeSniffer/wiki/Usage
+	-->
 	<!-- Show sniff and progress -->
 	<arg value="sp" />
 	<!-- Strip the file paths down to the relevant bit -->
@@ -27,8 +28,7 @@
 	<arg name="colors" />
 	<!-- Only lint php files by default -->
 	<arg name="extensions" value="php" />
-	<!-- Whenever possible, cache the scan results and re-use those for unchanged files on the next
-	scan. -->
+	<!-- Cache the scan results for reuse. -->
 	<arg name="cache" value="tests/_output/phpcs-cache.json" />
 	<!-- Enables parallel processing when available for faster results. -->
 	<arg name="parallel" value="20" />
@@ -39,15 +39,15 @@
 
 	<!--
 		Tests for PHP version compatibility.
-	https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards#Recomended-additional-rulesets
+		https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards#Recomended-additional-rulesets
 	-->
 	<config name="testVersion" value="7.4-" />
 
 	<!--
 		Tests for WordPress version compatibility.
-	https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards/wiki/Customizable-sniff-properties
+		https://github.com/WordPress-Coding-Standards/WordPress-Coding-Standards/wiki/Customizable-sniff-properties
 	-->
-	<config name="minimum_wp_version" value="6.8" />
+	<config name="minimum_wp_version" value="6.9" />
 
 	<!--
 		Load WordPress VIP Go standards
@@ -59,20 +59,13 @@
 		<exclude name="WordPressVIPMinimum.JS" />
 	</rule>
 	<rule ref="WordPress-Extra">
-		<!-- @todo: TO EVALUATE. -->
-		<!-- Allow PSR-4 class/file naming instead of WordPress class/file naming scheme -->
-		<!-- @TODO to evaluate -->
-		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound" />
-		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.InvalidPrefixPassed" />
-		<exclude name="WordPress.Files.FileName" />
-		<!-- Allow modern PHP syntax -->
-		<exclude name="Universal.Operators.DisallowShortTernary" />
 		<!-- Needed to typehint, see: https://github.com/WordPress/WordPress-Coding-Standards/issues/403 -->
 		<exclude name="Generic.Commenting.DocComment.MissingShort" />
-		<!-- Allow internal hook names without prefixes -->
-		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound" />
-		<!-- Allow unused parameters in interface implementations -->
-		<exclude name="Generic.CodeAnalysis.UnusedFunctionParameter" />
+		<!-- Allow modern PHP syntax -->
+		<exclude name="Universal.Operators.DisallowShortTernary" />
+		<exclude name="WordPress.Files.FileName" />
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound" />
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.ShortPrefixPassed" />
 	</rule>
 
 	<!--
@@ -80,14 +73,6 @@
 		@see: https://github.com/PHPCompatibility/PHPCompatibilityWP
 	-->
 	<rule ref="PHPCompatibilityWP" />
-
-	<!--
-		Checks from PCP
-		@see https://github.com/wordpress/plugin-check
-	-->
-	<rule
-		ref="./vendor/wpackagist-plugin/plugin-check/vendor/plugin-check/phpcs-sniffs/PluginCheck/ruleset.xml" />
-	<rule ref="./vendor/wpackagist-plugin/plugin-check/phpcs-rulesets/plugin-check.ruleset.xml" />
 
 	<!-- Check for superfluous whitespace - These get suppressed in VIP-GO.-->
 	<rule ref="Squiz.WhiteSpace.SuperfluousWhitespace">
@@ -161,13 +146,6 @@
 			</property>
 		</properties>
 	</rule>
-	<rule ref="SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions">
-		<properties>
-			<property name="ignoredNames" type="array">
-				<element value="WP_Error" />
-			</property>
-		</properties>
-	</rule>
 	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses" />
 	<rule ref="SlevomatCodingStandard.Namespaces.UseDoesNotStartWithBackslash" />
 	<rule ref="SlevomatCodingStandard.Namespaces.UseFromSameNamespace" />
@@ -192,13 +170,6 @@
 	</rule>
 	<rule ref="SlevomatCodingStandard.Variables.UselessVariable" />
 
-	<!--
-		Ignore Rules for Tests
-	-->
-	<rule ref="PluginCheck.CodeAnalysis.Offloading.OffloadedContent">
-		<exclude-pattern>/tests/*</exclude-pattern>
-	</rule>
-
 	<!-- Do not apply filename rules for unit tests -->
 	<rule ref="WordPress.Files.FileName.NotHyphenatedLowercase">
 		<exclude-pattern>tests/*</exclude-pattern>
@@ -207,22 +178,21 @@
 		<exclude-pattern>tests/*</exclude-pattern>
 	</rule>
 
+	<!-- Plugin-specific rule configs  -->
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
 		<properties>
 			<property name="prefixes" type="array">
-				<element value="mcp-adapter" />
-				<element value="WPMCP" />
+				<element value="mcp_adapter" /><!-- Function and variable prefix -->
+				<element value="WP\MCP" /><!-- Namespace -->
+				<element value="WP_MCP_" /><!-- Class constant prefix -->
 			</property>
 		</properties>
 	</rule>
 
-	<!-- Plugin-specific rule configs-->
-	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+	<rule ref="WordPress.WP.I18n">
 		<properties>
-			<property name="prefixes" type="array">
-				<!-- @todo: Should we use a namespace or prefix ? -->
+			<property name="text_domain" type="array">
 				<element value="mcp-adapter" />
-				<element value="WP_MCP" />
 			</property>
 		</properties>
 	</rule>

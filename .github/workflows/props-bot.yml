@@ -50,8 +50,9 @@ jobs:
     name: Generate a list of props
     runs-on: ubuntu-24.04
     permissions:
-      pull-requests: write # Required by props-bot-action to comment on the PR.
-      contents: read       # Required by props-bot-action to read repository contents.
+      # The action needs permission `write` permission for PRs in order to add a comment.
+      pull-requests: write
+      contents: read
     timeout-minutes: 20
     # The job will run when pull requests are open, ready for review and:
     #
@@ -75,7 +76,7 @@ jobs:
           format: 'git'
 
       - name: Remove the props-bot label
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         if: ${{ github.event.action == 'labeled' && 'props-bot' == github.event.label.name }}
         with:
           retries: 2

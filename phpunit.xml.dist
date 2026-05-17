@@ -11,7 +11,7 @@
 	convertErrorsToExceptions="true"
 	convertNoticesToExceptions="true"
 	convertWarningsToExceptions="true"
-	cacheResultFile="./tests/.phpunit.result.cache"
+	cacheResultFile="./tests/_output/.phpunit.result.cache"
 >
 	<testsuites>
 		<testsuite name="unit">
@@ -24,11 +24,11 @@
 	<coverage processUncoveredFiles="false">
 		<include>
 			<directory suffix=".php">includes</directory>
-			<file>mcp-adapter.php</file>
 		</include>
 		<report>
 			<clover outputFile="tests/_output/php-coverage.xml" />
 			<html outputDirectory="tests/_output/html" />
+			<text outputFile="php://stdout" showOnlySummary="true" />
 		</report>
 	</coverage>
 </phpunit>

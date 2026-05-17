@@ -1,0 +1,36 @@
+<?php
+
+class WP_Error {}
+
+/**
+ * WP-CLI stubs for PHPStan.
+ *
+ * Overrides some issues with the wp-cli-stubs package.
+ */
+class WP_CLI {
+		/**
+		 * Display error message prefixed with "Error: " and exit script.
+		 *
+		 * Error message is written to STDERR. Defaults to halting script execution
+		 * with return code 1.
+		 *
+		 * Use `WP_CLI::warning()` instead when script execution should be permitted
+		 * to continue.
+		 *
+		 * ```
+		 * # `wp cache flush` considers flush failure to be a fatal error.
+		 * if ( false === wp_cache_flush() ) {
+		 *     WP_CLI::error( 'The object cache could not be flushed.' );
+		 * }
+		 * ```
+		 *
+		 * @access public
+		 * @category Output
+		 *
+		 * @param string|\WP_Error|\Exception|\Throwable $message Message to write to STDERR.
+		 * @param bool|int            $exit    True defaults to exit(1).
+		 * @return ($exit is false ? void : never-return)
+		 */
+	public static function error( $message, $exit = \true ) {
+	}
+}
