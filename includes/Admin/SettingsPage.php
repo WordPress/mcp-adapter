@@ -157,7 +157,14 @@ final class SettingsPage {
 	 */
 	public function render_page(): void {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
-			wp_die( esc_html__( 'You do not have permission to access this page.', 'mcp-adapter' ) );
+			wp_die(
+				esc_html__( 'You do not have permission to access this page.', 'mcp-adapter' ),
+				esc_html__( 'Permission denied', 'mcp-adapter' ),
+				array(
+					'response'  => 403,
+					'back_link' => true,
+				)
+			);
 		}
 
 		$abilities = $this->discover_abilities();
@@ -201,7 +208,8 @@ final class SettingsPage {
 						</thead>
 						<tbody>
 							<?php foreach ( $abilities as $name => $info ) : ?>
-								<tr<?php echo $info['managed'] ? ' class="disabled"' : ''; ?>>
+								<?php $row_class = $info['managed'] ? 'disabled' : ''; ?>
+								<tr class="<?php echo esc_attr( $row_class ); ?>">
 									<td>
 										<?php if ( $info['managed'] ) : ?>
 											<input type="checkbox" disabled aria-label="<?php echo esc_attr( sprintf( /* translators: %s: ability name. */ __( 'Managed by adapter: %s', 'mcp-adapter' ), $name ) ); ?>" />
