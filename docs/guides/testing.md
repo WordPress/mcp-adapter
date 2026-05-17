@@ -28,7 +28,7 @@ First, ensure the wp-env environment is running:
 npm run wp-env:test start
 ```
 
-This starts a WordPress instance at http://localhost:8888 with all required dependencies.
+This starts a WordPress instance at http://localhost:8889 with all required dependencies.
 
 ### Running All Tests
 
