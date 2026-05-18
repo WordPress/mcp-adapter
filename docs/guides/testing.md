@@ -137,7 +137,7 @@ npm run wp-env:test start
 
 - **Class not found**: This typically occurs after adding new classes, pulling changes, or switching branches. Regenerate the Composer autoloader to resolve:
   ```bash
-  npm run wp-env:test run cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload
+  npm run wp-env:test -- run cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload
   ```
   The `--env-cwd` flag sets the working directory inside the Docker container to ensure Composer operates on the plugin's `composer.json`.
 

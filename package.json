@@ -8,7 +8,7 @@
 	},
 	"engines": {
 		"node": ">=22.21.1",
-		"npm": ">=10.9.4"
+		"npm": ">=11.10.0"
 	},
 	"files": [
 		"includes",
@@ -31,9 +31,9 @@
 		"wp-env:test": "wp-env --config=.wp-env.test.json"
 	},
 	"devDependencies": {
-		"@wordpress/env": "^11.6.0",
-		"@wordpress/scripts": "^32.2.0",
-		"@wordpress/prettier-config": "^4.46.0"
+		"@wordpress/env": "^11.5.0",
+		"@wordpress/scripts": "^32.1.0",
+		"@wordpress/prettier-config": "^4.45.0"
 	},
 	"overrides": {
 		"@babel/runtime": ">=7.26.10",
