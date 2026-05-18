@@ -84,6 +84,134 @@ final class McpServerTest extends TestCase {
 		$this->assertEmpty( $server_tools );
 	}
 
+	public function test_server_config_filter_can_modify_name_and_description(): void {
+		add_filter(
+			'mcp_adapter_server_config',
+			function ( array $config ) {
+				$config['server_name']        = 'Filtered Name';
+				$config['server_description'] = 'Filtered Description';
+				return $config;
+			}
+		);
+
+		$server = new McpServer(
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Original Name',
+			'Original Description',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+		);
+
+		$this->assertSame( 'Filtered Name', $server->get_server_name() );
+		$this->assertSame( 'Filtered Description', $server->get_server_description() );
+
+		remove_all_filters( 'mcp_adapter_server_config' );
+	}
+
+	public function test_server_config_filter_receives_server_id_as_second_param(): void {
+		$received_server_id = null;
+
+		add_filter(
+			'mcp_adapter_server_config',
+			function ( array $config, string $server_id ) use ( &$received_server_id ) {
+				$received_server_id = $server_id;
+				return $config;
+			},
+			10,
+			2
+		);
+
+		new McpServer(
+			'my-custom-server',
+			'mcp/v1',
+			'/mcp',
+			'Test',
+			'Test',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+		);
+
+		$this->assertSame( 'my-custom-server', $received_server_id );
+
+		remove_all_filters( 'mcp_adapter_server_config' );
+	}
+
+	public function test_server_config_filter_can_target_specific_server(): void {
+		add_filter(
+			'mcp_adapter_server_config',
+			function ( array $config, string $server_id ) {
+				if ( 'target-server' === $server_id ) {
+					$config['server_name'] = 'Modified';
+				}
+				return $config;
+			},
+			10,
+			2
+		);
+
+		$target = new McpServer(
+			'target-server',
+			'mcp/v1',
+			'/mcp',
+			'Original',
+			'Desc',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+		);
+
+		$other = new McpServer(
+			'other-server',
+			'mcp/v1',
+			'/mcp',
+			'Original',
+			'Desc',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+		);
+
+		$this->assertSame( 'Modified', $target->get_server_name() );
+		$this->assertSame( 'Original', $other->get_server_name() );
+
+		remove_all_filters( 'mcp_adapter_server_config' );
+	}
+
+	public function test_server_config_filter_invalid_types_fall_back_to_original(): void {
+		add_filter(
+			'mcp_adapter_server_config',
+			function ( array $config ) {
+				$config['server_name'] = 12345;   // Invalid — not a string.
+				$config['tools']       = 'bad';   // Invalid — not an array.
+				return $config;
+			}
+		);
+
+		$server = new McpServer(
+			'test-server',
+			'mcp/v1',
+			'/mcp',
+			'Original Name',
+			'Desc',
+			'0.1.0',
+			array( DummyTransport::class ),
+			NullMcpErrorHandler::class,
+			NullMcpObservabilityHandler::class,
+		);
+
+		$this->assertSame( 'Original Name', $server->get_server_name() );
+
+		remove_all_filters( 'mcp_adapter_server_config' );
+	}
+
 	public function test_validation_flag_is_configurable(): void {
 		// Test with validation enabled
 		add_filter( 'mcp_adapter_validation_enabled', '__return_true' );

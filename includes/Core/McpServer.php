@@ -143,6 +143,56 @@ class McpServer {
 		array $prompts = array(),
 		?callable $transport_permission_callback = null
 	) {
+		/**
+		 * Filters the configuration of any MCP server before it is applied.
+		 *
+		 * Fires for ALL servers during construction — including custom servers created
+		 * via the mcp_adapter_init action. Use $config['server_id'] or the $server_id
+		 * parameter to target a specific server or apply changes to all servers.
+		 *
+		 * @since 0.6.0
+		 *
+		 * @param array  $config {
+		 *     Server configuration array.
+		 *
+		 *     @type string   $server_id              Server identifier.
+		 *     @type string   $server_route_namespace REST API namespace.
+		 *     @type string   $server_route           REST API route.
+		 *     @type string   $server_name            Human-readable server name.
+		 *     @type string   $server_description     Server description.
+		 *     @type string   $server_version         Server version.
+		 *     @type string[] $tools                  Ability names to expose as tools.
+		 *     @type string[] $resources              Ability names to expose as resources.
+		 *     @type string[] $prompts                Ability names to expose as prompts.
+		 * }
+		 * @param string $server_id The server identifier (convenience — same as $config['server_id']).
+		 */
+		$config = apply_filters(
+			'mcp_adapter_server_config',
+			array(
+				'server_id'              => $server_id,
+				'server_route_namespace' => $server_route_namespace,
+				'server_route'           => $server_route,
+				'server_name'            => $server_name,
+				'server_description'     => $server_description,
+				'server_version'         => $server_version,
+				'tools'                  => $tools,
+				'resources'              => $resources,
+				'prompts'                => $prompts,
+			),
+			$server_id
+		);
+
+		$server_id              = isset( $config['server_id'] ) && is_string( $config['server_id'] ) ? $config['server_id'] : $server_id;
+		$server_route_namespace = isset( $config['server_route_namespace'] ) && is_string( $config['server_route_namespace'] ) ? $config['server_route_namespace'] : $server_route_namespace;
+		$server_route           = isset( $config['server_route'] ) && is_string( $config['server_route'] ) ? $config['server_route'] : $server_route;
+		$server_name            = isset( $config['server_name'] ) && is_string( $config['server_name'] ) ? $config['server_name'] : $server_name;
+		$server_description     = isset( $config['server_description'] ) && is_string( $config['server_description'] ) ? $config['server_description'] : $server_description;
+		$server_version         = isset( $config['server_version'] ) && is_string( $config['server_version'] ) ? $config['server_version'] : $server_version;
+		$tools                  = isset( $config['tools'] ) && is_array( $config['tools'] ) ? $config['tools'] : $tools;
+		$resources              = isset( $config['resources'] ) && is_array( $config['resources'] ) ? $config['resources'] : $resources;
+		$prompts                = isset( $config['prompts'] ) && is_array( $config['prompts'] ) ? $config['prompts'] : $prompts;
+
 		// Store server configuration
 		$this->server_id                     = $server_id;
 		$this->server_route_namespace        = $server_route_namespace;
