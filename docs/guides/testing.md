@@ -28,7 +28,7 @@ First, ensure the wp-env environment is running:
 npm run wp-env:test start
 ```
 
-This starts a WordPress instance at http://localhost:8888 with all required dependencies.
+This starts a WordPress instance at http://localhost:8889 with all required dependencies.
 
 ### Running All Tests
 
@@ -148,7 +148,7 @@ npm run wp-env:test start
 
 - WordPress site: http://localhost:8889
 - Admin dashboard: http://localhost:8889/wp-admin/ (admin/password)
-- Run WP-CLI commands: `npm run wp-env:test run cli --env-cwd=wp-content/plugins/mcp-adapter/ YOUR_COMMAND`
+- Run WP-CLI commands: `npm run wp-env:test run cli -- --env-cwd=wp-content/plugins/mcp-adapter/ YOUR_COMMAND`
 
 ## Continuous Integration
 
