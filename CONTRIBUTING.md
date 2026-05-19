@@ -31,7 +31,7 @@ Please see [SECURITY.md] (@TODO).
 
 ### Prerequisites
 
-- Node.js: 20.x (NVM recommended)
+- Node.js: 22.x (NVM recommended)
 - Docker
 - Git
 - Composer: (if you prefer to run the Composer tools locally)
@@ -77,7 +77,7 @@ The WordPress development site will be available at http://localhost:8888 and th
 
 - `npm run wp-env start`: Start the local development environment.
 - `npm run wp-env stop`: Stop the local development environment.
-- `npm run wp-env run tests-cli YOUR_CMD_HERE`: Run WP-CLI commands in the local environment.
+- `npm run wp-env:cli -- YOUR_CMD_HERE`: Run WP-CLI commands in the local environment.
 
 For more information on using `wp-env`, see the [wp-env documentation](https://developer.wordpress.org/block-editor/packages/packages-env/).
 

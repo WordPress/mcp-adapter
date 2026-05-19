@@ -1,34 +1,41 @@
-# Dependencies
+### WordPress ###
+
 # macOS/IDE
 .DS_Store
-.idea
-.Spotlight-V100
-.Trashes
-.vscode
+Thumbs.db
+.idea/
+.vscode/
 *.sublime-project
 *.sublime-workspace
-/.vscode/
-ehthumbs.db
-Thumbs.db
 
 # Log files
 *.log
 /tests/logs
 
-# Packages
+# Dependencies
 /vendor/
 /node_modules/
+
+# Build output
+build/
+
+# Generated language files
+/languages/*
+!/languages/.gitkeep
 
 # Environment
 .env
 
-# Cache
-.phpunit.result.cache
+# AI files
+.gemini/
+.claude/
+AGENTS.md
+GEMINI.md
+CLAUDE.md
 
 # Test output
 /tests/_output/*
 !/tests/_output/.gitkeep
-/coverage/
 
 # Configs
 /phpcs.xml
@@ -38,3 +45,5 @@ Thumbs.db
 # WP ENV
 /.wp-env.override.json
 
+# Build
+mcp-adapter.zip

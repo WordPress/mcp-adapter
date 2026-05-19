@@ -13,6 +13,9 @@ namespace WP\MCP;
 
 use WP\MCP\Core\McpAdapter;
 
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Class - Plugin
  */

@@ -17,7 +17,7 @@ const config = {
 			},
 		},
 		{
-			files: ['*.yml', '*.yaml'],
+			files: [ '*.yml', '*.yaml' ],
 			options: {
 				tabWidth: 2,
 				useTabs: false,

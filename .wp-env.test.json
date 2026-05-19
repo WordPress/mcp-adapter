@@ -1,0 +1,15 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/wp-env.json",
+	"testsEnvironment": false,
+	"port": 8889,
+	"core": null,
+	"plugins": [ "./." ],
+	"config": {
+		"FS_METHOD": "direct",
+		"WP_DEBUG": true,
+		"WP_DEBUG_LOG": "/var/www/html/wp-content/plugins/mcp-adapter/tests/_output/debug.log"
+	},
+	"mappings": {
+		"/wp-content/plugins/mcp-adapter": "."
+	}
+}

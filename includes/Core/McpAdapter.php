@@ -20,6 +20,9 @@ use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Servers\DefaultServerFactory;
 use WP_Error;
 
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
 /**
  * WordPress MCP Registry - Main class for managing multiple MCP servers.
  */

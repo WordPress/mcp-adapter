@@ -80,6 +80,7 @@ final class DiscoverAbilitiesAbility {
 	 *
 	 * @return array Array containing public MCP abilities.
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Required by the ability callback.
 	public static function execute( $input = array() ): array {
 		// Get all abilities and filter for publicly exposed ones
 		$abilities = wp_get_abilities();
@@ -119,6 +120,7 @@ final class DiscoverAbilitiesAbility {
 	 *
 	 * @return bool|\WP_Error True if the user has permission to discover abilities.
 	 */
+	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Required by the ability callback.
 	public static function check_permission( $input = array() ) {
 		// Verify caller identity - ensure user is authenticated
 		if ( ! is_user_logged_in() ) {
