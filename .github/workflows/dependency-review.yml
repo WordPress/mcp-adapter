@@ -27,4 +27,4 @@ jobs:
           license-check: true
           vulnerability-check: false # Since we only want to use the license check, we need to set this to false as otherwise the default is true.
           show-openssf-scorecard: false # Since we only want to use the license check, we need to set this to false as otherwise the default is true.
-          config-file: 'WordPress/ai/dependency-review-config.yml@main'
+          config-file: 'WordPress/ai/.github/dependency-review-config.yml@4498f98999a21ad626a46f5629c0a82c427debaa' # v0.9.0
