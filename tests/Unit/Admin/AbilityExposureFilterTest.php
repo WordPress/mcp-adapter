@@ -21,9 +21,10 @@ use WP\MCP\Tests\TestCase;
 final class AbilityExposureFilterTest extends TestCase {
 
 	/**
-	 * Reset the option between cases.
+	 * Reset the option between cases. Parent declares set_up() public, so
+	 * the override must match visibility under PHPUnit's LSP enforcement.
 	 */
-	protected function set_up(): void {
+	public function set_up(): void {
 		parent::set_up();
 		delete_option( AbilityExposureFilter::OPTION );
 	}

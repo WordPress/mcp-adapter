@@ -68,9 +68,11 @@ final class Plugin {
 		( new AbilityExposureFilter() )->register();
 
 		// Settings page is admin-only.
-		if ( is_admin() ) {
-			( new SettingsPage() )->register();
+		if ( ! is_admin() ) {
+			return;
 		}
+
+		( new SettingsPage() )->register();
 	}
 
 	/**

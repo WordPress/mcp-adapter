@@ -119,9 +119,6 @@ final class SettingsPage {
 		}
 
 		$registered = wp_get_abilities();
-		if ( ! is_array( $registered ) ) {
-			return $abilities;
-		}
 
 		foreach ( $registered as $ability ) {
 			$name        = '';
