@@ -27,7 +27,10 @@ final class SettingsPage {
 
 	private const MENU_SLUG    = 'mcp-adapter';
 	private const OPTION_GROUP = 'mcp_adapter_settings';
-	private const CAPABILITY   = 'manage_options';
+	// Capability is intentionally inlined at every call site as the literal
+	// string 'manage_options' because the WordPress.WP.Capabilities sniff
+	// only validates string literals; passing a class constant produces a
+	// "Couldn't determine the value" warning that breaks the PR's PHPCS gate.
 
 	/**
 	 * Wire admin hooks.
@@ -44,7 +47,7 @@ final class SettingsPage {
 		add_options_page(
 			__( 'MCP Adapter', 'mcp-adapter' ),
 			__( 'MCP Adapter', 'mcp-adapter' ),
-			self::CAPABILITY,
+			'manage_options',
 			self::MENU_SLUG,
 			array( $this, 'render_page' )
 		);
@@ -153,7 +156,7 @@ final class SettingsPage {
 	 * Render the settings page.
 	 */
 	public function render_page(): void {
-		if ( ! current_user_can( self::CAPABILITY ) ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die(
 				esc_html__( 'You do not have permission to access this page.', 'mcp-adapter' ),
 				esc_html__( 'Permission denied', 'mcp-adapter' ),
