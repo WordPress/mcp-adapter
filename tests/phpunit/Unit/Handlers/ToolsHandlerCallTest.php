@@ -368,4 +368,57 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertInstanceOf( CallToolResult::class, $result );
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
+
+	/**
+	 * Regression: a non-UTF-8 byte anywhere in a tool result used to cause
+	 * wp_json_encode() to return false. The handler then substituted '{}' for
+	 * the text content but still passed the unencodable payload into
+	 * structuredContent, which made WP REST envelope serialization fail and
+	 * surfaced to clients as "MCP error -32000: Connection closed". With the
+	 * fix the bad byte is substituted (U+FFFD) and the response is well-formed.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/195
+	 */
+	public function test_non_utf8_byte_in_result_does_not_break_response(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function () {
+			// 0x80 is not a valid leading byte for any UTF-8 sequence.
+			return array(
+				'ok'   => true,
+				'body' => "leading text \x80 trailing text",
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertFalse( (bool) $result->getIsError() );
+
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+
+		$text = $content[0]->getText();
+		$this->assertNotSame( '{}', $text, 'Pre-fix behavior substituted {} for unencodable results; should now be substituted JSON.' );
+
+		$decoded = json_decode( $text, true );
+		$this->assertIsArray( $decoded, 'Encoded text content must be valid JSON after substitution.' );
+		$this->assertTrue( $decoded['ok'] );
+		$this->assertArrayHasKey( 'body', $decoded );
+	}
 }

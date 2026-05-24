@@ -288,13 +288,29 @@ class StdioServerBridge {
 	 * @return string JSON-encoded response string.
 	 */
 	private function encode_response( array $response ): string {
-		$json = wp_json_encode( $response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		// JSON_INVALID_UTF8_SUBSTITUTE + JSON_PARTIAL_OUTPUT_ON_ERROR ensure a single bad byte
+		// in the payload does not cause an empty stdout line and a "Connection closed" symptom
+		// at the client. See ToolsHandler::call_tool for the parallel fix on the HTTP transport.
+		$json = wp_json_encode(
+			$response,
+			JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
+		);
 
 		if ( false === $json ) {
-			// Fallback when JSON encoding fails - use constant for consistency.
+			$this->log_to_stderr( sprintf( 'Response could not be JSON-encoded: %s', json_last_error_msg() ) );
+
+			// Preserve the original request id so client-side JSON-RPC correlation still works.
+			$id_json = isset( $response['id'] )
+				? wp_json_encode( $response['id'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR )
+				: 'null';
+			if ( false === $id_json || null === $id_json ) {
+				$id_json = 'null';
+			}
+
 			return sprintf(
-				'{"jsonrpc":"2.0","error":{"code":%d,"message":"Internal error"},"id":null}',
-				McpErrorFactory::INTERNAL_ERROR
+				'{"jsonrpc":"2.0","error":{"code":%d,"message":"Internal error: response could not be encoded"},"id":%s}',
+				McpErrorFactory::INTERNAL_ERROR,
+				$id_json
 			);
 		}
 

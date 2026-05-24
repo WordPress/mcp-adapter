@@ -296,9 +296,31 @@ class ToolsHandler {
 			}
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
-			$json_text = wp_json_encode( $result );
+			// Use UTF-8-tolerant flags so a single bad byte (e.g. from a copy-pasted smart quote
+			// or a binary blob in a custom field) does not cause an empty response body and the
+			// "MCP error -32000: Connection closed" downstream symptom.
+			$encode_flags = JSON_UNESCAPED_SLASHES
+				| JSON_UNESCAPED_UNICODE
+				| JSON_INVALID_UTF8_SUBSTITUTE
+				| JSON_PARTIAL_OUTPUT_ON_ERROR;
+			$json_text    = wp_json_encode( $result, $encode_flags );
+
 			if ( false === $json_text ) {
-				$json_text = '{}';
+				$this->mcp->get_error_handler()->log(
+					'Tool result could not be JSON-encoded',
+					array(
+						'tool'       => $request_params['name'] ?? 'unknown',
+						'json_error' => json_last_error_msg(),
+					)
+				);
+
+				return $this->create_error_result(
+					sprintf(
+						/* translators: %s: JSON error message */
+						__( 'Tool result could not be serialized: %s', 'mcp-adapter' ),
+						json_last_error_msg()
+					)
+				);
 			}
 
 			return CallToolResult::fromArray(
