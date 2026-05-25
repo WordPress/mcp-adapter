@@ -182,7 +182,7 @@ Individual server management with comprehensive configuration:
 ## Dependencies
 
 - **PHP**: >= 7.4
-- **WordPress**: >= 6.9+
+- **WordPress**: >= 6.9
 - **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (^0.1.0): Typed DTOs for MCP protocol types (MCP 2025-11-25)
 
 ## Installation
