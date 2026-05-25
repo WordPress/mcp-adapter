@@ -289,10 +289,7 @@ class StdioServerBridge {
 	 */
 	private function encode_response( array $response ): string {
 		// See ToolsHandler::call_tool for the parallel fix on the HTTP transport (issue #195).
-		$encode_flags = JSON_UNESCAPED_SLASHES
-			| JSON_UNESCAPED_UNICODE
-			| JSON_INVALID_UTF8_SUBSTITUTE
-			| JSON_PARTIAL_OUTPUT_ON_ERROR;
+		$encode_flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
 		$json         = wp_json_encode( $response, $encode_flags );
 
 		if ( false === $json ) {
@@ -311,10 +308,6 @@ class StdioServerBridge {
 				McpErrorFactory::INTERNAL_ERROR,
 				$id_json
 			);
-		}
-
-		if ( JSON_ERROR_NONE !== json_last_error() ) {
-			$this->log_to_stderr( sprintf( 'Response JSON-encoded with substitution: %s', json_last_error_msg() ) );
 		}
 
 		return $json;

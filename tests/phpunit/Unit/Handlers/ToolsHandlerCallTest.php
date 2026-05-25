@@ -422,13 +422,12 @@ final class ToolsHandlerCallTest extends TestCase {
 	}
 
 	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
-	public function test_partial_output_substitution_is_logged_and_succeeds(): void {
+	public function test_unencodable_result_emits_empty_payload_and_logs(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 
-		// Depth >512 flags JSON_ERROR_DEPTH on a PARTIAL_OUTPUT_ON_ERROR encode — the call
-		// succeeds with substitution but json_last_error() surfaces it. Recursion / resources
-		// / NAN take the same code path.
+		// Depth >512 triggers JSON_ERROR_DEPTH and wp_json_encode returns false (we no longer
+		// pass PARTIAL_OUTPUT_ON_ERROR, so depth/recursion/NAN/resources fall through here).
 		$deep = 'leaf';
 		for ( $i = 0; $i < 600; $i++ ) {
 			$deep = array( $deep );
@@ -459,12 +458,14 @@ final class ToolsHandlerCallTest extends TestCase {
 		$content = $result->getContent();
 		$this->assertNotEmpty( $content );
 		$this->assertInstanceOf( TextContent::class, $content[0] );
-		$this->assertNotSame( '{}', $content[0]->getText() );
+		$this->assertSame( '{}', $content[0]->getText() );
+
+		$this->assertNull( $result->getStructuredContent() );
 
 		$messages = array_column( DummyErrorHandler::$logs, 'message' );
 		$matched  = array_filter(
 			$messages,
-			static fn ( string $m ): bool => false !== strpos( $m, 'substitution' )
+			static fn ( string $m ): bool => false !== strpos( $m, 'could not be JSON-encoded' )
 		);
 		$this->assertNotEmpty( $matched );
 	}

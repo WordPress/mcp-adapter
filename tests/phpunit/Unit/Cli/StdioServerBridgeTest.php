@@ -707,13 +707,13 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
-	public function test_encode_response_preserves_id_on_partial_output_substitution(): void {
+	public function test_encode_response_fallback_preserves_id_when_payload_unencodable(): void {
 		$reflection             = new \ReflectionClass( $this->bridge );
 		$encode_response_method = $reflection->getMethod( 'encode_response' );
 		$encode_response_method->setAccessible( true );
 
-		// Depth >512 flags JSON_ERROR_DEPTH on a PARTIAL_OUTPUT_ON_ERROR encode — the call
-		// succeeds with substitution but should still round-trip the request id.
+		// Depth >512 triggers JSON_ERROR_DEPTH; without PARTIAL_OUTPUT_ON_ERROR
+		// wp_json_encode returns false, hitting the fallback path.
 		$deep = 'leaf';
 		for ( $i = 0; $i < 600; $i++ ) {
 			$deep = array( $deep );
@@ -728,11 +728,15 @@ final class StdioServerBridgeTest extends TestCase {
 		$encoded = $encode_response_method->invoke( $this->bridge, $response );
 
 		$this->assertIsString( $encoded );
-		$this->assertStringNotContainsString( 'response could not be encoded', $encoded );
-		// json_decode default depth (512) can't read the 600-deep output, so assert on the
-		// raw string instead — we only care that jsonrpc + id round-tripped, not the payload.
-		$this->assertStringContainsString( '"jsonrpc":"2.0"', $encoded );
-		$this->assertStringContainsString( '"id":"req-42"', $encoded );
+		$this->assertStringContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'jsonrpc', $decoded );
+		$this->assertSame( '2.0', $decoded['jsonrpc'] );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertSame( 'req-42', $decoded['id'] );
+		$this->assertArrayHasKey( 'error', $decoded );
 	}
 
 	public function test_handle_request_with_missing_params(): void {

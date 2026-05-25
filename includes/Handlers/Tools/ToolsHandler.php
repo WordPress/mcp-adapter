@@ -296,12 +296,9 @@ class ToolsHandler {
 			}
 
 			// JSON_INVALID_UTF8_SUBSTITUTE keeps a single bad byte from emptying the response
-			// (see issue #195). JSON_PARTIAL_OUTPUT_ON_ERROR keeps depth/recursion errors from
-			// the same fate but can still flag json_last_error() on success.
-			$encode_flags = JSON_UNESCAPED_SLASHES
-				| JSON_UNESCAPED_UNICODE
-				| JSON_INVALID_UTF8_SUBSTITUTE
-				| JSON_PARTIAL_OUTPUT_ON_ERROR;
+			// (see issue #195). Other failure modes (depth, recursion, NAN, resources) fall
+			// through to the false-branch below instead of being silently substituted.
+			$encode_flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
 			$json_text    = wp_json_encode( $result, $encode_flags );
 
 			if ( false === $json_text ) {
@@ -322,26 +319,10 @@ class ToolsHandler {
 				);
 			}
 
-			// Snapshot before json_decode below overwrites json_last_error().
-			$encode_error_code = json_last_error();
-			$encode_error_msg  = json_last_error_msg();
-
 			// Re-derive structuredContent from the sanitized text so the outer WP REST envelope
-			// (default flags) cannot trip on bytes that the inner encode tolerated. UTF-8
-			// substitution is silent in json_last_error(), so we cannot gate this on the error.
+			// (default flags) cannot trip on bytes that the inner encode tolerated.
 			$decoded    = json_decode( $json_text, true );
 			$structured = null === $decoded && 'null' !== $json_text ? $result : $decoded;
-
-			if ( JSON_ERROR_NONE !== $encode_error_code ) {
-				$this->mcp->get_error_handler()->log(
-					'Tool result JSON-encoded with substitution',
-					array(
-						'tool'       => $request_params['name'] ?? 'unknown',
-						'json_error' => $encode_error_msg,
-					),
-					'warning'
-				);
-			}
 
 			return CallToolResult::fromArray(
 				array(
