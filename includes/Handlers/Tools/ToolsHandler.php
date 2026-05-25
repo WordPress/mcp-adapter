@@ -298,8 +298,7 @@ class ToolsHandler {
 			// JSON_INVALID_UTF8_SUBSTITUTE keeps a single bad byte from emptying the response
 			// (see issue #195). Other failure modes (depth, recursion, NAN, resources) fall
 			// through to the false-branch below instead of being silently substituted.
-			$encode_flags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
-			$json_text    = wp_json_encode( $result, $encode_flags );
+			$json_text = wp_json_encode( $result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE );
 
 			if ( false === $json_text ) {
 				$this->mcp->get_error_handler()->log(

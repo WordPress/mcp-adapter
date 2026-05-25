@@ -470,6 +470,52 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'Handler exploded', $result->get_error_message() );
 	}
 
+	public function test_execute_catches_throwable_from_ability(): void {
+		// WP_Ability catches its own callback exceptions, so to exercise McpTool's
+		// own catch we replace the underlying ability with a mock that throws.
+		$ability = wp_get_ability( 'test/always-allowed' );
+		$tool    = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $tool );
+
+		$throwing_ability = $this->getMockBuilder( \WP_Ability::class )
+			->disableOriginalConstructor()
+			->onlyMethods( array( 'execute' ) )
+			->getMock();
+		$throwing_ability->method( 'execute' )->willThrowException( new \RuntimeException( 'ability blew up' ) );
+
+		$prop = new \ReflectionProperty( McpTool::class, 'ability' );
+		$prop->setAccessible( true );
+		$prop->setValue( $tool, $throwing_ability );
+
+		$result = $tool->execute( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_execution_failed', $result->get_error_code() );
+		$this->assertSame( 'ability blew up', $result->get_error_message() );
+	}
+
+	public function test_check_permission_catches_throwable_from_ability(): void {
+		$ability = wp_get_ability( 'test/always-allowed' );
+		$tool    = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $tool );
+
+		$throwing_ability = $this->getMockBuilder( \WP_Ability::class )
+			->disableOriginalConstructor()
+			->onlyMethods( array( 'check_permissions' ) )
+			->getMock();
+		$throwing_ability->method( 'check_permissions' )->willThrowException( new \RuntimeException( 'permission blew up' ) );
+
+		$prop = new \ReflectionProperty( McpTool::class, 'ability' );
+		$prop->setAccessible( true );
+		$prop->setValue( $tool, $throwing_ability );
+
+		$result = $tool->check_permission( array() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'mcp_permission_check_failed', $result->get_error_code() );
+		$this->assertSame( 'permission blew up', $result->get_error_message() );
+	}
+
 	public function test_check_permission_catches_exceptions(): void {
 		$tool = McpTool::fromArray(
 			array(
