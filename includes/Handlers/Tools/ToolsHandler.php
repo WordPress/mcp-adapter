@@ -321,13 +321,10 @@ class ToolsHandler {
 
 			// Re-derive structuredContent from the sanitized text so the outer WP REST envelope
 			// (default flags) cannot trip on bytes that the inner encode tolerated.
-			$decoded    = json_decode( $json_text, true );
-			$structured = null === $decoded && 'null' !== $json_text ? $result : $decoded;
-
 			return CallToolResult::fromArray(
 				array(
 					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $structured,
+					'structuredContent' => json_decode( $json_text, true ),
 					'isError'           => false,
 				)
 			);
