@@ -734,6 +734,44 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $decoded );
 	}
 
+	public function test_handle_request_catches_unexpected_throwable_from_router(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+		$router_property       = $reflection->getProperty( 'request_router' );
+		$router_property->setAccessible( true );
+
+		$original_router = $router_property->getValue( $this->bridge );
+		$mock_router     = $this->createMock( \WP\MCP\Transport\Infrastructure\RequestRouter::class );
+		$mock_router->method( 'route_request' )->willThrowException( new \RuntimeException( 'router blew up' ) );
+		$router_property->setValue( $this->bridge, $mock_router );
+
+		try {
+			$result = $handle_request_method->invoke(
+				$this->bridge,
+				wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 1,
+						'method'  => 'tools/list',
+						'params'  => array(),
+					)
+				)
+			);
+		} finally {
+			$router_property->setValue( $this->bridge, $original_router );
+		}
+
+		$this->assertIsString( $result );
+		$decoded = json_decode( $result, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'error', $decoded );
+		$this->assertSame( -32603, $decoded['error']['code'] );
+		$this->assertSame( 'Internal error', $decoded['error']['message'] );
+		$this->assertArrayHasKey( 'data', $decoded['error'] );
+		$this->assertStringContainsString( 'router blew up', $decoded['error']['data'] );
+	}
+
 	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
 	public function test_encode_response_fallback_emits_null_id_when_response_has_no_id(): void {
 		$reflection             = new \ReflectionClass( $this->bridge );
