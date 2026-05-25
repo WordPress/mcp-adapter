@@ -712,17 +712,12 @@ final class StdioServerBridgeTest extends TestCase {
 		$encode_response_method = $reflection->getMethod( 'encode_response' );
 		$encode_response_method->setAccessible( true );
 
-		// Depth >512 triggers JSON_ERROR_DEPTH; without PARTIAL_OUTPUT_ON_ERROR
+		// NAN triggers JSON_ERROR_INF_OR_NAN; without PARTIAL_OUTPUT_ON_ERROR
 		// wp_json_encode returns false, hitting the fallback path.
-		$deep = 'leaf';
-		for ( $i = 0; $i < 600; $i++ ) {
-			$deep = array( $deep );
-		}
-
 		$response = array(
 			'jsonrpc' => '2.0',
 			'id'      => 'req-42',
-			'result'  => array( 'nested' => $deep ),
+			'result'  => array( 'value' => NAN ),
 		);
 
 		$encoded = $encode_response_method->invoke( $this->bridge, $response );
@@ -745,15 +740,10 @@ final class StdioServerBridgeTest extends TestCase {
 		$encode_response_method = $reflection->getMethod( 'encode_response' );
 		$encode_response_method->setAccessible( true );
 
-		$deep = 'leaf';
-		for ( $i = 0; $i < 600; $i++ ) {
-			$deep = array( $deep );
-		}
-
 		// No 'id' key — exercises the ': "null"' branch of the fallback ternary.
 		$response = array(
 			'jsonrpc' => '2.0',
-			'result'  => array( 'nested' => $deep ),
+			'result'  => array( 'value' => NAN ),
 		);
 
 		$encoded = $encode_response_method->invoke( $this->bridge, $response );

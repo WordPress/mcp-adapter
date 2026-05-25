@@ -421,20 +421,91 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertStringNotContainsString( "\x80", $structured['body'] );
 	}
 
+	public function test_embedded_resource_nested_shape_is_unwrapped(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// Inject the nested EmbeddedResource shape (resource keyed under 'resource').
+		$filter = static function () {
+			return array(
+				'type'     => 'resource',
+				'resource' => array(
+					'uri'      => 'WordPress://local/nested-resource',
+					'text'     => 'nested payload',
+					'mimeType' => 'text/plain',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( TextResourceContents::class, $resource );
+		$this->assertSame( 'WordPress://local/nested-resource', $resource->getUri() );
+		$this->assertSame( 'nested payload', $resource->getText() );
+	}
+
+	public function test_throwable_from_filter_triggers_outer_catch(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// Throwing from a filter inside the try escapes McpTool::execute's own catch
+		// and hits the outer try/catch in ToolsHandler::call_tool. Use the pre_tool_call
+		// hook (not tool_call_result) so a callback exception leaving WP_Hook in a
+		// half-iterated state cannot leak into other tests that use tool_call_result.
+		$filter = static function () {
+			throw new \RuntimeException( 'filter blew up' );
+		};
+		add_filter( 'mcp_adapter_pre_tool_call', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+		}
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertSame( -32603, $error->getCode() );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Error calling tool', $messages );
+	}
+
 	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
 	public function test_unencodable_result_emits_empty_payload_and_logs(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 
-		// Depth >512 triggers JSON_ERROR_DEPTH and wp_json_encode returns false (we no longer
-		// pass PARTIAL_OUTPUT_ON_ERROR, so depth/recursion/NAN/resources fall through here).
-		$deep = 'leaf';
-		for ( $i = 0; $i < 600; $i++ ) {
-			$deep = array( $deep );
-		}
-
-		$filter = static function () use ( $deep ) {
-			return array( 'nested' => $deep );
+		// NAN triggers JSON_ERROR_INF_OR_NAN; without PARTIAL_OUTPUT_ON_ERROR
+		// wp_json_encode returns false and we hit the empty-payload fallback.
+		$filter = static function () {
+			return array( 'value' => NAN );
 		};
 		add_filter( 'mcp_adapter_tool_call_result', $filter );
 
