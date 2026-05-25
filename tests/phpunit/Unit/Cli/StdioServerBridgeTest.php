@@ -739,6 +739,59 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $decoded );
 	}
 
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_fallback_emits_null_id_when_response_has_no_id(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		$deep = 'leaf';
+		for ( $i = 0; $i < 600; $i++ ) {
+			$deep = array( $deep );
+		}
+
+		// No 'id' key — exercises the ': "null"' branch of the fallback ternary.
+		$response = array(
+			'jsonrpc' => '2.0',
+			'result'  => array( 'nested' => $deep ),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertNull( $decoded['id'] );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_fallback_recovers_when_id_itself_unencodable(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		// NAN can't be encoded without PARTIAL_OUTPUT_ON_ERROR, so the outer encode
+		// fails AND the inner id encode fails — exercises the recovery assignment.
+		$response = array(
+			'jsonrpc' => '2.0',
+			'id'      => NAN,
+			'result'  => array(),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertNull( $decoded['id'] );
+	}
+
 	public function test_handle_request_with_missing_params(): void {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
