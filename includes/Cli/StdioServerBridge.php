@@ -288,22 +288,21 @@ class StdioServerBridge {
 	 * @return string JSON-encoded response string.
 	 */
 	private function encode_response( array $response ): string {
-		// JSON_INVALID_UTF8_SUBSTITUTE + JSON_PARTIAL_OUTPUT_ON_ERROR ensure a single bad byte
-		// in the payload does not cause an empty stdout line and a "Connection closed" symptom
-		// at the client. See ToolsHandler::call_tool for the parallel fix on the HTTP transport.
-		$json = wp_json_encode(
-			$response,
-			JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
-		);
+		// See ToolsHandler::call_tool for the parallel fix on the HTTP transport (issue #195).
+		$encode_flags = JSON_UNESCAPED_SLASHES
+			| JSON_UNESCAPED_UNICODE
+			| JSON_INVALID_UTF8_SUBSTITUTE
+			| JSON_PARTIAL_OUTPUT_ON_ERROR;
+		$json         = wp_json_encode( $response, $encode_flags );
 
 		if ( false === $json ) {
 			$this->log_to_stderr( sprintf( 'Response could not be JSON-encoded: %s', json_last_error_msg() ) );
 
 			// Preserve the original request id so client-side JSON-RPC correlation still works.
 			$id_json = isset( $response['id'] )
-				? wp_json_encode( $response['id'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR )
+				? wp_json_encode( $response['id'], $encode_flags )
 				: 'null';
-			if ( false === $id_json || null === $id_json ) {
+			if ( false === $id_json ) {
 				$id_json = 'null';
 			}
 
@@ -312,6 +311,10 @@ class StdioServerBridge {
 				McpErrorFactory::INTERNAL_ERROR,
 				$id_json
 			);
+		}
+
+		if ( JSON_ERROR_NONE !== json_last_error() ) {
+			$this->log_to_stderr( sprintf( 'Response JSON-encoded with substitution: %s', json_last_error_msg() ) );
 		}
 
 		return $json;

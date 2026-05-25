@@ -369,22 +369,12 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
 
-	/**
-	 * Regression: a non-UTF-8 byte anywhere in a tool result used to cause
-	 * wp_json_encode() to return false. The handler then substituted '{}' for
-	 * the text content but still passed the unencodable payload into
-	 * structuredContent, which made WP REST envelope serialization fail and
-	 * surfaced to clients as "MCP error -32000: Connection closed". With the
-	 * fix the bad byte is substituted (U+FFFD) and the response is well-formed.
-	 *
-	 * @see https://github.com/WordPress/mcp-adapter/issues/195
-	 */
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
 	public function test_non_utf8_byte_in_result_does_not_break_response(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 
 		$filter = static function () {
-			// 0x80 is not a valid leading byte for any UTF-8 sequence.
 			return array(
 				'ok'   => true,
 				'body' => "leading text \x80 trailing text",
@@ -414,11 +404,68 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertInstanceOf( TextContent::class, $content[0] );
 
 		$text = $content[0]->getText();
-		$this->assertNotSame( '{}', $text, 'Pre-fix behavior substituted {} for unencodable results; should now be substituted JSON.' );
+		$this->assertNotSame( '{}', $text );
 
 		$decoded = json_decode( $text, true );
-		$this->assertIsArray( $decoded, 'Encoded text content must be valid JSON after substitution.' );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'ok', $decoded );
 		$this->assertTrue( $decoded['ok'] );
 		$this->assertArrayHasKey( 'body', $decoded );
+
+		$structured = $result->getStructuredContent();
+		$this->assertIsArray( $structured );
+		$this->assertArrayHasKey( 'ok', $structured );
+		$this->assertTrue( $structured['ok'] );
+		$this->assertArrayHasKey( 'body', $structured );
+		// structuredContent re-derived from sanitized text — no raw 0x80 reaches the outer envelope.
+		$this->assertStringNotContainsString( "\x80", $structured['body'] );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_partial_output_substitution_is_logged_and_succeeds(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// Depth >512 flags JSON_ERROR_DEPTH on a PARTIAL_OUTPUT_ON_ERROR encode — the call
+		// succeeds with substitution but json_last_error() surfaces it. Recursion / resources
+		// / NAN take the same code path.
+		$deep = 'leaf';
+		for ( $i = 0; $i < 600; $i++ ) {
+			$deep = array( $deep );
+		}
+
+		$filter = static function () use ( $deep ) {
+			return array( 'nested' => $deep );
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertFalse( (bool) $result->getIsError() );
+
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertNotSame( '{}', $content[0]->getText() );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$matched  = array_filter(
+			$messages,
+			static fn ( string $m ): bool => false !== strpos( $m, 'substitution' )
+		);
+		$this->assertNotEmpty( $matched );
 	}
 }

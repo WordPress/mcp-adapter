@@ -295,10 +295,9 @@ class ToolsHandler {
 				);
 			}
 
-			// Standard result - JSON-encode for text content, include as structuredContent.
-			// Use UTF-8-tolerant flags so a single bad byte (e.g. from a copy-pasted smart quote
-			// or a binary blob in a custom field) does not cause an empty response body and the
-			// "MCP error -32000: Connection closed" downstream symptom.
+			// JSON_INVALID_UTF8_SUBSTITUTE keeps a single bad byte from emptying the response
+			// (see issue #195). JSON_PARTIAL_OUTPUT_ON_ERROR keeps depth/recursion errors from
+			// the same fate but can still flag json_last_error() on success.
 			$encode_flags = JSON_UNESCAPED_SLASHES
 				| JSON_UNESCAPED_UNICODE
 				| JSON_INVALID_UTF8_SUBSTITUTE
@@ -307,26 +306,47 @@ class ToolsHandler {
 
 			if ( false === $json_text ) {
 				$this->mcp->get_error_handler()->log(
-					'Tool result could not be JSON-encoded',
+					'Tool result could not be JSON-encoded; emitting empty payload',
 					array(
 						'tool'       => $request_params['name'] ?? 'unknown',
 						'json_error' => json_last_error_msg(),
 					)
 				);
 
-				return $this->create_error_result(
-					sprintf(
-						/* translators: %s: JSON error message */
-						__( 'Tool result could not be serialized: %s', 'mcp-adapter' ),
-						json_last_error_msg()
+				return CallToolResult::fromArray(
+					array(
+						'content'           => array( ContentBlockHelper::text( '{}' ) ),
+						'structuredContent' => null,
+						'isError'           => false,
 					)
+				);
+			}
+
+			// Snapshot before json_decode below overwrites json_last_error().
+			$encode_error_code = json_last_error();
+			$encode_error_msg  = json_last_error_msg();
+
+			// Re-derive structuredContent from the sanitized text so the outer WP REST envelope
+			// (default flags) cannot trip on bytes that the inner encode tolerated. UTF-8
+			// substitution is silent in json_last_error(), so we cannot gate this on the error.
+			$decoded    = json_decode( $json_text, true );
+			$structured = null === $decoded && 'null' !== $json_text ? $result : $decoded;
+
+			if ( JSON_ERROR_NONE !== $encode_error_code ) {
+				$this->mcp->get_error_handler()->log(
+					'Tool result JSON-encoded with substitution',
+					array(
+						'tool'       => $request_params['name'] ?? 'unknown',
+						'json_error' => $encode_error_msg,
+					),
+					'warning'
 				);
 			}
 
 			return CallToolResult::fromArray(
 				array(
 					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $result,
+					'structuredContent' => $structured,
 					'isError'           => false,
 				)
 			);

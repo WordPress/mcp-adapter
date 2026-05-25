@@ -673,15 +673,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertEquals( -32601, $response['error']['code'] ); // Method not found
 	}
 
-	/**
-	 * Regression: previously wp_json_encode() in encode_response() ran with only
-	 * UNESCAPED_SLASHES|UNESCAPED_UNICODE, so a single non-UTF-8 byte returned
-	 * false and the fallback dropped the request id, breaking JSON-RPC
-	 * correlation on the client. With the fix the byte is substituted and the
-	 * normal encoded response (with id preserved) is emitted.
-	 *
-	 * @see https://github.com/WordPress/mcp-adapter/issues/195
-	 */
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
 	public function test_encode_response_tolerates_non_utf8_bytes_in_payload(): void {
 		$reflection             = new \ReflectionClass( $this->bridge );
 		$encode_response_method = $reflection->getMethod( 'encode_response' );
@@ -694,7 +686,6 @@ final class StdioServerBridgeTest extends TestCase {
 				'content' => array(
 					array(
 						'type' => 'text',
-						// 0x80 is not a valid leading byte for any UTF-8 sequence.
 						'text' => "before \x80 after",
 					),
 				),
@@ -704,17 +695,44 @@ final class StdioServerBridgeTest extends TestCase {
 		$encoded = $encode_response_method->invoke( $this->bridge, $response );
 
 		$this->assertIsString( $encoded );
-		$this->assertStringNotContainsString(
-			'response could not be encoded',
-			$encoded,
-			'Bad byte should be substituted, not trigger the encode-failure fallback.'
-		);
+		$this->assertStringNotContainsString( 'response could not be encoded', $encoded );
 
 		$decoded = json_decode( $encoded, true );
 		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'jsonrpc', $decoded );
 		$this->assertSame( '2.0', $decoded['jsonrpc'] );
-		$this->assertSame( 7, $decoded['id'], 'Request id must round-trip even when the payload contained bad bytes.' );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertSame( 7, $decoded['id'] );
 		$this->assertArrayHasKey( 'result', $decoded );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_preserves_id_on_partial_output_substitution(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		// Depth >512 flags JSON_ERROR_DEPTH on a PARTIAL_OUTPUT_ON_ERROR encode — the call
+		// succeeds with substitution but should still round-trip the request id.
+		$deep = 'leaf';
+		for ( $i = 0; $i < 600; $i++ ) {
+			$deep = array( $deep );
+		}
+
+		$response = array(
+			'jsonrpc' => '2.0',
+			'id'      => 'req-42',
+			'result'  => array( 'nested' => $deep ),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringNotContainsString( 'response could not be encoded', $encoded );
+		// json_decode default depth (512) can't read the 600-deep output, so assert on the
+		// raw string instead — we only care that jsonrpc + id round-tripped, not the payload.
+		$this->assertStringContainsString( '"jsonrpc":"2.0"', $encoded );
+		$this->assertStringContainsString( '"id":"req-42"', $encoded );
 	}
 
 	public function test_handle_request_with_missing_params(): void {
