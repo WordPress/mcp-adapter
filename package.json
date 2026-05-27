@@ -31,8 +31,8 @@
 		"wp-env:test": "wp-env --config=.wp-env.test.json"
 	},
 	"devDependencies": {
-		"@wordpress/env": "^11.5.0",
-		"@wordpress/scripts": "^32.1.0",
+		"@wordpress/env": "^11.6.0",
+		"@wordpress/scripts": "^32.2.0",
 		"@wordpress/prettier-config": "^4.45.0"
 	},
 	"overrides": {
