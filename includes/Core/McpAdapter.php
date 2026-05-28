@@ -58,6 +58,12 @@ final class McpAdapter {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
 
+			// Wire the default abilities now so they catch `wp_abilities_api_init`,
+			// which fires during the `init` action, before `rest_api_init` runs.
+			// Deferred initialization handles transports and the `mcp_adapter_init`
+			// action, neither of which need to be in place before `init`.
+			self::$instance->register_default_ability_hooks();
+
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
 				add_action( 'init', array( self::$instance, 'init' ), 20 );
@@ -68,6 +74,32 @@ final class McpAdapter {
 		}
 
 		return self::$instance;
+	}
+
+	/**
+	 * Wire the default server's ability registration hooks at instance() time.
+	 *
+	 * `wp_abilities_api_categories_init` and `wp_abilities_api_init` fire during
+	 * WordPress's `init` action. Because `instance()` is typically called during
+	 * plugin bootstrap (before `init`), wiring these handlers here ensures they
+	 * catch the abilities-api init pass. The previous placement inside
+	 * {@see self::maybe_create_default_server()} ran on `rest_api_init`, which is
+	 * after `init`, so the default abilities never registered for the abilities
+	 * API to discover.
+	 *
+	 * Gated by `mcp_adapter_create_default_server` so a host disabling the
+	 * default server does not register default abilities either.
+	 *
+	 * @internal For use by adapter initialization only.
+	 */
+	private function register_default_ability_hooks(): void {
+		/** This filter is documented in {@see self::maybe_create_default_server()}. */
+		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
+			return;
+		}
+
+		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
+		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
 	}
 
 	/**
@@ -118,10 +150,9 @@ final class McpAdapter {
 			return;
 		}
 
-		// Register category before abilities
-		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
-		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
-
+		// Ability registration hooks are wired earlier in
+		// {@see self::register_default_ability_hooks()} so they catch
+		// `wp_abilities_api_init`. This stage only schedules server creation.
 		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
 	}
 
