@@ -13,6 +13,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP;
 
+// Exit if accessed directly.
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Class - Autoloader
  */

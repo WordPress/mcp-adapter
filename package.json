@@ -7,13 +7,8 @@
 		"url": "git+https://github.com/WordPress/mcp-adapter.git"
 	},
 	"engines": {
-		"node": ">=20.10.0",
-		"npm": ">=10.2.3"
-	},
-	"devDependencies": {
-		"@wordpress/env": "^10.29.0",
-		"@wordpress/scripts": "^30.22.0",
-		"@wordpress/prettier-config": "^4.29.0"
+		"node": ">=22.21.1",
+		"npm": ">=10.9.4"
 	},
 	"files": [
 		"includes",
@@ -25,13 +20,30 @@
 		"mcp-adapter.php"
 	],
 	"scripts": {
-		"build": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer install --no-dev --optimize-autoloader",
-		"plugin-zip": "wp-scripts plugin-zip",
 		"format": "wp-scripts format",
-		"lint:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php",
-		"lint:php:fix": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:fix",
-		"lint:php:stan": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint:php:stan",
-		"test:php": "wp-env run tests-cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
-		"wp-env": "wp-env"
+		"lint:php": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint",
+		"lint:php:fix": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script format",
+		"lint:php:stan": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script phpstan",
+		"plugin-zip": "wp-scripts plugin-zip",
+		"test:php": "npm run wp-env:test -- run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
+		"wp-env": "wp-env",
+		"wp-env:cli": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/",
+		"wp-env:test": "wp-env --config=.wp-env.test.json"
+	},
+	"devDependencies": {
+		"@wordpress/env": "^11.6.0",
+		"@wordpress/scripts": "^32.2.0",
+		"@wordpress/prettier-config": "^4.45.0"
+	},
+	"overrides": {
+		"@babel/runtime": ">=7.26.10",
+		"markdownlint-cli": {
+			"minimatch": "3.1.4"
+		},
+		"prettier": "npm:wp-prettier@^3",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
+		"serialize-javascript": ">=7.0.3",
+		"webpack-dev-server@<=5.2.0": ">=5.2.1"
 	}
 }

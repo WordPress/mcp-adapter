@@ -7,7 +7,7 @@
  * consistent categorization across all MCP adapter components.
  *
  * @package McpAdapter
- * @since   n.e.x.t
+ * @since   0.5.0
  */
 
 declare( strict_types=1 );
@@ -22,7 +22,7 @@ namespace WP\MCP\Infrastructure\Observability;
  * - Permission failures: Occur when permission checks fail at execution time
  * - Execution failures: Occur during component execution
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 final class FailureReason {
 

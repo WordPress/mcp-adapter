@@ -16,7 +16,7 @@ namespace WP\MCP\Domain\Utils;
  * PHP decodes this as [] (empty array).
  * Abilities without input_schema expect null, not empty array.
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 class AbilityArgumentNormalizer {
 
@@ -30,7 +30,7 @@ class AbilityArgumentNormalizer {
 	 * @param mixed $parameters The parameters to normalize.
 	 *
 	 * @return mixed Normalized parameters (null if ability has no schema and params are empty).
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function normalize( \WP_Ability $ability, $parameters ) {

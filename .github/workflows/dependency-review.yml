@@ -1,0 +1,30 @@
+# Dependency Review Action
+#
+# This workflow scans dependency manifest files that change as part of a Pull Request and enforces this repository's dependency review policy. In this configuration, it is used for license checking only; vulnerability and OpenSSF Scorecard checks are disabled below.
+#
+# Source repository: https://github.com/actions/dependency-review-action
+# Public documentation: https://docs.github.com/en/code-security/supply-chain-security/understanding-your-software-supply-chain/about-dependency-review#dependency-review-enforcement
+name: Dependency Review
+
+on: [pull_request]
+
+# Disable permissions for all available scopes by default.
+# Any needed permissions should be configured at the job level.
+permissions: {}
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          license-check: true
+          vulnerability-check: false # Since we only want to use the license check, we need to set this to false as otherwise the default is true.
+          show-openssf-scorecard: false # Since we only want to use the license check, we need to set this to false as otherwise the default is true.
+          config-file: 'WordPress/ai/.github/dependency-review-config.yml@4498f98999a21ad626a46f5629c0a82c427debaa' # v0.9.0

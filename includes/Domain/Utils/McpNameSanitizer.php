@@ -21,7 +21,7 @@ use WP_Error;
  * Used for both tools and prompts (same naming rules).
  * NOT used for resources (which use URIs as identifiers).
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 class McpNameSanitizer {
 
@@ -60,7 +60,7 @@ class McpNameSanitizer {
 	 * @param string $name Original name.
 	 *
 	 * @return string|\WP_Error Sanitized name or WP_Error if unsalvageable.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function sanitize_name( string $name ) {

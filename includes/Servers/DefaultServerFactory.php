@@ -123,7 +123,7 @@ class DefaultServerFactory {
 				esc_html( $result->get_error_message() ),
 				esc_html( (string) $result->get_error_code() )
 			),
-			'n.e.x.t'
+			'0.5.0'
 		);
 	}
 

@@ -57,7 +57,7 @@ class ResourcesHandler {
 		 * Use this filter to filter resources by context, add dynamic resources,
 		 * or reorder the resources list.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
 		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
@@ -128,7 +128,7 @@ class ResourcesHandler {
 			 * Return the (optionally modified) parameters array to proceed with execution,
 			 * or return a WP_Error to block execution and return an error to the client.
 			 *
-			 * @since n.e.x.t
+			 * @since 0.5.0
 			 *
 			 * @param array                                $params       The request parameters.
 			 * @param string                               $uri          The resource URI.
@@ -150,7 +150,7 @@ class ResourcesHandler {
 			 * Use this filter for content transformation, caching storage,
 			 * PII redaction, or audit logging.
 			 *
-			 * @since n.e.x.t
+			 * @since 0.5.0
 			 *
 			 * @param mixed|\WP_Error                      $contents     The raw resource contents (may be WP_Error).
 			 * @param array                                $params       The request parameters used.

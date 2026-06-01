@@ -20,7 +20,7 @@ use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 /**
  * Handles prompts-related MCP methods.
  *
- * @since n.e.x.t
+ * @since 0.5.0
  */
 class PromptsHandler {
 	use HandlerHelperTrait;
@@ -76,7 +76,7 @@ class PromptsHandler {
 		 * Use this filter to filter prompts by context, add dynamic prompts,
 		 * or reorder the prompts list.
 		 *
-		 * @since n.e.x.t
+		 * @since 0.5.0
 		 *
 		 * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts Array of Prompt DTOs.
 		 * @param \WP\MCP\Core\McpServer                         $server  The MCP server instance.
@@ -147,7 +147,7 @@ class PromptsHandler {
 			 * Return the (optionally modified) arguments array to proceed with execution,
 			 * or return a WP_Error to block execution and return an error to the client.
 			 *
-			 * @since n.e.x.t
+			 * @since 0.5.0
 			 *
 			 * @param array                              $arguments   The prompt arguments.
 			 * @param string                             $prompt_name The prompt name being retrieved.
@@ -169,7 +169,7 @@ class PromptsHandler {
 			 * Use this filter for message transformation, context injection,
 			 * content enrichment, or audit logging.
 			 *
-			 * @since n.e.x.t
+			 * @since 0.5.0
 			 *
 			 * @param mixed|\WP_Error                    $result      The raw execution result (may be WP_Error).
 			 * @param array                              $arguments   The prompt arguments used.
@@ -221,7 +221,7 @@ class PromptsHandler {
 	 * - Tier 4: Multi-text with 'texts' array
 	 * - Tier 5: Fallback JSON encoding for arbitrary data
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result from prompt execution.
 	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO for description fallback.
@@ -261,7 +261,7 @@ class PromptsHandler {
 	/**
 	 * Tier 1: Full MCP-compliant format with 'messages' array.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result with 'messages' key.
 	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
@@ -319,7 +319,7 @@ class PromptsHandler {
 	 *
 	 * Creates a single user message with text content.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array                                 $result Raw result with 'text' key.
 	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO.
@@ -355,7 +355,7 @@ class PromptsHandler {
 	/**
 	 * Tier 3: Single message with 'role' and 'content'.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result with 'role' and 'content' keys.
 	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
@@ -383,7 +383,7 @@ class PromptsHandler {
 	 *
 	 * Creates multiple messages with the same role.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array                                 $result Raw result with 'texts' key.
 	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO.
@@ -436,7 +436,7 @@ class PromptsHandler {
 	 *
 	 * Used when no other tier matches. Logs an observability event.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result (arbitrary structure).
 	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
@@ -490,7 +490,7 @@ class PromptsHandler {
 	 *
 	 * Validates role and content type, applying defaults where needed.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array  $message     Raw message array.
 	 * @param string $prompt_name Prompt name for logging.
@@ -524,7 +524,7 @@ class PromptsHandler {
 	/**
 	 * Validate content type against ContentBlockFactory registry.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param array  $content     Content array with 'type' key.
 	 * @param string $prompt_name Prompt name for logging.
@@ -583,7 +583,7 @@ class PromptsHandler {
 	/**
 	 * Validate role value and apply default if invalid.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @param string $role        Role value to validate.
 	 * @param string $prompt_name Prompt name for logging (empty to skip logging).

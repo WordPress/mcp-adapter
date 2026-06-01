@@ -12,8 +12,8 @@ Join the `#core-ai` channel [on WordPress Slack](http://wordpress.slack.com) ([s
 
 In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/). All code in the MCP Adapter must follow these requirements:
 
-- **WordPress**: The plugin's minimum WordPress version requirement is 6.8.
-- **PHP**: The minimum required version is 7.4 (`^7.4 || ^8.0`). This is subject to change and will be kept in sync with the WordPress core minimum PHP version requirement.
+- **WordPress**: 6.9+
+- **PHP**: 7.4+
 
 We include [several tools](#useful-commands) to help ensure your code meets these standards.
 
@@ -31,7 +31,7 @@ Please see [SECURITY.md](SECURITY.md).
 
 ### Prerequisites
 
-- Node.js: 20.x (NVM recommended)
+- Node.js: 22.x (NVM recommended)
 - Docker
 - Git
 - Composer: (if you prefer to run the Composer tools locally)
@@ -77,7 +77,7 @@ The WordPress development site will be available at http://localhost:8888 and th
 
 - `npm run wp-env start`: Start the local development environment.
 - `npm run wp-env stop`: Stop the local development environment.
-- `npm run wp-env run tests-cli YOUR_CMD_HERE`: Run WP-CLI commands in the local environment.
+- `npm run wp-env:cli -- YOUR_CMD_HERE`: Run WP-CLI commands in the local environment.
 
 For more information on using `wp-env`, see the [wp-env documentation](https://developer.wordpress.org/block-editor/packages/packages-env/).
 

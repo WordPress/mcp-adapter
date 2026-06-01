@@ -145,7 +145,7 @@ class McpTransportContext {
 	 *
 	 * @throws \InvalidArgumentException If required keys are missing or unknown keys are present.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 */
 	public function __construct( array $properties ) {
 		$this->validate_properties( $properties );
@@ -175,7 +175,7 @@ class McpTransportContext {
 	 *
 	 * @throws \InvalidArgumentException If required keys are missing or unknown keys are present.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 */
 	private function validate_properties( array $properties ): void {
 		$provided_keys = array_keys( $properties );

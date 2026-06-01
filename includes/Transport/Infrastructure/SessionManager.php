@@ -42,6 +42,13 @@ final class SessionManager {
 	private const DEFAULT_INACTIVITY_TIMEOUT = DAY_IN_SECONDS;
 
 	/**
+	 * Minimum interval between last_activity writes in seconds.
+	 *
+	 * @var int
+	 */
+	private const DEFAULT_ACTIVITY_UPDATE_INTERVAL = 60;
+
+	/**
 	 * Create a new session for a user
 	 *
 	 * @param int $user_id The user ID.
@@ -156,7 +163,7 @@ final class SessionManager {
 	/**
 	 * Get configuration values.
 	 *
-	 * @return array<string, int> Configuration array.
+	 * @return array{max_sessions: int, inactivity_timeout: int, activity_update_interval: int} Configuration array.
 	 */
 	private static function get_config(): array {
 		/**
@@ -183,9 +190,29 @@ final class SessionManager {
 		 */
 		$inactivity_timeout = (int) apply_filters( 'mcp_adapter_session_inactivity_timeout', self::DEFAULT_INACTIVITY_TIMEOUT );
 
+		/**
+		 * Filters the minimum interval between session last_activity writes.
+		 *
+		 * To reduce write amplification, the session manager only updates
+		 * `last_activity` if at least this many seconds have elapsed since
+		 * the last write.
+		 *
+		 * @since 0.5.0
+		 *
+		 * @param int $interval Minimum seconds between writes. Default 60.
+		 */
+		$activity_update_interval = (int) apply_filters( 'mcp_adapter_session_activity_update_interval', self::DEFAULT_ACTIVITY_UPDATE_INTERVAL );
+
+		// Clamp: interval must be less than inactivity timeout to prevent
+		// sessions from expiring despite active use.
+		if ( $activity_update_interval >= $inactivity_timeout ) {
+			$activity_update_interval = (int) ( $inactivity_timeout / 2 );
+		}
+
 		return array(
-			'max_sessions'       => $max_sessions,
-			'inactivity_timeout' => $inactivity_timeout,
+			'max_sessions'             => $max_sessions,
+			'inactivity_timeout'       => $inactivity_timeout,
+			'activity_update_interval' => max( 0, $activity_update_interval ),
 		);
 	}
 
@@ -254,9 +281,6 @@ final class SessionManager {
 			return false;
 		}
 
-		// Opportunistic cleanup
-		self::cleanup_expired_sessions( $user_id );
-
 		$sessions = self::get_all_user_sessions( $user_id );
 
 		if ( ! isset( $sessions[ $session_id ] ) ) {
@@ -274,9 +298,12 @@ final class SessionManager {
 			return false;
 		}
 
-		// Update last activity
-		$sessions[ $session_id ]['last_activity'] = time();
-		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+		// Throttle last_activity writes to reduce write amplification
+		$activity_update_interval = $config['activity_update_interval'];
+		if ( time() - $session['last_activity'] >= $activity_update_interval ) {
+			$sessions[ $session_id ]['last_activity'] = time();
+			update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+		}
 
 		return true;
 	}

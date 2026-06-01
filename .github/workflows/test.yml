@@ -1,5 +1,9 @@
 name: Test
 
+# Disable permissions for all available scopes by default.
+# Any needed permissions should be configured at the job level.
+permissions: {}
+
 on:
   workflow_dispatch:
   push:
@@ -38,13 +42,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
           persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2.37.1
         with:
           php-version: '8.3'
           coverage: none
@@ -57,19 +61,17 @@ jobs:
         run: echo "date=$(/bin/date -u --date='last Mon' "+%F")" >> "$GITHUB_OUTPUT"
 
       - name: Cache PHPCS scan cache
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: tests/_output/phpcs-cache.json
-          key: ${{ runner.os }}-date-${{ steps.get-date.outputs.date }}-phpcs-cache-${{ hashFiles('**/composer.json', 'phpcs.xml.dist') }}
+          key: ${{ runner.os }}-date-${{ steps.get-date.outputs.date }}-phpcs-cache-${{ hashFiles('**/composer.json', '.phpcs.xml.dist') }}
 
-      # Since Composer dependencies are installed using `composer update` and no lock file is in version control,
-      # passing a custom cache suffix ensures that the cache is flushed at least once per week.
       - name: Install Composer dependencies
-        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
 
       - name: Run PHPCS
         id: phpcs
-        run: composer lint:php -- --report-full --report-checkstyle=./tests/_output/phpcs-report.xml
+        run: composer lint -- --report-full --report-checkstyle=./tests/_output/phpcs-report.xml
 
       - name: Show PHPCS results in PR
         if: ${{ always() && steps.phpcs.outcome == 'failure' }}
@@ -81,7 +83,6 @@ jobs:
   #
   # Performs the following steps:
   # - Checks out the repository.
-  # - Checks out the public wordpress/abilities-api repository as a sibling directory.
   # - Sets up PHP.
   # - Configures caching for PHP static analysis scans.
   # - Installs Composer dependencies.
@@ -97,23 +98,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: mcp-adapter
-          persist-credentials: false
-
-      # Clone the public wordpress/abilities-api repo as a sibling directory for PHPStan analysis
-      - name: Checkout wordpress/abilities-api repo
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: wordpress/abilities-api
-          path: abilities-api
-          ref: trunk
-          fetch-depth: 1
+          show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
           persist-credentials: false
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2.37.1
         with:
           php-version: 8.3
           coverage: none
@@ -126,7 +117,7 @@ jobs:
         run: echo "date=$(/bin/date -u --date='last Mon' "+%F")" >> "$GITHUB_OUTPUT"
 
       - name: Cache PHP Static Analysis scan cache
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: tests/_output # This is defined in the base.neon file.
           key: 'phpstan-result-cache-${{ runner.os }}-date-${{ steps.get-date.outputs.date }}'
@@ -134,24 +125,20 @@ jobs:
             phpstan-result-cache-
 
       - name: Install Composer dependencies
-        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
-        with:
-          working-directory: mcp-adapter
+        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
 
       - name: Make Composer packages available globally
         run: echo "${PWD}/vendor/bin" >> "$GITHUB_PATH"
-        working-directory: mcp-adapter
 
       - name: Run PHP static analysis tests
         id: phpstan
         run: phpstan analyse -vvv --error-format=checkstyle | cs2pr
-        working-directory: mcp-adapter
 
-      - name: 'Save result cache'
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      - name: Save result cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         if: ${{ !cancelled() }}
         with:
-          path: mcp-adapter/tests/_output
+          path: tests/_output
           key: 'phpstan-result-cache-${{ runner.os }}-date-${{ steps.get-date.outputs.date }}'
 
   # Runs the PHPUnit tests for WordPress.
@@ -171,11 +158,14 @@ jobs:
   phpunit:
     name: Test PHP ${{ matrix.php }} WP ${{ matrix.wp }}${{ matrix.coverage && ' with coverage' || '' }}
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         php: ['8.4', '8.3', '8.2', '8.1', '8.0', '7.4']
-        wp: [latest, trunk]
+        wp: [latest, trunk, '6.9']
         coverage: [false]
         include:
           - php: '8.4'
@@ -192,7 +182,7 @@ jobs:
           echo "PHP_FPM_GID=$(id -g)" >> "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
           persist-credentials: false
@@ -205,16 +195,16 @@ jobs:
       # dependency versions are installed and cached.
       ##
       - name: Set up PHP
-        uses: shivammathur/setup-php@9e72090525849c5e82e596468b86eb55e9cc5401 # v2.32.0
+        uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2.37.1
         with:
           php-version: '${{ matrix.php }}'
           coverage: none
 
       - name: Install Composer dependencies
-        uses: ramsey/composer-install@a2636af0004d1c0499ffca16ac0b4cc94df70565 # v3.1.0
+        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
 
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           cache: 'npm'
           node-version-file: '.nvmrc'
@@ -223,21 +213,21 @@ jobs:
         run: npm ci
 
       - name: Start the Docker testing environment
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           timeout_minutes: 10
           max_attempts: 3
           command: |
             if [ "${{ matrix.coverage }}" == "true" ]; then
-            npm run wp-env start -- --xdebug=coverage
+            npm run wp-env:test start -- --xdebug=coverage
             else
-            npm run wp-env start
+            npm run wp-env:test start
             fi
 
       - name: Log versions
         run: |
-          npm run wp-env -- run cli php -- -v
-          npm run wp-env -- run cli wp core version
+          npm run wp-env:test -- run cli php -- -v
+          npm run wp-env:test -- run cli wp core version
 
       - name: Run PHPUnit tests${{ matrix.coverage && ' with coverage report' || '' }}
         id: phpunit
@@ -247,7 +237,7 @@ jobs:
       - name: Upload code coverage report
         continue-on-error: true
         if: ${{ matrix.coverage }}
-        uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: tests/_output/php-coverage.xml
@@ -256,7 +246,7 @@ jobs:
 
       - name: Upload HTML coverage report as artifact
         if: ${{ matrix.coverage }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wp-code-coverage-${{ matrix.php }}-${{ matrix.wp }}
           path: tests/_output/html

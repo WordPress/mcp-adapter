@@ -124,12 +124,13 @@ add_action( 'plugins_loaded', function() {
 
 ## Basic Usage
 
-The MCP Adapter automatically creates a default server that exposes all registered WordPress abilities through a layered architecture. This provides immediate MCP functionality without requiring manual server configuration.
+The MCP Adapter automatically creates a default server that exposes registered WordPress abilities through a layered architecture. This provides immediate MCP functionality without requiring manual server configuration.
 
 **How it works:**
-- All WordPress abilities registered via `wp_register_ability()` are automatically available
-- The default server supports both HTTP and STDIO transports
-- Abilities are exposed as tools, resources, or prompts based on their characteristics
+- WordPress abilities registered via `wp_register_ability()` with the `meta.mcp.public` flag set to `true` are discoverable and executable on the default server via its built-in adapter tools
+- On the default server, public abilities are accessed through `mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, and `mcp-adapter/execute-ability` rather than being auto-registered individually in `tools/list`
+- Alternatively, abilities can be explicitly listed when creating a [custom MCP server](#creating-custom-mcp-servers); in that case, they can be exposed directly as MCP tools, resources, or prompts without requiring the `meta.mcp.public` flag
+- The default server supports both HTTP and STDIO transports and supports multiple MCP protocol versions
 - Built-in error handling and observability are included
 - Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
 - Access via STDIO: `wp mcp-adapter serve --server=mcp-adapter-default-server`
@@ -143,6 +144,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/get-posts', [
         'label' => 'Get Posts',
         'description' => 'Retrieve WordPress posts with optional filtering',
+        'category' => 'site',
         'input_schema' => [
             'type' => 'object',
             'properties' => [
@@ -183,25 +185,34 @@ add_action( 'wp_abilities_api_init', function() {
         },
         'permission_callback' => function() {
             return current_user_can( 'read' );
-        }
+        },
+        'meta' => [
+            'mcp' => [
+                'public' => true, // Required for default MCP server access
+            ],
+        ],
     ]);
 });
 
-// The ability is automatically available via the default MCP server
-// No additional configuration needed!
+// With the meta.mcp.public flag, the ability is exposed through the default MCP server.
+// In the default server configuration, discover it via `discover-abilities`
+// and invoke it via `mcp-adapter/execute-ability` rather than expecting
+// it to appear as its own entry in `tools/list`.
+// Without the meta.mcp.public flag, abilities are only accessible
+// through custom MCP servers that explicitly list them.
 ```
 
 </details>
 
-For detailed information about creating WordPress abilities, see the [WordPress Abilities API documentation](https://github.com/WordPress/abilities-api).
+For detailed information about creating WordPress abilities, see the [Abilities API developer documentation](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/).
 
 ### Connecting to MCP Servers
 
 The MCP Adapter supports multiple connection methods. Here are examples for connecting with MCP clients:
 
-#### STDIO Transport (Testing Only)
+#### STDIO Transport (Local Development)
 
-For testing purposes only, you can interact directly with MCP servers using WP-CLI commands:
+For local development and testing, you can interact directly with MCP servers using WP-CLI commands:
 
 ```bash
 # List all available MCP servers
@@ -216,7 +227,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapt
 
 #### MCP Client Configuration
 
-Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to connect to your WordPress MCP servers:
+Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to connect to your WordPress MCP servers.
 
 <details>
 <summary><strong>STDIO Transport Configuration for local sites (click to expand)</strong></summary>
@@ -252,6 +263,8 @@ Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to co
 
 <details>
 <summary><strong>HTTP Transport via Proxy (click to expand)</strong></summary>
+
+The [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automattic/mcp-wordpress-remote) proxy runs locally and translates STDIO-based MCP communication from AI clients into HTTP REST API calls that WordPress understands. Authentication uses [WordPress Application Passwords](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/).
 
 ```json
 {
@@ -343,6 +356,7 @@ See the [Observability Guide](docs/guides/observability.md) for detailed metrics
 ## Migration
 
 - [Migration Guide: v0.5.0](docs/migration/v0.5.0.md) — Breaking changes and upgrade instructions
+- [Migration Guide: v0.3.0](docs/migration/v0.3.0.md) — Transport, observability, and hook name changes
 
 ## License
 [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html)

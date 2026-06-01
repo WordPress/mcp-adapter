@@ -9,7 +9,7 @@ This guide covers different installation methods for the MCP Adapter.
 The MCP Adapter is designed to be installed as a Composer package. This is the primary and recommended installation method:
 
 ```bash
-composer require wordpress/abilities-api wordpress/mcp-adapter
+composer require wordpress/mcp-adapter
 ```
 
 #### Using Jetpack Autoloader (Highly Recommended)
@@ -145,25 +145,9 @@ new MyMcpPlugin();
 
 Alternatively, you can install the MCP Adapter as a traditional WordPress plugin:
 
-#### From GitHub
-
-1. **Download or clone** the plugin:
-   ```bash
-   # Clone to your plugins directory
-   cd /path/to/your/wordpress/wp-content/plugins/
-   git clone https://github.com/WordPress/mcp-adapter.git
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   cd mcp-adapter
-   composer install
-   ```
-
-3. **Activate the plugin** in WordPress admin or via WP-CLI:
-   ```bash
-   wp plugin activate mcp-adapter
-   ```
+```bash
+wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
+```
 
 The plugin automatically initializes and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
 
@@ -213,8 +197,7 @@ add_action( 'wp_loaded', function() {
 - Run `composer install` in the plugin directory
 
 **"WordPress Abilities API not available"**
-- Install and activate the WordPress Abilities API plugin
-- Verify `wp_register_ability()` function exists
+- Ensure you're running WordPress 6.9 or higher.
 
 **REST API not responding**
 - Check WordPress REST API is enabled
@@ -249,8 +232,7 @@ Once installation is complete:
 
 ### Required
 - **PHP**: >= 7.4
-- **WordPress**: >= 6.8
-- **WordPress Abilities API**: For ability registration
+- **WordPress**: >= 6.9
 
 ### Optional
 - **Composer**: For dependency management

@@ -9,8 +9,7 @@ The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, al
 ## Prerequisites
 
 - **PHP 7.4 or higher**
-- **WordPress 6.8 or higher**
-- **WordPress Abilities API**
+- **WordPress 6.9 or higher**
 - **Composer** (recommended)
 
 ## Quick Start
@@ -19,16 +18,12 @@ The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, al
 
 **Recommended: Composer Package**
 ```bash
-composer require wordpress/abilities-api wordpress/mcp-adapter
+composer require wordpress/mcp-adapter
 ```
 
 **Alternative: WordPress Plugin**
 ```bash
-# Clone to plugins directory
-git clone https://github.com/WordPress/mcp-adapter.git wp-content/plugins/mcp-adapter
-cd wp-content/plugins/mcp-adapter
-composer install
-wp plugin activate mcp-adapter
+wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
 ```
 
 ### Step 2: Register a Simple Ability

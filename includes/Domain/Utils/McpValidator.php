@@ -26,7 +26,7 @@ class McpValidator {
 	 * MUST support: image/png, image/jpeg, image/jpg
 	 * SHOULD support: image/svg+xml, image/webp
 	 *
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 * @var array<string>
 	 */
@@ -50,7 +50,7 @@ class McpValidator {
 	 * @param int $max_length Maximum allowed length. Default is 128 per MCP spec.
 	 *
 	 * @return bool True if valid, false otherwise.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function validate_name( string $name, int $max_length = 128 ): bool {
@@ -128,7 +128,7 @@ class McpValidator {
 	 * @param bool $log_warnings Whether to log warnings for invalid icons. Default true.
 	 *
 	 * @return array{valid: array, errors: array} Array with 'valid' icons and 'errors' details.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function validate_icons_array( array $icons, bool $log_warnings = true ): array {
@@ -185,7 +185,7 @@ class McpValidator {
 	 * @param array $icon The icon data to validate.
 	 *
 	 * @return array Array of validation errors, empty if valid.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function get_icon_validation_errors( array $icon ): array {
@@ -257,7 +257,7 @@ class McpValidator {
 	 * @param string $src The icon source to validate.
 	 *
 	 * @return bool True if valid, false otherwise.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function validate_icon_src( string $src ): bool {
@@ -291,7 +291,7 @@ class McpValidator {
 	 * @param string $mime_type The MIME type to validate.
 	 *
 	 * @return bool True if valid icon MIME type, false otherwise.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function validate_icon_mime_type( string $mime_type ): bool {
@@ -307,7 +307,7 @@ class McpValidator {
 	 * @param string $size The size string to validate.
 	 *
 	 * @return bool True if valid, false otherwise.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function validate_icon_size( string $size ): bool {
@@ -335,7 +335,7 @@ class McpValidator {
 	 * @param string $theme The theme to validate.
 	 *
 	 * @return bool True if valid, false otherwise.
-	 * @since n.e.x.t
+	 * @since 0.5.0
 	 *
 	 */
 	public static function validate_icon_theme( string $theme ): bool {
