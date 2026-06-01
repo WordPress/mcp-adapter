@@ -10,12 +10,12 @@ Join the `#core-ai` channel [on WordPress Slack](http://wordpress.slack.com) ([s
 
 ## Coding standards
 
-In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/). All code in the Performance Lab plugin must follow these requirements:
+In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/). All code in the MCP Adapter must follow these requirements:
 
-- **WordPress**: As of MCP Adapter v0.1.0, released {@todo}, the plugin's minimum WordPress version requirement is 6.8.
-- **PHP**: The minimum required version right now is 7.4. This is subject to change and will be brought in sync with the WordPress core minimum PHP version requirement closer to release.
+- **WordPress**: The plugin's minimum WordPress version requirement is 6.8.
+- **PHP**: The minimum required version is 7.4. This is subject to change and will be kept in sync with the WordPress core minimum PHP version requirement.
 
-We include [several tools](#useful-commands) to help ensure your code meets contribution
+We include [several tools](#useful-commands) to help ensure your code meets these standards.
 
 ## Guidelines
 
@@ -25,7 +25,7 @@ We include [several tools](#useful-commands) to help ensure your code meets cont
 
 ## Reporting Security Issues
 
-Please see [SECURITY.md] (@TODO).
+Please see [SECURITY.md](SECURITY.md).
 
 ## Local Setup
 
