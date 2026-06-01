@@ -356,7 +356,8 @@ class MyErrorHandler implements \WP\MCP\Infrastructure\ErrorHandling\Contracts\M
 // Check implementation
 if ( ! in_array( 
     \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface::class, 
-    class_implements( MyErrorHandler::class ) 
+    class_implements( MyErrorHandler::class ),
+    true
 )) {
     error_log( 'Error handler missing interface' );
 }

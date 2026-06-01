@@ -2,6 +2,105 @@
 
 This document explains how the MCP Adapter transforms WordPress abilities into MCP components and handles requests from AI agents.
 
+## Directory structure
+
+```
+includes/
+│
+├── Plugin.php                     # Bootstrap — singleton, dependency check, initializes McpAdapter
+├── Autoloader.php                 # PSR-4 autoloader
+│
+├── Core/                          # Registry and server management
+│   ├── McpAdapter.php             # Main singleton registry; fires mcp_adapter_init
+│   ├── McpServer.php              # Individual server configuration and component access
+│   ├── McpComponentRegistry.php   # Stores and retrieves McpComponentInterface instances
+│   ├── McpTransportFactory.php    # Instantiates transports with dependency injection
+│   └── McpVersionNegotiator.php   # MCP protocol version negotiation
+│
+├── Abilities/                     # Built-in meta-abilities for the default server
+│   ├── DiscoverAbilitiesAbility.php  # mcp-adapter/discover-abilities
+│   ├── ExecuteAbilityAbility.php     # mcp-adapter/execute-ability
+│   ├── GetAbilityInfoAbility.php     # mcp-adapter/get-ability-info
+│   └── McpAbilityHelperTrait.php     # Shared helpers (mcp.public check, mcp.type)
+│
+├── Cli/                           # WP-CLI integration
+│   ├── McpCommand.php             # wp mcp-adapter serve / list
+│   └── StdioServerBridge.php      # Bridges WP-CLI stdin/stdout to MCP server
+│
+├── Domain/                        # Business logic and MCP component models
+│   ├── Contracts/
+│   │   └── McpComponentInterface.php       # Internal contract for all MCP components
+│   ├── Utils/
+│   │   ├── McpNameSanitizer.php            # Converts ability names to MCP-safe names
+│   │   ├── McpValidator.php                # Validates names, URIs, and schemas
+│   │   ├── McpAnnotationMapper.php         # Maps ability meta.annotations to MCP DTOs
+│   │   ├── SchemaTransformer.php           # Transforms JSON Schema formats
+│   │   ├── ContentBlockHelper.php          # Factory for MCP content block DTOs
+│   │   └── AbilityArgumentNormalizer.php   # Normalizes empty {} input to null
+│   ├── Tools/
+│   │   ├── McpTool.php                     # Wraps Tool DTO with execution logic
+│   │   ├── RegisterAbilityAsMcpTool.php    # Converts a WordPress ability to McpTool
+│   │   └── McpToolValidator.php            # Validates tool names and schemas
+│   ├── Resources/
+│   │   ├── McpResource.php                 # Wraps Resource DTO with execution logic
+│   │   ├── RegisterAbilityAsMcpResource.php # Converts a WordPress ability to McpResource
+│   │   └── McpResourceValidator.php        # Validates resource URIs and schemas
+│   └── Prompts/
+│       ├── Contracts/
+│       │   └── McpPromptBuilderInterface.php  # Interface for prompt message builders
+│       ├── McpPrompt.php                      # Wraps Prompt DTO with execution logic
+│       ├── McpPromptBuilder.php               # Builds prompt messages from ability output
+│       ├── McpPromptValidator.php             # Validates prompt names and arguments
+│       └── RegisterAbilityAsMcpPrompt.php     # Converts a WordPress ability to McpPrompt
+│
+├── Handlers/                      # JSON-RPC method handlers
+│   ├── HandlerHelperTrait.php     # Shared error response helpers
+│   ├── Initialize/
+│   │   └── InitializeHandler.php  # Handles initialize / initialized
+│   ├── Tools/
+│   │   └── ToolsHandler.php       # Handles tools/list, tools/call
+│   ├── Resources/
+│   │   └── ResourcesHandler.php   # Handles resources/list, resources/read
+│   ├── Prompts/
+│   │   └── PromptsHandler.php     # Handles prompts/list, prompts/get
+│   └── System/
+│       └── SystemHandler.php      # Handles ping, notifications/cancelled
+│
+├── Infrastructure/
+│   ├── ErrorHandling/
+│   │   ├── Contracts/
+│   │   │   └── McpErrorHandlerInterface.php  # log( $message, $context, $type )
+│   │   ├── ErrorLogMcpErrorHandler.php        # Logs to PHP error_log
+│   │   ├── NullMcpErrorHandler.php            # No-op (null object pattern)
+│   │   └── McpErrorFactory.php                # Creates JSON-RPC error responses
+│   └── Observability/
+│       ├── Contracts/
+│       │   └── McpObservabilityHandlerInterface.php  # record_event( $event, $tags, $duration_ms )
+│       ├── ErrorLogMcpObservabilityHandler.php        # Logs events to PHP error_log
+│       ├── NullMcpObservabilityHandler.php            # No-op (null object pattern)
+│       ├── ConsoleObservabilityHandler.php            # Outputs events to stdout
+│       ├── McpObservabilityHelperTrait.php            # Tag management helpers
+│       └── FailureReason.php                          # Standardized failure reason constants
+│
+├── Transport/
+│   ├── Contracts/
+│   │   ├── McpTransportInterface.php      # Base transport contract
+│   │   └── McpRestTransportInterface.php  # REST transport contract (register_routes, check_permission)
+│   ├── HttpTransport.php                  # Unified HTTP transport (MCP 2025-11-25)
+│   └── Infrastructure/
+│       ├── HttpRequestContext.php         # Encapsulates HTTP request data
+│       ├── HttpRequestHandler.php         # Processes raw HTTP requests
+│       ├── HttpSessionValidator.php       # Validates Mcp-Session-Id header
+│       ├── JsonRpcResponseBuilder.php     # Builds JSON-RPC responses
+│       ├── McpTransportContext.php        # Bundles server + handlers for transport use
+│       ├── McpTransportHelperTrait.php    # Shared transport utilities
+│       ├── RequestRouter.php              # Routes MCP methods to handlers; records observability events
+│       └── SessionManager.php            # Creates and manages HTTP sessions
+│
+└── Servers/
+    └── DefaultServerFactory.php          # Creates the default mcp-adapter-default-server
+```
+
 ## System architecture
 
 The MCP Adapter uses a two-layer architecture that separates protocol concerns from WordPress integration:

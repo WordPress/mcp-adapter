@@ -116,9 +116,10 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'My First MCP Server',                      // Human-readable name
         'A simple MCP server for demonstration',    // Description
         '1.0.0',                                    // Version
-        [ \WP\MCP\Transport\HttpTransport::class ], // Transport methods
+        array( \WP\MCP\Transport\HttpTransport::class ), // Transport methods
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
-        [ 'my-plugin/get-site-info' ]              // Abilities to expose as tools
+        null,                                       // Observability handler (null = default)
+        array( 'my-plugin/get-site-info' )          // Abilities to expose as tools
     );
 });
 ```

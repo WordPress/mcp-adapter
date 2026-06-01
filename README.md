@@ -17,7 +17,7 @@ This adapter bridges WordPress's Abilities API with the [MCP specification](http
 - **Ability-to-MCP Conversion**: Automatically converts WordPress abilities into MCP tools, resources, and prompts
 - **Multi-Server Management**: Create and manage multiple MCP servers with unique configurations
 - **Extensible Transport Layer**:
-    - **HTTP Transport**: Unified transport implementing [MCP 2025-06-18 specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports.md) for HTTP-based communication
+    - **HTTP Transport**: Unified transport implementing [MCP 2025-11-25 specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) for HTTP-based communication
     - **STDIO Transport**: Process-based communication via standard input/output for local development and CLI integration
     - **Custom Transport Support**: Implement `McpTransportInterface` to create specialized communication protocols
     - **Multi-Transport Configuration**: Configure servers with multiple transport methods simultaneously
@@ -304,7 +304,7 @@ add_action('mcp_adapter_init', function($adapter) {
         'Description of my server',       // Server description
         'v1.0.0',                        // Server version
         [                                 // Transport methods
-            \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-06-18 compliant
+            \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-11-25 compliant
         ],
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
         \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class, // Observability handler
