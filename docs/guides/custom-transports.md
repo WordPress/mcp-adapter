@@ -86,14 +86,14 @@ class ApiKeyTransport implements McpRestTransportInterface {
     }
     
     public function check_permission( \WP_REST_Request $request ) {
-        $api_key = $request->get_header( 'X-API-Key' );
-        
+        $api_key = sanitize_text_field( $request->get_header( 'X-API-Key' ) );
+
         if ( empty( $api_key ) ) {
             return false;
         }
-        
+
         // Validate against stored keys
-        $valid_keys = get_option( 'mcp_api_keys', [] );
+        $valid_keys = get_option( 'mcp_api_keys', array() );
         return in_array( $api_key, $valid_keys, true );
     }
     

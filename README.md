@@ -109,20 +109,17 @@ require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload_packages.php';
 
 ### Using MCP Adapter in Your Plugin
 
-Using the MCP Adapter in your plugin is straightforward, just check availability and instantiate:
+Check availability and initialize on `plugins_loaded` so all plugins are available before the adapter starts:
 
 ```php
-use WP\MCP\Core\McpAdapter;
+add_action( 'plugins_loaded', function() {
+    if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
+        // MCP Adapter is not active — show an admin notice or return early.
+        return;
+    }
 
-// 1. Check if MCP Adapter is available
-if ( ! class_exists( McpAdapter::class ) ) {
-    // Handle missing dependency (show admin notice, etc.)
-    return;
-}
-
-// 2. Initialize the adapter
-McpAdapter::instance();
-// That's it!
+    WP\MCP\Core\McpAdapter::instance();
+} );
 ```
 
 ## Basic Usage

@@ -58,12 +58,16 @@ add_action( 'wp_abilities_api_init', function() {
             ]
         ],
         'execute_callback' => function( $input ) {
-            $post_data = [
+            if ( empty( $input['title'] ) ) {
+                return new \WP_Error( 'missing_title', 'Post title is required.' );
+            }
+
+            $post_data = array(
                 'post_title'   => sanitize_text_field( $input['title'] ),
                 'post_content' => wp_kses_post( $input['content'] ),
-                'post_status'  => in_array( $input['status'], ['draft', 'publish'] ) ? $input['status'] : 'draft',
-                'post_type'    => 'post'
-            ];
+                'post_status'  => in_array( $input['status'], array( 'draft', 'publish' ), true ) ? $input['status'] : 'draft',
+                'post_type'    => 'post',
+            );
             
             // Handle category if provided
             if ( ! empty( $input['category'] ) ) {
