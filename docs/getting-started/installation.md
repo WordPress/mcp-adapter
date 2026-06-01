@@ -120,7 +120,8 @@ class MyMcpPlugin {
             '1.0.0',
             [ \WP\MCP\Transport\HttpTransport::class ],
             \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
-            [ 'my-plugin/get-posts' ]
+            null, // observability handler (null = use default)
+            [ 'my-plugin/get-posts' ] // tools
         );
     }
     

@@ -36,30 +36,6 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 - **[Contributing Guide](../CONTRIBUTING.md)** - Development setup, coding standards, and contribution workflow
 - **[Testing Guide](guides/testing.md)** - Running and writing tests with wp-env
 
-## Quick navigation
-
-### New to MCP Adapter?
-1. [Quick Start Guide](getting-started/README.md)
-2. [Default Server](guides/default-server.md)
-3. [Basic Examples](getting-started/basic-examples.md)
-4. [Architecture Overview](architecture/overview.md)
-
-### Build custom tools
-1. [Creating Abilities](guides/creating-abilities.md)
-2. [Basic Examples](getting-started/basic-examples.md)
-
-### Custom authentication
-1. [Transport Permissions](guides/transport-permissions.md) (recommended)
-2. [Custom Transports](guides/custom-transports.md) (advanced)
-
-### Upgrading
-1. [Migrating to v0.5.0](migration/v0.5.0.md)
-2. [Migrating to v0.3.0](migration/v0.3.0.md)
-
-### Troubleshooting
-1. [Common Issues](troubleshooting/common-issues.md)
-2. [Installation Guide](getting-started/installation.md)
-
 ---
 
-**Ready to get started?** Jump into the [Quick Start Guide](getting-started/README.md) and have your first MCP server running in minutes!
+New to MCP Adapter? Start with the [Quick Start Guide](getting-started/README.md).

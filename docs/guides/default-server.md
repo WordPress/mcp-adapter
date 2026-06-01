@@ -424,48 +424,6 @@ add_filter('mcp_adapter_execute_ability_capability', function() {
 });
 ```
 
-## Customization
-
-### Server Configuration Filter
-
-You can customize the entire server configuration using the `mcp_adapter_default_server_config` filter:
-
-```php
-add_filter('mcp_adapter_default_server_config', function($config) {
-    // Change server name
-    $config['server_name'] = 'My Custom MCP Server';
-    
-    // Add custom error handler
-    $config['error_handler'] = MyCustomErrorHandler::class;
-    
-    // Add additional tools
-    $config['tools'][] = 'my-plugin/custom-tool';
-    
-    return $config;
-});
-```
-
-### Adding Resources and Prompts
-
-The default server can be extended with resources and prompts:
-
-```php
-add_filter('mcp_adapter_default_server_config', function($config) {
-    // Add resources
-    $config['resources'] = [
-        'my-plugin/site-config',
-        'my-plugin/user-data'
-    ];
-    
-    // Add prompts  
-    $config['prompts'] = [
-        'my-plugin/code-review',
-        'my-plugin/content-analysis'
-    ];
-    
-    return $config;
-});
-```
 
 ## Usage Examples
 
