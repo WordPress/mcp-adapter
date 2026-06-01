@@ -131,9 +131,10 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
         'Secure MCP Server',
         'MCP server with API key authentication',
         '1.0.0',
-        [ ApiKeyTransport::class ], // Use custom transport
+        array( ApiKeyTransport::class ), // Use custom transport
         \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
-        [ 'my-plugin/secure-tool' ]
+        null,                            // Observability handler (null = default)
+        array( 'my-plugin/secure-tool' ) // Tools
     );
 });
 ```

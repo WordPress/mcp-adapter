@@ -8,7 +8,7 @@ The official WordPress package for MCP integration that exposes WordPress abilit
 
 ## Overview
 
-This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
+This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
 
 ## Features
 
@@ -51,7 +51,7 @@ For a full breakdown of the component structure, see the [Architecture Overview]
 ### Required
 
 - **PHP**: `^7.4 || ^8.0`
-- **WordPress**: >= 6.8
+- **WordPress**: >= 6.9
 - **[WordPress Abilities API](https://github.com/WordPress/abilities-api)**: Must be installed and active as a WordPress plugin
 - **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types — installed automatically via Composer
 
@@ -308,24 +308,24 @@ The [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automatt
 For advanced use cases, you can create custom MCP servers with specific configurations:
 
 ```php
-add_action('mcp_adapter_init', function($adapter) {
+add_action( 'mcp_adapter_init', function( $adapter ) {
     $adapter->create_server(
         'my-server-id',                    // Unique server identifier
         'my-namespace',                    // REST API namespace
-        'mcp',                            // REST API route
-        'My MCP Server',                  // Server name
-        'Description of my server',       // Server description
-        'v1.0.0',                        // Server version
-        [                                 // Transport methods
-            \WP\MCP\Transport\HttpTransport::class,  // Recommended: MCP 2025-11-25 compliant
-        ],
-        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class, // Error handler
-        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class, // Observability handler
-        ['my-plugin/my-ability'],         // Abilities to expose as tools
-        [],                              // Resources (optional)
-        [],                              // Prompts (optional)
+        'mcp',                             // REST API route
+        'My MCP Server',                   // Server name
+        'Description of my server',        // Server description
+        'v1.0.0',                          // Server version
+        array(                             // Transport methods
+            \WP\MCP\Transport\HttpTransport::class,
+        ),
+        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,        // Error handler
+        \WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler::class,    // Observability handler
+        array( 'my-plugin/my-ability' ),   // Abilities to expose as tools
+        array(),                           // Resources (optional)
+        array()                            // Prompts (optional)
     );
-});
+} );
 ```
 
 ### Custom Transport Implementation

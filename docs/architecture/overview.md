@@ -169,6 +169,15 @@ The remaining layers wire the Schema and Adapter layers together:
 - **Name sanitization**: Uses `McpNameSanitizer` to normalize tool and prompt names
 - **Validation**: Validates components with `McpValidator` when validation is enabled
 
+### McpVersionNegotiator
+
+Negotiates the MCP protocol version between client and server. If the client requests a supported version it is echoed back; otherwise the server falls back to the latest supported version.
+
+**Supported protocol versions** (newest-first):
+- `2025-11-25` (latest — recommended)
+- `2025-06-18`
+- `2024-11-05`
+
 ### McpTransportFactory
 - **Purpose**: Creates transport instances with dependency injection
 - **Context Creation**: Builds `McpTransportContext` with all required handlers

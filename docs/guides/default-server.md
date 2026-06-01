@@ -178,6 +178,15 @@ add_filter( 'mcp_adapter_session_inactivity_timeout', function () {
 } );
 ```
 
+**`mcp_adapter_session_activity_update_interval`** — Minimum number of seconds between activity timestamp updates for an active session. Updating the timestamp on every request adds a database write; this interval throttles those writes. Default: `60` seconds.
+
+```php
+// Update activity timestamp at most every 5 minutes
+add_filter( 'mcp_adapter_session_activity_update_interval', function () {
+    return 5 * MINUTE_IN_SECONDS;
+} );
+```
+
 Sessions are stored in user meta and are cleaned up automatically when a new session is created or an existing session is validated.
 
 ### STDIO transport (WP-CLI)

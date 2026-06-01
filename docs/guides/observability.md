@@ -173,6 +173,18 @@ All events use a **consistent naming pattern with status tags** for easier filte
 
 The `failure_reason` tag provides specific context for errors. When WordPress abilities return `WP_Error` objects, the error code is used directly as the failure reason.
 
+The `FailureReason` class (`WP\MCP\Infrastructure\Observability\FailureReason`) provides constants for all standard failure reasons. Use these constants in custom handlers to avoid hardcoding strings:
+
+```php
+use WP\MCP\Infrastructure\Observability\FailureReason;
+
+public function record_event( string $event, array $tags = [], ?float $duration_ms = null ): void {
+    if ( isset( $tags['failure_reason'] ) && FailureReason::PERMISSION_DENIED === $tags['failure_reason'] ) {
+        // handle permission denied specifically
+    }
+}
+```
+
 **Standard Failure Reasons:**
 
 **Tool-related:**
