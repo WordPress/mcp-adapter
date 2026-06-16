@@ -52,7 +52,7 @@
 	},
 	"require": {
 		"php": "^7.4 || ^8.0",
-		"wordpress/php-mcp-schema": "^0.1.0",
+		"wordpress/php-mcp-schema": "^0.1.2",
 		"ext-json": "*"
 	},
 	"require-dev": {

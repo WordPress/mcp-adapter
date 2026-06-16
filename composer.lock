@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c4130a57090962955d1034a7b62caefc",
+    "content-hash": "951fe9c682f026c7fcb51d1a398e7594",
     "packages": [
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "v0.1.1",
+            "version": "v0.1.2",
             "source": {
                 "type": "git",
-                "url": "https://github.com/WordPress/php-mcp-schema.git",
-                "reference": "e2118ec421ead51a3e17a3d8160f4537727e91b9"
+                "url": "https://github.com/WordPress/php-mcp-schema",
+                "reference": "95df8a50a3bd54f6b7c4869c6e2185db380d4d63"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/e2118ec421ead51a3e17a3d8160f4537727e91b9",
-                "reference": "e2118ec421ead51a3e17a3d8160f4537727e91b9",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/95df8a50a3bd54f6b7c4869c6e2185db380d4d63",
+                "reference": "95df8a50a3bd54f6b7c4869c6e2185db380d4d63",
                 "shasum": ""
             },
             "require": {
@@ -51,11 +51,7 @@
                 "php",
                 "schema"
             ],
-            "support": {
-                "issues": "https://github.com/WordPress/php-mcp-schema/issues",
-                "source": "https://github.com/WordPress/php-mcp-schema/tree/v0.1.1"
-            },
-            "time": "2026-04-10T19:35:16+00:00"
+            "time": "2026-06-05T08:26:32+00:00"
         }
     ],
     "packages-dev": [
