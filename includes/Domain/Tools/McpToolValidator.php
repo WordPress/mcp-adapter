@@ -265,6 +265,12 @@ class McpToolValidator {
 			);
 		}
 
+		// Normalize stdClass properties (e.g. an empty `{}` emitted by the schema DTO for
+		// parameter-less tools) to an array so the structural checks below treat it as a valid object.
+		if ( isset( $schema['properties'] ) && $schema['properties'] instanceof \stdClass ) {
+			$schema['properties'] = (array) $schema['properties'];
+		}
+
 		// If properties exist, they must be an array/object.
 		if ( isset( $schema['properties'] ) && ! is_array( $schema['properties'] ) ) {
 			$errors[] = sprintf(
