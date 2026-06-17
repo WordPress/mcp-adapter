@@ -320,6 +320,23 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
 } );
 ```
 
+> [!IMPORTANT]
+> Always register servers against the `$adapter` instance passed to your callback (as above). Do **not** call `\WP\MCP\Core\McpAdapter::instance()` from inside the callback. The `mcp_adapter_init` action name is global, so if two active plugins each bundle their own copy of this library, every copy's dispatch runs every copy's `mcp_adapter_init` callbacks. Using the passed-in `$adapter` keeps each callback registering against the copy that actually dispatched it; reaching for `instance()` instead resolves to *your* copy's singleton on every dispatch and produces `duplicate_server_id` errors.
+
+### Registering servers with `on_init()`
+
+`McpAdapter::on_init()` is a convenience wrapper around `add_action( 'mcp_adapter_init', ... )` that builds the identity check in for you: the wrapped callback only runs when *this* adapter is the one dispatching, so it is safe even when multiple copies of the library are active in the same request. Call it on your copy's adapter at plugin load — there is no need to add the action yourself:
+
+```php
+\WP\MCP\Core\McpAdapter::instance()->on_init( function ( $adapter ) {
+    $adapter->create_server(
+        // ...same arguments as above...
+    );
+} );
+```
+
+If you already register against the `$adapter` passed to your own `mcp_adapter_init` callback (as shown in the previous section), you are equally safe — `on_init()` simply makes that guarantee explicit and harder to get wrong.
+
 ### Custom Transport Implementation
 
 The MCP Adapter includes production-ready HTTP transports. For specialized requirements like custom authentication, message queues, or enterprise integrations, you can create custom transport protocols.
