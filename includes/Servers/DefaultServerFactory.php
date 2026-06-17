@@ -31,9 +31,32 @@ class DefaultServerFactory {
 	 * WordPress filters for customization, making it perfect for use within
 	 * the McpAdapter.
 	 *
+	 * When hooked to the `mcp_adapter_init` action, WordPress passes the dispatching
+	 * adapter instance as the first argument. If that instance is not this copy's
+	 * singleton, the call bails out. This prevents duplicate server registration
+	 * when multiple copies of this library are active in the same request (e.g.
+	 * two plugins that each vendor `wordpress/mcp-adapter`, with or without
+	 * namespace prefixing) and each copy's dispatch fires every copy's callbacks.
+	 *
+	 * The parameter is intentionally untyped: in a multi-copy setup the dispatching
+	 * adapter may be a different class (different namespace) than this factory's
+	 * own `McpAdapter` import, so a strict type hint would raise a TypeError before
+	 * the guard could run.
+	 *
+	 * @since n.e.x.t Added optional `$dispatching_adapter` parameter and cross-dispatch guard.
+	 *
+	 * @param mixed $dispatching_adapter The dispatching adapter instance passed by WordPress.
+	 *                                   Null when invoked directly (not via the action).
+	 *
 	 * @return void
 	 */
-	public static function create(): void {
+	public static function create( $dispatching_adapter = null ): void {
+
+		// Bail when the dispatching adapter isn't this copy's singleton.
+		// See the docblock for why the parameter is untyped.
+		if ( null !== $dispatching_adapter && McpAdapter::instance() !== $dispatching_adapter ) {
+			return;
+		}
 
 		// Auto-discover resources and prompts from abilities
 		$auto_discovered_resources = self::discover_abilities_by_type( 'resource' );
