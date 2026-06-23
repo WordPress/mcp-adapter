@@ -19,6 +19,31 @@ namespace WP\MCP\Domain\Utils;
  */
 class SchemaTransformer {
 	/**
+	 * Maximum recursion depth for the normalize walk.
+	 *
+	 * Guards against pathological/cyclic structures blowing the PHP stack.
+	 *
+	 * @var int
+	 */
+	private const MAX_DEPTH = 64;
+
+	/**
+	 * WordPress-only argument keys that are not part of the JSON Schema spec.
+	 *
+	 * These must be stripped from the emitted MCP schema. They can carry
+	 * object-valued callables (e.g. sanitize_callback => array( $obj, 'method' ))
+	 * whose object graph may be cyclic.
+	 *
+	 * @var array<int,string>
+	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
+	private const WP_ONLY_KEYS = array(
+		'sanitize_callback',
+		'validate_callback',
+		'arg_options',
+	);
+
+	/**
 	 * Transform a schema to MCP-compatible object format.
 	 *
 	 * If the schema is already an object type, it is returned unchanged.
@@ -120,17 +145,47 @@ class SchemaTransformer {
 	/**
 	 * Recursively convert objects to arrays.
 	 *
-	 * @param mixed $value The value to convert.
+	 * Casts objects to arrays as before, but guards against runaway recursion:
+	 * cyclic object graphs (e.g. an object-valued sanitize_callback whose object
+	 * references itself) are short-circuited via spl_object_id() tracking, and a
+	 * MAX_DEPTH ceiling stops any other pathological nesting. While walking, the
+	 * WordPress-only keys (sanitize_callback, validate_callback, arg_options) are
+	 * stripped because they are not valid JSON Schema and may carry such cyclic
+	 * callables. They are stripped wherever encountered: that is the behaviour the
+	 * issue asks for and the simplest correct approach. The risk of clobbering a
+	 * legitimately named data property is accepted as negligible for schema input.
+	 *
+	 * @param mixed              $value   The value to convert.
+	 * @param int                $depth   Current recursion depth.
+	 * @param array<int,bool>    $visited Object ids already seen on this branch.
 	 *
 	 * @return mixed The converted value.
 	 */
-	private static function convert_objects_to_arrays( $value ) {
+	private static function convert_objects_to_arrays( $value, int $depth = 0, array $visited = array() ) {
+		if ( $depth >= self::MAX_DEPTH ) {
+			return null;
+		}
+
 		if ( is_object( $value ) ) {
-			$value = (array) $value;
+			// Track identity BEFORE the cast, since (array) loses object identity.
+			$object_id = spl_object_id( $value );
+			if ( isset( $visited[ $object_id ] ) ) {
+				return null;
+			}
+			$visited[ $object_id ] = true;
+			$value                 = (array) $value;
 		}
 
 		if ( is_array( $value ) ) {
-			return array_map( array( self::class, 'convert_objects_to_arrays' ), $value );
+			$result = array();
+			foreach ( $value as $key => $item ) {
+				if ( in_array( $key, self::WP_ONLY_KEYS, true ) ) {
+					continue;
+				}
+				$result[ $key ] = self::convert_objects_to_arrays( $item, $depth + 1, $visited );
+			}
+
+			return $result;
 		}
 
 		return $value;
