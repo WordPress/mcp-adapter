@@ -99,6 +99,40 @@ final class McpAdapter {
 	}
 
 	/**
+	 * Register a callback to run when this adapter initializes.
+	 *
+	 * An alternative to `add_action( 'mcp_adapter_init', ... )` that builds the
+	 * identity guard in for you. The `mcp_adapter_init` action name is global,
+	 * so when more than one copy of this library is active in the same request
+	 * (e.g. two plugins that each vendor `wordpress/mcp-adapter`, with or without
+	 * namespace prefixing), every copy's dispatch runs every copy's subscribers.
+	 * Registering servers inside an unguarded subscriber causes
+	 * duplicate-registration errors on subsequent dispatches.
+	 *
+	 * A subscriber that uses the `$adapter` passed to its `mcp_adapter_init`
+	 * callback is already safe; this helper just wraps the action with the same
+	 * identity check so the callback only runs when this adapter is the one
+	 * dispatching.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param callable $callback Receives this adapter instance when invoked.
+	 *
+	 * @return void
+	 */
+	public function on_init( callable $callback ): void {
+		add_action(
+			'mcp_adapter_init',
+			function ( $adapter = null ) use ( $callback ) {
+				if ( $adapter !== $this ) {
+					return;
+				}
+				$callback( $adapter );
+			}
+		);
+	}
+
+	/**
 	 * Conditionally create the default server based on filter.
 	 *
 	 * @internal For use by adapter initialization only.
