@@ -295,16 +295,35 @@ class ToolsHandler {
 				);
 			}
 
-			// Standard result - JSON-encode for text content, include as structuredContent.
-			$json_text = wp_json_encode( $result );
+			// JSON_INVALID_UTF8_SUBSTITUTE keeps a single bad byte from emptying the response
+			// (see issue #195). Other failure modes (depth, recursion, NAN, resources) fall
+			// through to the false-branch below instead of being silently substituted.
+			$json_text = wp_json_encode( $result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE );
+
 			if ( false === $json_text ) {
-				$json_text = '{}';
+				$this->mcp->get_error_handler()->log(
+					'Tool result could not be JSON-encoded; emitting empty payload',
+					array(
+						'tool'       => $request_params['name'] ?? 'unknown',
+						'json_error' => json_last_error_msg(),
+					)
+				);
+
+				return CallToolResult::fromArray(
+					array(
+						'content'           => array( ContentBlockHelper::text( '{}' ) ),
+						'structuredContent' => null,
+						'isError'           => false,
+					)
+				);
 			}
 
+			// Re-derive structuredContent from the sanitized text so the outer WP REST envelope
+			// (default flags) cannot trip on bytes that the inner encode tolerated.
 			return CallToolResult::fromArray(
 				array(
 					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $result,
+					'structuredContent' => json_decode( $json_text, true ),
 					'isError'           => false,
 				)
 			);
