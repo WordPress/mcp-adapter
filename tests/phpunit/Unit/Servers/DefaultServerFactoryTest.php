@@ -251,4 +251,34 @@ final class DefaultServerFactoryTest extends TestCase {
 		$this->assertNotNull( $server );
 		$this->assertInstanceOf( NullMcpObservabilityHandler::class, $server->get_observability_handler() );
 	}
+
+	public function test_create_with_matching_adapter_registers_server(): void {
+		global $wp_current_filter;
+		$wp_current_filter[] = 'mcp_adapter_init';
+
+		DefaultServerFactory::create( McpAdapter::instance() );
+
+		array_pop( $wp_current_filter );
+
+		$this->assertNotNull( $this->adapter->get_server( 'mcp-adapter-default-server' ) );
+	}
+
+	public function test_create_with_foreign_adapter_bails_out(): void {
+		global $wp_current_filter;
+		$wp_current_filter[] = 'mcp_adapter_init';
+
+		// Simulate a second adapter instance — the kind that would be dispatched
+		// by another vendored copy of this library in the same request.
+		$foreign = ( new \ReflectionClass( McpAdapter::class ) )->newInstanceWithoutConstructor();
+		$this->assertNotSame( McpAdapter::instance(), $foreign );
+
+		DefaultServerFactory::create( $foreign );
+
+		array_pop( $wp_current_filter );
+
+		$this->assertNull(
+			$this->adapter->get_server( 'mcp-adapter-default-server' ),
+			'Default server must not be registered on our singleton when a foreign adapter dispatched.'
+		);
+	}
 }
