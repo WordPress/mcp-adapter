@@ -373,4 +373,164 @@ final class SchemaTransformerTest extends TestCase {
 		$this->assertIsArray( $result['schema']['properties']['name'] );
 		$this->assertSame( 'string', $result['schema']['properties']['name']['type'] );
 	}
+
+	/**
+	 * Issue #207: A schema property may carry an object-valued WP callback
+	 * (e.g. sanitize_callback => array( $obj, 'method' )). If that object's
+	 * graph contains a back-reference (cycle), convert_objects_to_arrays()
+	 * recurses without a cycle guard until the PHP stack/memory blows.
+	 *
+	 * This test asserts the transform completes and returns a 'schema' key
+	 * without a fatal. NOTE: on current (buggy) code a real stack overflow is
+	 * an uncatchable fatal that crashes the whole PHPUnit process, so this can
+	 * only turn green after the guard lands. The RED proof for this case is
+	 * demonstrated via a constrained subprocess repro (see task notes).
+	 */
+	public function test_transform_withCyclicObjectValuedCallback_doesNotBlowStack(): void {
+		$obj       = new \stdClass();
+		$obj->self = $obj;
+
+		$schema = array(
+			'type'       => 'object',
+			'properties' => array(
+				'image' => array(
+					'type'              => 'string',
+					'sanitize_callback' => array( $obj, 'method' ),
+				),
+			),
+		);
+
+		$result = SchemaTransformer::transform_to_object_schema( $schema );
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'schema', $result );
+	}
+
+	/**
+	 * Issue #207: the cycle guard must hold independently of key-stripping.
+	 * Here the back-reference lives under a legitimate JSON Schema key
+	 * (properties), which is NOT stripped, so only the spl_object_id() guard
+	 * can prevent the runaway recursion. This pins the guard directly rather
+	 * than relying on the WP-only key being skipped before recursion.
+	 */
+	public function test_transform_withCycleUnderNonStrippedKey_doesNotBlowStack(): void {
+		$node             = new \stdClass();
+		$node->type       = 'object';
+		$node->properties = new \stdClass();
+		// Back-reference under 'properties' (a legit, non-stripped key).
+		$node->properties->child = $node;
+
+		$schema = array(
+			'type'       => 'object',
+			'properties' => array(
+				'node' => $node,
+			),
+		);
+
+		$result = SchemaTransformer::transform_to_object_schema( $schema );
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'schema', $result );
+	}
+
+	/**
+	 * Issue #207: WordPress-only keys (sanitize_callback, validate_callback,
+	 * arg_options) are not part of the JSON Schema spec and must not leak into
+	 * the emitted MCP schema. They should be stripped recursively while
+	 * legitimate JSON Schema keys are preserved.
+	 */
+	public function test_transform_stripsWpOnlyKeysFromEmittedSchema(): void {
+		$schema = array(
+			'type'       => 'object',
+			'properties' => array(
+				'title' => array(
+					'type'              => 'string',
+					'description'       => 'Post title',
+					'enum'              => array( 'a', 'b' ),
+					'sanitize_callback' => 'sanitize_text_field',
+					'validate_callback' => 'rest_validate_request_arg',
+					'arg_options'       => array( 'sanitize_callback' => 'sanitize_text_field' ),
+				),
+			),
+		);
+
+		$result = SchemaTransformer::transform_to_object_schema( $schema );
+
+		$emitted = $result['schema'];
+
+		$this->assertFalse( self::schema_contains_key( $emitted, 'sanitize_callback' ), 'sanitize_callback must be stripped' );
+		$this->assertFalse( self::schema_contains_key( $emitted, 'validate_callback' ), 'validate_callback must be stripped' );
+		$this->assertFalse( self::schema_contains_key( $emitted, 'arg_options' ), 'arg_options must be stripped' );
+
+		$property = $emitted['properties']['title'];
+		$this->assertSame( 'string', $property['type'] );
+		$this->assertSame( 'Post title', $property['description'] );
+		$this->assertSame( array( 'a', 'b' ), $property['enum'] );
+	}
+
+	/**
+	 * Issue #207 regression guard: a legitimate nested object schema, where
+	 * properties arrive as stdClass instances (as from a JSON decode cycle)
+	 * and carry no callbacks, must still convert to the expected array
+	 * structure.
+	 */
+	public function test_transform_legitimateNestedObjectSchema_stillConverts(): void {
+		$address               = new \stdClass();
+		$address->type         = 'object';
+		$street                = new \stdClass();
+		$street->type          = 'string';
+		$city                  = new \stdClass();
+		$city->type            = 'string';
+		$address_props         = new \stdClass();
+		$address_props->street = $street;
+		$address_props->city   = $city;
+		$address->properties   = $address_props;
+
+		$properties          = new \stdClass();
+		$properties->address = $address;
+
+		$schema = array(
+			'type'       => 'object',
+			'properties' => $properties,
+		);
+
+		$result = SchemaTransformer::transform_to_object_schema( $schema );
+
+		$this->assertFalse( $result['was_transformed'] );
+
+		$emitted = $result['schema'];
+		$this->assertIsArray( $emitted['properties'] );
+		$this->assertIsArray( $emitted['properties']['address'] );
+		$this->assertSame( 'object', $emitted['properties']['address']['type'] );
+		$this->assertIsArray( $emitted['properties']['address']['properties'] );
+		$this->assertSame( 'string', $emitted['properties']['address']['properties']['street']['type'] );
+		$this->assertSame( 'string', $emitted['properties']['address']['properties']['city']['type'] );
+	}
+
+	/**
+	 * Recursively determine whether a schema array contains the given key
+	 * anywhere in its structure.
+	 *
+	 * @param mixed  $value The value to search.
+	 * @param string $key   The key to look for.
+	 *
+	 * @return bool True if the key exists anywhere.
+	 */
+	private static function schema_contains_key( $value, string $key ): bool {
+		if ( ! is_array( $value ) ) {
+			return false;
+		}
+
+		if ( array_key_exists( $key, $value ) ) {
+			return true;
+		}
+
+		foreach ( $value as $item ) {
+			if ( self::schema_contains_key( $item, $key ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
