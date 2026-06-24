@@ -38,6 +38,10 @@ class DummyTransport implements McpRestTransportInterface {
 		return new \WP_REST_Response( array( 'success' => true ) );
 	}
 
+	public function boot(): void {
+		// No-op for testing
+	}
+
 	public function register_routes(): void {
 		// No-op for testing
 	}
