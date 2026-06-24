@@ -27,6 +27,7 @@ Custom transports implement one of two interfaces:
 ```php
 interface McpTransportInterface {
     public function __construct( McpTransportContext $context );
+    public function boot(): void;
     public function register_routes(): void;
 }
 ```
@@ -68,6 +69,9 @@ class ApiKeyTransport implements McpRestTransportInterface {
     
     public function __construct( McpTransportContext $context ) {
         $this->context = $context;
+    }
+
+    public function boot(): void {
         $this->register_routes();
     }
     
@@ -158,7 +162,8 @@ See [Transport Permissions](transport-permissions.md) for simpler authentication
 ## Implementation Notes
 
 ### Required Methods
-- `__construct()`: Accept `McpTransportContext` and call `register_routes()`
+- `__construct()`: Accept `McpTransportContext` and set up dependencies (no WordPress hooks)
+- `boot()`: Register WordPress hooks; `McpTransportFactory` calls this after construction
 - `register_routes()`: Register WordPress REST API endpoints
 - `check_permission()`: Validate request access (REST transports only)
 - `handle_request()`: Process MCP requests (REST transports only)
