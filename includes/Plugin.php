@@ -76,7 +76,7 @@ final class Plugin {
 				'admin_notices',
 				static function () {
 					wp_admin_notice(
-						__( 'Abilities API not available (wp_register_ability function not found)', 'mcp-adapter' ),
+						__( 'MCP Adapter requires WordPress 6.9 or newer. The Abilities API is included in WordPress core.', 'mcp-adapter' ),
 						array(
 							'type'    => 'error',
 							'dismiss' => false,
