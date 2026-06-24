@@ -4,9 +4,21 @@ This guide covers different installation methods for the MCP Adapter.
 
 ## Installation Methods
 
-### Method 1: Composer Package (Recommended)
+### Method 1: WordPress Plugin (Recommended)
 
-The MCP Adapter is designed to be installed as a Composer package. This is the primary and recommended installation method:
+Download the latest release from [GitHub](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other WordPress plugin, or use WP-CLI:
+
+```bash
+wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
+```
+
+The plugin automatically initializes and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
+
+Requires WordPress 6.9 or newer. The Abilities API ships with core — you do not need a separate abilities-api plugin.
+
+### Method 2: Composer Package (for plugin developers)
+
+If you are building a plugin that depends on MCP Adapter, install it as a Composer package:
 
 ```bash
 composer require wordpress/mcp-adapter
@@ -133,23 +145,13 @@ class MyMcpPlugin {
     
     public function missing_abilities_api_notice() {
         echo '<div class="notice notice-error"><p>';
-        echo 'My MCP Plugin requires the WordPress Abilities API to be loaded.';
+        echo 'My MCP Plugin requires WordPress 6.9 or newer (Abilities API is included in core).';
         echo '</p></div>';
     }
 }
 
 new MyMcpPlugin();
 ```
-
-### Method 2: WordPress Plugin (Alternative)
-
-Alternatively, you can install the MCP Adapter as a traditional WordPress plugin:
-
-```bash
-wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
-```
-
-The plugin automatically initializes and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
 
 ## Verifying Installation
 
@@ -197,7 +199,7 @@ add_action( 'wp_loaded', function() {
 - Run `composer install` in the plugin directory
 
 **"WordPress Abilities API not available"**
-- Ensure you're running WordPress 6.9 or higher.
+- Requires WordPress 6.9 or higher. The Abilities API is part of core — there is no separate plugin to install.
 
 **REST API not responding**
 - Check WordPress REST API is enabled
