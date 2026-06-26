@@ -36,6 +36,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/get-site-info', [
         'label' => 'Get Site Information',
         'description' => 'Retrieves basic information about the current WordPress site',
+        'category' => 'site',
         'input_schema' => [
             'type' => 'object',
             'properties' => [

@@ -245,6 +245,40 @@ function(): bool {
 
 ## Ability Issues
 
+### `wp_register_ability()` returns `null`
+
+A common cause is a missing or unregistered `category`. `wp_register_ability()` requires a `category`, and that category must already be registered when registration runs. If it is missing or unknown, the function returns `null` and the ability never appears. There is no `WP_Error`; core calls `_doing_it_wrong()`, which only surfaces a notice when `WP_DEBUG` is on. With `WP_DEBUG` off (typical on production) it looks completely silent, so enable it and check the debug log for a message like `Ability category "..." is not registered`.
+
+```php
+// Wrong: no category → returns null, ability never registers.
+wp_register_ability( 'my-plugin/my-ability', [
+    'label'       => 'My Ability',
+    'description' => 'Test ability',
+    // ...
+] );
+
+// Right: use a registered category. Core provides 'site' and 'user'.
+wp_register_ability( 'my-plugin/my-ability', [
+    'label'       => 'My Ability',
+    'description' => 'Test ability',
+    'category'    => 'site',
+    // ...
+] );
+```
+
+For a custom category, register it first on the `wp_abilities_api_categories_init` hook (a separate, earlier hook than `wp_abilities_api_init`):
+
+```php
+add_action( 'wp_abilities_api_categories_init', function () {
+    wp_register_ability_category( 'my-plugin', [
+        'label'       => 'My Plugin',
+        'description' => 'Abilities provided by My Plugin.',
+    ] );
+} );
+```
+
+See [Ability categories](../guides/creating-abilities.md#ability-categories-required) for details.
+
 ### Ability Not Found
 ```bash
 # Check ability is registered
