@@ -168,9 +168,9 @@ $adapter->create_server(
 );
 
 // Individual abilities check specific permissions.
-// Partial snippet — only the permission_callback is shown. A working
+// Partial snippet: only the permission_callback is shown. A working
 // registration also needs 'label', 'description', 'category', and
-// 'execute_callback' (see the Creating Abilities guide).
+// 'execute_callback'.
 wp_register_ability('my-plugin/edit-post', [
     'permission_callback' => function($args) {
         // Ability: Check if user can edit THIS specific post
@@ -179,6 +179,8 @@ wp_register_ability('my-plugin/edit-post', [
     // ...
 ]);
 ```
+
+The omitted fields are required. See [Creating Abilities](creating-abilities.md) for the full registration shape.
 
 ## Best Practices
 
