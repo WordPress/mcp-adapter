@@ -11,6 +11,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP;
 
+use WP\MCP\Admin\AbilityExposureFilter;
+use WP\MCP\Admin\SettingsPage;
 use WP\MCP\Core\McpAdapter;
 
 // Exit if accessed directly.
@@ -60,6 +62,17 @@ final class Plugin {
 		}
 
 		McpAdapter::instance();
+
+		// Always register the ability-exposure filter so that opted-in
+		// abilities receive `meta.mcp.public = true` at registration time.
+		( new AbilityExposureFilter() )->register();
+
+		// Settings page is admin-only.
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		( new SettingsPage() )->register();
 	}
 
 	/**
