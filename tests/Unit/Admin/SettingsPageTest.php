@@ -2,9 +2,9 @@
 /**
  * SettingsPage unit tests.
  *
- * Covers the security-critical save path (sanitize_option) and the ability
- * discovery used to build the page, both of which back the
- * Settings > MCP Adapter screen added in this PR.
+ * Covers the security-critical save path (sanitize_option), the ability
+ * discovery used to build the page, and the page rendering and registration,
+ * which together back the Settings > MCP Adapter screen added in this PR.
  *
  * @package WP\MCP\Tests\Unit\Admin
  */
@@ -22,9 +22,9 @@ use WP\MCP\Tests\TestCase;
  *
  * Validates that the settings page only ever persists ability names that are
  * actually registered on the site and outside the adapter's managed namespace,
- * and that discovery reports each ability with the managed flag the UI relies
- * on. These are the cases that keep a hand-edited or replayed POST from
- * exposing arbitrary or adapter-internal abilities to the default MCP server.
+ * that discovery reports each ability with the managed flag the UI relies on,
+ * that the page denies access without manage_options, and that it renders the
+ * registered abilities as checkboxes bound to the canonical option.
  */
 final class SettingsPageTest extends TestCase {
 
@@ -33,8 +33,42 @@ final class SettingsPageTest extends TestCase {
 	private const MANAGED = 'mcp-adapter/discover-abilities';
 
 	/**
-	 * Reset the option and ensure the two fixtures exist before each test.
-	 * Parent declares set_up() public, so the override must match visibility.
+	 * Administrator user id used for the render test.
+	 *
+	 * @var int
+	 */
+	private static $admin_id;
+
+	/**
+	 * Create the administrator the render test runs as.
+	 */
+	public static function set_up_before_class(): void {
+		parent::set_up_before_class();
+
+		self::$admin_id = wp_insert_user(
+			array(
+				'user_login' => 'spt_admin',
+				'user_pass'  => 'password',
+				'user_email' => 'spt_admin@example.com',
+				'role'       => 'administrator',
+			)
+		);
+	}
+
+	/**
+	 * Remove the test user.
+	 */
+	public static function tear_down_after_class(): void {
+		if ( self::$admin_id ) {
+			wp_delete_user( self::$admin_id );
+		}
+		parent::tear_down_after_class();
+	}
+
+	/**
+	 * Reset the option, ensure the two fixtures exist, and default to the
+	 * administrator. Parent declares set_up() public, so the override must
+	 * match visibility.
 	 */
 	public function set_up(): void {
 		parent::set_up();
@@ -43,19 +77,18 @@ final class SettingsPageTest extends TestCase {
 		if ( ! wp_get_ability( self::ALPHA ) ) {
 			$this->register_ability_in_hook( self::ALPHA, $this->fixture_args( 'Settings Alpha', 'Alpha for settings test' ) );
 		}
-		if ( wp_get_ability( self::BETA ) ) {
-			return;
+		if ( ! wp_get_ability( self::BETA ) ) {
+			$this->register_ability_in_hook( self::BETA, $this->fixture_args( 'Settings Beta', 'Beta for settings test' ) );
 		}
 
-		$this->register_ability_in_hook( self::BETA, $this->fixture_args( 'Settings Beta', 'Beta for settings test' ) );
+		wp_set_current_user( self::$admin_id );
 	}
 
 	/**
-	 * Remove the fixtures so each test starts from a known registry.
+	 * Restore the logged-out state.
 	 */
 	public function tear_down(): void {
-		wp_unregister_ability( self::ALPHA );
-		wp_unregister_ability( self::BETA );
+		wp_set_current_user( 0 );
 		parent::tear_down();
 	}
 
@@ -155,5 +188,40 @@ final class SettingsPageTest extends TestCase {
 		$sorted = $keys;
 		sort( $sorted, SORT_STRING );
 		$this->assertSame( $sorted, $keys );
+	}
+
+	public function test_register_wires_admin_hooks(): void {
+		$page = new SettingsPage();
+		$page->register();
+
+		$this->assertNotFalse( has_action( 'admin_menu', array( $page, 'register_menu' ) ) );
+		$this->assertNotFalse( has_action( 'admin_init', array( $page, 'register_setting' ) ) );
+	}
+
+	public function test_register_setting_registers_the_option(): void {
+		$page = new SettingsPage();
+		$page->register_setting();
+
+		$registered = get_registered_settings();
+		$this->assertArrayHasKey( AbilityExposureFilter::OPTION, $registered );
+	}
+
+	public function test_render_outputs_checkboxes_bound_to_the_option(): void {
+		update_option( AbilityExposureFilter::OPTION, array( self::ALPHA ) );
+		$page = new SettingsPage();
+
+		ob_start();
+		$page->render_page();
+		$html = (string) ob_get_clean();
+
+		// Page chrome + the option-bound checkbox for a real ability.
+		$this->assertStringContainsString( 'MCP Adapter', $html );
+		$this->assertStringContainsString( esc_attr( AbilityExposureFilter::OPTION ) . '[]', $html );
+		$this->assertStringContainsString( self::ALPHA, $html );
+		// The opted-in ability renders checked.
+		$this->assertStringContainsString( 'checked', $html );
+		// The managed ability renders, but as a disabled/managed row.
+		$this->assertStringContainsString( self::MANAGED, $html );
+		$this->assertStringContainsString( 'managed by the adapter', $html );
 	}
 }
