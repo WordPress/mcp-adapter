@@ -312,7 +312,7 @@ The MCP Adapter automatically converts WordPress Abilities API annotation names 
         'readonly' => true,        // Auto-converted to readOnlyHint
         'destructive' => false,    // Auto-converted to destructiveHint
         'idempotent' => true,      // Auto-converted to idempotentHint
-        'openWorldHint' => false,  // No WordPress equivalent, use MCP format
+        'open_world' => false,     // Auto-converted to openWorldHint
         'title' => 'My Tool'       // No WordPress equivalent, use MCP format
     ]
 ]
@@ -336,7 +336,7 @@ The MCP Adapter automatically converts WordPress Abilities API annotation names 
 | `readonly` | `readOnlyHint` | Tool doesn't modify data |
 | `destructive` | `destructiveHint` | Tool may delete/destroy data |
 | `idempotent` | `idempotentHint` | Same input → same output |
-| *(no equivalent)* | `openWorldHint` | Can work with arbitrary data |
+| `open_world` | `openWorldHint` | Can work with arbitrary data |
 | *(no equivalent)* | `title` | Custom display title |
 
 **Why Use WordPress Format?**
@@ -386,6 +386,7 @@ Tools support these MCP specification annotations:
 - `readonly` → `readOnlyHint`
 - `destructive` → `destructiveHint`
 - `idempotent` → `idempotentHint`
+- `open_world` → `openWorldHint`
 
 ### Resource & Prompt Annotations (Annotations)
 
@@ -427,7 +428,7 @@ wp_register_ability('my-plugin/analyze-data', [
             'readonly' => true,              // WordPress format → readOnlyHint
             'destructive' => false,          // WordPress format → destructiveHint
             'idempotent' => true,            // WordPress format → idempotentHint
-            'openWorldHint' => false,        // No WordPress equivalent
+            'open_world' => false,           // WordPress format → openWorldHint
             'title' => 'Data Analysis Tool'  // No WordPress equivalent
         ],
         'mcp' => [
