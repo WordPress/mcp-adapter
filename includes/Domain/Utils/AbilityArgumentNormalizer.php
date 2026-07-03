@@ -14,7 +14,10 @@ namespace WP\MCP\Domain\Utils;
  *
  * MCP clients send {} (empty object) for tools without arguments.
  * PHP decodes this as [] (empty array).
- * Abilities without input_schema expect null, not empty array.
+ *
+ * Abilities without an input_schema expect null, not an empty array.
+ * Abilities with an input_schema expect an empty array (a valid empty
+ * object), never null, or validation rejects it as "not of type object".
  *
  * @since 0.5.0
  */
@@ -23,21 +26,31 @@ class AbilityArgumentNormalizer {
 	/**
 	 * Normalize parameters for an ability based on its input schema.
 	 *
-	 * If the ability has no input schema, empty arrays are converted to null.
-	 * This ensures compatibility with abilities that don't accept parameters.
+	 * No input schema: empty arrays are converted to null, so abilities that
+	 * take no parameters see null.
+	 * Has input schema: null or an empty array is converted to an empty array,
+	 * so a zero-argument call validates as an empty object instead of failing
+	 * as "not of type object".
 	 *
-	 * @param \WP_Ability $ability The ability to normalize parameters for.
-	 * @param mixed $parameters The parameters to normalize.
+	 * @param \WP_Ability $ability    The ability to normalize parameters for.
+	 * @param mixed       $parameters The parameters to normalize.
 	 *
-	 * @return mixed Normalized parameters (null if ability has no schema and params are empty).
+	 * @return mixed Normalized parameters (null when no schema and params are empty; empty array when a schema is present and params are empty or null).
 	 * @since 0.5.0
-	 *
+	 * @since n.e.x.t Empty or null parameters for schema-defining abilities normalize to an empty array.
 	 */
 	public static function normalize( \WP_Ability $ability, $parameters ) {
 		$input_schema = $ability->get_input_schema();
 
-		if ( empty( $input_schema ) && is_array( $parameters ) && empty( $parameters ) ) {
-			return null;
+		// No schema: an empty {} means "no arguments" -> null.
+		if ( empty( $input_schema ) ) {
+			return is_array( $parameters ) && empty( $parameters ) ? null : $parameters;
+		}
+
+		// Has schema: a missing/empty argument set (null or {}) -> empty object,
+		// so validation sees a valid empty object, never null.
+		if ( null === $parameters || array() === $parameters ) {
+			return array();
 		}
 
 		return $parameters;

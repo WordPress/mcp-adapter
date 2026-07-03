@@ -93,9 +93,13 @@ final class AbilityArgumentNormalizerTest extends TestCase {
 	}
 
 	/**
-	 * Test that null parameters remain null even with input schema.
+	 * Test that null parameters normalize to an empty array when the ability has an input schema.
+	 *
+	 * A schema-defining ability validates its input against the schema. null is
+	 * rejected as "not of type object"; an empty array is a valid empty object.
+	 * See issue #229.
 	 */
-	public function test_null_parameters_remain_null_with_schema(): void {
+	public function test_null_parameters_normalized_to_empty_array_with_schema(): void {
 		$ability = $this->create_ability_mock(
 			array(
 				'type'       => 'object',
@@ -107,7 +111,8 @@ final class AbilityArgumentNormalizerTest extends TestCase {
 
 		$result = AbilityArgumentNormalizer::normalize( $ability, null );
 
-		$this->assertNull( $result );
+		$this->assertIsArray( $result );
+		$this->assertEmpty( $result );
 	}
 
 	/**
