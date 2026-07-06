@@ -21,7 +21,7 @@ use DateTime;
 class McpValidator {
 
 	/**
-	 * URI scheme grammar per RFC 3986 §3.1 (regex character class, no anchors).
+	 * URI scheme grammar per RFC 3986 §3.1 (unanchored regex fragment).
 	 *
 	 * Shared by URI validation and scheme folding so the two can never drift
 	 * apart on what counts as a scheme.
@@ -541,11 +541,12 @@ class McpValidator {
 	 * @since n.e.x.t
 	 */
 	public static function fold_uri_scheme( string $uri ): string {
-		return (string) preg_replace_callback(
+		// On PCRE failure preg_replace_callback() returns null; keep the URI as-is.
+		return preg_replace_callback(
 			'/^(' . self::URI_SCHEME_PATTERN . '):/',
 			static fn( array $matches ): string => strtolower( $matches[1] ) . ':',
 			$uri
-		);
+		) ?? $uri;
 	}
 
 	/**

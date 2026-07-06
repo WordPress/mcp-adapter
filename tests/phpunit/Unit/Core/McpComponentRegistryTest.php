@@ -395,6 +395,11 @@ final class McpComponentRegistryTest extends TestCase {
 			'Lowercased scheme should match the mixed-case advertised URI'
 		);
 
+		$this->assertNotNull(
+			$this->registry->get_mcp_resource( 'WORDPRESS://test/case-resource' ), // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- The uppercase scheme is the point of the test.
+			'Uppercased scheme should match the mixed-case advertised URI'
+		);
+
 		$this->assertNull(
 			$this->registry->get_mcp_resource( 'wordpress://test/CASE-resource' ), // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- The lowercase scheme is the point of the test.
 			'Only the scheme is case-insensitive; the path must still match exactly'
