@@ -16,8 +16,9 @@ namespace WP\MCP\Domain\Utils;
  * PHP decodes this as [] (empty array).
  *
  * Abilities without an input_schema expect null, not an empty array.
- * Abilities with an input_schema expect an empty array (a valid empty
- * object), never null, or validation rejects it as "not of type object".
+ * Abilities with an input_schema expect an empty array, never null. PHP's
+ * [] satisfies an empty object or empty array schema, but null fails
+ * validation as "not of type <schema type>" (object, array, and so on).
  *
  * @since 0.5.0
  */
@@ -29,8 +30,8 @@ class AbilityArgumentNormalizer {
 	 * No input schema: empty arrays are converted to null, so abilities that
 	 * take no parameters see null.
 	 * Has input schema: null or an empty array is converted to an empty array,
-	 * so a zero-argument call validates as an empty object instead of failing
-	 * as "not of type object".
+	 * so a zero-argument call passes schema validation instead of failing as
+	 * "not of type <schema type>" (object, array, and so on).
 	 *
 	 * @param \WP_Ability $ability    The ability to normalize parameters for.
 	 * @param mixed       $parameters The parameters to normalize.
@@ -47,8 +48,8 @@ class AbilityArgumentNormalizer {
 			return is_array( $parameters ) && empty( $parameters ) ? null : $parameters;
 		}
 
-		// Has schema: a missing/empty argument set (null or {}) -> empty object,
-		// so validation sees a valid empty object, never null.
+		// Has schema: a missing/empty argument set (null or {}) -> [], which
+		// satisfies an empty object or array schema. null never validates.
 		if ( null === $parameters || array() === $parameters ) {
 			return array();
 		}
