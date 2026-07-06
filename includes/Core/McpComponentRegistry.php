@@ -14,6 +14,7 @@ use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -629,7 +630,20 @@ class McpComponentRegistry {
 	 *
 	 */
 	public function get_mcp_resource( string $resource_uri ): ?McpResource {
-		return $this->mcp_resources[ $resource_uri ] ?? null;
+		if ( isset( $this->mcp_resources[ $resource_uri ] ) ) {
+			return $this->mcp_resources[ $resource_uri ];
+		}
+
+		// URI schemes are case-insensitive (RFC 3986 §3.1): clients that lowercase
+		// the scheme would otherwise miss a resource advertised with mixed case.
+		$folded = McpValidator::fold_uri_scheme( $resource_uri );
+		foreach ( $this->mcp_resources as $stored_uri => $mcp_resource ) {
+			if ( McpValidator::fold_uri_scheme( (string) $stored_uri ) === $folded ) {
+				return $mcp_resource;
+			}
+		}
+
+		return null;
 	}
 
 	/**
