@@ -41,6 +41,12 @@ jobs:
         uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
         with:
           composer-options: '--no-dev'
+        env:
+          # Give the Jetpack Autoloader the real plugin version for its class
+          # manifest, so "newest copy wins" works when another plugin (e.g.
+          # WooCommerce) bundles an older copy of the WP\MCP\ classes. Without
+          # this, Composer guesses a dev-* version from the git ref.
+          COMPOSER_ROOT_VERSION: ${{ github.event.release.tag_name }}
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
