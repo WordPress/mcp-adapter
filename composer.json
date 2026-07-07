@@ -67,7 +67,7 @@
 		"phpunit/phpunit": "^9.6",
 		"slevomat/coding-standard": "^8.0",
 		"szepeviktor/phpstan-wordpress": "^2.0",
-		"wp-phpunit/wp-phpunit": "^6.5",
+		"wp-phpunit/wp-phpunit": "^7.0",
 		"yoast/phpunit-polyfills": "^4.0"
 	},
 	"scripts": {
