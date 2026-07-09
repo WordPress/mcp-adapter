@@ -2,6 +2,8 @@
 
 This guide provides simple, working examples for creating MCP tools, resources, and prompts using the WordPress MCP Adapter.
 
+> **Every ability needs a `category`.** It must be a registered category, or `wp_register_ability()` returns `null` and the ability never appears (no `WP_Error`, just a `_doing_it_wrong()` notice you'll miss unless `WP_DEBUG` is on). Core provides `site` and `user`; register custom categories on the `wp_abilities_api_categories_init` hook first. See [Ability categories](../guides/creating-abilities.md#ability-categories-required).
+
 ## Example 1: Tool - Create Post
 
 Tools execute actions and return results. Here's a simple post creation tool:
@@ -13,6 +15,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/create-post', [
         'label' => 'Create Post',
         'description' => 'Creates a new WordPress post with the specified content',
+        'category' => 'site',
         'input_schema' => [
             'type' => 'object',
             'properties' => [
@@ -130,6 +133,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/site-config', [
         'label' => 'Site Configuration',
         'description' => 'WordPress site configuration and settings',
+        'category' => 'site',
         'execute_callback' => function() {
             return [
                 'site_name' => get_bloginfo( 'name' ),
@@ -183,6 +187,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/code-review', [
         'label' => 'Code Review Prompt',
         'description' => 'Generate a code review prompt with specific focus areas',
+        'category' => 'site',
         'execute_callback' => function( $input ) {
             $code = $input['code'] ?? '';
             $focus = $input['focus'] ?? ['security', 'performance'];

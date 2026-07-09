@@ -34,12 +34,32 @@ The `type` parameter specifies how the ability should be exposed in the MCP serv
 
 If not specified, abilities default to `type: 'tool'`.
 
+## Ability categories (required)
+
+Every ability **must** declare a `category`, and that category must already be registered when `wp_register_ability()` runs. If you omit `category` or use one that isn't registered, `wp_register_ability()` returns `null` and the ability never appears. There is no `WP_Error`; core calls `_doing_it_wrong()`, which only surfaces a PHP notice when `WP_DEBUG` is on. With `WP_DEBUG` off (typical on production) the failure looks completely silent.
+
+WordPress core registers two categories you can use right away: `site` and `user`.
+
+To use your own category, register it first on the `wp_abilities_api_categories_init` hook. Categories register on this hook; abilities register on `wp_abilities_api_init` — a separate, later hook. Register the category before any ability that references it:
+
+```php
+add_action( 'wp_abilities_api_categories_init', function () {
+    wp_register_ability_category( 'my-plugin', [
+        'label'       => 'My Plugin',
+        'description' => 'Abilities provided by My Plugin.',
+    ] );
+} );
+```
+
+Then reference the slug in your abilities: `'category' => 'my-plugin'`.
+
 ## Basic Ability Structure
 
 ```php
 wp_register_ability('my-plugin/my-ability', [
     'label' => 'My Ability',
     'description' => 'What this ability does',
+    'category' => 'site',         // Required. Must be a registered category (core: 'site', 'user').
     'input_schema' => [...],      // For tools (supports both object and flattened schemas)
     'output_schema' => [...],     // Optional for tools
     'execute_callback' => 'my_callback',
@@ -419,6 +439,7 @@ Resources and Prompts share the same annotation schema per MCP specification:
 wp_register_ability('my-plugin/analyze-data', [
     'label' => 'Data Analyzer',
     'description' => 'Analyze data with various algorithms',
+    'category' => 'site',
     'input_schema' => [...],
     'execute_callback' => 'analyze_data_callback',
     'permission_callback' => function() { return current_user_can('read'); },
@@ -441,6 +462,7 @@ wp_register_ability('my-plugin/analyze-data', [
 wp_register_ability('my-plugin/user-data', [
     'label' => 'User Data Resource',
     'description' => 'Access to user profile data',
+    'category' => 'user',
     'execute_callback' => 'get_user_data',
     'permission_callback' => function() { return current_user_can('read'); },
     'meta' => [
@@ -461,6 +483,7 @@ wp_register_ability('my-plugin/user-data', [
 wp_register_ability('my-plugin/review-prompt', [
     'label' => 'Code Review Prompt',
     'description' => 'Generate structured code review prompts',
+    'category' => 'site',
     'input_schema' => [
         'type' => 'object',
         'properties' => [
@@ -492,6 +515,7 @@ Tools execute actions and return results:
 wp_register_ability('my-plugin/create-post', [
     'label' => 'Create Post',
     'description' => 'Create a new WordPress post with the given title and content',
+    'category' => 'site',
     'input_schema' => [
         'type' => 'object',
         'properties' => [
@@ -556,6 +580,7 @@ For simple tools that accept and return single values, you can use flattened sch
 wp_register_ability('my-plugin/count-posts', [
     'label' => 'Count Posts',
     'description' => 'Count posts of a specific type',
+    'category' => 'site',
     'input_schema' => [
         'type' => 'string',
         'description' => 'Post type to count',
@@ -599,6 +624,7 @@ Resources provide access to data or content. They require a `uri` in the meta fi
 wp_register_ability('my-plugin/site-config', [
     'label' => 'Site Configuration',
     'description' => 'WordPress site configuration and settings',
+    'category' => 'site',
     'execute_callback' => function() {
         return [
             'site_name' => get_bloginfo('name'),
@@ -656,6 +682,7 @@ Prompts use standard JSON Schema `input_schema` to define their parameters. The 
 wp_register_ability('my-plugin/code-review', [
     'label' => 'Code Review Prompt',
     'description' => 'Generate a code review prompt with specific focus areas',
+    'category' => 'site',
     'input_schema' => [
         'type' => 'object',
         'properties' => [
@@ -712,6 +739,7 @@ You can also annotate the generated message content according to the [MCP specif
 wp_register_ability('my-plugin/analysis-prompt', [
     'label' => 'Analysis Prompt',
     'description' => 'Generate analysis prompts with content annotations',
+    'category' => 'site',
     'input_schema' => [
         'type' => 'object',
         'properties' => [

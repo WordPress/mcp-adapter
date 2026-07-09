@@ -393,6 +393,7 @@ The default server implements a metadata-driven security model:
 wp_register_ability('my-plugin/safe-tool', [
     'label' => 'Safe Tool',
     'description' => 'A safe tool for MCP access',
+    'category' => 'site',
     'execute_callback' => 'my_safe_callback',
     'permission_callback' => function() {
         return current_user_can('read');

@@ -85,6 +85,7 @@ class MyMcpPlugin {
             wp_register_ability( 'my-plugin/get-posts', [
                 'label' => 'Get Posts',
                 'description' => 'Retrieve WordPress posts',
+                'category' => 'site',
                 'input_schema' => [
                     'type' => 'object',
                     'properties' => [
