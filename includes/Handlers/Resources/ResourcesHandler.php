@@ -14,6 +14,7 @@ use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
 use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
 
@@ -72,6 +73,24 @@ class ResourcesHandler {
 		return ListResourcesResult::fromArray(
 			array(
 				'resources' => $resources,
+			)
+		);
+	}
+
+	/**
+	 * Handles the resources/templates/list request.
+	 *
+	 * The adapter has no resource-template concept, so this always returns an empty
+	 * list. The method still needs a handler: `resources/templates/list` is part of
+	 * the base `resources` capability (no sub-flag gates it), which the server always
+	 * advertises, so spec-compliant clients call it during resource discovery.
+	 *
+	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult Empty resource-templates list.
+	 */
+	public function list_resource_templates(): ListResourceTemplatesResult {
+		return ListResourceTemplatesResult::fromArray(
+			array(
+				'resourceTemplates' => array(),
 			)
 		);
 	}
