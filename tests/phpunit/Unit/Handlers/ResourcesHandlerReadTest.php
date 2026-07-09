@@ -155,6 +155,31 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertSame( 'WordPress://local/resource-plain-string', $contents[0]->getUri() );
 	}
 
+	public function test_read_resource_with_lowercased_scheme_echoes_advertised_uri(): void {
+		wp_set_current_user( 1 );
+
+		$server  = $this->makeServer( array(), array( 'test/resource-plain-string' ) );
+		$handler = new ResourcesHandler( $server );
+
+		// The resource is advertised with a mixed-case scheme (WordPress://...). A client
+		// that canonicalizes the scheme to lowercase per RFC 3986 3.1 still resolves it, and
+		// the response must echo the advertised URI, not the request's lowercased scheme, so
+		// contents[].uri stays consistent with resources/list.
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'wordpress://local/resource-plain-string' ) ) // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- The lowercase scheme is the point of the test.
+		);
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertNotEmpty( $contents );
+		$this->assertSame(
+			'WordPress://local/resource-plain-string',
+			$contents[0]->getUri(),
+			'Read response must echo the advertised URI, not the client-lowercased scheme.'
+		);
+	}
+
 	public function test_pre_resource_read_filter_can_modify_params(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array( 'test/resource' ) );

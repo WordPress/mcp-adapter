@@ -178,7 +178,11 @@ class ResourcesHandler {
 			// Contents should be an array of resource content items.
 			// If it's already an array of properly formatted items, convert each to a DTO.
 			// Otherwise, wrap the result as text content.
-			$content_dtos = $this->convert_contents_to_dtos( $contents, $uri );
+			//
+			// Seed the fallback content URI with the advertised URI, not the client's
+			// request URI, so contents[].uri matches resources/list even when the client
+			// lowercased the scheme (RFC 3986 3.1). For an exact-case read the two are equal.
+			$content_dtos = $this->convert_contents_to_dtos( $contents, $resource->getUri() );
 
 			return ReadResourceResult::fromArray(
 				array(
