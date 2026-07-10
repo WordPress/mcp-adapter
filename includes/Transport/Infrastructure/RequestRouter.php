@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Observability\McpObservabilityHelperTrait;
 use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
@@ -23,6 +23,8 @@ use WP\McpSchema\Server\Tools\DTO\CallToolResult;
  * all transport implementations via dependency injection.
  */
 class RequestRouter {
+
+	use McpObservabilityHelperTrait;
 
 	/**
 	 * The transport context.
@@ -290,8 +292,7 @@ class RequestRouter {
 			// Filter argument keys to exclude sensitive-looking ones.
 			$safe_keys = array();
 			foreach ( array_keys( $params['arguments'] ) as $arg_key ) {
-				// @todo Replace this with a less-coupled way to access `McpObservabilityHelperTrait:is_sensitive_key()`.
-				if ( ErrorLogMcpObservabilityHandler::is_sensitive_key( (string) $arg_key ) ) {
+				if ( self::is_sensitive_key( (string) $arg_key ) ) {
 					$safe_keys[] = '[REDACTED]';
 				} else {
 					$safe_keys[] = $arg_key;
