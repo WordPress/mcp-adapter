@@ -9,6 +9,7 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult;
 use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
@@ -47,6 +48,18 @@ final class ResourcesHandlerListTest extends TestCase {
 		$resource_array = $resources[0]->toArray();
 		$this->assertArrayHasKey( 'uri', $resource_array );
 		$this->assertArrayHasKey( 'name', $resource_array );
+	}
+
+	public function test_list_resource_templates_returns_empty_result(): void {
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$result = $handler->list_resource_templates();
+
+		// The adapter has no resource-template concept, so the list is always empty,
+		// but the method must still respond so spec-compliant clients stop getting -32601.
+		$this->assertInstanceOf( ListResourceTemplatesResult::class, $result );
+		$this->assertSame( array(), $result->getResourceTemplates() );
 	}
 
 	public function test_list_resources_applies_resources_list_filter(): void {
