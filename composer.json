@@ -34,6 +34,7 @@
 		"optimize-autoloader": true,
 		"preferred-install": "dist",
 		"allow-plugins": {
+			"automattic/jetpack-autoloader": true,
 			"dealerdirect/phpcodesniffer-composer-installer": true,
 			"phpstan/extension-installer": true
 		}
@@ -52,6 +53,7 @@
 	},
 	"require": {
 		"php": "^7.4 || ^8.0",
+		"automattic/jetpack-autoloader": "^5.0",
 		"wordpress/php-mcp-schema": "^0.1.0",
 		"ext-json": "*"
 	},
