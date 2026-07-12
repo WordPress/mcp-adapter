@@ -40,10 +40,7 @@ final class Autoloader {
 			return self::$is_loaded;
 		}
 
-		// Load through the Jetpack Autoloader. When more than one active plugin
-		// ships the WP\MCP\ classes (for example WooCommerce vendors its own
-		// copy), it loads the newest version of each class instead of whichever
-		// plugin registered its autoloader first.
+		// Jetpack Autoloader uses `autoload_packages.php` instead of `autoload.php`.
 		$autoloader      = WP_MCP_DIR . '/vendor/autoload_packages.php';
 		self::$is_loaded = self::require_autoloader( $autoloader );
 
