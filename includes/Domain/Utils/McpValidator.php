@@ -21,6 +21,18 @@ use DateTime;
 class McpValidator {
 
 	/**
+	 * URI scheme grammar per RFC 3986 §3.1 (unanchored regex fragment).
+	 *
+	 * Shared by URI validation and scheme folding so the two can never drift
+	 * apart on what counts as a scheme.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var string
+	 */
+	private const URI_SCHEME_PATTERN = '[a-zA-Z][a-zA-Z0-9+.-]*';
+
+	/**
 	 * Allowed MIME types for MCP icons per specification.
 	 *
 	 * MUST support: image/png, image/jpeg, image/jpg
@@ -512,7 +524,29 @@ class McpValidator {
 
 		// Basic URI validation: must have scheme followed by colon (RFC 3986).
 		// This accepts any protocol as per MCP specification.
-		return (bool) preg_match( '/^[a-zA-Z][a-zA-Z0-9+.-]*:.+/', $uri );
+		return (bool) preg_match( '/^' . self::URI_SCHEME_PATTERN . ':.+/', $uri );
+	}
+
+	/**
+	 * Lowercase the scheme (the part before the first ":") of a URI.
+	 *
+	 * URI schemes are case-insensitive per RFC 3986, so "Foo://x" and "foo://x"
+	 * identify the same resource. Lowercasing the scheme on both sides of a
+	 * comparison lets the two forms match. Everything after the scheme is left
+	 * untouched, because case may be meaningful there.
+	 *
+	 * @param string $uri Resource URI.
+	 *
+	 * @return string Same URI with a lowercased scheme.
+	 * @since n.e.x.t
+	 */
+	public static function fold_uri_scheme( string $uri ): string {
+		// On PCRE failure preg_replace_callback() returns null; keep the URI as-is.
+		return preg_replace_callback(
+			'/^(' . self::URI_SCHEME_PATTERN . '):/',
+			static fn( array $matches ): string => strtolower( $matches[1] ) . ':',
+			$uri
+		) ?? $uri;
 	}
 
 	/**

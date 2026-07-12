@@ -352,6 +352,62 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertNull( $nonexistent );
 	}
 
+	/**
+	 * Resource lookup ignores scheme case (RFC 3986 §3.1).
+	 *
+	 * A resource advertised with a mixed-case scheme must be readable when the
+	 * client canonicalizes the scheme to lowercase, and vice versa.
+	 */
+	public function test_get_mcp_resource_matches_regardless_of_scheme_case(): void {
+		$advertised_uri = 'WordPress://test/case-resource';
+
+		$this->register_ability_in_hook(
+			'test/resource-scheme-case',
+			array(
+				'label'               => 'Scheme Case Resource',
+				'description'         => 'Resource with a mixed-case scheme',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return 'content';
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => $advertised_uri,
+					),
+				),
+			)
+		);
+
+		$this->registry->register_resources( array( 'test/resource-scheme-case' ) );
+
+		$this->assertNotNull(
+			$this->registry->get_mcp_resource( $advertised_uri ),
+			'Exact advertised URI should resolve'
+		);
+
+		$this->assertNotNull(
+			$this->registry->get_mcp_resource( 'wordpress://test/case-resource' ), // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- The lowercase scheme is the point of the test.
+			'Lowercased scheme should match the mixed-case advertised URI'
+		);
+
+		$this->assertNotNull(
+			$this->registry->get_mcp_resource( 'WORDPRESS://test/case-resource' ), // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- The uppercase scheme is the point of the test.
+			'Uppercased scheme should match the mixed-case advertised URI'
+		);
+
+		$this->assertNull(
+			$this->registry->get_mcp_resource( 'wordpress://test/CASE-resource' ), // phpcs:ignore WordPress.WP.CapitalPDangit.MisspelledInText -- The lowercase scheme is the point of the test.
+			'Only the scheme is case-insensitive; the path must still match exactly'
+		);
+
+		wp_unregister_ability( 'test/resource-scheme-case' );
+	}
+
 	public function test_get_mcp_prompt_by_name(): void {
 		$this->registry->register_prompts( array( 'test/prompt' ) );
 
