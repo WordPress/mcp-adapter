@@ -42,11 +42,14 @@ trait McpAbilityHelperTrait {
 
 		if ( ! self::is_ability_mcp_exposed( $ability, $exposure_path ) ) {
 			// Error code preserved for backward compatibility with clients
-			// catching the pre-filter behavior; the message is intentionally
-			// unchanged for the same reason.
+			// catching the pre-filter behavior. Message intentionally omits
+			// the "mcp.public!=true" parenthetical from prior releases: the
+			// exposure filter can now hide an ability whose `mcp.public` is
+			// true, so citing that specific field in the message would
+			// mislead in the filter-driven cases.
 			return new WP_Error(
 				'ability_not_public_mcp',
-				sprintf( 'Ability "%s" is not exposed via MCP (mcp.public!=true)', $ability_name )
+				sprintf( 'Ability "%s" is not exposed via MCP', $ability_name )
 			);
 		}
 

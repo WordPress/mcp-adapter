@@ -519,6 +519,72 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	}
 
 	/**
+	 * SECURITY INVARIANT: exposure is not authorization — the caller
+	 * still has to pass the tool's own authentication / capability
+	 * gate before the exposure filter is even consulted.
+	 *
+	 * A downstream widening exposure (e.g. to reveal an ability to
+	 * server-scoped clients) must not thereby grant execution rights
+	 * to an unauthenticated principal.
+	 */
+	public function test_exposure_filter_does_not_bypass_capability_check_for_unauthorized_principal(): void {
+		$this->register_ability_in_hook(
+			'test/exposed-but-unauthorized',
+			array(
+				'label'               => 'Exposed But Unauthorized',
+				'description'         => 'Ability the exposure filter widens for an unauthenticated caller.',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'ok' => true ); },
+				// The ability itself is permissive — the failure must
+				// come from the tool-level capability gate, not from
+				// the ability's own permission_callback.
+				'permission_callback' => static function () {
+					return true; },
+			)
+		);
+
+		$filter = static function ( $is_exposed, $ability ) {
+			return 'test/exposed-but-unauthorized' === $ability->get_name() ? true : $is_exposed;
+		};
+		add_filter( 'mcp_adapter_is_ability_exposed', $filter, 10, 3 );
+
+		// Unauthenticated principal.
+		$previous_user = get_current_user_id();
+		wp_set_current_user( 0 );
+
+		try {
+			$result = ExecuteAbilityAbility::check_permission(
+				array(
+					'ability_name' => 'test/exposed-but-unauthorized',
+					'parameters'   => new \stdClass(),
+				)
+			);
+
+			$this->assertInstanceOf(
+				WP_Error::class,
+				$result,
+				'An exposure filter that returns true must not upgrade an unauthenticated principal into an authorized one.'
+			);
+			$this->assertSame(
+				'authentication_required',
+				$result->get_error_code(),
+				"The failure must come from the tool's authentication gate, not from the exposure gate."
+			);
+			$this->assertNotSame(
+				'ability_not_public_mcp',
+				$result->get_error_code(),
+				'The exposure gate must not run before the authentication gate.'
+			);
+		} finally {
+			wp_set_current_user( $previous_user );
+			remove_filter( 'mcp_adapter_is_ability_exposed', $filter, 10 );
+			wp_unregister_ability( 'test/exposed-but-unauthorized' );
+		}
+	}
+
+	/**
 	 * SECURITY INVARIANT: exposure is not authorization.
 	 *
 	 * Even if the `mcp_adapter_is_ability_exposed` filter marks an
