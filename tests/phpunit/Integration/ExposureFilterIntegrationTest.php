@@ -83,7 +83,10 @@ final class ExposureFilterIntegrationTest extends TestCase {
 			$result  = $handler->call_tool(
 				array(
 					'params' => array(
-						'name'      => 'mcp-adapter/discover-abilities',
+						// McpNameSanitizer replaces "/" with "-" for the tool name;
+// the *ability* name still contains the slash but the MCP tool
+// name the client invokes does not.
+'name'      => 'mcp-adapter-discover-abilities',
 						'arguments' => array(),
 					),
 				)
@@ -143,7 +146,10 @@ final class ExposureFilterIntegrationTest extends TestCase {
 		$handler->call_tool(
 			array(
 				'params' => array(
-					'name'      => 'mcp-adapter/discover-abilities',
+					// McpNameSanitizer replaces "/" with "-" for the tool name;
+// the *ability* name still contains the slash but the MCP tool
+// name the client invokes does not.
+'name'      => 'mcp-adapter-discover-abilities',
 					'arguments' => array(),
 				),
 			)
