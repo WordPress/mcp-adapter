@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP\MCP\Core\McpAdapter;
 use WP_Error;
 
 /**
@@ -35,10 +36,7 @@ trait McpAbilityHelperTrait {
 			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
 		}
 
-		$meta          = $ability->get_meta();
-		$is_public_mcp = $meta['mcp']['public'] ?? false;
-
-		if ( ! $is_public_mcp ) {
+		if ( ! self::is_ability_mcp_public( $ability ) ) {
 			return new WP_Error(
 				'ability_not_public_mcp',
 				sprintf( 'Ability "%s" is not exposed via MCP (mcp.public!=true)', $ability_name )
@@ -59,9 +57,34 @@ trait McpAbilityHelperTrait {
 	 * @return bool True if publicly exposed, false otherwise.
 	 */
 	protected static function is_ability_mcp_public( \WP_Ability $ability ): bool {
-		$meta = $ability->get_meta();
+		$meta      = $ability->get_meta();
+		$is_public = (bool) ( $meta['mcp']['public'] ?? false );
 
-		return (bool) ( $meta['mcp']['public'] ?? false );
+		$server = class_exists( McpAdapter::class )
+			? McpAdapter::instance()->get_current_server()
+			: null;
+
+		/**
+		 * Filters whether an ability is considered publicly exposed via MCP
+		 * for the purposes of the built-in discover/get-info/execute tools.
+		 *
+		 * The default value reflects the ability's `meta.mcp.public` flag.
+		 * Return true to expose an ability that is not statically marked
+		 * public, or false to hide one that is.
+		 *
+		 * The current MCP server (if any) is passed so integrators can make
+		 * per-server exposure decisions — e.g. reveal an ability on an
+		 * internal server but hide it on a public one. `$server` is null
+		 * when the ability is invoked outside of an MCP request (e.g.
+		 * WP-CLI or a direct `wp_get_ability( ... )->execute()` call).
+		 *
+		 * @since 0.6.0
+		 *
+		 * @param bool                        $is_public Whether the ability is publicly exposed via MCP by default.
+		 * @param \WP_Ability                 $ability   The ability being checked.
+		 * @param \WP\MCP\Core\McpServer|null $server    The MCP server handling the current request, or null.
+		 */
+		return (bool) apply_filters( 'mcp_adapter_is_ability_public', $is_public, $ability, $server );
 	}
 
 	/**

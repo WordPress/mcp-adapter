@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Tools;
 
+use WP\MCP\Core\McpAdapter;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
@@ -127,6 +128,13 @@ class ToolsHandler {
 		if ( isset( $request_params['arguments'] ) && ! is_array( $request_params['arguments'] ) ) {
 			return McpErrorFactory::invalid_params( $request_id, 'arguments must be an object' );
 		}
+
+		// Expose the current server to downstream code (ability
+		// permission checks, execute callbacks, filters they trigger)
+		// so it can identify which server the call is coming from.
+		// Cleared in `finally` below to survive exceptions and early
+		// returns.
+		McpAdapter::instance()->set_current_server( $this->mcp );
 
 		try {
 			$tool_name = trim( (string) $request_params['name'] );
@@ -318,6 +326,8 @@ class ToolsHandler {
 			);
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
+		} finally {
+			McpAdapter::instance()->set_current_server( null );
 		}
 	}
 
