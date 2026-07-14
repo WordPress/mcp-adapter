@@ -153,7 +153,7 @@ final class GetAbilityInfoAbility {
 		}
 
 		// Check MCP exposure restrictions
-		return self::check_ability_mcp_exposure( $ability_name );
+		return self::check_ability_mcp_exposure( $ability_name, McpAbilityExposureContext::PATH_GET_INFO );
 	}
 
 	/**

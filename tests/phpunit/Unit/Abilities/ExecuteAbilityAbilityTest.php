@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\ExecuteAbilityAbility;
+use WP\MCP\Abilities\McpAbilityExposureContext;
 use WP\MCP\Tests\TestCase;
 use WP_Error;
 
@@ -468,7 +469,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertFalse( $annotations['idempotent'] );
 	}
 
-	public function test_is_ability_public_filter_can_bypass_exposure_gate(): void {
+	public function test_is_ability_exposed_filter_can_bypass_exposure_gate(): void {
 		$this->register_ability_in_hook(
 			'test/not-public-execute-filter',
 			array(
@@ -492,10 +493,15 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertInstanceOf( WP_Error::class, $blocked );
 		$this->assertEquals( 'ability_not_public_mcp', $blocked->get_error_code() );
 
-		$filter = static function ( $is_public, $ability ) {
-			return 'test/not-public-execute-filter' === $ability->get_name() ? true : $is_public;
+		$captured_path = null;
+		$filter        = static function ( $is_exposed, $ability, $context ) use ( &$captured_path ) {
+			if ( 'test/not-public-execute-filter' === $ability->get_name() ) {
+				$captured_path = $context->exposure_path;
+				return true;
+			}
+			return $is_exposed;
 		};
-		add_filter( 'mcp_adapter_is_ability_public', $filter, 10, 3 );
+		add_filter( 'mcp_adapter_is_ability_exposed', $filter, 10, 3 );
 
 		try {
 			$allowed = ExecuteAbilityAbility::check_permission(
@@ -505,9 +511,65 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 				)
 			);
 			$this->assertTrue( $allowed, 'Filter should be able to bypass the exposure gate.' );
+			$this->assertSame( McpAbilityExposureContext::PATH_EXECUTE, $captured_path );
 		} finally {
-			remove_filter( 'mcp_adapter_is_ability_public', $filter, 10 );
+			remove_filter( 'mcp_adapter_is_ability_exposed', $filter, 10 );
 			wp_unregister_ability( 'test/not-public-execute-filter' );
+		}
+	}
+
+	/**
+	 * SECURITY INVARIANT: exposure is not authorization.
+	 *
+	 * Even if the `mcp_adapter_is_ability_exposed` filter marks an
+	 * ability as exposed, the execute-ability tool must still consult
+	 * the ability's own `permission_callback`. Otherwise a downstream
+	 * that widens exposure for visibility reasons would inadvertently
+	 * grant *invocation* rights it never intended.
+	 */
+	public function test_exposure_filter_does_not_replace_ability_permission_check(): void {
+		$this->register_ability_in_hook(
+			'test/exposed-but-denied',
+			array(
+				'label'               => 'Exposed But Denied',
+				'description'         => 'Ability with denying permission_callback.',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'ok' => true ); },
+				'permission_callback' => static function () {
+					return new WP_Error( 'ability_permission_denied', 'Nope.' );
+				},
+			)
+		);
+
+		$filter = static function ( $is_exposed, $ability ) {
+			return 'test/exposed-but-denied' === $ability->get_name() ? true : $is_exposed;
+		};
+		add_filter( 'mcp_adapter_is_ability_exposed', $filter, 10, 3 );
+
+		try {
+			$result = ExecuteAbilityAbility::check_permission(
+				array(
+					'ability_name' => 'test/exposed-but-denied',
+					'parameters'   => new \stdClass(),
+				)
+			);
+
+			$this->assertInstanceOf( WP_Error::class, $result, 'Exposure must not bypass the ability permission callback.' );
+			$this->assertSame(
+				'ability_permission_denied',
+				$result->get_error_code(),
+				"The failure must come from the ability's permission_callback, not the exposure gate."
+			);
+			$this->assertNotSame(
+				'ability_not_public_mcp',
+				$result->get_error_code(),
+				'The exposure gate should have passed; the error must originate from the permission callback instead.'
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_is_ability_exposed', $filter, 10 );
+			wp_unregister_ability( 'test/exposed-but-denied' );
 		}
 	}
 }
