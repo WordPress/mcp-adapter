@@ -85,7 +85,7 @@ final class ExposureFilterIntegrationTest extends TestCase {
 				array(
 					'params' => array(
 						'name'      => 'mcp-adapter/discover-abilities',
-						'arguments' => new \stdClass(),
+						'arguments' => array(),
 					),
 				)
 			);
@@ -123,7 +123,7 @@ final class ExposureFilterIntegrationTest extends TestCase {
 			array(
 				'params' => array(
 					'name'      => 'mcp-adapter/discover-abilities',
-					'arguments' => new \stdClass(),
+					'arguments' => array(),
 				),
 			)
 		);
