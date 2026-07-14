@@ -51,27 +51,25 @@ final class ExposureFilterIntegrationTest extends TestCase {
 	}
 
 	public function test_call_tool_threads_actual_server_into_exposure_filter(): void {
-		$this->register_ability_in_hook(
-			'test/integration-target',
-			array(
-				'label'               => 'Integration Target',
-				'description'         => 'Probed via the filter while the built-in discover tool runs.',
-				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function () {
-					return array(); },
-				'permission_callback' => static function () {
-					return true; },
-				'meta'                => array( 'mcp' => array( 'type' => 'tool' ) ),
-			)
+		// Use the already-registered `test/always-allowed` fixture (has
+		// `mcp.public => true`), which is guaranteed to be present in
+		// `wp_get_abilities()` in every test run — avoids any
+		// registration-timing ambiguity.
+		$this->assertTrue(
+			wp_has_ability( 'test/always-allowed' ),
+			'Sanity: fixture ability must be registered before this test runs.'
 		);
 
 		$server = $this->makeServer( array( 'mcp-adapter/discover-abilities' ) );
 
 		$captured_server = 'unset';
 		$captured_path   = null;
-		$filter          = function ( $is_exposed, $ability, $context ) use ( &$captured_server, &$captured_path ) {
-			if ( 'test/integration-target' === $ability->get_name() ) {
+		$fire_count      = 0;
+		$saw_names       = array();
+		$filter          = function ( $is_exposed, $ability, $context ) use ( &$captured_server, &$captured_path, &$fire_count, &$saw_names ) {
+			++$fire_count;
+			$saw_names[] = $ability->get_name();
+			if ( 'test/always-allowed' === $ability->get_name() ) {
 				$captured_server = $context->server;
 				$captured_path   = $context->exposure_path;
 			}
@@ -79,9 +77,10 @@ final class ExposureFilterIntegrationTest extends TestCase {
 		};
 		add_filter( 'mcp_adapter_is_ability_exposed', $filter, 10, 3 );
 
+		$result = null;
 		try {
 			$handler = new ToolsHandler( $server );
-			$handler->call_tool(
+			$result  = $handler->call_tool(
 				array(
 					'params' => array(
 						'name'      => 'mcp-adapter/discover-abilities',
@@ -91,8 +90,30 @@ final class ExposureFilterIntegrationTest extends TestCase {
 			);
 		} finally {
 			remove_filter( 'mcp_adapter_is_ability_exposed', $filter, 10 );
-			wp_unregister_ability( 'test/integration-target' );
 		}
+
+		// Diagnostic assertion first — surfaces the actual state in CI
+		// output if the filter never fired (rather than a bare "unset"
+		// mismatch that hides the root cause).
+		$this->assertGreaterThan(
+			0,
+			$fire_count,
+			sprintf(
+				'Exposure filter never fired. call_tool returned %s. Abilities seen by filter: %s',
+				null === $result ? 'null' : get_class( $result ),
+				empty( $saw_names ) ? '(none)' : implode( ', ', $saw_names )
+			)
+		);
+
+		$this->assertContains(
+			'test/always-allowed',
+			$saw_names,
+			sprintf(
+				'Filter fired %d times but never for test/always-allowed. Names seen: %s',
+				$fire_count,
+				implode( ', ', $saw_names )
+			)
+		);
 
 		$this->assertInstanceOf(
 			McpServer::class,
