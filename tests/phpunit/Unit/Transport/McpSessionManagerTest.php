@@ -460,6 +460,50 @@ final class McpSessionManagerTest extends TestCase {
 	}
 
 	/**
+	 * Test legacy migration reuses rows created before a previous migration completed.
+	 */
+	public function test_legacy_migration_does_not_duplicate_existing_session_rows(): void {
+		$session_id = 'd1b2c3d4-e5f6-4789-abcd-0123456789ab';
+		$session    = array(
+			'created_at'    => time() - 10,
+			'last_activity' => time() - 10,
+			'client_params' => array( 'name' => 'released-client' ),
+		);
+
+		add_user_meta( $this->test_user_id, 'mcp_adapter_sessions', array( $session_id => $session ) );
+		add_user_meta( $this->test_user_id, 'mcp_adapter_sessions', array_merge( array( 'session_id' => $session_id ), $session ) );
+
+		$this->assertSame( array( $session_id => $session ), SessionManager::get_all_user_sessions( $this->test_user_id ) );
+		$this->assertCount( 1, get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', false ) );
+	}
+
+	/**
+	 * Test deletion reports a targeted mutation failure.
+	 */
+	public function test_delete_session_returns_false_when_targeted_delete_fails(): void {
+		$session_id = SessionManager::create_session( $this->test_user_id, array() );
+		$this->assertIsString( $session_id );
+
+		add_filter(
+			'delete_user_metadata',
+			static function ( $check, $user_id, $meta_key ) {
+				if ( 'mcp_adapter_sessions' === $meta_key ) {
+					return false;
+				}
+
+				return $check;
+			},
+			10,
+			3
+		);
+
+		$this->assertFalse( SessionManager::delete_session( $this->test_user_id, $session_id ) );
+		$this->assertArrayHasKey( $session_id, SessionManager::get_all_user_sessions( $this->test_user_id ) );
+
+		remove_all_filters( 'delete_user_metadata' );
+	}
+
+	/**
 	 * Test mutations of one session preserve every sibling session.
 	 */
 	public function test_session_mutations_preserve_siblings(): void {

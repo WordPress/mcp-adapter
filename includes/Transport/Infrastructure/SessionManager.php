@@ -79,7 +79,7 @@ final class SessionManager {
 				}
 			);
 
-			$oldest_session_id = key( $sessions );
+			$oldest_session_id = array_key_first( $sessions );
 			if ( is_string( $oldest_session_id ) ) {
 				self::delete_session( $user_id, $oldest_session_id );
 			}
@@ -152,9 +152,11 @@ final class SessionManager {
 		}
 
 		$stored_sessions = get_user_meta( $user_id, self::SESSION_META_KEY, false );
-		self::migrate_legacy_sessions( $user_id, $stored_sessions );
+		if ( self::migrate_legacy_sessions( $user_id, $stored_sessions ) ) {
+			$stored_sessions = get_user_meta( $user_id, self::SESSION_META_KEY, false );
+		}
 
-		return self::get_sessions_from_stored_values( get_user_meta( $user_id, self::SESSION_META_KEY, false ) );
+		return self::get_sessions_from_stored_values( $stored_sessions );
 	}
 
 	/**
@@ -166,20 +168,41 @@ final class SessionManager {
 	 * @param int $user_id The user ID.
 	 * @param array $stored_sessions Stored meta values.
 	 *
-	 * @return void
+	 * @return bool Whether any legacy sessions were migrated.
 	 */
-	private static function migrate_legacy_sessions( int $user_id, array $stored_sessions ): void {
+	private static function migrate_legacy_sessions( int $user_id, array $stored_sessions ): bool {
+		$stored_session_ids = array();
+		foreach ( $stored_sessions as $stored_session ) {
+			if ( ! is_array( $stored_session ) || ! isset( $stored_session['session_id'] ) || ! is_string( $stored_session['session_id'] ) ) {
+				continue;
+			}
+
+			$stored_session_ids[ $stored_session['session_id'] ] = true;
+		}
+
+		$migrated = false;
 		foreach ( $stored_sessions as $legacy_sessions ) {
 			if ( ! self::is_legacy_session_map( $legacy_sessions ) ) {
 				continue;
 			}
 
 			foreach ( $legacy_sessions as $session_id => $session ) {
-				add_user_meta( $user_id, self::SESSION_META_KEY, self::prepare_stored_session( $session_id, $session ) );
+				if ( isset( $stored_session_ids[ $session_id ] ) ) {
+					continue;
+				}
+
+				if ( false === add_user_meta( $user_id, self::SESSION_META_KEY, self::prepare_stored_session( $session_id, $session ) ) ) {
+					continue 2;
+				}
+
+				$stored_session_ids[ $session_id ] = true;
 			}
 
 			delete_user_meta( $user_id, self::SESSION_META_KEY, $legacy_sessions );
+			$migrated = true;
 		}
+
+		return $migrated;
 	}
 
 	/**
@@ -417,8 +440,6 @@ final class SessionManager {
 			return false;
 		}
 
-		self::delete_stored_session( $user_id, $session_id, $sessions[ $session_id ] );
-
-		return true;
+		return self::delete_stored_session( $user_id, $session_id, $sessions[ $session_id ] );
 	}
 }
