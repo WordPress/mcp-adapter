@@ -57,6 +57,25 @@ final class McpSessionManagerTest extends TestCase {
 	}
 
 	/**
+	 * Set a session's last activity directly, without rewriting its siblings.
+	 *
+	 * @param string $session_id Session ID.
+	 * @param int    $last_activity Unix timestamp.
+	 *
+	 * @return void
+	 */
+	private function set_session_last_activity( string $session_id, int $last_activity ): void {
+		$session                  = SessionManager::get_session( $this->test_user_id, $session_id );
+		$stored_session           = $session;
+		$stored_session['session_id'] = $session_id;
+		$session['last_activity'] = $last_activity;
+		$updated_session           = $session;
+		$updated_session['session_id'] = $session_id;
+
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $updated_session, $stored_session );
+	}
+
+	/**
 	 * Test successful session creation
 	 */
 	public function test_create_session_success(): void {
@@ -216,10 +235,8 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertIsString( $session_id_1 );
 		$this->assertIsString( $session_id_2 );
 
-		// Manually modify one session to be expired
-		$sessions                                   = SessionManager::get_all_user_sessions( $this->test_user_id );
-		$sessions[ $session_id_1 ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 ); // Over 24 hours ago
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		// Manually modify one session to be expired.
+		$this->set_session_last_activity( $session_id_1, time() - ( DAY_IN_SECONDS + 3600 ) );
 
 		// Run cleanup
 		$removed = SessionManager::cleanup_expired_sessions( $this->test_user_id );
@@ -268,11 +285,9 @@ final class McpSessionManagerTest extends TestCase {
 		$session_id = SessionManager::create_session( $this->test_user_id, array() );
 		$this->assertIsString( $session_id );
 
-		// Directly update the timestamp to simulate time passing beyond throttle window
-		$sessions                                 = \WP\MCP\Transport\Infrastructure\SessionManager::get_all_user_sessions( $this->test_user_id );
-		$old_timestamp                            = time() - 61;
-		$sessions[ $session_id ]['last_activity'] = $old_timestamp;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		// Directly update the timestamp to simulate time passing beyond throttle window.
+		$old_timestamp = time() - 61;
+		$this->set_session_last_activity( $session_id, $old_timestamp );
 
 		// Validate session (should update last_activity)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
@@ -314,10 +329,8 @@ final class McpSessionManagerTest extends TestCase {
 		); // 1 second
 
 		$short_session = SessionManager::create_session( $this->test_user_id, array() );
-		// Manually expire the session by backdating its last_activity
-		$sessions                                    = SessionManager::get_all_user_sessions( $this->test_user_id );
-		$sessions[ $short_session ]['last_activity'] = time() - 3;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		// Manually expire the session by backdating its last_activity.
+		$this->set_session_last_activity( $short_session, time() - 3 );
 
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $short_session );
 		$this->assertFalse( $is_valid ); // Should be expired
@@ -355,10 +368,8 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertIsString( $valid_session_id );
 		$this->assertIsString( $expired_session_id );
 
-		// Backdate one session to make it expired
-		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
-		$sessions[ $expired_session_id ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 );
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		// Backdate one session to make it expired.
+		$this->set_session_last_activity( $expired_session_id, time() - ( DAY_IN_SECONDS + 3600 ) );
 
 		// Validate the valid session
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $valid_session_id );
@@ -384,10 +395,9 @@ final class McpSessionManagerTest extends TestCase {
 		$session_id = SessionManager::create_session( $this->test_user_id, array() );
 		$this->assertIsString( $session_id );
 
-		// Backdate last_activity by 16s (more than half of 30s timeout = clamped interval of 15s)
-		$sessions                                 = SessionManager::get_all_user_sessions( $this->test_user_id );
-		$sessions[ $session_id ]['last_activity'] = time() - 16;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		// Backdate last_activity by 16s (more than half of 30s timeout = clamped interval of 15s).
+		$old_activity = time() - 16;
+		$this->set_session_last_activity( $session_id, $old_activity );
 
 		// Validate — should succeed AND update last_activity because 16s > clamped interval (15s)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
@@ -395,10 +405,82 @@ final class McpSessionManagerTest extends TestCase {
 
 		$sessions_after = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertGreaterThan(
-			$sessions[ $session_id ]['last_activity'],
+			$old_activity,
 			$sessions_after[ $session_id ]['last_activity']
 		);
 
 		remove_all_filters( 'mcp_adapter_session_inactivity_timeout' );
+	}
+
+	/**
+	 * Test legacy collection sessions migrate without invalidating active clients.
+	 */
+	public function test_legacy_sessions_migrate_and_remain_valid(): void {
+		$session_id = 'd1b2c3d4-e5f6-4789-abcd-0123456789ab';
+		$session    = array(
+			'created_at'    => time() - 10,
+			'last_activity' => time() - 10,
+			'client_params' => array( 'name' => 'released-client' ),
+		);
+
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', array( $session_id => $session ) );
+
+		$this->assertTrue( SessionManager::validate_session( $this->test_user_id, $session_id ) );
+		$this->assertSame( $session, SessionManager::get_session( $this->test_user_id, $session_id ) );
+		$stored_sessions = get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', false );
+		$this->assertCount( 1, $stored_sessions );
+		$this->assertSame( $session_id, $stored_sessions[0]['session_id'] );
+	}
+
+	/**
+	 * Test legacy migration removes only the legacy map, not sibling rows.
+	 */
+	public function test_legacy_migration_preserves_independent_session_rows(): void {
+		$legacy_session_id = 'd1b2c3d4-e5f6-4789-abcd-0123456789ab';
+		$new_session_id    = 'e1b2c3d4-e5f6-4789-abcd-0123456789ab';
+		$legacy_session    = array(
+			'created_at'    => time() - 10,
+			'last_activity' => time() - 10,
+			'client_params' => array( 'name' => 'released-client' ),
+		);
+		$new_session       = array(
+			'session_id'    => $new_session_id,
+			'created_at'    => time() - 10,
+			'last_activity' => time() - 10,
+			'client_params' => array( 'name' => 'new-client' ),
+		);
+
+		add_user_meta( $this->test_user_id, 'mcp_adapter_sessions', array( $legacy_session_id => $legacy_session ) );
+		add_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $new_session );
+
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$this->assertArrayHasKey( $legacy_session_id, $sessions );
+		$this->assertArrayHasKey( $new_session_id, $sessions );
+		$this->assertSame( $new_session['client_params'], $sessions[ $new_session_id ]['client_params'] );
+	}
+
+	/**
+	 * Test mutations of one session preserve every sibling session.
+	 */
+	public function test_session_mutations_preserve_siblings(): void {
+		$expired_session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'expired' ) );
+		$updated_session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'updated' ) );
+		$sibling_session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'sibling' ) );
+		$this->assertIsString( $expired_session_id );
+		$this->assertIsString( $updated_session_id );
+		$this->assertIsString( $sibling_session_id );
+		$this->assertCount( 3, get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', false ) );
+
+		$sibling = SessionManager::get_session( $this->test_user_id, $sibling_session_id );
+		$this->set_session_last_activity( $expired_session_id, time() - DAY_IN_SECONDS - 1 );
+		$this->set_session_last_activity( $updated_session_id, time() - 61 );
+
+		$this->assertSame( 1, SessionManager::cleanup_expired_sessions( $this->test_user_id ) );
+		$this->assertTrue( SessionManager::validate_session( $this->test_user_id, $updated_session_id ) );
+		$this->assertTrue( SessionManager::delete_session( $this->test_user_id, $updated_session_id ) );
+
+		$this->assertFalse( SessionManager::get_session( $this->test_user_id, $expired_session_id ) );
+		$this->assertFalse( SessionManager::get_session( $this->test_user_id, $updated_session_id ) );
+		$this->assertSame( $sibling, SessionManager::get_session( $this->test_user_id, $sibling_session_id ) );
 	}
 }

@@ -21,7 +21,7 @@ use WP_Error;
 final class SessionManager {
 
 	/**
-	 * User meta key for storing sessions
+	 * User meta key for storing sessions.
 	 *
 	 * @var string
 	 */
@@ -79,21 +79,26 @@ final class SessionManager {
 				}
 			);
 
-			array_shift( $sessions );
+			$oldest_session_id = key( $sessions );
+			if ( is_string( $oldest_session_id ) ) {
+				self::delete_session( $user_id, $oldest_session_id );
+			}
 		}
 
 		// Create a new session
 		$session_id = wp_generate_uuid4();
 		$now        = time();
 
-		$sessions[ $session_id ] = array(
+		$session = array(
 			'created_at'    => $now,
 			'last_activity' => $now,
 			'client_params' => $params,
 		);
 
-		// Save sessions
-		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+		// Each session has its own row, so concurrent requests cannot overwrite siblings.
+		if ( false === add_user_meta( $user_id, self::SESSION_META_KEY, self::prepare_stored_session( $session_id, $session ) ) ) {
+			return false;
+		}
 
 		return $session_id;
 	}
@@ -123,17 +128,12 @@ final class SessionManager {
 				continue;
 			}
 
-			// Session is inactive - remove it
-			unset( $sessions[ $session_id ] );
-			++$removed;
-		}
-
-		if ( $removed > 0 ) {
-			if ( empty( $sessions ) ) {
-				delete_user_meta( $user_id, self::SESSION_META_KEY );
-			} else {
-				update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+			// Session is inactive - remove its independent meta row.
+			if ( ! self::delete_stored_session( $user_id, $session_id, $session ) ) {
+				continue;
 			}
+
+			++$removed;
 		}
 
 		return $removed;
@@ -151,13 +151,106 @@ final class SessionManager {
 			return array();
 		}
 
-		$sessions = get_user_meta( $user_id, self::SESSION_META_KEY, true );
+		$stored_sessions = get_user_meta( $user_id, self::SESSION_META_KEY, false );
+		self::migrate_legacy_sessions( $user_id, $stored_sessions );
 
-		if ( ! is_array( $sessions ) ) {
-			return array();
+		return self::get_sessions_from_stored_values( get_user_meta( $user_id, self::SESSION_META_KEY, false ) );
+	}
+
+	/**
+	 * Migrate the released collection-based storage to independent session rows.
+	 *
+	 * The exact legacy map value is deleted after its independent records are
+	 * added, so a concurrent new session row is never removed.
+	 *
+	 * @param int $user_id The user ID.
+	 * @param array $stored_sessions Stored meta values.
+	 *
+	 * @return void
+	 */
+	private static function migrate_legacy_sessions( int $user_id, array $stored_sessions ): void {
+		foreach ( $stored_sessions as $legacy_sessions ) {
+			if ( ! self::is_legacy_session_map( $legacy_sessions ) ) {
+				continue;
+			}
+
+			foreach ( $legacy_sessions as $session_id => $session ) {
+				add_user_meta( $user_id, self::SESSION_META_KEY, self::prepare_stored_session( $session_id, $session ) );
+			}
+
+			delete_user_meta( $user_id, self::SESSION_META_KEY, $legacy_sessions );
+		}
+	}
+
+	/**
+	 * Determine whether a stored value is a released collection-based session map.
+	 *
+	 * @param mixed $stored_session Stored meta value.
+	 *
+	 * @return bool
+	 */
+	private static function is_legacy_session_map( $stored_session ): bool {
+		if ( ! is_array( $stored_session ) || isset( $stored_session['session_id'] ) ) {
+			return false;
+		}
+
+		foreach ( $stored_session as $session_id => $session ) {
+			if ( ! is_string( $session_id ) || '' === $session_id || ! is_array( $session ) ) {
+				return false;
+			}
+		}
+
+		return ! empty( $stored_session );
+	}
+
+	/**
+	 * Convert stored session rows to the public session collection shape.
+	 *
+	 * @param array $stored_sessions Stored meta values.
+	 *
+	 * @return array
+	 */
+	private static function get_sessions_from_stored_values( array $stored_sessions ): array {
+		$sessions = array();
+
+		foreach ( $stored_sessions as $stored_session ) {
+			if ( ! is_array( $stored_session ) || ! isset( $stored_session['session_id'] ) || ! is_string( $stored_session['session_id'] ) ) {
+				continue;
+			}
+
+			$session_id = $stored_session['session_id'];
+			unset( $stored_session['session_id'] );
+			$sessions[ $session_id ] = $stored_session;
 		}
 
 		return $sessions;
+	}
+
+	/**
+	 * Add the internal session ID required to target a single meta row.
+	 *
+	 * @param string $session_id Session ID.
+	 * @param array  $session Session data.
+	 *
+	 * @return array
+	 */
+	private static function prepare_stored_session( string $session_id, array $session ): array {
+		$session['session_id'] = $session_id;
+
+		return $session;
+	}
+
+	/**
+	 * Delete a session by matching its complete stored meta value.
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $session_id Session ID.
+	 * @param array  $session Session data.
+	 *
+	 * @return bool
+	 */
+	private static function delete_stored_session( int $user_id, string $session_id, array $session ): bool {
+		return delete_user_meta( $user_id, self::SESSION_META_KEY, self::prepare_stored_session( $session_id, $session ) );
 	}
 
 	/**
@@ -259,13 +352,11 @@ final class SessionManager {
 	 */
 	private static function clear_session( int $user_id, string $session_id ): void {
 		$sessions = self::get_all_user_sessions( $user_id );
-
 		if ( ! isset( $sessions[ $session_id ] ) ) {
 			return;
 		}
 
-		unset( $sessions[ $session_id ] );
-		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+		self::delete_stored_session( $user_id, $session_id, $sessions[ $session_id ] );
 	}
 
 	/**
@@ -301,8 +392,8 @@ final class SessionManager {
 		// Throttle last_activity writes to reduce write amplification
 		$activity_update_interval = $config['activity_update_interval'];
 		if ( time() - $session['last_activity'] >= $activity_update_interval ) {
-			$sessions[ $session_id ]['last_activity'] = time();
-			update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+			$session['last_activity'] = time();
+			update_user_meta( $user_id, self::SESSION_META_KEY, self::prepare_stored_session( $session_id, $session ), self::prepare_stored_session( $session_id, $sessions[ $session_id ] ) );
 		}
 
 		return true;
@@ -322,18 +413,11 @@ final class SessionManager {
 		}
 
 		$sessions = self::get_all_user_sessions( $user_id );
-
 		if ( ! isset( $sessions[ $session_id ] ) ) {
 			return false;
 		}
 
-		unset( $sessions[ $session_id ] );
-
-		if ( empty( $sessions ) ) {
-			delete_user_meta( $user_id, self::SESSION_META_KEY );
-		} else {
-			update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
-		}
+		self::delete_stored_session( $user_id, $session_id, $sessions[ $session_id ] );
 
 		return true;
 	}
