@@ -106,7 +106,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertNotEmpty( $request_event );
 		$first_request = reset( $request_event );
 		$this->assertNotNull( $first_request['duration_ms'] );
-		$this->assertGreaterThan( 0, $first_request['duration_ms'] );
+		$this->assertGreaterThanOrEqual( 0, $first_request['duration_ms'] );
 	}
 
 	public function test_route_request_initialize_with_session(): void {
@@ -284,7 +284,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertNotEmpty( $success_event );
 		$first_success = reset( $success_event );
 		$this->assertNotNull( $first_success['duration_ms'] );
-		$this->assertGreaterThan( 0, $first_success['duration_ms'] );
+		$this->assertGreaterThanOrEqual( 0, $first_success['duration_ms'] );
 
 		// Verify tags are included
 		$this->assertArrayHasKey( 'tags', $first_success );

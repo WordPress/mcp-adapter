@@ -22,6 +22,7 @@ use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\HttpRequestHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
+use WP\MCP\Transport\Infrastructure\SessionManager;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -496,8 +497,8 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayHasKey( 'result', $data, 'Initialize must succeed' );
 
 		// The session header is set via a rest_post_dispatch filter which doesn't
-		// fire in unit tests. Read the session ID directly from user meta instead.
-		$sessions = get_user_meta( get_current_user_id(), 'mcp_adapter_sessions', true );
+		// fire in unit tests. Read the session ID through the storage abstraction.
+		$sessions = SessionManager::get_all_user_sessions( get_current_user_id() );
 		$this->assertNotEmpty( $sessions, 'Initialize must create a session in user meta' );
 
 		// Return the most recently created session ID.
