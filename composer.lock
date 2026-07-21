@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
-            "version": "v5.0.20",
+            "version": "v5.0.21",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/jetpack-autoloader.git",
-                "reference": "b6abf43a9ea638d6a0edc02f0dd7575703f9c2a1"
+                "reference": "07b6e0d9b5f948659ce8503140551d5758865a3c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/jetpack-autoloader/zipball/b6abf43a9ea638d6a0edc02f0dd7575703f9c2a1",
-                "reference": "b6abf43a9ea638d6a0edc02f0dd7575703f9c2a1",
+                "url": "https://api.github.com/repos/Automattic/jetpack-autoloader/zipball/07b6e0d9b5f948659ce8503140551d5758865a3c",
+                "reference": "07b6e0d9b5f948659ce8503140551d5758865a3c",
                 "shasum": ""
             },
             "require": {
@@ -66,9 +66,9 @@
                 "wordpress"
             ],
             "support": {
-                "source": "https://github.com/Automattic/jetpack-autoloader/tree/v5.0.20"
+                "source": "https://github.com/Automattic/jetpack-autoloader/tree/v5.0.21"
             },
-            "time": "2026-06-15T12:15:05+00:00"
+            "time": "2026-07-13T23:33:42+00:00"
         },
         {
             "name": "wordpress/php-mcp-schema",
