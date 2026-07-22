@@ -157,6 +157,8 @@ final class McpSessionManagerTest extends TestCase {
 		// Verify session is gone
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertCount( 0, $sessions );
+		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
+		$this->assertSame( array(), get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', true ) );
 	}
 
 	/**
