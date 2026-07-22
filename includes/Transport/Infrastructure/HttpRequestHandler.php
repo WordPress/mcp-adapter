@@ -198,7 +198,7 @@ class HttpRequestHandler {
 
 		// Validate session for all requests except initialize (router will handle initialize session creation)
 		if ( 'initialize' !== $method ) {
-			$session_validation = HttpSessionValidator::validate_session( $context );
+			$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
 			if ( true !== $session_validation ) {
 				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
 			}
@@ -325,7 +325,7 @@ class HttpRequestHandler {
 	 * @return \WP_REST_Response Termination response.
 	 */
 	private function handle_session_termination( HttpRequestContext $context ): \WP_REST_Response {
-		$result = HttpSessionValidator::terminate_session( $context );
+		$result = HttpSessionValidator::terminate_session_with_error_handler( $context, $this->transport_context->error_handler );
 
 		if ( true !== $result ) {
 			$http_status = McpErrorFactory::get_http_status_for_error( $result );

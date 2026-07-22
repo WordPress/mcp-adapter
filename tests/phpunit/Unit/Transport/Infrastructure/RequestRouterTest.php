@@ -22,6 +22,7 @@ use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
+use WP\MCP\Transport\Infrastructure\SessionManager;
 use WP\McpSchema\Common\McpConstants;
 use WP_REST_Request;
 
@@ -133,6 +134,56 @@ final class RequestRouterTest extends TestCase {
 		// Should have session ID for HTTP context
 		$this->assertArrayHasKey( '_session_id', $result );
 		$this->assertIsString( $result['_session_id'] );
+	}
+
+	/**
+	 * Test exhausted session update retries are reported to the configured error handler.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_route_request_logs_exhausted_session_update_retries(): void {
+		$attempts              = 0;
+		$block_session_updates = static function ( $check, $object_id, $meta_key ) use ( &$attempts ) {
+			if ( 'mcp_adapter_sessions' !== $meta_key ) {
+				return $check;
+			}
+
+			++$attempts;
+
+			return false;
+		};
+
+		add_filter( 'update_user_metadata', $block_session_updates, 10, 3 );
+
+		$request      = new WP_REST_Request( 'POST', '/test-mcp' );
+		$http_context = new HttpRequestContext( $request );
+		$result       = $this->router->route_request(
+			'initialize',
+			array( 'protocolVersion' => '2025-11-25' ),
+			1,
+			'test-transport',
+			$http_context
+		);
+
+		remove_filter( 'update_user_metadata', $block_session_updates, 10 );
+
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertSame( 5, $attempts );
+		$this->assertSame(
+			array(
+				array(
+					'message' => 'Failed to persist MCP sessions after exhausting update retries.',
+					'context' => array(
+						'component' => SessionManager::class,
+						'method'    => 'mutate_sessions',
+						'user_id'   => $this->test_user_id,
+						'attempts'  => 5,
+					),
+					'type'    => 'error',
+				),
+			),
+			DummyErrorHandler::$logs
+		);
 	}
 
 	public function test_route_request_tools_list(): void {

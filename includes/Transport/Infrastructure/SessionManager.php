@@ -10,6 +10,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
+use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP_Error;
 
 /**
@@ -64,12 +66,15 @@ final class SessionManager {
 	/**
 	 * Create a new session for a user
 	 *
-	 * @param int $user_id The user ID.
-	 * @param array $params Client parameters from initialize request.
+	 * @since n.e.x.t Added the optional error handler.
+	 *
+	 * @param int                                                   $user_id      The user ID.
+	 * @param array                                                 $params       Client parameters from initialize request.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 *
 	 * @return string|false The session ID on success, false on failure.
 	 */
-	public static function create_session( int $user_id, array $params = array() ) {
+	public static function create_session( int $user_id, array $params = array(), ?McpErrorHandlerInterface $error_handler = null ) {
 		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
 			return false;
 		}
@@ -107,7 +112,8 @@ final class SessionManager {
 				);
 
 				return $sessions;
-			}
+			},
+			$error_handler
 		);
 
 		if ( ! $created ) {
@@ -126,11 +132,12 @@ final class SessionManager {
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @param int      $user_id  The user ID.
-	 * @param callable $mutation Receives the latest sessions and returns the updated sessions.
+	 * @param int                                                   $user_id       The user ID.
+	 * @param callable                                              $mutation      Receives the latest sessions and returns the updated sessions.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 * @return bool True when the mutation was stored, false after repeated conflicts.
 	 */
-	private static function mutate_sessions( int $user_id, callable $mutation ): bool {
+	private static function mutate_sessions( int $user_id, callable $mutation, ?McpErrorHandlerInterface $error_handler = null ): bool {
 		for ( $attempt = 0; $attempt < self::MAX_UPDATE_ATTEMPTS; ++$attempt ) {
 			wp_cache_delete( $user_id, 'user_meta' );
 			$previous_sessions = self::get_all_user_sessions( $user_id );
@@ -145,6 +152,17 @@ final class SessionManager {
 				return true;
 			}
 		}
+
+		$error_handler = $error_handler ?? new ErrorLogMcpErrorHandler();
+		$error_handler->log(
+			'Failed to persist MCP sessions after exhausting update retries.',
+			array(
+				'component' => self::class,
+				'method'    => 'mutate_sessions',
+				'user_id'   => $user_id,
+				'attempts'  => self::MAX_UPDATE_ATTEMPTS,
+			)
+		);
 
 		return false;
 	}
@@ -319,12 +337,15 @@ final class SessionManager {
 	/**
 	 * Validate a session and update last activity
 	 *
-	 * @param int $user_id The user ID.
-	 * @param string $session_id The session ID.
+	 * @since n.e.x.t Added the optional error handler.
+	 *
+	 * @param int                                                   $user_id      The user ID.
+	 * @param string                                                $session_id   The session ID.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 *
 	 * @return bool True if valid, false otherwise.
 	 */
-	public static function validate_session( int $user_id, string $session_id ): bool {
+	public static function validate_session( int $user_id, string $session_id, ?McpErrorHandlerInterface $error_handler = null ): bool {
 		if ( ! $user_id || ! $session_id ) {
 			return false;
 		}
@@ -354,7 +375,8 @@ final class SessionManager {
 				}
 
 				return $sessions;
-			}
+			},
+			$error_handler
 		);
 
 		return $stored && $is_valid;
@@ -363,12 +385,15 @@ final class SessionManager {
 	/**
 	 * Delete a specific session
 	 *
-	 * @param int $user_id The user ID.
-	 * @param string $session_id The session ID.
+	 * @since n.e.x.t Added the optional error handler.
+	 *
+	 * @param int                                                   $user_id      The user ID.
+	 * @param string                                                $session_id   The session ID.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 *
 	 * @return bool True on success, false on failure.
 	 */
-	public static function delete_session( int $user_id, string $session_id ): bool {
+	public static function delete_session( int $user_id, string $session_id, ?McpErrorHandlerInterface $error_handler = null ): bool {
 		if ( ! $user_id || ! $session_id ) {
 			return false;
 		}
@@ -386,7 +411,8 @@ final class SessionManager {
 				unset( $sessions[ $session_id ] );
 
 				return $sessions;
-			}
+			},
+			$error_handler
 		);
 
 		return $stored && $session_found;
