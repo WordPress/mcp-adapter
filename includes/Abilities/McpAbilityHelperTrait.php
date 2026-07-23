@@ -21,8 +21,8 @@ trait McpAbilityHelperTrait {
 	/**
 	 * Checks if ability is publicly exposed via MCP.
 	 *
-	 * Validates against the ability's mcp.public metadata flag.
-	 * Only abilities with mcp.public=true are accessible via default MCP server.
+	 * Validates against the ability's resolved mcp.public metadata flag.
+	 * Only abilities with effective MCP public exposure are accessible via default MCP server.
 	 *
 	 * @param string $ability_name The ability name to check.
 	 *

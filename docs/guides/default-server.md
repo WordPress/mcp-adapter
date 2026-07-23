@@ -8,7 +8,7 @@ The MCP Adapter supports two approaches for exposing WordPress abilities to AI a
 
 ### Default server: layered discovery
 
-The default server is created automatically when the plugin loads. It exposes three meta-tools that let AI agents dynamically discover and execute any WordPress ability marked with `mcp.public=true` metadata:
+The default server is created automatically when the plugin loads. It exposes three meta-tools that let AI agents dynamically discover and execute abilities with `meta.public=true` or an explicit `meta.mcp.public=true`. An explicit `meta.mcp.public=false` opts an otherwise public ability out of MCP:
 
 1. **`mcp-adapter-discover-abilities`** — Lists all publicly available abilities
 2. **`mcp-adapter-get-ability-info`** — Retrieves the full schema for a specific ability
@@ -18,7 +18,7 @@ The default server is created automatically when the plugin loads. It exposes th
 
 The AI agent navigates this layered interface: discover what is available, inspect what it needs, then execute. This keeps the MCP `tools/list` response small (only 3 tool schemas) regardless of how many abilities exist on the site.
 
-The default server also auto-discovers abilities registered with `mcp.public=true` and `mcp.type` set to `resource` or `prompt`, exposing them as MCP resources and prompts alongside the three meta-tools.
+The default server also auto-discovers public abilities with `mcp.type` set to `resource` or `prompt`, exposing them as MCP resources and prompts alongside the three meta-tools.
 
 **Best for:**
 - General-purpose AI integration where the set of abilities changes over time
@@ -64,8 +64,8 @@ The AI agent sees `my-plugin-create-post` and `my-plugin-update-post` as individ
 | AI interaction | Discover → Inspect → Execute (3 steps) | Call tool directly (1 step) |
 | Scalability | Unlimited abilities without growing `tools/list` | Each tool adds to `tools/list` response |
 | Schema detail | AI fetches schemas on demand via `get-ability-info` | Full schemas visible immediately |
-| Configuration | Zero-config; abilities opt in with `mcp.public=true` | Explicit ability list per server |
-| Auto-discovery | Resources and prompts with `mcp.public=true` auto-discovered | Only explicitly listed components |
+| Configuration | Zero-config; abilities opt in with `meta.public=true` | Explicit ability list per server |
+| Auto-discovery | Public resources and prompts are auto-discovered | Only explicitly listed components |
 | Transport | HTTP (REST API) by default; STDIO via WP-CLI | Any transport you configure |
 
 ### Disabling the default server
@@ -268,12 +268,12 @@ The AI agent uses these three tools in combination to systematically explore and
 **Security**: 
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_discover_abilities_capability` filter)
-- Only returns abilities with `mcp.public=true` metadata
+- Only returns abilities with effective MCP public exposure
 
 **Behavior**:
 - Scans all registered WordPress abilities
 - Excludes abilities starting with `mcp-adapter/` (prevents self-referencing)
-- Filters to only include abilities with `mcp.public=true` in their metadata
+- Filters to only include abilities exposed by `meta.public=true` or `meta.mcp.public=true`
 - Returns ability name, label, and description for each public ability
 
 **Output Format**:
@@ -307,7 +307,7 @@ The AI agent uses these three tools in combination to systematically explore and
 **Security**:
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_get_ability_info_capability` filter)
-- Only works with abilities that have `mcp.public=true` metadata
+- Only works with abilities that have effective MCP public exposure
 - Returns `ability_not_public_mcp` error for non-public abilities
 
 **Output Format**:
@@ -344,13 +344,13 @@ The AI agent uses these three tools in combination to systematically explore and
 **Security**:
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_execute_ability_capability` filter)
-- Only executes abilities with `mcp.public=true` metadata
+- Only executes abilities that have effective MCP public exposure
 - Performs additional permission check on the target ability itself
 - Double-checks permissions before execution as additional security layer
 
 **Execution Flow**:
 1. Validates user authentication and capabilities
-2. Checks if target ability has `mcp.public=true` metadata
+2. Checks whether the target ability has effective MCP public exposure
 3. Verifies target ability exists
 4. Calls the target ability's permission callback
 5. Executes the target ability with provided parameters
@@ -385,8 +385,8 @@ The AI agent uses these three tools in combination to systematically explore and
 The default server implements a metadata-driven security model:
 
 - **Default Secure**: Abilities are NOT accessible via MCP by default
-- **Explicit Opt-in**: Abilities must include `mcp.public=true` in their metadata to be accessible
-- **Granular Control**: Each ability individually decides if it should be MCP-accessible
+- **Explicit Opt-in**: Abilities must set `meta.public=true` or `meta.mcp.public=true` to be accessible
+- **Granular Control**: `meta.mcp.public` can override the high-level public setting for MCP only
 
 **Example of Public MCP Ability**:
 ```php
@@ -399,9 +399,7 @@ wp_register_ability('my-plugin/safe-tool', [
         return current_user_can('read');
     },
     'meta' => [
-        'mcp' => [
-            'public' => true, // This makes it accessible via MCP
-        ]
+        'public' => true, // This makes it accessible to clients, including MCP
     ]
 ]);
 ```
@@ -411,7 +409,7 @@ wp_register_ability('my-plugin/safe-tool', [
 All core abilities require:
 1. **WordPress Authentication**: User must be logged in (`is_user_logged_in()`)
 2. **Capability Check**: User must have required capability (default: `read`)
-3. **MCP Exposure Check**: Target ability must have `mcp.public=true` metadata
+3. **MCP Exposure Check**: Target ability must have effective MCP public exposure
 
 ### Capability Filters
 
@@ -471,7 +469,7 @@ The default server uses structured error handling:
 - `authentication_required`: User not logged in
 - `insufficient_capability`: User lacks required WordPress capability
 - `ability_not_found`: Requested ability doesn't exist
-- `ability_not_public_mcp`: Ability not exposed via MCP (missing `mcp.public=true`)
+- `ability_not_public_mcp`: Ability is not exposed via MCP
 - `missing_ability_name`: Required ability name parameter missing
 
 ### Error Response Format
@@ -490,7 +488,7 @@ The default server uses structured error handling:
 
 ### For Plugin Developers
 
-1. **Secure by Default**: Only add `mcp.public=true` to abilities that should be accessible via MCP
+1. **Secure by Default**: Only set `meta.public=true` for abilities that should be client-accessible; use `meta.mcp.public=false` to opt out of MCP specifically
 2. **Proper Permissions**: Implement appropriate permission callbacks for your abilities
 3. **Clear Documentation**: Provide good labels and descriptions for your abilities
 4. **Input Validation**: Use proper input schemas to validate parameters
@@ -505,14 +503,14 @@ The default server uses structured error handling:
 ## Troubleshooting
 
 ### No Abilities Returned
-- Check that abilities have `mcp.public=true` in their metadata
+- Check that abilities have `meta.public=true` or `meta.mcp.public=true`, without an MCP-specific opt-out
 - Verify user is authenticated and has required capabilities
 - Ensure abilities are properly registered during `wp_abilities_api_init`
 
 ### Permission Denied Errors
 - Verify user authentication (logged in)
 - Check user has required capability (default: `read`)
-- Confirm ability has `mcp.public=true` metadata
+- Confirm the ability has public exposure and does not set `meta.mcp.public=false`
 
 ### Ability Not Found
 - Ensure ability is registered before MCP server initialization

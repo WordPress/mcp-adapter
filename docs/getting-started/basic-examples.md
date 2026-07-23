@@ -100,13 +100,11 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'publish_posts' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'annotations' => [
                 'priority' => 2.0,
                 'readOnlyHint' => false,
                 'destructiveHint' => false
-            ],
-            'mcp' => [
-                'public' => true  // Expose this ability via MCP
             ]
         ]
     ]);
@@ -148,6 +146,7 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'manage_options' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'uri' => 'wordpress://site/config',  // Required for resources
             'annotations' => [
                 'readOnlyHint' => true,
@@ -156,7 +155,6 @@ add_action( 'wp_abilities_api_init', function() {
                 'priority' => 0.8
             ],
             'mcp' => [
-                'public' => true,      // Expose this ability via MCP
                 'type'   => 'resource' // Mark as resource for auto-discovery
             ]
         ]
@@ -212,6 +210,7 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'edit_posts' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'arguments' => [
                 [
                     'name' => 'code',
@@ -229,7 +228,6 @@ add_action( 'wp_abilities_api_init', function() {
                 'idempotentHint' => true
             ],
             'mcp' => [
-                'public' => true,   // Expose this ability via MCP
                 'type'   => 'prompt' // Mark as prompt for auto-discovery
             ]
         ]
