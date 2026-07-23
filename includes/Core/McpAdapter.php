@@ -95,7 +95,12 @@ final class McpAdapter {
 
 		$mcp_meta = $meta['mcp'] ?? array();
 
-		if ( ! is_array( $mcp_meta ) || isset( $mcp_meta['public'] ) ) {
+		// If meta.mcp is malformed, treat it as unset so inheritance can still apply safely.
+		if ( isset( $meta['mcp'] ) && ! is_array( $mcp_meta ) ) {
+			$mcp_meta = array();
+		}
+
+		if ( isset( $mcp_meta['public'] ) ) {
 			return $args;
 		}
 
