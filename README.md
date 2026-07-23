@@ -190,8 +190,10 @@ add_action( 'wp_abilities_api_init', function() {
 // and invoke it via `mcp-adapter/execute-ability` rather than expecting
 // it to appear as its own entry in `tools/list`.
 // To opt out of MCP while remaining public to other clients, explicitly set
-// meta.mcp.public to false. Without either public flag, abilities are only accessible
-// through custom MCP servers that explicitly list them.
+// meta.mcp.public to false.
+// To expose only through MCP, omit meta.public and set meta.mcp.public to true.
+// Without either public flag, abilities are only accessible through custom MCP
+// servers that explicitly list them.
 ```
 
 </details>

@@ -111,7 +111,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		wp_unregister_ability( 'test/not-public' );
 	}
 
-	public function test_execute_inherits_public_exposure_and_respects_mcp_opt_out(): void {
+	public function test_execute_inherits_public_exposure_and_respects_mcp_overrides(): void {
 		$this->register_ability_in_hook(
 			'test/public-inherited',
 			array(
@@ -147,22 +147,45 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 			)
 		);
 
+		$this->register_ability_in_hook(
+			'test/mcp-only-opt-in',
+			array(
+				'label'               => 'MCP-only Opt-in Test',
+				'description'         => 'Opts into MCP without high-level public exposure.',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array();
+				},
+				'permission_callback' => '__return_true',
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+			)
+		);
+
 		$inherited_ability = wp_get_ability( 'test/public-inherited' );
 		$opt_out_ability   = wp_get_ability( 'test/public-mcp-opt-out' );
+		$mcp_only_ability  = wp_get_ability( 'test/mcp-only-opt-in' );
 
 		$this->assertNotNull( $inherited_ability );
 		$this->assertNotNull( $opt_out_ability );
+		$this->assertNotNull( $mcp_only_ability );
 		$this->assertTrue( $inherited_ability->get_meta()['mcp']['public'] );
 		$this->assertFalse( $opt_out_ability->get_meta()['mcp']['public'] );
+		$this->assertTrue( $mcp_only_ability->get_meta()['mcp']['public'] );
 
 		$result        = DiscoverAbilitiesAbility::execute( array() );
 		$ability_names = array_column( $result['abilities'], 'name' );
 
 		$this->assertContains( 'test/public-inherited', $ability_names );
 		$this->assertNotContains( 'test/public-mcp-opt-out', $ability_names );
+		$this->assertContains( 'test/mcp-only-opt-in', $ability_names );
 
 		wp_unregister_ability( 'test/public-inherited' );
 		wp_unregister_ability( 'test/public-mcp-opt-out' );
+		wp_unregister_ability( 'test/mcp-only-opt-in' );
 	}
 
 	public function test_check_permission_requires_capability(): void {

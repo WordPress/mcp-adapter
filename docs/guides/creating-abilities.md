@@ -36,6 +36,16 @@ To keep an otherwise public ability out of MCP, opt out explicitly:
 ]
 ```
 
+To expose an ability only through MCP without opting into other client channels, leave `meta.public` unset and opt into MCP explicitly:
+
+```php
+'meta' => [
+    'mcp' => [
+        'public' => true,
+    ],
+]
+```
+
 ### MCP Type
 
 The `type` parameter specifies how the ability should be exposed in the MCP server:

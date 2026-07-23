@@ -96,6 +96,22 @@ final class McpAdapterAbilityExposureTest extends TestCase {
 					),
 				),
 			),
+			'MCP-only opt-in does not require public metadata' => array(
+				'args'     => array(
+					'meta' => array(
+						'mcp' => array(
+							'public' => true,
+						),
+					),
+				),
+				'expected' => array(
+					'meta' => array(
+						'mcp' => array(
+							'public' => true,
+						),
+					),
+				),
+			),
 			'private ability remains unchanged'     => array(
 				'args'     => array(
 					'meta' => array(
