@@ -111,81 +111,99 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		wp_unregister_ability( 'test/not-public' );
 	}
 
-	public function test_execute_inherits_public_exposure_and_respects_mcp_overrides(): void {
+	/**
+	 * @dataProvider data_public_exposure
+	 *
+	 * @param array<string, mixed> $meta                Ability metadata.
+	 * @param bool                 $expected_mcp_public Expected resolved MCP exposure.
+	 */
+	public function test_execute_inherits_public_exposure_and_respects_mcp_overrides(
+		array $meta,
+		bool $expected_mcp_public
+	): void {
+		$ability_name = 'test/public-exposure';
+
 		$this->register_ability_in_hook(
-			'test/public-inherited',
+			$ability_name,
 			array(
-				'label'               => 'Public Inherited Test',
-				'description'         => 'Inherits MCP exposure from the public metadata.',
+				'label'               => 'Public Exposure Test',
+				'description'         => 'Tests resolved MCP exposure metadata.',
 				'category'            => 'test',
 				'execute_callback'    => static function () {
 					return array();
 				},
 				'permission_callback' => '__return_true',
-				'meta'                => array(
-					'public' => true,
-				),
+				'meta'                => $meta,
 			)
 		);
 
-		$this->register_ability_in_hook(
-			'test/public-mcp-opt-out',
-			array(
-				'label'               => 'Public MCP Opt-out Test',
-				'description'         => 'Opts out of MCP exposure explicitly.',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return array();
-				},
-				'permission_callback' => '__return_true',
+		$registered_ability  = wp_get_ability( $ability_name );
+		$resolved_mcp_public = null !== $registered_ability ? ( $registered_ability->get_meta()['mcp']['public'] ?? null ) : null;
+		$result              = DiscoverAbilitiesAbility::execute( array() );
+		$ability_names       = array_column( $result['abilities'], 'name' );
+
+		wp_unregister_ability( $ability_name );
+
+		$this->assertNotNull( $registered_ability );
+		$this->assertSame( $expected_mcp_public, $resolved_mcp_public );
+
+		if ( $expected_mcp_public ) {
+			$this->assertContains( $ability_name, $ability_names );
+		} else {
+			$this->assertNotContains( $ability_name, $ability_names );
+		}
+	}
+
+	/**
+	 * @return array<string, array{
+	 *     meta: array<string, mixed>,
+	 *     expected_mcp_public: bool
+	 * }>
+	 */
+	public function data_public_exposure(): array {
+		return array(
+			'public ability inherits MCP exposure'  => array(
+				'meta'                => array(
+					'public' => true,
+				),
+				'expected_mcp_public' => true,
+			),
+			'explicit MCP opt-out takes precedence' => array(
 				'meta'                => array(
 					'public' => true,
 					'mcp'    => array(
 						'public' => false,
 					),
 				),
-			)
-		);
-
-		$this->register_ability_in_hook(
-			'test/mcp-only-opt-in',
-			array(
-				'label'               => 'MCP-only Opt-in Test',
-				'description'         => 'Opts into MCP without high-level public exposure.',
-				'category'            => 'test',
-				'execute_callback'    => static function () {
-					return array();
-				},
-				'permission_callback' => '__return_true',
+				'expected_mcp_public' => false,
+			),
+			'explicit MCP opt-in takes precedence'  => array(
+				'meta'                => array(
+					'public' => false,
+					'mcp'    => array(
+						'public' => true,
+					),
+				),
+				'expected_mcp_public' => true,
+			),
+			'MCP-only opt-in does not require public metadata' => array(
 				'meta'                => array(
 					'mcp' => array(
 						'public' => true,
 					),
 				),
-			)
+				'expected_mcp_public' => true,
+			),
+			'null MCP exposure inherits the public setting' => array(
+				'meta'                => array(
+					'public' => true,
+					'mcp'    => array(
+						'public' => null,
+					),
+				),
+				'expected_mcp_public' => true,
+			),
 		);
-
-		$inherited_ability = wp_get_ability( 'test/public-inherited' );
-		$opt_out_ability   = wp_get_ability( 'test/public-mcp-opt-out' );
-		$mcp_only_ability  = wp_get_ability( 'test/mcp-only-opt-in' );
-
-		$this->assertNotNull( $inherited_ability );
-		$this->assertNotNull( $opt_out_ability );
-		$this->assertNotNull( $mcp_only_ability );
-		$this->assertTrue( $inherited_ability->get_meta()['mcp']['public'] );
-		$this->assertFalse( $opt_out_ability->get_meta()['mcp']['public'] );
-		$this->assertTrue( $mcp_only_ability->get_meta()['mcp']['public'] );
-
-		$result        = DiscoverAbilitiesAbility::execute( array() );
-		$ability_names = array_column( $result['abilities'], 'name' );
-
-		$this->assertContains( 'test/public-inherited', $ability_names );
-		$this->assertNotContains( 'test/public-mcp-opt-out', $ability_names );
-		$this->assertContains( 'test/mcp-only-opt-in', $ability_names );
-
-		wp_unregister_ability( 'test/public-inherited' );
-		wp_unregister_ability( 'test/public-mcp-opt-out' );
-		wp_unregister_ability( 'test/mcp-only-opt-in' );
 	}
 
 	public function test_check_permission_requires_capability(): void {
