@@ -191,9 +191,13 @@ add_action( 'wp_abilities_api_init', function() {
 // it to appear as its own entry in `tools/list`.
 // To opt out of MCP while remaining public to other clients, explicitly set
 // meta.mcp.public to false.
-// To expose only through MCP, omit meta.public and set meta.mcp.public to true.
+// To expose only through MCP, omit `meta.public` and set `meta.mcp.public` to true.
 // Without either public flag, abilities are only accessible through custom MCP
 // servers that explicitly list them.
+// Note: how far `meta.public` reaches depends on the WordPress version. WordPress
+// core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in 7.1. On
+// WordPress 6.9 and 7.0, this adapter honors `meta.public` for MCP, but REST API
+// access still requires setting `meta.show_in_rest` to true.
 ```
 
 </details>

@@ -25,6 +25,8 @@ WordPress abilities are NOT accessible via the default MCP server by default. Se
 ]
 ```
 
+> **Note**: How far `meta.public` reaches depends on the WordPress version. WordPress core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in version 7.1. On WordPress 6.9 and 7.0, the MCP Adapter honors `meta.public` for MCP exposure, but REST API access still requires setting `meta.show_in_rest` to `true`.
+
 To keep an otherwise public ability out of MCP, opt out explicitly:
 
 ```php

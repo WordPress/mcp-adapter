@@ -113,6 +113,8 @@ add_action( 'wp_abilities_api_init', function() {
 
 The ability is automatically available via the default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
 
+> **Note**: How far `meta.public` reaches depends on the WordPress version. WordPress core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in version 7.1. On WordPress 6.9 and 7.0, the MCP Adapter honors `meta.public` for MCP exposure, but REST API access still requires setting `meta.show_in_rest` to `true`.
+
 ### Testing the Tool
 
 ```bash
