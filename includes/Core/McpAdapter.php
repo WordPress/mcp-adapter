@@ -59,7 +59,8 @@ final class McpAdapter {
 			self::$instance = new self();
 
 			// Inherit the high-level ability exposure setting before abilities are registered.
-			add_filter( 'wp_register_ability_args', array( self::$instance, 'inherit_public_ability_exposure' ) );
+			// Runs last so earlier filters can still adjust `meta.public` or `meta.mcp.public`.
+			add_filter( 'wp_register_ability_args', array( self::$instance, 'inherit_public_ability_exposure' ), PHP_INT_MAX );
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
@@ -78,9 +79,10 @@ final class McpAdapter {
 	 *
 	 * An explicit MCP-specific setting takes precedence. This mirrors the
 	 * Abilities API exposure cascade, where a channel-specific value overrides
-	 * the high-level public value.
+	 * the high-level public value. The filter is hooked at the lowest possible
+	 * priority so it resolves exposure from the final filtered metadata.
 	 *
-	 * @since 0.6.0
+	 * @since n.e.x.t
 	 *
 	 * @param array<string, mixed> $args Ability registration arguments.
 	 *
@@ -95,12 +97,9 @@ final class McpAdapter {
 
 		$mcp_meta = $meta['mcp'] ?? array();
 
-		// If meta.mcp is malformed, treat it as unset so inheritance can still apply safely.
-		if ( isset( $meta['mcp'] ) && ! is_array( $mcp_meta ) ) {
-			$mcp_meta = array();
-		}
-
-		if ( isset( $mcp_meta['public'] ) ) {
+		// Fail closed when meta.mcp is malformed. Downstream reads use null
+		// coalescing, so the invalid value never triggers PHP warnings.
+		if ( ! is_array( $mcp_meta ) || isset( $mcp_meta['public'] ) ) {
 			return $args;
 		}
 

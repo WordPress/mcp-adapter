@@ -115,11 +115,11 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	 * @dataProvider data_public_exposure
 	 *
 	 * @param array<string, mixed> $meta                Ability metadata.
-	 * @param bool                 $expected_mcp_public Expected resolved MCP exposure.
+	 * @param bool|null            $expected_mcp_public Expected resolved MCP exposure, or null when it stays unset.
 	 */
 	public function test_execute_inherits_public_exposure_and_respects_mcp_overrides(
 		array $meta,
-		bool $expected_mcp_public
+		?bool $expected_mcp_public
 	): void {
 		$ability_name = 'test/public-exposure';
 
@@ -137,14 +137,15 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 			)
 		);
 
-		$registered_ability  = wp_get_ability( $ability_name );
-		$resolved_mcp_public = null !== $registered_ability ? ( $registered_ability->get_meta()['mcp']['public'] ?? null ) : null;
+		$registered_ability = wp_get_ability( $ability_name );
+		$this->assertNotNull( $registered_ability );
+
+		$resolved_mcp_public = $registered_ability->get_meta()['mcp']['public'] ?? null;
 		$result              = DiscoverAbilitiesAbility::execute( array() );
 		$ability_names       = array_column( $result['abilities'], 'name' );
 
 		wp_unregister_ability( $ability_name );
 
-		$this->assertNotNull( $registered_ability );
 		$this->assertSame( $expected_mcp_public, $resolved_mcp_public );
 
 		if ( $expected_mcp_public ) {
@@ -157,7 +158,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	/**
 	 * @return array<string, array{
 	 *     meta: array<string, mixed>,
-	 *     expected_mcp_public: bool
+	 *     expected_mcp_public: bool|null
 	 * }>
 	 */
 	public function data_public_exposure(): array {
@@ -202,6 +203,88 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 					),
 				),
 				'expected_mcp_public' => true,
+			),
+			'malformed MCP metadata fails closed'   => array(
+				'meta'                => array(
+					'public' => true,
+					'mcp'    => 'invalid',
+				),
+				'expected_mcp_public' => null,
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider data_late_public_exposure_changes
+	 *
+	 * @param bool $registered_public Initial `meta.public` value passed at registration.
+	 * @param bool $filtered_public   Final `meta.public` value set by a later filter.
+	 */
+	public function test_execute_resolves_exposure_from_late_filtered_metadata(
+		bool $registered_public,
+		bool $filtered_public
+	): void {
+		$ability_name = 'test/late-filtered-exposure';
+
+		$late_filter = static function ( array $args, string $name ) use ( $ability_name, $filtered_public ): array {
+			if ( $ability_name === $name ) {
+				$args['meta']['public'] = $filtered_public;
+			}
+
+			return $args;
+		};
+		add_filter( 'wp_register_ability_args', $late_filter, 20, 2 );
+
+		$this->register_ability_in_hook(
+			$ability_name,
+			array(
+				'label'               => 'Late Filtered Exposure Test',
+				'description'         => 'Tests exposure resolution after later filters run.',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array();
+				},
+				'permission_callback' => '__return_true',
+				'meta'                => array(
+					'public' => $registered_public,
+				),
+			)
+		);
+
+		$registered_ability = wp_get_ability( $ability_name );
+		$this->assertNotNull( $registered_ability );
+
+		$resolved_mcp_public = $registered_ability->get_meta()['mcp']['public'] ?? null;
+		$result              = DiscoverAbilitiesAbility::execute( array() );
+		$ability_names       = array_column( $result['abilities'], 'name' );
+
+		remove_filter( 'wp_register_ability_args', $late_filter, 20 );
+		wp_unregister_ability( $ability_name );
+
+		if ( $filtered_public ) {
+			$this->assertTrue( $resolved_mcp_public );
+			$this->assertContains( $ability_name, $ability_names );
+		} else {
+			$this->assertNull( $resolved_mcp_public );
+			$this->assertNotContains( $ability_name, $ability_names );
+		}
+	}
+
+	/**
+	 * @return array<string, array{
+	 *     registered_public: bool,
+	 *     filtered_public: bool
+	 * }>
+	 */
+	public function data_late_public_exposure_changes(): array {
+		return array(
+			'late opt-out overrides registered public exposure' => array(
+				'registered_public' => true,
+				'filtered_public'   => false,
+			),
+			'late opt-in overrides registered private exposure' => array(
+				'registered_public' => false,
+				'filtered_public'   => true,
 			),
 		);
 	}
