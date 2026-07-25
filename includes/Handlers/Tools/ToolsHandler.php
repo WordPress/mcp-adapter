@@ -170,7 +170,8 @@ class ToolsHandler {
 			 * Filters tool arguments before execution, or short-circuits execution entirely.
 			 *
 			 * Return the (optionally modified) arguments array to proceed with execution,
-			 * or return a WP_Error to block execution and return an error to the client.
+			 * a WP_Error to block execution and return an error to the client, or a
+			 * PreToolCallDecision to explicitly proceed, complete, or reject the call.
 			 *
 			 * @since 0.5.0
 			 *
@@ -178,12 +179,29 @@ class ToolsHandler {
 			 * @param string                       $tool_name The tool name being called.
 			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
 			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 * @return array|\WP_Error|\WP\MCP\Handlers\Tools\PreToolCallDecision
 			 */
 			$args = apply_filters( 'mcp_adapter_pre_tool_call', $args, $tool_name, $mcp_tool, $this->mcp );
 
-			// Allow pre-filter to short-circuit execution by returning WP_Error.
+			if ( $args instanceof PreToolCallDecision ) {
+				if ( $args->should_complete() ) {
+					return $args->get_result();
+				}
+
+				if ( ! $args->should_proceed() ) {
+					return $this->create_error_result( $args->get_error()->get_error_message() );
+				}
+
+				$args = $args->get_args();
+			}
+
+			// Preserve the legacy WP_Error short-circuit behavior.
 			if ( is_wp_error( $args ) ) {
 				return $this->create_error_result( $args->get_error_message() );
+			}
+
+			if ( ! is_array( $args ) ) {
+				return $this->create_error_result( __( 'Invalid pre-tool-call filter return value', 'mcp-adapter' ) );
 			}
 
 			$result = $mcp_tool->execute( $args );
