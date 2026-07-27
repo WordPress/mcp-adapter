@@ -1154,6 +1154,66 @@ final class DummyAbility {
 			)
 		);
 
+		// Resource returning text content with _meta.
+		wp_register_ability(
+			'test/resource-text-with-meta',
+			array(
+				'label'               => 'Resource Text With Meta',
+				'description'         => 'A resource returning text content with _meta',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array(
+						array(
+							'uri'      => 'WordPress://local/resource-text-with-meta',
+							'text'     => 'hello meta',
+							'mimeType' => 'text/plain',
+							'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+						),
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-text-with-meta',
+					),
+				),
+			)
+		);
+
+		// Resource returning blob content with _meta.
+		wp_register_ability(
+			'test/resource-blob-with-meta',
+			array(
+				'label'               => 'Resource Blob With Meta',
+				'description'         => 'A resource returning blob content with _meta',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array(
+						array(
+							'uri'      => 'WordPress://local/resource-blob-with-meta',
+							'blob'     => base64_encode( 'binary-with-meta' ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+							'mimeType' => 'application/octet-stream',
+							'_meta'    => array( 'checksum' => 'abc123' ),
+						),
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-blob-with-meta',
+					),
+				),
+			)
+		);
+
 		// =========================================================================
 		// Prompt Icons and _meta Test Abilities (MCP 2025-11-25)
 		// =========================================================================

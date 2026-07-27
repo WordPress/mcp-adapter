@@ -327,4 +327,50 @@ final class ResourcesHandlerReadTest extends TestCase {
 
 		remove_filter( 'mcp_adapter_resource_read_result', $filter );
 	}
+
+	public function test_read_resource_preserves_meta_on_text_content(): void {
+		wp_set_current_user( 1 );
+
+		$server  = $this->makeServer( array(), array( 'test/resource-text-with-meta' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-text-with-meta' ) )
+		);
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertNotEmpty( $contents );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+
+		// Verify _meta is preserved end-to-end.
+		$meta = $contents[0]->get_meta();
+		$this->assertIsArray( $meta, '_meta should be an array, not null.' );
+		$this->assertArrayHasKey( 'ui', $meta );
+		$this->assertTrue( $meta['ui']['prefersBorder'] );
+	}
+
+	public function test_read_resource_preserves_meta_on_blob_content(): void {
+		wp_set_current_user( 1 );
+
+		$server  = $this->makeServer( array(), array( 'test/resource-blob-with-meta' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-blob-with-meta' ) )
+		);
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertNotEmpty( $contents );
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+
+		// Verify _meta is preserved end-to-end.
+		$meta = $contents[0]->get_meta();
+		$this->assertIsArray( $meta, '_meta should be an array, not null.' );
+		$this->assertArrayHasKey( 'checksum', $meta );
+		$this->assertSame( 'abc123', $meta['checksum'] );
+	}
 }

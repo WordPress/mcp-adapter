@@ -278,6 +278,7 @@ class ResourcesHandler {
 	private function create_content_dto( array $item, string $default_uri ) {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
+		$meta      = isset( $item['_meta'] ) && is_array( $item['_meta'] ) ? $item['_meta'] : null;
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {
@@ -286,6 +287,7 @@ class ResourcesHandler {
 					'uri'      => $item_uri,
 					'blob'     => (string) $item['blob'],
 					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+					'_meta'    => $meta,
 				)
 			);
 		}
@@ -298,6 +300,7 @@ class ResourcesHandler {
 				'uri'      => $item_uri,
 				'text'     => (string) $text,
 				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+				'_meta'    => $meta,
 			)
 		);
 	}
