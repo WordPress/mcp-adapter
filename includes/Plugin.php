@@ -23,9 +23,9 @@ final class Plugin {
 	/**
 	 * The one true plugin.
 	 *
-	 * @var static
+	 * @var static|null
 	 */
-	private static self $instance;
+	private static ?self $instance = null;
 
 	/**
 	 * Gets the singleton instance of the plugin.
@@ -33,7 +33,7 @@ final class Plugin {
 	 * @return self The plugin instance.
 	 */
 	public static function instance(): self {
-		if ( ! isset( self::$instance ) ) {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 			self::$instance->setup();
 
@@ -72,18 +72,18 @@ final class Plugin {
 	private function has_dependencies(): bool {
 		// Check if Abilities API is available.
 		if ( ! function_exists( 'wp_register_ability' ) ) {
-			add_action(
-				'admin_notices',
-				static function () {
-					wp_admin_notice(
-						__( 'Abilities API not available (wp_register_ability function not found)', 'mcp-adapter' ),
-						array(
-							'type'    => 'error',
-							'dismiss' => false,
-						),
-					);
-				}
-			);
+			$display_notice = static function () {
+				wp_admin_notice(
+					__( 'MCP Adapter: Abilities API is not available (wp_register_ability function not found). Please ensure the Abilities API plugin is installed and activated.', 'mcp-adapter' ),
+					array(
+						'type'    => 'error',
+						'dismiss' => false,
+					)
+				);
+			};
+
+			add_action( 'admin_notices', $display_notice );
+			add_action( 'network_admin_notices', $display_notice );
 
 			return false;
 		}

@@ -33,15 +33,17 @@ final class McpAdapter {
 	/**
 	 * Registry instance
 	 *
-	 * @var \WP\MCP\Core\McpAdapter
+	 * @var \WP\MCP\Core\McpAdapter|null
 	 */
-	private static self $instance;
+	private static ?self $instance = null;
+
 	/**
 	 * Track if the adapter has been initialized to prevent duplicate initialization
 	 *
 	 * @var bool
 	 */
 	private static bool $initialized = false;
+
 	/**
 	 * Registered servers
 	 *
@@ -55,7 +57,7 @@ final class McpAdapter {
 	 * @return \WP\MCP\Core\McpAdapter
 	 */
 	public static function instance(): self {
-		if ( ! isset( self::$instance ) ) {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
@@ -140,14 +142,13 @@ final class McpAdapter {
 			return;
 		}
 
-		\WP_CLI::add_command(
-			'mcp-adapter',
-			McpCommand::class,
-			array(
-				'shortdesc' => 'Manage MCP servers via WP-CLI.',
-				'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport.',
-			)
+		$command_info = array(
+			'shortdesc' => 'Manage MCP servers via WP-CLI.',
+			'longdesc'  => 'Commands for managing and serving MCP servers, including STDIO transport.',
 		);
+
+		\WP_CLI::add_command( 'mcp-adapter', McpCommand::class, $command_info );
+		\WP_CLI::add_command( 'mcp', McpCommand::class, $command_info );
 	}
 
 	/**
