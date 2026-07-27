@@ -368,4 +368,149 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertInstanceOf( CallToolResult::class, $result );
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
+
+	/**
+	 * Runs a tool whose raw result is replaced by the given embedded-resource shape.
+	 *
+	 * @param array $shape The embedded resource result to substitute.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	private function call_tool_returning( array $shape ) {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function () use ( $shape ) {
+			return $shape;
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		return $result;
+	}
+
+	public function test_embedded_resource_nested_shape_preserves_meta_on_both_levels(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'_meta'       => array( 'block' => 'level' ),
+				'resource'    => array(
+					'uri'      => 'ui://example/app',
+					'mimeType' => 'text/html;profile=mcp-app',
+					'text'     => '<!doctype html>',
+					'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		// Outer keys belong to the content block.
+		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
+		$this->assertNotNull( $content[0]->getAnnotations() );
+		$this->assertSame( array( 'user' ), $content[0]->getAnnotations()->getAudience() );
+
+		// The nested _meta belongs to the resource contents.
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( TextResourceContents::class, $resource );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $resource->get_meta() );
+	}
+
+	public function test_embedded_resource_nested_blob_shape_preserves_meta_on_both_levels(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'_meta'    => array( 'block' => 'level' ),
+				'resource' => array(
+					'uri'      => 'WordPress://local/tool-embedded-blob',
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+					'_meta'    => array( 'pages' => 3 ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
+
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( BlobResourceContents::class, $resource );
+		$this->assertSame( array( 'pages' => 3 ), $resource->get_meta() );
+	}
+
+	public function test_embedded_resource_flat_shape_assigns_meta_to_content_block_only(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'uri'      => 'ui://example/app',
+				'mimeType' => 'text/html;profile=mcp-app',
+				'text'     => '<!doctype html>',
+				'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		// The flat shape has one level, so _meta lands on the block and is not duplicated
+		// onto the nested contents.
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->get_meta() );
+		$this->assertNull( $content[0]->getResource()->get_meta() );
+	}
+
+	public function test_embedded_resource_with_invalid_annotations_still_returns_result(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'audience' => 'not-an-array' ),
+			)
+		);
+
+		// Malformed annotations are dropped, not raised: the resource still reaches the client.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertNull( $content[0]->getAnnotations() );
+		$this->assertSame( 'body', $content[0]->getResource()->getText() );
+	}
+
+	public function test_embedded_resource_without_meta_leaves_both_levels_null(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type' => 'resource',
+				'uri'  => 'WordPress://local/tool-embedded-text',
+				'text' => 'body',
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertNull( $content[0]->getResource()->get_meta() );
+	}
 }

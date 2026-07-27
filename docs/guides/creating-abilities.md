@@ -671,6 +671,45 @@ wp_register_ability('my-plugin/site-config', [
 ]);
 ```
 
+### Returning Structured Resource Contents
+
+The example above returns a plain array, which the adapter JSON-encodes into a single text content item. To control the response yourself, return a list of content items instead. Each item may set `uri`, `mimeType`, one of `text` or `blob`, and `_meta`:
+
+```php
+'execute_callback' => function() {
+    return [
+        [
+            'uri'      => 'ui://my-plugin/app',
+            'mimeType' => 'text/html;profile=mcp-app',
+            'text'     => '<!doctype html>...',
+            '_meta'    => [
+                'ui' => ['prefersBorder' => true],
+            ],
+        ],
+    ];
+},
+```
+
+`_meta` travels with the resource but is not part of its body. MCP Apps UI resources use it for CSP config and rendering hints.
+
+MCP declares `_meta` as a JSON object, so it must be a non-empty PHP associative array — a sequential array (including an empty one) would serialize as a JSON array. Anything else is dropped, and the rest of the content item is still returned. Key names may carry an optional reverse-DNS prefix (`com.example/hint`); prefixes whose second label is `modelcontextprotocol` or `mcp` are reserved by the specification.
+
+Tools can return the same contents embedded in a `resource` content block. The nested form keeps the two `_meta` levels distinct — the outer one belongs to the content block, the inner one to the resource contents:
+
+```php
+return [
+    'type'     => 'resource',
+    '_meta'    => ['block' => 'level'],
+    'resource' => [
+        'uri'   => 'ui://my-plugin/app',
+        'text'  => '<!doctype html>...',
+        '_meta' => ['ui' => ['prefersBorder' => true]],
+    ],
+];
+```
+
+The flat form (`['type' => 'resource', 'uri' => ..., 'text' => ..., '_meta' => ...]`) has only one level, so its `_meta` belongs to the content block.
+
 ## Creating Prompts
 
 Prompts generate structured messages for language models. They use `input_schema` to define parameters, which are automatically converted to MCP prompt arguments format. Prompts should set `type: 'prompt'` in the MCP configuration.

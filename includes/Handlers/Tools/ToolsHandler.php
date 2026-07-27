@@ -11,9 +11,11 @@ namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
 
@@ -234,6 +236,16 @@ class ToolsHandler {
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
+			//
+			// Two shapes are accepted, and they place `_meta` differently:
+			//
+			// - Nested `{ type, resource: { uri, text, _meta }, annotations, _meta }` maps
+			//   one-to-one onto the DTO tree, so the outer keys belong to the content block
+			//   and the inner `_meta` to the resource contents.
+			// - Flat `{ type, uri, text, _meta }` is the content block itself, written with
+			//   its resource fields inlined. There is only one level for `_meta` to mean, so
+			//   it belongs to the block. Reading it into the contents as well would duplicate
+			//   the same metadata on both levels of the response.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
 				$resource_item = $result;
 				if ( isset( $result['resource'] ) && is_array( $result['resource'] ) ) {
@@ -247,6 +259,13 @@ class ToolsHandler {
 					$uri = trim( $uri );
 				}
 
+				$block_meta    = McpValidator::normalize_meta( $result['_meta'] ?? null );
+				$resource_meta = $resource_item !== $result
+					? McpValidator::normalize_meta( $resource_item['_meta'] ?? null )
+					: null;
+
+				$annotations = $this->build_annotations( $result['annotations'] ?? null, $tool_name );
+
 				// Only return an EmbeddedResource if we have a valid URI and some content.
 				if ( is_string( $uri ) && '' !== $uri ) {
 					if ( isset( $resource_item['text'] ) && is_string( $resource_item['text'] ) ) {
@@ -256,7 +275,10 @@ class ToolsHandler {
 									ContentBlockHelper::embedded_text_resource(
 										$uri,
 										$resource_item['text'],
-										is_string( $mime_type ) ? $mime_type : null
+										is_string( $mime_type ) ? $mime_type : null,
+										$annotations,
+										$block_meta,
+										$resource_meta
 									),
 								),
 								'isError' => false,
@@ -271,7 +293,10 @@ class ToolsHandler {
 									ContentBlockHelper::embedded_blob_resource(
 										$uri,
 										$resource_item['blob'],
-										is_string( $mime_type ) ? $mime_type : null
+										is_string( $mime_type ) ? $mime_type : null,
+										$annotations,
+										$block_meta,
+										$resource_meta
 									),
 								),
 								'isError' => false,
@@ -318,6 +343,46 @@ class ToolsHandler {
 			);
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
+		}
+	}
+
+	/**
+	 * Build an Annotations DTO from a tool result's `annotations` key.
+	 *
+	 * Malformed annotations are logged and dropped rather than raised. Annotations are
+	 * a rendering hint, and before they were read here a tool returning a malformed one
+	 * still got its result delivered; failing the whole call now would be a regression
+	 * for tools whose output is otherwise valid.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed  $annotations The raw annotations value from the tool result.
+	 * @param string $tool_name   Tool name for logging.
+	 *
+	 * @return \WP\McpSchema\Common\Protocol\DTO\Annotations|null
+	 */
+	private function build_annotations( $annotations, string $tool_name ): ?Annotations {
+		if ( $annotations instanceof Annotations ) {
+			return $annotations;
+		}
+
+		if ( ! is_array( $annotations ) ) {
+			return null;
+		}
+
+		try {
+			return Annotations::fromArray( $annotations );
+		} catch ( \Throwable $exception ) {
+			$this->mcp->get_error_handler()->log(
+				'Invalid annotations in tool result, dropping them',
+				array(
+					'tool_name' => $tool_name,
+					'exception' => $exception->getMessage(),
+				),
+				'warning'
+			);
+
+			return null;
 		}
 	}
 

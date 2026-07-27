@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
@@ -270,6 +271,14 @@ class ResourcesHandler {
 	/**
 	 * Create a content DTO from an array item.
 	 *
+	 * `_meta` is carried through from the item so metadata a handler attaches to its
+	 * resource contents reaches the client. MCP Apps UI resources rely on this: they
+	 * put CSP config and border hints under `_meta.ui` alongside the HTML body.
+	 *
+	 * A `_meta` that would not serialize as a JSON object is dropped rather than
+	 * forwarded, so a malformed one costs the client its metadata and not the resource.
+	 * See {@see McpValidator::normalize_meta()}.
+	 *
 	 * @param array $item The content item array.
 	 * @param string $default_uri The default URI to use if not specified.
 	 *
@@ -278,6 +287,7 @@ class ResourcesHandler {
 	private function create_content_dto( array $item, string $default_uri ) {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
+		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {
@@ -286,6 +296,7 @@ class ResourcesHandler {
 					'uri'      => $item_uri,
 					'blob'     => (string) $item['blob'],
 					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+					'_meta'    => $meta,
 				)
 			);
 		}
@@ -298,6 +309,7 @@ class ResourcesHandler {
 				'uri'      => $item_uri,
 				'text'     => (string) $text,
 				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+				'_meta'    => $meta,
 			)
 		);
 	}

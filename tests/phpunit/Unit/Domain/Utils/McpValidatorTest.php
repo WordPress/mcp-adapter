@@ -966,4 +966,54 @@ final class McpValidatorTest extends TestCase {
 		$this->assertEquals( array( '48x48' ), $result['valid'][0]['sizes'] );
 		$this->assertEquals( 'light', $result['valid'][0]['theme'] );
 	}
+
+	public function test_normalize_meta_keeps_associative_array(): void {
+		$meta = array( 'ui' => array( 'prefersBorder' => true ) );
+
+		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
+	}
+
+	public function test_normalize_meta_keeps_prefixed_keys(): void {
+		// Reverse-DNS and vendor prefixes are valid _meta key names per MCP.
+		$meta = array(
+			'com.example/hint'      => 'value',
+			'openai/outputTemplate' => 'ui://example/app',
+		);
+
+		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
+	}
+
+	/**
+	 * @dataProvider provide_non_object_meta
+	 *
+	 * @param mixed $meta The value to normalize.
+	 */
+	public function test_normalize_meta_rejects_values_that_are_not_json_objects( $meta ): void {
+		$this->assertNull( McpValidator::normalize_meta( $meta ) );
+	}
+
+	/**
+	 * @return array<string, array{0: mixed}>
+	 */
+	public function provide_non_object_meta(): array {
+		return array(
+			'null'          => array( null ),
+			'string'        => array( 'not-an-object' ),
+			'int'           => array( 42 ),
+			'bool'          => array( true ),
+			'object'        => array( new \stdClass() ),
+			// These are arrays, but they serialize to a JSON array rather than an object.
+			'empty array'   => array( array() ),
+			'list'          => array( array( 'a', 'b' ) ),
+			'numeric keys'  => array( array( 0 => 'a', 1 => 'b' ) ),
+			'string digits' => array( array( '0' => 'a', '1' => 'b' ) ),
+		);
+	}
+
+	public function test_normalize_meta_keeps_sparse_numeric_keys(): void {
+		// Not a list, so it serializes as {"1":"a"} — a valid JSON object.
+		$meta = array( 1 => 'a' );
+
+		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
+	}
 }

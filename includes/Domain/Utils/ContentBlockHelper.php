@@ -82,11 +82,17 @@ final class ContentBlockHelper {
 	 *
 	 * Use this for embedding text-based resources (files, documents, etc.) in content.
 	 *
+	 * The DTO tree has two levels that each carry their own `_meta`: the content
+	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
+	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
+	 * the spec and are not interchangeable.
+	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $text The text content of the resource.
 	 * @param string|null $mime_type Optional MIME type of the resource.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
+	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
 	 */
@@ -95,13 +101,15 @@ final class ContentBlockHelper {
 		string $text,
 		?string $mime_type = null,
 		?Annotations $annotations = null,
-		?array $_meta = null
+		?array $_meta = null,
+		?array $resource_meta = null
 	): EmbeddedResource {
 		$resource = TextResourceContents::fromArray(
 			array(
 				'uri'      => $uri,
 				'text'     => $text,
 				'mimeType' => $mime_type,
+				'_meta'    => $resource_meta,
 			)
 		);
 
@@ -120,11 +128,17 @@ final class ContentBlockHelper {
 	 *
 	 * Use this for embedding binary resources (images, PDFs, etc.) in content.
 	 *
+	 * The DTO tree has two levels that each carry their own `_meta`: the content
+	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
+	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
+	 * the spec and are not interchangeable.
+	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $blob Base64-encoded binary data.
 	 * @param string|null $mime_type Optional MIME type of the resource.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
+	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
 	 */
@@ -133,13 +147,15 @@ final class ContentBlockHelper {
 		string $blob,
 		?string $mime_type = null,
 		?Annotations $annotations = null,
-		?array $_meta = null
+		?array $_meta = null,
+		?array $resource_meta = null
 	): EmbeddedResource {
 		$resource = BlobResourceContents::fromArray(
 			array(
 				'uri'      => $uri,
 				'blob'     => $blob,
 				'mimeType' => $mime_type,
+				'_meta'    => $resource_meta,
 			)
 		);
 
