@@ -29,6 +29,12 @@ use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
  * ContentBlockInterface. These DTOs are used in tool call results, prompt messages,
  * and resource contents throughout the MCP protocol.
  *
+ * Every `_meta` argument passes through {@see McpValidator::normalize_meta()}, so a
+ * value that would not serialize as a JSON object arrives at the client as an absent
+ * field rather than as a JSON array. MCP declares `_meta` an object, and clients
+ * validate it as part of the enclosing response, so a non-object there risks the
+ * whole payload rather than just the metadata.
+ *
  * @since 0.5.0
  */
 final class ContentBlockHelper {
@@ -50,7 +56,7 @@ final class ContentBlockHelper {
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -72,7 +78,7 @@ final class ContentBlockHelper {
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -109,7 +115,7 @@ final class ContentBlockHelper {
 				'uri'      => $uri,
 				'text'     => $text,
 				'mimeType' => $mime_type,
-				'_meta'    => $resource_meta,
+				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
 			)
 		);
 
@@ -118,7 +124,7 @@ final class ContentBlockHelper {
 				'type'        => EmbeddedResource::TYPE,
 				'resource'    => $resource,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -155,7 +161,7 @@ final class ContentBlockHelper {
 				'uri'      => $uri,
 				'blob'     => $blob,
 				'mimeType' => $mime_type,
-				'_meta'    => $resource_meta,
+				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
 			)
 		);
 
@@ -164,7 +170,7 @@ final class ContentBlockHelper {
 				'type'        => EmbeddedResource::TYPE,
 				'resource'    => $resource,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -200,7 +206,7 @@ final class ContentBlockHelper {
 				'type'        => TextContent::TYPE,
 				'text'        => $text,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}

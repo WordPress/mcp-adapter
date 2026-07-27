@@ -163,8 +163,9 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			'arguments'   => $argument_dtos,
 		);
 
-		if ( ! empty( $this->meta ) ) {
-			$prompt_data['_meta'] = $this->meta;
+		$prompt_meta = McpValidator::normalize_meta( $this->meta );
+		if ( null !== $prompt_meta ) {
+			$prompt_data['_meta'] = $prompt_meta;
 		}
 
 		// Only include icons if valid ones exist.
