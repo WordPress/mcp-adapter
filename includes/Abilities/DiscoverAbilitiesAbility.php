@@ -89,8 +89,8 @@ final class DiscoverAbilitiesAbility {
 		foreach ( $abilities as $ability ) {
 			$ability_name = $ability->get_name();
 
-			// Check if ability is publicly exposed via MCP
-			if ( ! self::is_ability_mcp_public( $ability ) ) {
+			// Check if ability is exposed via MCP for the discover path.
+			if ( ! self::is_ability_mcp_exposed( $ability, McpAbilityExposureContext::PATH_DISCOVER ) ) {
 				continue;
 			}
 

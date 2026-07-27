@@ -50,6 +50,19 @@ final class McpAdapter {
 	private array $servers = array();
 
 	/**
+	 * The MCP server handling the current request, if any.
+	 *
+	 * Set by transport-layer handlers around request dispatch so that
+	 * downstream code (e.g. the built-in discover/get-info/execute
+	 * abilities, or filters they expose) can identify which server
+	 * the current call is coming from. Null when no server context
+	 * is active (e.g. WP-CLI, direct ability invocation).
+	 *
+	 * @var \WP\MCP\Core\McpServer|null
+	 */
+	private ?McpServer $current_server = null;
+
+	/**
 	 * Get the registry instance
 	 *
 	 * @return \WP\MCP\Core\McpAdapter
@@ -323,6 +336,41 @@ final class McpAdapter {
 	 */
 	public function get_servers(): array {
 		return $this->servers;
+	}
+
+	/**
+	 * Set the MCP server handling the current request.
+	 *
+	 * Called by transport-layer handlers (e.g. ToolsHandler) around
+	 * request dispatch so that code invoked deeper in the stack —
+	 * ability permission checks, execute callbacks, and any filters
+	 * they expose — can identify which server initiated the call.
+	 *
+	 * Pass null to clear the context (do this in a `finally` block
+	 * so exceptions do not leak stale server state to unrelated
+	 * subsequent calls).
+	 *
+	 * @since 0.6.0
+	 *
+	 * @param \WP\MCP\Core\McpServer|null $server The current server, or null to clear.
+	 */
+	public function set_current_server( ?McpServer $server ): void {
+		$this->current_server = $server;
+	}
+
+	/**
+	 * Get the MCP server handling the current request, if any.
+	 *
+	 * Returns null when no server context is active (e.g. the current
+	 * call originated from WP-CLI, cron, or a direct
+	 * `wp_get_ability( ... )->execute()` outside of an MCP request).
+	 *
+	 * @since 0.6.0
+	 *
+	 * @return \WP\MCP\Core\McpServer|null The current server, or null.
+	 */
+	public function get_current_server(): ?McpServer {
+		return $this->current_server;
 	}
 
 	/**

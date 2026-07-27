@@ -174,7 +174,7 @@ final class ExecuteAbilityAbility {
 		}
 
 		// Check MCP exposure restrictions
-		$exposure_check = self::check_ability_mcp_exposure( $ability_name );
+		$exposure_check = self::check_ability_mcp_exposure( $ability_name, McpAbilityExposureContext::PATH_EXECUTE );
 		if ( is_wp_error( $exposure_check ) ) {
 			return $exposure_check;
 		}

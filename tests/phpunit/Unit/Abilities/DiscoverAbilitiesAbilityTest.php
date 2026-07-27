@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\DiscoverAbilitiesAbility;
+use WP\MCP\Abilities\McpAbilityExposureContext;
 use WP\MCP\Tests\TestCase;
 use WP_Error;
 
@@ -238,5 +239,51 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertTrue( $annotations['readonly'] );
 		$this->assertFalse( $annotations['destructive'] );
 		$this->assertTrue( $annotations['idempotent'] );
+	}
+
+	public function test_is_ability_exposed_filter_can_expose_non_public_ability(): void {
+		$this->register_ability_in_hook(
+			'test/filter-exposed',
+			array(
+				'label'               => 'Filter Exposed',
+				'description'         => 'Not statically public; forced visible via filter.',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array(); },
+				'permission_callback' => static function () {
+					return true; },
+				'meta'                => array( 'mcp' => array( 'type' => 'tool' ) ),
+			)
+		);
+
+		$before       = DiscoverAbilitiesAbility::execute( array() );
+		$before_names = array_column( $before['abilities'], 'name' );
+		$this->assertNotContains( 'test/filter-exposed', $before_names, 'Sanity: non-public ability is hidden by default.' );
+
+		$captured_ability_name = null;
+		$captured_context      = null;
+		$filter                = function ( $is_exposed, $ability, $context ) use ( &$captured_ability_name, &$captured_context ) {
+			if ( 'test/filter-exposed' === $ability->get_name() ) {
+				$captured_ability_name = $ability->get_name();
+				$captured_context      = $context;
+				return true;
+			}
+			return $is_exposed;
+		};
+		add_filter( 'mcp_adapter_is_ability_exposed', $filter, 10, 3 );
+
+		try {
+			$after       = DiscoverAbilitiesAbility::execute( array() );
+			$after_names = array_column( $after['abilities'], 'name' );
+			$this->assertContains( 'test/filter-exposed', $after_names, 'Filter should be able to force-include a non-public ability.' );
+			$this->assertSame( 'test/filter-exposed', $captured_ability_name );
+			$this->assertInstanceOf( McpAbilityExposureContext::class, $captured_context );
+			$this->assertSame( McpAbilityExposureContext::PATH_DISCOVER, $captured_context->exposure_path );
+			$this->assertNull( $captured_context->server, 'Context server should be null when no MCP request is in flight.' );
+		} finally {
+			remove_filter( 'mcp_adapter_is_ability_exposed', $filter, 10 );
+			wp_unregister_ability( 'test/filter-exposed' );
+		}
 	}
 }
