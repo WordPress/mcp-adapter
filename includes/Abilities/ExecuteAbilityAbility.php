@@ -20,7 +20,7 @@ use WP_Error;
  *
  * SECURITY CONSIDERATIONS:
  * - This ability has openWorldHint=true, allowing execution of any registered ability
- * - Only abilities with mcp.public=true metadata can be executed via default MCP server.
+ * - Only abilities with effective MCP public exposure can be executed via default MCP server.
  * - Requires proper WordPress capability checks for secure operation
  * - Caller identity verification is enforced through WordPress authentication
  *

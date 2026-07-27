@@ -13,15 +13,38 @@ WordPress abilities can be registered as different MCP components:
 
 ## MCP Exposure
 
-WordPress abilities are NOT accessible via default MCP server by default. To make an ability available through the default MCP server, you must explicitly add `mcp.public: true` to the ability's metadata.
+WordPress abilities are NOT accessible via the default MCP server by default. Set the high-level `meta.public` flag to `true` to make an ability available to clients, including MCP. An explicit `meta.mcp.public` value overrides that default for MCP only.
+
+```php
+'meta' => [
+    'public' => true, // Expose to clients, including MCP
+    'mcp' => [
+        'type'   => 'tool' // Optional: 'tool' (default), 'resource', or 'prompt'
+    ],
+    'annotations' => [...] // Optional MCP annotations
+]
+```
+
+> **Note**: How far `meta.public` reaches depends on the WordPress version. WordPress core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in version 7.1. On WordPress 6.9 and 7.0, the MCP Adapter honors `meta.public` for MCP exposure, but REST API access still requires setting `meta.show_in_rest` to `true`.
+
+To keep an otherwise public ability out of MCP, opt out explicitly:
+
+```php
+'meta' => [
+    'public' => true,
+    'mcp' => [
+        'public' => false,
+    ],
+]
+```
+
+To expose an ability only through MCP without opting into other client channels, leave `meta.public` unset and opt into MCP explicitly:
 
 ```php
 'meta' => [
     'mcp' => [
-        'public' => true,  // Required for MCP access
-        'type'   => 'tool' // Optional: 'tool' (default), 'resource', or 'prompt'
+        'public' => true,
     ],
-    'annotations' => [...] // Optional MCP annotations
 ]
 ```
 
@@ -65,11 +88,11 @@ wp_register_ability('my-plugin/my-ability', [
     'execute_callback' => 'my_callback',
     'permission_callback' => 'my_permission_check',
     'meta' => [
+        'public' => true,          // Expose to clients, including MCP
         'annotations' => [...],   // MCP annotations
         'uri' => '...',          // For resources
         'arguments' => [...],    // For prompts
         'mcp' => [
-            'public' => true,    // Expose via MCP (required for MCP access)
             'type'   => 'tool',  // 'tool', 'resource', or 'prompt'
         ]
     ]
@@ -444,6 +467,7 @@ wp_register_ability('my-plugin/analyze-data', [
     'execute_callback' => 'analyze_data_callback',
     'permission_callback' => function() { return current_user_can('read'); },
     'meta' => [
+        'public' => true,
         'annotations' => [
             'readonly' => true,              // WordPress format → readOnlyHint
             'destructive' => false,          // WordPress format → destructiveHint
@@ -452,7 +476,6 @@ wp_register_ability('my-plugin/analyze-data', [
             'title' => 'Data Analysis Tool'  // No WordPress equivalent
         ],
         'mcp' => [
-            'public' => true,
             'type' => 'tool'
         ]
     ]
@@ -466,6 +489,7 @@ wp_register_ability('my-plugin/user-data', [
     'execute_callback' => 'get_user_data',
     'permission_callback' => function() { return current_user_can('read'); },
     'meta' => [
+        'public' => true,
         'uri' => 'wordpress://users/profile',
         'annotations' => [
             'audience' => ['assistant'],     // For AI use only
@@ -473,7 +497,6 @@ wp_register_ability('my-plugin/user-data', [
             'lastModified' => date('c')      // ISO 8601 timestamp
         ],
         'mcp' => [
-            'public' => true,
             'type' => 'resource'
         ]
     ]
@@ -494,13 +517,13 @@ wp_register_ability('my-plugin/review-prompt', [
     'execute_callback' => 'generate_review_prompt',
     'permission_callback' => function() { return current_user_can('edit_posts'); },
     'meta' => [
+        'public' => true,
         'annotations' => [
             'audience' => ['user', 'assistant'], // For both user and AI
             'priority' => 0.8,                  // High priority
             'lastModified' => date('c')          // Current timestamp
         ],
         'mcp' => [
-            'public' => true,
             'type' => 'prompt'
         ]
     ]
@@ -560,13 +583,11 @@ wp_register_ability('my-plugin/create-post', [
         return current_user_can('publish_posts');
     },
     'meta' => [
+        'public' => true, // Expose to clients, including MCP
         'annotations' => [
             'readonly' => false,       // Tool modifies data (WordPress format)
             'destructive' => false,    // Tool doesn't delete data (WordPress format)
             'idempotent' => false      // Multiple calls create multiple posts (WordPress format)
-        ],
-        'mcp' => [
-            'public' => true  // Expose this ability via MCP
         ]
     ]
 ]);
@@ -600,12 +621,10 @@ wp_register_ability('my-plugin/count-posts', [
         return current_user_can('read');
     },
     'meta' => [
+        'public' => true,
         'annotations' => [
             'readonly' => true,
             'idempotent' => false  // Count may change over time
-        ],
-        'mcp' => [
-            'public' => true
         ]
     ]
 ]);
@@ -638,6 +657,7 @@ wp_register_ability('my-plugin/site-config', [
         return current_user_can('manage_options');
     },
     'meta' => [
+        'public' => true, // Expose to clients, including MCP
         'uri' => 'wordpress://site/config',
         'annotations' => [
             'audience' => ['user', 'assistant'], // For both users and AI
@@ -645,7 +665,6 @@ wp_register_ability('my-plugin/site-config', [
             'lastModified' => '2024-01-15T10:30:00Z' // Last update timestamp
         ],
         'mcp' => [
-            'public' => true,      // Expose this ability via MCP
             'type'   => 'resource' // Mark as resource for auto-discovery
         ]
     ]
@@ -719,12 +738,12 @@ wp_register_ability('my-plugin/code-review', [
         return current_user_can('edit_posts');
     },
     'meta' => [
+        'public' => true, // Expose to clients, including MCP
         'annotations' => [
             'audience' => ['user'],         // For user-facing prompts
             'priority' => 0.7               // Standard priority
         ],
         'mcp' => [
-            'public' => true,   // Expose this ability via MCP
             'type'   => 'prompt' // Mark as prompt for auto-discovery
         ]
     ]
@@ -785,13 +804,13 @@ wp_register_ability('my-plugin/analysis-prompt', [
         return current_user_can('read');
     },
     'meta' => [
+        'public' => true, // Expose to clients, including MCP
         'annotations' => [
             'audience' => ['assistant'],        // For AI analysis only
             'priority' => 0.9,                 // High priority analysis
             'lastModified' => date('c')         // Current timestamp
         ],
         'mcp' => [
-            'public' => true,   // Expose this ability via MCP
             'type'   => 'prompt' // Mark as prompt for auto-discovery
         ]
     ]

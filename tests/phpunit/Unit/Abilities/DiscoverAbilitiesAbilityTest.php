@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\DiscoverAbilitiesAbility;
+use WP\MCP\Abilities\McpAbilityExposure;
 use WP\MCP\Tests\TestCase;
 use WP_Error;
 
@@ -109,6 +110,203 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 		// Clean up
 		wp_unregister_ability( 'test/not-public' );
+	}
+
+	/**
+	 * @dataProvider data_public_exposure
+	 *
+	 * @param array<string, mixed> $meta                Ability metadata.
+	 * @param bool                 $expected_mcp_public Expected resolved MCP exposure.
+	 */
+	public function test_execute_inherits_public_exposure_and_respects_mcp_overrides(
+		array $meta,
+		bool $expected_mcp_public
+	): void {
+		$ability_name = 'test/public-exposure';
+
+		$this->register_ability_in_hook(
+			$ability_name,
+			array(
+				'label'               => 'Public Exposure Test',
+				'description'         => 'Tests resolved MCP exposure metadata.',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array();
+				},
+				'permission_callback' => '__return_true',
+				'meta'                => $meta,
+			)
+		);
+
+		$registered_ability = wp_get_ability( $ability_name );
+		$this->assertNotNull( $registered_ability );
+
+		$resolved_mcp_public = McpAbilityExposure::is_public( $registered_ability );
+		$result              = DiscoverAbilitiesAbility::execute( array() );
+		$ability_names       = array_column( $result['abilities'], 'name' );
+
+		wp_unregister_ability( $ability_name );
+
+		$this->assertSame( $expected_mcp_public, $resolved_mcp_public );
+
+		if ( $expected_mcp_public ) {
+			$this->assertContains( $ability_name, $ability_names );
+		} else {
+			$this->assertNotContains( $ability_name, $ability_names );
+		}
+	}
+
+	/**
+	 * @return array<string, array{
+	 *     meta: array<string, mixed>,
+	 *     expected_mcp_public: bool
+	 * }>
+	 */
+	public function data_public_exposure(): array {
+		return array(
+			'public ability inherits MCP exposure'  => array(
+				'meta'                => array(
+					'public' => true,
+				),
+				'expected_mcp_public' => true,
+			),
+			'explicit MCP opt-out takes precedence' => array(
+				'meta'                => array(
+					'public' => true,
+					'mcp'    => array(
+						'public' => false,
+					),
+				),
+				'expected_mcp_public' => false,
+			),
+			'explicit MCP opt-in takes precedence'  => array(
+				'meta'                => array(
+					'public' => false,
+					'mcp'    => array(
+						'public' => true,
+					),
+				),
+				'expected_mcp_public' => true,
+			),
+			'MCP-only opt-in does not require public metadata' => array(
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+					),
+				),
+				'expected_mcp_public' => true,
+			),
+			'null MCP exposure inherits the public setting' => array(
+				'meta'                => array(
+					'public' => true,
+					'mcp'    => array(
+						'public' => null,
+					),
+				),
+				'expected_mcp_public' => true,
+			),
+			'malformed MCP metadata fails closed'   => array(
+				'meta'                => array(
+					'public' => true,
+					'mcp'    => 'invalid',
+				),
+				'expected_mcp_public' => false,
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider data_late_public_exposure_changes
+	 *
+	 * @param bool $registered_public Initial `meta.public` value passed at registration.
+	 * @param bool $filtered_public   Final `meta.public` value set by a later filter.
+	 * @param int  $filter_priority   Priority the competing filter registers at.
+	 */
+	public function test_execute_resolves_exposure_from_late_filtered_metadata(
+		bool $registered_public,
+		bool $filtered_public,
+		int $filter_priority
+	): void {
+		$ability_name = 'test/late-filtered-exposure';
+
+		$late_filter = static function ( array $args, string $name ) use ( $ability_name, $filtered_public ): array {
+			if ( $ability_name === $name ) {
+				$args['meta']['public'] = $filtered_public;
+			}
+
+			return $args;
+		};
+		add_filter( 'wp_register_ability_args', $late_filter, $filter_priority, 2 );
+
+		$this->register_ability_in_hook(
+			$ability_name,
+			array(
+				'label'               => 'Late Filtered Exposure Test',
+				'description'         => 'Tests exposure resolution after later filters run.',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					return array();
+				},
+				'permission_callback' => '__return_true',
+				'meta'                => array(
+					'public' => $registered_public,
+				),
+			)
+		);
+
+		$registered_ability = wp_get_ability( $ability_name );
+		$this->assertNotNull( $registered_ability );
+
+		$resolved_mcp_public = McpAbilityExposure::is_public( $registered_ability );
+		$result              = DiscoverAbilitiesAbility::execute( array() );
+		$ability_names       = array_column( $result['abilities'], 'name' );
+
+		remove_filter( 'wp_register_ability_args', $late_filter, $filter_priority );
+		wp_unregister_ability( $ability_name );
+
+		if ( $filtered_public ) {
+			$this->assertTrue( $resolved_mcp_public );
+			$this->assertContains( $ability_name, $ability_names );
+		} else {
+			$this->assertFalse( $resolved_mcp_public );
+			$this->assertNotContains( $ability_name, $ability_names );
+		}
+	}
+
+	/**
+	 * @return array<string, array{
+	 *     registered_public: bool,
+	 *     filtered_public: bool,
+	 *     filter_priority: int
+	 * }>
+	 */
+	public function data_late_public_exposure_changes(): array {
+		return array(
+			'late opt-out overrides registered public exposure' => array(
+				'registered_public' => true,
+				'filtered_public'   => false,
+				'filter_priority'   => 20,
+			),
+			'late opt-in overrides registered private exposure' => array(
+				'registered_public' => false,
+				'filtered_public'   => true,
+				'filter_priority'   => 20,
+			),
+			// A competing callback registered at the same priority still runs
+			// last, because WordPress orders same-priority callbacks by
+			// registration order. No priority can win this, so exposure must
+			// not be resolved while the ability is being registered.
+			'same-priority opt-out still wins'     => array(
+				'registered_public' => true,
+				'filtered_public'   => false,
+				'filter_priority'   => PHP_INT_MAX,
+			),
+			'same-priority opt-in still wins'      => array(
+				'registered_public' => false,
+				'filtered_public'   => true,
+				'filter_priority'   => PHP_INT_MAX,
+			),
+		);
 	}
 
 	public function test_check_permission_requires_capability(): void {

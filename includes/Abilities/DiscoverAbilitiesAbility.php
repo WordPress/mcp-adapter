@@ -19,7 +19,7 @@ use WP_Error;
  *
  * SECURITY CONSIDERATIONS:
  * - This ability exposes information about all registered abilities in the system
- * - Only abilities with mcp.public=true metadata will be returned
+ * - Only abilities with effective MCP public exposure will be returned
  * - Requires proper WordPress capability checks for secure operation
  *
  * @see https://developer.wordpress.org/apis/security/ for detailed security guidance

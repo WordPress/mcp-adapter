@@ -100,13 +100,11 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'publish_posts' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'annotations' => [
                 'priority' => 2.0,
                 'readOnlyHint' => false,
                 'destructiveHint' => false
-            ],
-            'mcp' => [
-                'public' => true  // Expose this ability via MCP
             ]
         ]
     ]);
@@ -114,6 +112,8 @@ add_action( 'wp_abilities_api_init', function() {
 ```
 
 The ability is automatically available via the default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
+
+> **Note**: How far `meta.public` reaches depends on the WordPress version. WordPress core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in version 7.1. On WordPress 6.9 and 7.0, the MCP Adapter honors `meta.public` for MCP exposure, but REST API access still requires setting `meta.show_in_rest` to `true`.
 
 ### Testing the Tool
 
@@ -148,6 +148,7 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'manage_options' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'uri' => 'wordpress://site/config',  // Required for resources
             'annotations' => [
                 'readOnlyHint' => true,
@@ -156,7 +157,6 @@ add_action( 'wp_abilities_api_init', function() {
                 'priority' => 0.8
             ],
             'mcp' => [
-                'public' => true,      // Expose this ability via MCP
                 'type'   => 'resource' // Mark as resource for auto-discovery
             ]
         ]
@@ -212,6 +212,7 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'edit_posts' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'arguments' => [
                 [
                     'name' => 'code',
@@ -229,7 +230,6 @@ add_action( 'wp_abilities_api_init', function() {
                 'idempotentHint' => true
             ],
             'mcp' => [
-                'public' => true,   // Expose this ability via MCP
                 'type'   => 'prompt' // Mark as prompt for auto-discovery
             ]
         ]

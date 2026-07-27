@@ -119,7 +119,8 @@ add_action( 'plugins_loaded', function() {
 The MCP Adapter automatically creates a default server that exposes registered WordPress abilities through a layered architecture. This provides immediate MCP functionality without requiring manual server configuration.
 
 **How it works:**
-- WordPress abilities registered via `wp_register_ability()` with the `meta.mcp.public` flag set to `true` are discoverable and executable on the default server via its built-in adapter tools
+- WordPress abilities registered via `wp_register_ability()` with `meta.public` set to `true` are discoverable and executable on the default server via its built-in adapter tools
+- Set `meta.mcp.public` explicitly to override the high-level setting for MCP only; `false` opts a public ability out, while `true` exposes an otherwise private ability to MCP
 - On the default server, public abilities are accessed through `mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, and `mcp-adapter/execute-ability` rather than being auto-registered individually in `tools/list`
 - Alternatively, abilities can be explicitly listed when creating a [custom MCP server](#creating-custom-mcp-servers); in that case, they can be exposed directly as MCP tools, resources, or prompts without requiring the `meta.mcp.public` flag
 - The default server supports both HTTP and STDIO transports and supports multiple MCP protocol versions
@@ -179,19 +180,24 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'read' );
         },
         'meta' => [
-            'mcp' => [
-                'public' => true, // Required for default MCP server access
-            ],
+            'public' => true, // Expose to clients, including the default MCP server
         ],
     ]);
 });
 
-// With the meta.mcp.public flag, the ability is exposed through the default MCP server.
+// With the meta.public flag, the ability is exposed through the default MCP server.
 // In the default server configuration, discover it via `discover-abilities`
 // and invoke it via `mcp-adapter/execute-ability` rather than expecting
 // it to appear as its own entry in `tools/list`.
-// Without the meta.mcp.public flag, abilities are only accessible
-// through custom MCP servers that explicitly list them.
+// To opt out of MCP while remaining public to other clients, explicitly set
+// meta.mcp.public to false.
+// To expose only through MCP, omit `meta.public` and set `meta.mcp.public` to true.
+// Without either public flag, abilities are only accessible through custom MCP
+// servers that explicitly list them.
+// Note: how far `meta.public` reaches depends on the WordPress version. WordPress
+// core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in 7.1. On
+// WordPress 6.9 and 7.0, this adapter honors `meta.public` for MCP, but REST API
+// access still requires setting `meta.show_in_rest` to true.
 ```
 
 </details>
