@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Servers;
 
+use WP\MCP\Abilities\McpAbilityExposure;
 use WP\MCP\Core\McpAdapter;
 use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
@@ -146,7 +147,7 @@ class DefaultServerFactory {
 			$meta         = $ability->get_meta();
 
 			// Skip if not publicly exposed
-			if ( ! ( $meta['mcp']['public'] ?? false ) ) {
+			if ( ! McpAbilityExposure::is_public( $ability ) ) {
 				continue;
 			}
 

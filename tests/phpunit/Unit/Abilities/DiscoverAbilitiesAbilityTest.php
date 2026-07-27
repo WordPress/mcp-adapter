@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\DiscoverAbilitiesAbility;
+use WP\MCP\Abilities\McpAbilityExposure;
 use WP\MCP\Tests\TestCase;
 use WP_Error;
 
@@ -115,11 +116,11 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	 * @dataProvider data_public_exposure
 	 *
 	 * @param array<string, mixed> $meta                Ability metadata.
-	 * @param bool|null            $expected_mcp_public Expected resolved MCP exposure, or null when it stays unset.
+	 * @param bool                 $expected_mcp_public Expected resolved MCP exposure.
 	 */
 	public function test_execute_inherits_public_exposure_and_respects_mcp_overrides(
 		array $meta,
-		?bool $expected_mcp_public
+		bool $expected_mcp_public
 	): void {
 		$ability_name = 'test/public-exposure';
 
@@ -140,7 +141,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$registered_ability = wp_get_ability( $ability_name );
 		$this->assertNotNull( $registered_ability );
 
-		$resolved_mcp_public = $registered_ability->get_meta()['mcp']['public'] ?? null;
+		$resolved_mcp_public = McpAbilityExposure::is_public( $registered_ability );
 		$result              = DiscoverAbilitiesAbility::execute( array() );
 		$ability_names       = array_column( $result['abilities'], 'name' );
 
@@ -158,7 +159,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	/**
 	 * @return array<string, array{
 	 *     meta: array<string, mixed>,
-	 *     expected_mcp_public: bool|null
+	 *     expected_mcp_public: bool
 	 * }>
 	 */
 	public function data_public_exposure(): array {
@@ -209,7 +210,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 					'public' => true,
 					'mcp'    => 'invalid',
 				),
-				'expected_mcp_public' => null,
+				'expected_mcp_public' => false,
 			),
 		);
 	}
@@ -219,10 +220,12 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	 *
 	 * @param bool $registered_public Initial `meta.public` value passed at registration.
 	 * @param bool $filtered_public   Final `meta.public` value set by a later filter.
+	 * @param int  $filter_priority   Priority the competing filter registers at.
 	 */
 	public function test_execute_resolves_exposure_from_late_filtered_metadata(
 		bool $registered_public,
-		bool $filtered_public
+		bool $filtered_public,
+		int $filter_priority
 	): void {
 		$ability_name = 'test/late-filtered-exposure';
 
@@ -233,7 +236,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 
 			return $args;
 		};
-		add_filter( 'wp_register_ability_args', $late_filter, 20, 2 );
+		add_filter( 'wp_register_ability_args', $late_filter, $filter_priority, 2 );
 
 		$this->register_ability_in_hook(
 			$ability_name,
@@ -254,18 +257,18 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$registered_ability = wp_get_ability( $ability_name );
 		$this->assertNotNull( $registered_ability );
 
-		$resolved_mcp_public = $registered_ability->get_meta()['mcp']['public'] ?? null;
+		$resolved_mcp_public = McpAbilityExposure::is_public( $registered_ability );
 		$result              = DiscoverAbilitiesAbility::execute( array() );
 		$ability_names       = array_column( $result['abilities'], 'name' );
 
-		remove_filter( 'wp_register_ability_args', $late_filter, 20 );
+		remove_filter( 'wp_register_ability_args', $late_filter, $filter_priority );
 		wp_unregister_ability( $ability_name );
 
 		if ( $filtered_public ) {
 			$this->assertTrue( $resolved_mcp_public );
 			$this->assertContains( $ability_name, $ability_names );
 		} else {
-			$this->assertNull( $resolved_mcp_public );
+			$this->assertFalse( $resolved_mcp_public );
 			$this->assertNotContains( $ability_name, $ability_names );
 		}
 	}
@@ -273,7 +276,8 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	/**
 	 * @return array<string, array{
 	 *     registered_public: bool,
-	 *     filtered_public: bool
+	 *     filtered_public: bool,
+	 *     filter_priority: int
 	 * }>
 	 */
 	public function data_late_public_exposure_changes(): array {
@@ -281,10 +285,26 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 			'late opt-out overrides registered public exposure' => array(
 				'registered_public' => true,
 				'filtered_public'   => false,
+				'filter_priority'   => 20,
 			),
 			'late opt-in overrides registered private exposure' => array(
 				'registered_public' => false,
 				'filtered_public'   => true,
+				'filter_priority'   => 20,
+			),
+			// A competing callback registered at the same priority still runs
+			// last, because WordPress orders same-priority callbacks by
+			// registration order. No priority can win this, so exposure must
+			// not be resolved while the ability is being registered.
+			'same-priority opt-out still wins'     => array(
+				'registered_public' => true,
+				'filtered_public'   => false,
+				'filter_priority'   => PHP_INT_MAX,
+			),
+			'same-priority opt-in still wins'      => array(
+				'registered_public' => false,
+				'filtered_public'   => true,
+				'filter_priority'   => PHP_INT_MAX,
 			),
 		);
 	}
