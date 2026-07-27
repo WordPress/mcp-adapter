@@ -10,6 +10,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
+use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP_Error;
 
 /**
@@ -17,6 +19,10 @@ use WP_Error;
  *
  * Handles session creation, validation, and cleanup using user meta storage.
  * Sessions are tied to authenticated users to prevent anonymous session flooding.
+ * MCP protocol revisions that do not negotiate session IDs should bypass this
+ * compatibility storage entirely.
+ * Established session maps use compare-and-swap semantics. An older
+ * unconditional writer can still overwrite a concurrent newer writer.
  */
 final class SessionManager {
 
@@ -49,53 +55,116 @@ final class SessionManager {
 	private const DEFAULT_ACTIVITY_UPDATE_INTERVAL = 60;
 
 	/**
+	 * Maximum attempts for a concurrent session mutation.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var int
+	 */
+	private const MAX_UPDATE_ATTEMPTS = 5;
+
+	/**
 	 * Create a new session for a user
 	 *
-	 * @param int $user_id The user ID.
-	 * @param array $params Client parameters from initialize request.
+	 * @since n.e.x.t Added the optional error handler.
+	 *
+	 * @param int                                                   $user_id      The user ID.
+	 * @param array                                                 $params       Client parameters from initialize request.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 *
 	 * @return string|false The session ID on success, false on failure.
 	 */
-	public static function create_session( int $user_id, array $params = array() ) {
+	public static function create_session( int $user_id, array $params = array(), ?McpErrorHandlerInterface $error_handler = null ) {
 		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
 			return false;
 		}
 
-		// Cleanup inactive sessions first
-		self::cleanup_expired_sessions( $user_id );
-
-		// Get current sessions
-		$sessions = self::get_all_user_sessions( $user_id );
-
-		// Check session limit - remove oldest if over limit
-		$config       = self::get_config();
-		$max_sessions = $config['max_sessions'];
-		if ( count( $sessions ) >= $max_sessions ) {
-			// Remove oldest session (FIFO) - sort by created_at and remove first
-			uasort(
-				$sessions,
-				static function ( $a, $b ) {
-					return $a['created_at'] <=> $b['created_at'];
-				}
-			);
-
-			array_shift( $sessions );
-		}
-
-		// Create a new session
 		$session_id = wp_generate_uuid4();
 		$now        = time();
+		$config     = self::get_config();
 
-		$sessions[ $session_id ] = array(
-			'created_at'    => $now,
-			'last_activity' => $now,
-			'client_params' => $params,
+		$created = self::mutate_sessions(
+			$user_id,
+			static function ( array $sessions ) use ( $config, $now, $params, $session_id ): array {
+				foreach ( $sessions as $stored_session_id => $session ) {
+					if ( $session['last_activity'] + $config['inactivity_timeout'] >= $now ) {
+						continue;
+					}
+
+					unset( $sessions[ $stored_session_id ] );
+				}
+
+				if ( count( $sessions ) >= $config['max_sessions'] ) {
+					uasort(
+						$sessions,
+						static function ( $a, $b ) {
+							return $a['created_at'] <=> $b['created_at'];
+						}
+					);
+
+					array_shift( $sessions );
+				}
+
+				$sessions[ $session_id ] = array(
+					'created_at'    => $now,
+					'last_activity' => $now,
+					'client_params' => $params,
+				);
+
+				return $sessions;
+			},
+			$error_handler
 		);
 
-		// Save sessions
-		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+		if ( ! $created ) {
+			return false;
+		}
 
 		return $session_id;
+	}
+
+	/**
+	 * Apply a session mutation without overwriting an established session map.
+	 *
+	 * WordPress ignores an empty $prev_value. Concurrent first connections may
+	 * therefore still overwrite each other, but subsequent writes retry when the
+	 * previously read non-empty map has changed.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int                                                   $user_id       The user ID.
+	 * @param callable                                              $mutation      Receives the latest sessions and returns the updated sessions.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
+	 * @return bool True when the mutation was stored, false after repeated conflicts.
+	 */
+	private static function mutate_sessions( int $user_id, callable $mutation, ?McpErrorHandlerInterface $error_handler = null ): bool {
+		for ( $attempt = 0; $attempt < self::MAX_UPDATE_ATTEMPTS; ++$attempt ) {
+			wp_cache_delete( $user_id, 'user_meta' );
+			$previous_sessions = self::get_all_user_sessions( $user_id );
+			$updated_sessions  = $mutation( $previous_sessions );
+
+			if ( $updated_sessions === $previous_sessions ) {
+				return true;
+			}
+
+			$updated = update_user_meta( $user_id, self::SESSION_META_KEY, $updated_sessions, $previous_sessions );
+			if ( false !== $updated ) {
+				return true;
+			}
+		}
+
+		$error_handler = $error_handler ?? new ErrorLogMcpErrorHandler();
+		$error_handler->log(
+			'Failed to persist MCP sessions after exhausting update retries.',
+			array(
+				'component' => self::class,
+				'method'    => 'mutate_sessions',
+				'user_id'   => $user_id,
+				'attempts'  => self::MAX_UPDATE_ATTEMPTS,
+			)
+		);
+
+		return false;
 	}
 
 	/**
@@ -110,33 +179,30 @@ final class SessionManager {
 			return 0;
 		}
 
-		$sessions = self::get_all_user_sessions( $user_id );
-		$now      = time();
-		$removed  = 0;
-
+		$now                = time();
+		$removed            = 0;
 		$config             = self::get_config();
 		$inactivity_timeout = $config['inactivity_timeout'];
 
-		foreach ( $sessions as $session_id => $session ) {
-			// Check if still active - skip if valid
-			if ( $session['last_activity'] + $inactivity_timeout >= $now ) {
-				continue;
+		$stored = self::mutate_sessions(
+			$user_id,
+			static function ( array $sessions ) use ( $inactivity_timeout, $now, &$removed ): array {
+				$removed = 0;
+
+				foreach ( $sessions as $session_id => $session ) {
+					if ( $session['last_activity'] + $inactivity_timeout >= $now ) {
+						continue;
+					}
+
+					unset( $sessions[ $session_id ] );
+					++$removed;
+				}
+
+				return $sessions;
 			}
+		);
 
-			// Session is inactive - remove it
-			unset( $sessions[ $session_id ] );
-			++$removed;
-		}
-
-		if ( $removed > 0 ) {
-			if ( empty( $sessions ) ) {
-				delete_user_meta( $user_id, self::SESSION_META_KEY );
-			} else {
-				update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
-			}
-		}
-
-		return $removed;
+		return $stored ? $removed : 0;
 	}
 
 	/**
@@ -258,83 +324,97 @@ final class SessionManager {
 	 * @return void
 	 */
 	private static function clear_session( int $user_id, string $session_id ): void {
-		$sessions = self::get_all_user_sessions( $user_id );
+		self::mutate_sessions(
+			$user_id,
+			static function ( array $sessions ) use ( $session_id ): array {
+				unset( $sessions[ $session_id ] );
 
-		if ( ! isset( $sessions[ $session_id ] ) ) {
-			return;
-		}
-
-		unset( $sessions[ $session_id ] );
-		update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
+				return $sessions;
+			}
+		);
 	}
 
 	/**
 	 * Validate a session and update last activity
 	 *
-	 * @param int $user_id The user ID.
-	 * @param string $session_id The session ID.
+	 * @since n.e.x.t Added the optional error handler.
+	 *
+	 * @param int                                                   $user_id      The user ID.
+	 * @param string                                                $session_id   The session ID.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 *
 	 * @return bool True if valid, false otherwise.
 	 */
-	public static function validate_session( int $user_id, string $session_id ): bool {
+	public static function validate_session( int $user_id, string $session_id, ?McpErrorHandlerInterface $error_handler = null ): bool {
 		if ( ! $user_id || ! $session_id ) {
 			return false;
 		}
 
-		$sessions = self::get_all_user_sessions( $user_id );
+		$config   = self::get_config();
+		$now      = time();
+		$is_valid = false;
 
-		if ( ! isset( $sessions[ $session_id ] ) ) {
-			return false;
-		}
+		$stored = self::mutate_sessions(
+			$user_id,
+			static function ( array $sessions ) use ( $config, $now, $session_id, &$is_valid ): array {
+				if ( ! isset( $sessions[ $session_id ] ) ) {
+					$is_valid = false;
+					return $sessions;
+				}
 
-		$session = $sessions[ $session_id ];
+				if ( $sessions[ $session_id ]['last_activity'] + $config['inactivity_timeout'] < $now ) {
+					$is_valid = false;
+					unset( $sessions[ $session_id ] );
 
-		// Check inactivity timeout
-		$config             = self::get_config();
-		$inactivity_timeout = $config['inactivity_timeout'];
-		if ( $session['last_activity'] + $inactivity_timeout < time() ) {
-			self::clear_session( $user_id, $session_id );
+					return $sessions;
+				}
 
-			return false;
-		}
+				$is_valid = true;
+				if ( $now - $sessions[ $session_id ]['last_activity'] >= $config['activity_update_interval'] ) {
+					$sessions[ $session_id ]['last_activity'] = $now;
+				}
 
-		// Throttle last_activity writes to reduce write amplification
-		$activity_update_interval = $config['activity_update_interval'];
-		if ( time() - $session['last_activity'] >= $activity_update_interval ) {
-			$sessions[ $session_id ]['last_activity'] = time();
-			update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
-		}
+				return $sessions;
+			},
+			$error_handler
+		);
 
-		return true;
+		return $stored && $is_valid;
 	}
 
 	/**
 	 * Delete a specific session
 	 *
-	 * @param int $user_id The user ID.
-	 * @param string $session_id The session ID.
+	 * @since n.e.x.t Added the optional error handler.
+	 *
+	 * @param int                                                   $user_id      The user ID.
+	 * @param string                                                $session_id   The session ID.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
 	 *
 	 * @return bool True on success, false on failure.
 	 */
-	public static function delete_session( int $user_id, string $session_id ): bool {
+	public static function delete_session( int $user_id, string $session_id, ?McpErrorHandlerInterface $error_handler = null ): bool {
 		if ( ! $user_id || ! $session_id ) {
 			return false;
 		}
 
-		$sessions = self::get_all_user_sessions( $user_id );
+		$session_found = false;
+		$stored        = self::mutate_sessions(
+			$user_id,
+			static function ( array $sessions ) use ( $session_id, &$session_found ): array {
+				if ( ! isset( $sessions[ $session_id ] ) ) {
+					$session_found = false;
+					return $sessions;
+				}
 
-		if ( ! isset( $sessions[ $session_id ] ) ) {
-			return false;
-		}
+				$session_found = true;
+				unset( $sessions[ $session_id ] );
 
-		unset( $sessions[ $session_id ] );
+				return $sessions;
+			},
+			$error_handler
+		);
 
-		if ( empty( $sessions ) ) {
-			delete_user_meta( $user_id, self::SESSION_META_KEY );
-		} else {
-			update_user_meta( $user_id, self::SESSION_META_KEY, $sessions );
-		}
-
-		return true;
+		return $stored && $session_found;
 	}
 }

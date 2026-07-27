@@ -325,7 +325,7 @@ class RequestRouter {
 		// Handle session creation if HTTP context is provided.
 		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
 		if ( $http_context && ! $http_context->session_id ) {
-			$session_result = HttpSessionValidator::create_session( $params );
+			$session_result = HttpSessionValidator::create_session_with_error_handler( $params, $this->context->error_handler );
 
 			if ( is_array( $session_result ) ) {
 				$error = $session_result['error'] ?? array();
