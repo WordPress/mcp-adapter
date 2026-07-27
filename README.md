@@ -1,5 +1,7 @@
 # MCP Adapter
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2FWordPress%2Fmcp-adapter.svg)](https://mcptoplist.com/server/glama%2FWordPress%2Fmcp-adapter)
+
 Part of the [**AI Building Blocks for WordPress** initiative](https://make.wordpress.org/ai/2025/07/17/ai-building-blocks)
 
 The official WordPress package for MCP integration that exposes WordPress abilities as [Model Context Protocol (MCP)](https://modelcontextprotocol.io) tools, resources, and prompts for AI agents.
