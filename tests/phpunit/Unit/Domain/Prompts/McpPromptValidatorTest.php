@@ -474,21 +474,35 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertEmpty( $errors );
 	}
 
-	public function test_validate_prompt_messages_with_invalid_image_mime_type(): void {
+	public function test_validate_prompt_messages_accepts_any_image_mime_type(): void {
 		$messages = array(
 			array(
 				'role'    => 'user',
 				'content' => array(
 					'type'     => 'image',
 					'data'     => base64_encode( 'image-data' ),
-					'mimeType' => 'text/plain', // Invalid for image
+					'mimeType' => 'text/plain',
+				),
+			),
+		);
+
+		$this->assertSame( array(), McpPromptValidator::validate_prompt_messages( $messages ) );
+	}
+
+	public function test_validate_prompt_messages_with_missing_image_mime_type(): void {
+		$messages = array(
+			array(
+				'role'    => 'user',
+				'content' => array(
+					'type' => 'image',
+					'data' => base64_encode( 'image-data' ),
 				),
 			),
 		);
 
 		$errors = McpPromptValidator::validate_prompt_messages( $messages );
 		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'image content must have a valid image MIME type', $errors[0] );
+		$this->assertStringContainsString( 'image content must have a mimeType field', $errors[0] );
 	}
 
 	public function test_validate_prompt_messages_with_valid_audio_content(): void {
@@ -507,21 +521,35 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertEmpty( $errors );
 	}
 
-	public function test_validate_prompt_messages_with_invalid_audio_mime_type(): void {
+	public function test_validate_prompt_messages_accepts_any_audio_mime_type(): void {
 		$messages = array(
 			array(
 				'role'    => 'user',
 				'content' => array(
 					'type'     => 'audio',
 					'data'     => base64_encode( 'audio-data' ),
-					'mimeType' => 'text/plain', // Invalid for audio
+					'mimeType' => 'text/plain',
+				),
+			),
+		);
+
+		$this->assertSame( array(), McpPromptValidator::validate_prompt_messages( $messages ) );
+	}
+
+	public function test_validate_prompt_messages_with_missing_audio_mime_type(): void {
+		$messages = array(
+			array(
+				'role'    => 'user',
+				'content' => array(
+					'type' => 'audio',
+					'data' => base64_encode( 'audio-data' ),
 				),
 			),
 		);
 
 		$errors = McpPromptValidator::validate_prompt_messages( $messages );
 		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'audio content must have a valid audio MIME type', $errors[0] );
+		$this->assertStringContainsString( 'audio content must have a mimeType field', $errors[0] );
 	}
 
 	public function test_validate_prompt_messages_with_valid_resource_content(): void {
@@ -929,7 +957,7 @@ final class McpPromptValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'resource_link content mimeType must be a string', implode( ' ', $errors ) );
 	}
 
-	public function test_validate_prompt_messages_with_resource_link_invalid_mime_type_format(): void {
+	public function test_validate_prompt_messages_accepts_any_resource_link_mime_type_string(): void {
 		$messages = array(
 			array(
 				'role'    => 'assistant',
@@ -942,9 +970,7 @@ final class McpPromptValidatorTest extends TestCase {
 			),
 		);
 
-		$errors = McpPromptValidator::validate_prompt_messages( $messages );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'resource_link content mimeType must be a valid MIME type format', implode( ' ', $errors ) );
+		$this->assertSame( array(), McpPromptValidator::validate_prompt_messages( $messages ) );
 	}
 
 	public function test_validate_prompt_messages_with_resource_link_invalid_size(): void {

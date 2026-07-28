@@ -33,24 +33,6 @@ class McpValidator {
 	private const URI_SCHEME_PATTERN = '[a-zA-Z][a-zA-Z0-9+.-]*';
 
 	/**
-	 * Allowed MIME types for MCP icons per specification.
-	 *
-	 * MUST support: image/png, image/jpeg, image/jpg
-	 * SHOULD support: image/svg+xml, image/webp
-	 *
-	 * @since 0.5.0
-	 *
-	 * @var array<string>
-	 */
-	private static array $allowed_icon_mime_types = array(
-		'image/png',
-		'image/jpeg',
-		'image/jpg',
-		'image/svg+xml',
-		'image/webp',
-	);
-
-	/**
 	 * Validate an MCP component name.
 	 *
 	 * Validates that a name follows MCP naming conventions per MCP 2025-11-25 spec:
@@ -78,32 +60,6 @@ class McpValidator {
 
 		// Only allow letters, numbers, hyphens, underscores, and dots per MCP spec.
 		return (bool) preg_match( '/^[a-zA-Z0-9_.-]+$/', $name );
-	}
-
-	/**
-	 * Validate image MIME type.
-	 *
-	 * Checks if the MIME type is a valid image type according to MCP specification.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid image MIME type, false otherwise.
-	 */
-	public static function validate_image_mime_type( string $mime_type ): bool {
-		return str_starts_with( strtolower( $mime_type ), 'image/' );
-	}
-
-	/**
-	 * Validate audio MIME type.
-	 *
-	 * Checks if the MIME type is a valid audio type according to MCP specification.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid audio MIME type, false otherwise.
-	 */
-	public static function validate_audio_mime_type( string $mime_type ): bool {
-		return str_starts_with( strtolower( $mime_type ), 'audio/' );
 	}
 
 	/**
@@ -212,17 +168,9 @@ class McpValidator {
 			$errors[] = __( 'Icon src must be a valid URL (http/https) or data: URI', 'mcp-adapter' );
 		}
 
-		// mimeType is optional but must be valid if present.
-		if ( isset( $icon['mimeType'] ) ) {
-			if ( ! is_string( $icon['mimeType'] ) ) {
-				$errors[] = __( 'Icon mimeType must be a string', 'mcp-adapter' );
-			} elseif ( ! self::validate_icon_mime_type( $icon['mimeType'] ) ) {
-				$errors[] = sprintf(
-				/* translators: %s: comma-separated list of allowed MIME types */
-					__( 'Icon mimeType must be one of: %s', 'mcp-adapter' ),
-					implode( ', ', self::$allowed_icon_mime_types )
-				);
-			}
+		// mimeType is optional. Only its type is checked.
+		if ( isset( $icon['mimeType'] ) && ! is_string( $icon['mimeType'] ) ) {
+			$errors[] = __( 'Icon mimeType must be a string', 'mcp-adapter' );
 		}
 
 		// sizes is optional but must be valid if present.
@@ -292,22 +240,6 @@ class McpValidator {
 		}
 
 		return false;
-	}
-
-	/**
-	 * Validate an icon MIME type.
-	 *
-	 * Per MCP spec, clients MUST support image/png, image/jpeg (and image/jpg).
-	 * Clients SHOULD support image/svg+xml, image/webp.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid icon MIME type, false otherwise.
-	 * @since 0.5.0
-	 *
-	 */
-	public static function validate_icon_mime_type( string $mime_type ): bool {
-		return in_array( strtolower( trim( $mime_type ) ), self::$allowed_icon_mime_types, true );
 	}
 
 	/**
@@ -577,21 +509,5 @@ class McpValidator {
 			static fn( array $matches ): string => strtolower( $matches[1] ) . ':',
 			$uri
 		) ?? $uri;
-	}
-
-	/**
-	 * Validate general MIME type format.
-	 *
-	 * Validates that a MIME type follows the standard format: type/subtype
-	 * where both type and subtype contain valid characters.
-	 *
-	 * @param string $mime_type The MIME type to validate.
-	 *
-	 * @return bool True if valid MIME type format, false otherwise.
-	 */
-	public static function validate_mime_type( string $mime_type ): bool {
-		// RFC 2045 compliant: allows +, ., and other valid MIME type characters.
-		// Examples: image/svg+xml, application/vnd.api+json, text/plain.
-		return (bool) preg_match( '/^[a-zA-Z0-9][a-zA-Z0-9!#$&^_.+-]*\/[a-zA-Z0-9][a-zA-Z0-9!#$&^_.+-]*$/', $mime_type );
 	}
 }

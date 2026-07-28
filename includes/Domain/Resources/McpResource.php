@@ -150,10 +150,10 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['description'] = $config['description'];
 		}
 
-		// Include mimeType only when valid.
+		// Include mimeType when non-empty. The value itself is not checked.
 		if ( isset( $config['mimeType'] ) ) {
 			$mime_type = trim( $config['mimeType'] );
-			if ( '' !== $mime_type && McpValidator::validate_mime_type( $mime_type ) ) {
+			if ( '' !== $mime_type ) {
 				$resource_data['mimeType'] = $mime_type;
 			}
 		}
