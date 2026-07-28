@@ -9,7 +9,7 @@ WordPress abilities can be registered as different MCP components:
 - **Resources**: Provide access to data or content
 - **Prompts**: Generate structured messages for language models
 
-**Full annotation support**: All component types support MCP annotations through the ability's `meta.annotations` field to provide behavior hints to MCP clients.
+**Annotations** provide behavior hints to MCP clients. Where you write them depends on the component type: Tools read `meta.annotations`, Resources read `meta.mcp.annotations`, and Prompts take no descriptor annotations at all. See [MCP Annotations](#mcp-annotations).
 
 ## MCP Exposure
 
@@ -21,7 +21,7 @@ WordPress abilities are NOT accessible via the default MCP server by default. Se
     'mcp' => [
         'type'   => 'tool' // Optional: 'tool' (default), 'resource', or 'prompt'
     ],
-    'annotations' => [...] // Optional MCP annotations
+    'annotations' => [...] // Optional MCP annotations (Tools; Resources use mcp.annotations)
 ]
 ```
 
@@ -88,16 +88,20 @@ wp_register_ability('my-plugin/my-ability', [
     'execute_callback' => 'my_callback',
     'permission_callback' => 'my_permission_check',
     'meta' => [
-        'public' => true,          // Expose to clients, including MCP
-        'annotations' => [...],   // MCP annotations
-        'uri' => '...',          // For resources
-        'arguments' => [...],    // For prompts
+        'public' => true,             // Expose to clients, including MCP
+        'annotations' => [...],       // MCP annotations (Tools only)
         'mcp' => [
-            'type'   => 'tool',  // 'tool', 'resource', or 'prompt'
+            'type'        => 'tool',  // 'tool', 'resource', or 'prompt'
+            'uri'         => '...',   // For resources
+            'annotations' => [...],   // For resources
+            'arguments'   => [...],   // For prompts
         ]
     ]
 ]);
 ```
+
+Note that Tools and Resources read annotations from different places, and Prompts have no
+descriptor annotations at all. The [MCP Annotations](#mcp-annotations) section covers this.
 
 ## Tool naming
 
@@ -338,7 +342,21 @@ For simple single-value outputs, you can use flattened schemas. These are automa
 
 ## MCP Annotations
 
-Annotations provide behavior hints to MCP clients about how to handle your abilities. **Annotations are type-specific** - Tools use different annotations than Resources and Prompts.
+Annotations provide behavior hints to MCP clients about how to handle your abilities. **Annotations are type-specific** — Tools use a different vocabulary than Resources, and each type reads them from a different place.
+
+| Component | Where to write them | What you write |
+|---|---|---|
+| **Tool** descriptor | `meta.annotations` | `readonly`, `destructive`, `idempotent` (Abilities API names), plus `openWorldHint` and `title` |
+| **Resource** descriptor | `meta.mcp.annotations` | `audience`, `priority`, `lastModified` |
+| **Prompt** descriptor | *not supported* | — |
+| **Content block** (tool result or prompt message) | `annotations` on the block itself | `audience`, `priority`, `lastModified` |
+
+Tool annotations are the one case where the name you write differs from the name that goes on the wire: the adapter maps `readonly` → `readOnlyHint`, `destructive` → `destructiveHint`, `idempotent` → `idempotentHint`. `openWorldHint` and `title` have no Abilities API equivalent, so they are written and emitted under the same name.
+
+Two things to watch:
+
+- Resources also accept a top-level `meta.annotations`, but that location is **deprecated as of 0.5.0** and logs a deprecation notice. Write `meta.mcp.annotations` instead. The same applies to `meta.uri`, `meta.mimeType` and `meta.size` — prefer `meta.mcp.*`.
+- The MCP `Prompt` object has **no** `annotations` field, so a Prompt ability's `meta.annotations` is ignored entirely — it is neither emitted nor logged. Annotate the message content blocks instead.
 
 ### Annotation Format: WordPress Abilities API vs MCP
 
@@ -388,47 +406,58 @@ The MCP Adapter automatically converts WordPress Abilities API annotation names 
 - **Future-proof**: Additional WordPress formats may be added
 - **Interoperability**: Works with other WordPress Abilities API consumers
 
-#### For Resources & Prompts: MCP Format Only
+#### For Resources: MCP Format Only, Under `mcp`
 
-Resources and Prompts use MCP format directly - there are no WordPress equivalents:
+Resources use MCP format directly — there are no WordPress equivalents — and read from `meta.mcp.annotations`:
 
 ```php
 'meta' => [
-    'annotations' => [
-        'audience' => ['user', 'assistant'],      // MCP format (no WordPress equivalent)
-        'lastModified' => '2024-01-15T10:30:00Z', // MCP format (no WordPress equivalent)
-        'priority' => 0.8                         // MCP format (no WordPress equivalent)
+    'mcp' => [
+        'type' => 'resource',
+        'annotations' => [
+            'audience' => ['user', 'assistant'],      // MCP format (no WordPress equivalent)
+            'lastModified' => '2024-01-15T10:30:00Z', // MCP format (no WordPress equivalent)
+            'priority' => 0.8                         // MCP format (no WordPress equivalent)
+        ]
     ]
 ]
 ```
 
+A top-level `meta.annotations` on a Resource still works, but is deprecated as of 0.5.0 and logs a notice.
+
+#### For Prompts: No Descriptor Annotations
+
+The MCP `Prompt` object has no `annotations` field, so there is nothing to write on a Prompt ability's meta. Annotate the message content blocks your callback returns — see [Message Content Annotations](#message-content-annotations-mcp-specification).
+
 ### Tool Annotations (ToolAnnotations)
 
-Tools support these MCP specification annotations:
+Write them in `meta.annotations`, using the Abilities API names where one exists:
 
 ```php
 'meta' => [
     'annotations' => [
-        'readOnlyHint' => true,       // Tool doesn't modify data
-        'destructiveHint' => false,   // Tool doesn't delete/destroy data
-        'idempotentHint' => true,     // Same input → same output
+        'readonly' => true,           // Tool doesn't modify data
+        'destructive' => false,       // Tool doesn't delete/destroy data
+        'idempotent' => true,         // Same input → same output
         'openWorldHint' => false,     // Works with predefined data only
         'title' => 'Custom Title'     // Display title (optional)
     ]
 ]
 ```
 
-**Supported Tool Annotation Fields:**
-- `readOnlyHint` (bool): Tool doesn't modify data
-- `destructiveHint` (bool): Tool may delete or destroy data
-- `idempotentHint` (bool): Same input always produces same output
-- `openWorldHint` (bool): Tool can work with arbitrary/unknown data
-- `title` (string): Custom display title for the tool
+**Field Names — Written vs Emitted:**
 
-**WordPress → MCP Field Conversion**: For backward compatibility, Tools support WordPress-format field names that are automatically converted:
-- `readonly` → `readOnlyHint`
-- `destructive` → `destructiveHint`
-- `idempotent` → `idempotentHint`
+| What you write | What MCP receives | Meaning |
+|---|---|---|
+| `readonly` (bool) | `readOnlyHint` | Tool doesn't modify data |
+| `destructive` (bool) | `destructiveHint` | Tool may delete or destroy data |
+| `idempotent` (bool) | `idempotentHint` | Same input always produces same output |
+| `openWorldHint` (bool) | `openWorldHint` | Tool can work with arbitrary/unknown data |
+| `title` (string) | `title` | Custom display title for the tool |
+
+`readonly`, `destructive` and `idempotent` are the WordPress Abilities API's own annotation names. WordPress core defines them on every ability, validates that `meta.annotations` is an array, and reads them back in its REST layer — so writing them keeps your ability consistent for every Abilities API consumer, not just MCP.
+
+Writing the MCP names (`readOnlyHint`, `destructiveHint`, `idempotentHint`) directly also works. If both are present, the Abilities API name wins.
 
 ### Tool Result Annotations
 
@@ -452,30 +481,35 @@ The annotations above describe the tool itself and belong on its descriptor, in 
 
 A tool hint written on a result is dropped: `readOnlyHint` and its siblings describe a tool, and a content block is not one. Values outside what MCP allows — a `priority` beyond 0.0–1.0, an `audience` role other than `user` or `assistant`, a `lastModified` that is not a valid timestamp — cause the annotations to be dropped as a group and logged, and the result is still returned.
 
-### Resource & Prompt Annotations (Annotations)
+### Resource Annotations (Annotations)
 
-Resources and Prompts share the same annotation schema per MCP specification:
+Resources use the MCP content annotation schema, written under `meta.mcp.annotations`:
 
 ```php
 'meta' => [
-    'annotations' => [
-        'audience' => ['user', 'assistant'],      // Intended audience
-        'lastModified' => '2024-01-15T10:30:00Z', // ISO 8601 timestamp
-        'priority' => 0.8                         // 0.0 (lowest) to 1.0 (highest)
+    'mcp' => [
+        'type' => 'resource',
+        'annotations' => [
+            'audience' => ['user', 'assistant'],      // Intended audience
+            'lastModified' => '2024-01-15T10:30:00Z', // ISO 8601 timestamp
+            'priority' => 0.8                         // 0.0 (lowest) to 1.0 (highest)
+        ]
     ]
 ]
 ```
 
-**Supported Resource & Prompt Annotation Fields:**
+**Supported Resource Annotation Fields:**
 - `audience` (array): Intended roles - `["user"]`, `["assistant"]`, or both
 - `lastModified` (string): ISO 8601 timestamp of last modification
 - `priority` (float): Relative importance (0.0 = lowest, 1.0 = highest)
 
+Content blocks — whether returned from a tool or carried in a prompt message — use these same three fields, written on the block itself.
+
 ### Annotation Usage by Component Type
 
-- **Tools**: Support two types of annotations — `meta.annotations` describes the tool's behavior and execution characteristics on its descriptor, while a returned content block takes content annotations
-- **Resources**: Use annotations for content metadata and access patterns  
-- **Prompts**: Support two types of annotations (template-level and message content-level)
+- **Tools**: Two places. `meta.annotations` describes the tool's behavior and execution characteristics on its descriptor; a returned content block takes content annotations on the block.
+- **Resources**: One place, `meta.mcp.annotations`, for content metadata and access patterns.
+- **Prompts**: One place, the message content blocks. The descriptor has no annotations field.
 
 ### Complete Annotation Example
 
@@ -512,19 +546,19 @@ wp_register_ability('my-plugin/user-data', [
     'permission_callback' => function() { return current_user_can('read'); },
     'meta' => [
         'public' => true,
-        'uri' => 'wordpress://users/profile',
-        'annotations' => [
-            'audience' => ['assistant'],     // For AI use only
-            'priority' => 0.9,              // High importance
-            'lastModified' => date('c')      // ISO 8601 timestamp
-        ],
         'mcp' => [
-            'type' => 'resource'
+            'type' => 'resource',
+            'uri' => 'wordpress://users/profile',
+            'annotations' => [
+                'audience' => ['assistant'],     // For AI use only
+                'priority' => 0.9,              // High importance
+                'lastModified' => date('c')      // ISO 8601 timestamp
+            ]
         ]
     ]
 ]);
 
-// Prompt with Prompt-specific annotations
+// Prompt — no descriptor annotations; annotate the message content instead
 wp_register_ability('my-plugin/review-prompt', [
     'label' => 'Code Review Prompt',
     'description' => 'Generate structured code review prompts',
@@ -540,11 +574,6 @@ wp_register_ability('my-plugin/review-prompt', [
     'permission_callback' => function() { return current_user_can('edit_posts'); },
     'meta' => [
         'public' => true,
-        'annotations' => [
-            'audience' => ['user', 'assistant'], // For both user and AI
-            'priority' => 0.8,                  // High priority
-            'lastModified' => date('c')          // Current timestamp
-        ],
         'mcp' => [
             'type' => 'prompt'
         ]
@@ -659,7 +688,7 @@ wp_register_ability('my-plugin/count-posts', [
 
 ## Creating Resources
 
-Resources provide access to data or content. They require a `uri` in the meta field and should set `type: 'resource'` in the MCP configuration:
+Resources provide access to data or content. They require a `uri` and should set `type: 'resource'`, both under `meta.mcp`:
 
 ```php
 wp_register_ability('my-plugin/site-config', [
@@ -680,14 +709,14 @@ wp_register_ability('my-plugin/site-config', [
     },
     'meta' => [
         'public' => true, // Expose to clients, including MCP
-        'uri' => 'wordpress://site/config',
-        'annotations' => [
-            'audience' => ['user', 'assistant'], // For both users and AI
-            'priority' => 0.8,                  // High priority resource
-            'lastModified' => '2024-01-15T10:30:00Z' // Last update timestamp
-        ],
         'mcp' => [
-            'type'   => 'resource' // Mark as resource for auto-discovery
+            'type' => 'resource', // Mark as resource for auto-discovery
+            'uri'  => 'wordpress://site/config',
+            'annotations' => [
+                'audience' => ['user', 'assistant'], // For both users and AI
+                'priority' => 0.8,                  // High priority resource
+                'lastModified' => '2024-01-15T10:30:00Z' // Last update timestamp
+            ]
         ]
     ]
 ]);
@@ -812,10 +841,6 @@ wp_register_ability('my-plugin/code-review', [
     },
     'meta' => [
         'public' => true, // Expose to clients, including MCP
-        'annotations' => [
-            'audience' => ['user'],         // For user-facing prompts
-            'priority' => 0.7               // Standard priority
-        ],
         'mcp' => [
             'type'   => 'prompt' // Mark as prompt for auto-discovery
         ]
@@ -878,11 +903,6 @@ wp_register_ability('my-plugin/analysis-prompt', [
     },
     'meta' => [
         'public' => true, // Expose to clients, including MCP
-        'annotations' => [
-            'audience' => ['assistant'],        // For AI analysis only
-            'priority' => 0.9,                 // High priority analysis
-            'lastModified' => date('c')         // Current timestamp
-        ],
         'mcp' => [
             'type'   => 'prompt' // Mark as prompt for auto-discovery
         ]
@@ -892,19 +912,16 @@ wp_register_ability('my-plugin/analysis-prompt', [
 
 ### Prompt Annotations Summary
 
-**Template-Level Annotations** (in `meta.annotations`):
-- Apply to the prompt template itself
-- Describe the prompt's behavior characteristics
-- Support Prompt-specific annotations: `audience`, `priority`, `lastModified`
-
-**Message Content Annotations** (in message `content.annotations`):
+**Message Content Annotations** (in message `content.annotations`) are the only annotations a prompt has:
 - Apply to individual messages within the prompt
 - Provide metadata for specific message content
 - Support: `audience`, `priority`, `lastModified`
 
+There is no template-level equivalent. The MCP `Prompt` object carries no `annotations` field, so writing `meta.annotations` on a prompt ability has no effect — the value is not emitted, and no warning is logged.
+
 ### Key Points for Prompts
 
-1. **Use `input_schema`** instead of `meta.arguments` - it provides validation and is automatically converted to MCP format
+1. **Use `input_schema`** instead of `meta.mcp.arguments` - it provides validation and is automatically converted to MCP format
 2. **Callbacks receive validated input** - the Abilities API validates against your schema
 3. **Return MCP message format** - prompts must return `{ messages: [...] }` structure
 4. **Set `type: 'prompt'`** in `meta.mcp` for proper auto-discovery
