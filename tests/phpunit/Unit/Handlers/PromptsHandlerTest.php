@@ -1602,6 +1602,25 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'nested', $block['text'] );
 	}
 
+	public function test_missing_content_type_with_scalar_text_keeps_the_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array( 'text' => 'plain body' ),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertSame( 'plain body', $block['text'] );
+	}
+
 	public function test_resource_link_with_a_non_numeric_size_omits_size(): void {
 		$result = $this->get_prompt_returning(
 			array(
