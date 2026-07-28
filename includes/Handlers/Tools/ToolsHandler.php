@@ -11,6 +11,7 @@ namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
@@ -381,9 +382,21 @@ class ToolsHandler {
 			return null;
 		}
 
+		// The mapper is the single seam where raw annotation input becomes DTO-ready: it
+		// keeps only the fields the content Annotations type models, and coerces each to the
+		// type that type asserts. Both matter here. Vocabulary it drops - most likely the
+		// tool hints, which belong on the descriptor - would otherwise leave an all-null DTO
+		// that serializes to `[]` where MCP declares an object. And a loosely typed but valid
+		// value, such as the string "0.5" WordPress hands back from post meta, would
+		// otherwise be rejected by the DTO's strict float assertion.
+		$mapped = McpAnnotationMapper::map( $annotations, 'resource' );
+		if ( empty( $mapped ) ) {
+			return null;
+		}
+
 		// Tool output is untrusted, and a value the schema rejects costs the whole content
 		// block rather than just the annotation. Validate before building the DTO.
-		$errors = McpValidator::get_annotation_validation_errors( $annotations );
+		$errors = McpValidator::get_annotation_validation_errors( $mapped );
 		if ( ! empty( $errors ) ) {
 			$this->mcp->get_error_handler()->log(
 				'Invalid annotations in tool result, dropping them',
@@ -397,27 +410,9 @@ class ToolsHandler {
 			return null;
 		}
 
-		// Validation above should leave nothing for fromArray() to reject, but it lives in a
-		// separately versioned package, so the guard stays.
-		try {
-			$dto = Annotations::fromArray( $annotations );
-
-			// Vocabulary the content Annotations type does not model - most likely the tool
-			// hints, which belong on the descriptor - leaves an all-null DTO behind. That
-			// serializes to `[]`, so omit the field rather than emit a JSON array.
-			return array() === $dto->toArray() ? null : $dto;
-		} catch ( \Throwable $exception ) {
-			$this->mcp->get_error_handler()->log(
-				'Invalid annotations in tool result, dropping them',
-				array(
-					'tool_name' => $tool_name,
-					'exception' => $exception->getMessage(),
-				),
-				'warning'
-			);
-
-			return null;
-		}
+		// Mapping and validation between them leave nothing for fromArray() to reject, so
+		// there is no local catch here. The tool-call boundary still wraps this method.
+		return Annotations::fromArray( $mapped );
 	}
 
 	/**

@@ -11,6 +11,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -157,9 +158,11 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		// Include size only when > 0.
-		if ( isset( $config['size'] ) && $config['size'] > 0 ) {
-			$resource_data['size'] = $config['size'];
+		// Include size only when > 0. A byte count reaches us as whatever the caller had -
+		// "1024" from stored data, 1024.0 from arithmetic - while the schema asserts a
+		// strict int, so cast rather than let a usable value fail the whole resource.
+		if ( isset( $config['size'] ) && is_numeric( $config['size'] ) && (int) $config['size'] > 0 ) {
+			$resource_data['size'] = (int) $config['size'];
 		}
 
 		// Validate and include icons if set.
@@ -175,11 +178,30 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
-		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
+		// Annotations go through the mapper before the DTO sees them: it keeps only the
+		// fields the shared Annotations type models and coerces each to the type that type
+		// asserts. Without it, vocabulary the type does not model leaves an all-null DTO
+		// that serializes to `[]` where MCP declares an object, and a loosely typed value -
+		// the string "0.5" WordPress hands back from post meta - fails the DTO's strict
+		// float assertion and takes the whole resource down with it. A rendering hint must
+		// not cost the resource its registration.
+		$annotations = isset( $config['annotations'] ) && is_array( $config['annotations'] )
+			? McpAnnotationMapper::map( $config['annotations'], 'resource' )
+			: array();
+
+		// Mapping fixes each value's type but says nothing about its range. A well-typed but
+		// out-of-spec value - priority outside 0.0-1.0, an audience role MCP does not define -
+		// is rejected by a conforming client along with the whole resource, so drop the
+		// annotations rather than publish something unusable. Matches what
+		// RegisterAbilityAsMcpResource already does on the ability-backed path.
+		if ( ! empty( $annotations ) && ! empty( McpValidator::get_annotation_validation_errors( $annotations ) ) ) {
+			$annotations = array();
+		}
+
+		// Create the Resource DTO - wrap in try-catch since ResourceDto::fromArray() can throw.
 		try {
-			// Process annotations inside try-catch since Annotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
+			if ( ! empty( $annotations ) ) {
+				$resource_data['annotations'] = Annotations::fromArray( $annotations );
 			}
 
 			$resource = ResourceDto::fromArray( $resource_data );

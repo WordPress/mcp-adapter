@@ -658,6 +658,32 @@ final class ToolsHandlerCallTest extends TestCase {
 	}
 
 	/**
+	 * WordPress hands back numeric values as strings all over the place - get_post_meta()
+	 * and get_option() both do - so a tool computing priority from stored data commonly
+	 * returns "0.5" rather than 0.5. That is a valid priority, and it must reach the wire
+	 * as a JSON number rather than costing the tool its annotations.
+	 */
+	public function test_embedded_resource_with_numeric_string_priority_emits_it_as_a_number(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'priority' => '0.5' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame( array( 'priority' => 0.5 ), $block['annotations'] );
+		$this->assertStringContainsString( '"priority":0.5', (string) wp_json_encode( $block ) );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid annotations in tool result, dropping them', $messages );
+	}
+
+	/**
 	 * Without a URI the result is not an embedded resource at all, so it falls through to
 	 * the generic JSON path where no annotations were ever going to be attached. Warning
 	 * that annotations were "dropped" there sends the reader after the wrong problem.
