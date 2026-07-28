@@ -747,6 +747,8 @@ What you write there is a request to the client, not a control the adapter appli
 
 MCP declares `_meta` as a JSON object, so it must be a non-empty PHP associative array — a sequential array (including an empty one) would serialize as a JSON array. This holds wherever the adapter emits `_meta`: resource contents, content blocks, and the `_meta` a tool, resource or prompt declares under `mcp._meta`. A value that would not serialize as an object is dropped, and whatever it travelled with is still returned. Key names may carry an optional reverse-DNS prefix (`com.example/hint`); prefixes whose second label is `modelcontextprotocol` or `mcp` are reserved by the specification.
 
+Embedding a resource in a tool result is a general content-block capability, not the route to an MCP App. An MCP App is predeclared: register the UI resource so it appears in `resources/list` under its `ui://` URI, then bind it from the tool descriptor with `mcp._meta.ui.resourceUri`. The host fetches the template itself over `resources/read` and renders it in a sandboxed frame, and the tool result carries only data. A tool result that embeds the UI resource instead is rendered as plain text.
+
 Tools can return the same contents embedded in a `resource` content block. Two levels each carry their own `_meta`: the content block, and the resource contents nested inside it. The flat form is a content item with a `type` tag added, so its `_meta` describes the resource exactly as it does above:
 
 ```php
