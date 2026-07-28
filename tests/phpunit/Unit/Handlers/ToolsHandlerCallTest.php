@@ -776,4 +776,152 @@ final class ToolsHandlerCallTest extends TestCase {
 			$block['annotations']
 		);
 	}
+
+	/**
+	 * `type` marks an image result as a description of a content block, so its sibling
+	 * `annotations` and `_meta` are the block's, exactly as they are for `type: resource`.
+	 */
+	public function test_image_result_emits_valid_annotations_as_an_object(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'image',
+				'results'     => 'binary',
+				'mimeType'    => 'image/png',
+				'annotations' => array(
+					'audience' => array( 'user' ),
+					'priority' => 0.8,
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame(
+			array(
+				'audience' => array( 'user' ),
+				'priority' => 0.8,
+			),
+			$block['annotations']
+		);
+	}
+
+	public function test_image_result_carries_meta(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'image',
+				'results'  => 'binary',
+				'mimeType' => 'image/png',
+				'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $block['_meta'] );
+	}
+
+	/**
+	 * The image branch routes annotations through the same seam the resource branch uses,
+	 * so an out-of-range value is dropped as a group and logged rather than reaching the
+	 * wire, where a conforming client rejects the whole content block.
+	 */
+	public function test_image_result_with_out_of_range_priority_omits_annotations_and_logs(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'image',
+				'results'     => 'binary',
+				'mimeType'    => 'image/png',
+				'annotations' => array( 'priority' => 5 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertNotEmpty( $block['data'] );
+
+		$dropped = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $entry ): bool {
+					return 'Invalid annotations in tool result, dropping them' === $entry['message'];
+				}
+			)
+		);
+
+		$this->assertCount( 1, $dropped );
+		$this->assertArrayHasKey( 'errors', $dropped[0]['context'] );
+	}
+
+	/**
+	 * Tool hints describe a tool, not a content block, so the mapper's content vocabulary
+	 * leaves nothing behind and the key is omitted rather than emitted as an empty object.
+	 */
+	public function test_image_result_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'image',
+				'results'     => 'binary',
+				'mimeType'    => 'image/png',
+				'annotations' => array( 'readOnlyHint' => true ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $block ) );
+	}
+
+	/**
+	 * MCP declares `_meta` an object, so a list is omitted rather than emitted as a JSON
+	 * array, which a conforming client rejects along with the block carrying it.
+	 */
+	public function test_image_result_with_list_meta_omits_meta(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'image',
+				'results'  => 'binary',
+				'mimeType' => 'image/png',
+				'_meta'    => array( 'a', 'b' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( '_meta', $block );
+		$this->assertNotEmpty( $block['data'] );
+	}
+
+	/**
+	 * The generic JSON fallback carries no `type` marker, so every key it holds is tool
+	 * data. `annotations` there is already emitted inside the text block and in
+	 * `structuredContent`, and reading it as a block annotation would give one key two
+	 * meanings with nothing to tell them apart.
+	 */
+	public function test_untyped_result_treats_annotations_as_data_not_block_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'rows'        => array( 1, 2 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertSame(
+			array(
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'rows'        => array( 1, 2 ),
+			),
+			$result->getStructuredContent()
+		);
+	}
 }

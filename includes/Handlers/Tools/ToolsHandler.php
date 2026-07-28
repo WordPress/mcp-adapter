@@ -314,18 +314,41 @@ class ToolsHandler {
 			}
 
 			// Handle image results.
+			//
+			// `type` marks this result as a description of a content block rather than tool
+			// data, so its sibling `annotations` and `_meta` are the block's, which is the
+			// reading the `resource` branch above already applies to the same two keys.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] && isset( $result['results'] ) ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
+				$annotations = $this->build_content_annotations(
+					$result['annotations'] ?? null,
+					$this->mcp->get_error_handler(),
+					'Invalid annotations in tool result, dropping them',
+					array( 'tool_name' => $tool_name )
+				);
+
 				return CallToolResult::fromArray(
 					array(
-						'content'           => array( ContentBlockHelper::image( $image_data, $mime_type ) ),
+						'content'           => array(
+							ContentBlockHelper::image(
+								$image_data,
+								$mime_type,
+								$annotations,
+								McpValidator::normalize_meta( $result['_meta'] ?? null )
+							),
+						),
 						'structuredContent' => null,
 						'isError'           => false,
 					)
 				);
 			}
+
+			// The generic fallback carries no `type` marker, so every key it holds is tool
+			// data: the result is JSON-encoded into the text block and returned verbatim as
+			// `structuredContent`. Reading `annotations` or `_meta` off it would give one key
+			// two meanings, with nothing to tell a rendering hint from a domain field.
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
 			$json_text = wp_json_encode( $result );
