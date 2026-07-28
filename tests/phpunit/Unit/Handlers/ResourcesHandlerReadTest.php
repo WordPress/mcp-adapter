@@ -465,4 +465,105 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
 		$this->assertNull( $contents[0]->get_meta() );
 	}
+
+	/**
+	 * `blob` alone is enough to describe resource contents: the URI falls back to the
+	 * resource's own, and binary contents carry no `text`.
+	 */
+	public function test_read_resource_with_blob_only_item_returns_blob_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertSame( 'ZGF0YQ==', $contents[0]->getBlob() );
+		$this->assertSame( 'application/pdf', $contents[0]->getMimeType() );
+		$this->assertSame( 'WordPress://local/resource-1', $contents[0]->getUri() );
+	}
+
+	public function test_read_resource_with_blob_only_item_preserves_meta(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+					'_meta'    => array( 'pages' => 3 ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertSame( array( 'pages' => 3 ), $contents[0]->get_meta() );
+	}
+
+	/**
+	 * Only the first item is inspected to decide whether the return is a list of content
+	 * items, so a first item the check does not recognize costs every sibling as well.
+	 */
+	public function test_read_resource_with_blob_only_first_item_keeps_its_siblings(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+				),
+				array(
+					'uri'  => 'WordPress://local/resource-2',
+					'text' => 'sibling',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertCount( 2, $contents );
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[1] );
+		$this->assertSame( 'sibling', $contents[1]->getText() );
+	}
 }
