@@ -85,10 +85,12 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	protected ?array $icons = null;
 
 	/**
-	 * Additional metadata passed through to MCP clients.
+	 * Additional metadata for MCP clients.
 	 *
 	 * Use this to attach purpose-specific metadata that MCP clients can consume.
-	 * Keys are passed through unchanged.
+	 * Key names are kept as written. MCP declares `_meta` an object, so {@see self::build()}
+	 * emits this only when it is a non-empty associative array; a list or an empty array
+	 * would serialize as a JSON array and is omitted instead.
 	 *
 	 * @since 0.5.0
 	 *
@@ -259,7 +261,8 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Set additional metadata.
 	 *
-	 * This metadata is passed through to MCP clients unchanged.
+	 * Key names are kept as written. MCP declares `_meta` an object, so {@see self::build()}
+	 * emits this only when it is a non-empty associative array.
 	 *
 	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
 	 *
