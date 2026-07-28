@@ -62,12 +62,6 @@ class McpResourceValidator {
 			$errors[] = __( 'Resource URI must be a valid URI string', 'mcp-adapter' );
 		}
 
-		// Validate the MIME type if present.
-		$mime_type = $resource_dto->getMimeType();
-		if ( $mime_type && ! McpValidator::validate_mime_type( $mime_type ) ) {
-			$errors[] = __( 'Resource MIME type is invalid', 'mcp-adapter' );
-		}
-
 		// Validate icons if present.
 		$icons = $resource_dto->getIcons();
 		if ( ! empty( $icons ) ) {
@@ -161,13 +155,9 @@ class McpResourceValidator {
 			$errors[] = __( 'Resource blob content must be valid base64-encoded data', 'mcp-adapter' );
 		}
 
-		// Validate mimeType if present (optional).
-		if ( isset( $resource_data['mimeType'] ) ) {
-			if ( ! is_string( $resource_data['mimeType'] ) ) {
-				$errors[] = __( 'Resource mimeType must be a string if provided', 'mcp-adapter' );
-			} elseif ( ! McpValidator::validate_mime_type( $resource_data['mimeType'] ) ) {
-				$errors[] = __( 'Resource mimeType must be a valid MIME type format', 'mcp-adapter' );
-			}
+		// mimeType is optional. Only its type is checked.
+		if ( isset( $resource_data['mimeType'] ) && ! is_string( $resource_data['mimeType'] ) ) {
+			$errors[] = __( 'Resource mimeType must be a string if provided', 'mcp-adapter' );
 		}
 
 		return $errors;
