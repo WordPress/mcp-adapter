@@ -775,6 +775,26 @@ return [
 ];
 ```
 
+### Returning an Image
+
+A tool returns an image by marking the result `type` as `image` and putting the **raw bytes** in `results`. The adapter base64-encodes them into the `data` field MCP expects, so do not encode them yourself:
+
+```php
+'execute_callback' => function() {
+    return [
+        'type'     => 'image',
+        'results'  => file_get_contents( $path ),  // raw bytes, not base64
+        'mimeType' => 'image/png',
+        'annotations' => ['audience' => ['user']],
+        '_meta'    => ['block' => 'level'],
+    ];
+},
+```
+
+`mimeType` defaults to `image/png` when omitted. `annotations` and `_meta` describe the content block, exactly as in the `resource` form above.
+
+`results` is the only key the image branch reads. A result marked `type: 'image'` that carries the encoded bytes under `data` instead is returned as ordinary tool data — a JSON text block — and the adapter logs a warning naming the tool.
+
 ## Creating Prompts
 
 Prompts generate structured messages for language models. They use `input_schema` to define parameters, which are automatically converted to MCP prompt arguments format. Prompts should set `type: 'prompt'` in the MCP configuration.

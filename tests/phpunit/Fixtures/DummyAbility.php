@@ -150,6 +150,32 @@ final class DummyAbility {
 			)
 		);
 
+		// Image ability: marks itself as an image but omits the `results` key.
+		wp_register_ability(
+			'test/image-without-results',
+			array(
+				'label'               => 'Image Tool Without Results',
+				'description'         => 'Returns an image-marked payload with no results key',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( array $input ) {
+					return array(
+						'type'     => 'image',
+						'data'     => 'iVBORw0KGgo=',
+						'mimeType' => 'image/png',
+					);
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true, // Expose via MCP for testing
+					),
+				),
+			)
+		);
+
 		// Tool ability: returns an EmbeddedResource-style payload (text).
 		wp_register_ability(
 			'test/embedded-text-resource',

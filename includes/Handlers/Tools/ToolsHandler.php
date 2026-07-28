@@ -329,7 +329,20 @@ class ToolsHandler {
 			// `type` marks this result as a description of a content block rather than tool
 			// data, so its sibling `annotations` and `_meta` are the block's, which is the
 			// reading the `resource` branch above already applies to the same two keys.
-			if ( isset( $result['type'] ) && 'image' === $result['type'] && isset( $result['results'] ) ) {
+			$is_image_result = isset( $result['type'] ) && 'image' === $result['type'];
+
+			// The image bytes are read from `results`. Without that key there is nothing to
+			// encode, so the result falls through to the generic path and reaches the client
+			// as a text block; say so rather than letting the `type` marker go unanswered.
+			if ( $is_image_result && ! isset( $result['results'] ) ) {
+				$this->mcp->get_error_handler()->log(
+					'Tool result marked type "image" has no "results" key, returning it as tool data',
+					array( 'tool_name' => $tool_name ),
+					'warning'
+				);
+			}
+
+			if ( $is_image_result && isset( $result['results'] ) ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 

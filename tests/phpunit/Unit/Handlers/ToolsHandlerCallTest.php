@@ -124,6 +124,28 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertNotEmpty( $content[0]->getMimeType() );
 	}
 
+	public function test_image_result_without_results_key_logs_warning_and_falls_through_to_tool_data(): void {
+		$server  = $this->makeServer( array( 'test/image-without-results' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-image-without-results' ),
+			)
+		);
+
+		// The image branch reads `results`, so this payload stays tool data.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains(
+			'Tool result marked type "image" has no "results" key, returning it as tool data',
+			$messages
+		);
+	}
+
 	public function test_embedded_text_resource_result_is_converted_to_embedded_resource_content_block(): void {
 		$server  = $this->makeServer( array( 'test/embedded-text-resource' ) );
 		$handler = new ToolsHandler( $server );
