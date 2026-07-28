@@ -12,6 +12,7 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
@@ -168,11 +169,21 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
+		// Annotations go through the mapper before the DTO sees them: it keeps only the
+		// fields ToolAnnotations models and coerces each to the type that type asserts.
+		// Without it, the shared content vocabulary leaves an all-null DTO that serializes
+		// to `[]` where MCP declares an object, and a hint stored as "1" - which is how
+		// WordPress hands booleans back - fails the DTO's strict bool assertion and takes
+		// the whole tool down with it. A rendering hint must not cost the tool its
+		// registration.
+		$annotations = isset( $config['annotations'] ) && is_array( $config['annotations'] )
+			? McpAnnotationMapper::map( $config['annotations'], 'tool' )
+			: array();
+
+		// Create the Tool DTO - wrap in try-catch since ToolDto::fromArray() can throw.
 		try {
-			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
+			if ( ! empty( $annotations ) ) {
+				$tool_data['annotations'] = ToolAnnotations::fromArray( $annotations );
 			}
 
 			$tool = ToolDto::fromArray( $tool_data );

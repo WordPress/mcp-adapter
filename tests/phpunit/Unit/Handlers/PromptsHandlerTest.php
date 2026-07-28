@@ -1096,6 +1096,512 @@ final class PromptsHandlerTest extends TestCase {
 		);
 	}
 
+
+	/**
+	 * Content blocks take the shared Annotations vocabulary. Tool hints belong on the
+	 * tool descriptor, and leave an all-null DTO here that serializes as a JSON array.
+	 */
+	public function test_message_content_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'readOnlyHint' => true ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $block ) );
+	}
+
+	public function test_message_content_with_out_of_range_priority_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'priority' => 5 ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertArrayNotHasKey( 'annotations', $this->first_content_block( $result ) );
+	}
+
+	public function test_message_content_with_unknown_audience_role_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'audience' => array( 'robot' ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertArrayNotHasKey( 'annotations', $this->first_content_block( $result ) );
+	}
+
+	/**
+	 * A non-string audience entry is cast to the literal "Array" by the schema DTO.
+	 * Validation has to reject it before the DTO sees it.
+	 */
+	public function test_message_content_with_non_string_audience_entry_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'audience' => array( array( 'nested' ) ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( 'Array', (string) wp_json_encode( $block ) );
+	}
+
+	/**
+	 * WordPress hands stored numbers back as strings. The schema asserts a strict float,
+	 * so without normalization a usable priority throws and loses the whole prompt.
+	 */
+	public function test_message_content_with_loosely_typed_priority_is_normalized(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'priority' => '0.5' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 0.5, $this->first_content_block( $result )['annotations']['priority'] );
+	}
+
+	public function test_message_content_with_valid_annotations_emits_them_as_an_object(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array(
+								'audience'     => array( 'user' ),
+								'priority'     => 0.8,
+								'lastModified' => '2026-07-28T00:00:00Z',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame(
+			array(
+				'audience'     => array( 'user' ),
+				'priority'     => 0.8,
+				'lastModified' => '2026-07-28T00:00:00Z',
+			),
+			$this->first_content_block( $result )['annotations']
+		);
+	}
+
+	/**
+	 * A resource_link size is the other caller-supplied number the schema asserts as a
+	 * strict int, so it needs the same treatment stored byte counts get elsewhere.
+	 */
+	public function test_resource_link_content_with_numeric_string_size_is_normalized(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'resource_link',
+							'uri'  => 'WordPress://local/prompt-link',
+							'name' => 'Linked resource',
+							'size' => '1024',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 1024, $this->first_content_block( $result )['size'] );
+	}
+
+	/**
+	 * Tier 2 builds its own content block but copies the caller's annotations into it,
+	 * so it needs the same normalization the message tiers get.
+	 */
+	public function test_tier2_text_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'text'        => 'body',
+				'annotations' => array( 'readOnlyHint' => true ),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertSame( 'body', $block['text'] );
+	}
+
+	public function test_dropped_message_annotations_are_logged_with_the_prompt_name(): void {
+		DummyErrorHandler::reset();
+
+		$this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'priority' => 5 ),
+						),
+					),
+				),
+			)
+		);
+
+		$dropped = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $log ): bool {
+					return false !== strpos( $log['message'], 'Invalid annotations' );
+				}
+			)
+		);
+
+		$this->assertNotEmpty( $dropped );
+		$this->assertSame( 'warning', $dropped[0]['type'] );
+		$this->assertSame( 'test-prompt', $dropped[0]['context']['prompt_name'] );
+		$this->assertArrayHasKey( 'errors', $dropped[0]['context'] );
+	}
+
+	// =========================================================================
+	// Message-Level Degradation
+	//
+	// A content block the schema DTOs refuse used to throw, and get_prompt()'s
+	// catch turned that into an error response - so one unrenderable message
+	// cost every message in the prompt. The handler already degrades an unknown
+	// content type and an invalid role to a text representation; these pin the
+	// same rule for a valid type carrying a payload the DTO rejects.
+	// =========================================================================
+
+	public function test_message_with_non_string_text_degrades_only_that_message(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'text',
+							'text' => 'Summarise this post.',
+						),
+					),
+					array(
+						'role'    => 'assistant',
+						'content' => array(
+							'type' => 'text',
+							'text' => 123,
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertCount( 2, $result->getMessages() );
+
+		$this->assertSame( 'Summarise this post.', $this->first_content_block( $result )['text'] );
+
+		$degraded = $this->content_block_at( $result, 1 );
+		$this->assertSame( 'text', $degraded['type'] );
+		$this->assertStringContainsString( '123', $degraded['text'] );
+	}
+
+	public function test_message_with_image_missing_data_degrades_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'image',
+							'mimeType' => 'image/png',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertStringContainsString( '"type": "image"', $block['text'] );
+	}
+
+	public function test_message_with_malformed_icon_entry_degrades_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'  => 'resource_link',
+							'uri'   => 'WordPress://local/thing',
+							'name'  => 'thing',
+							'icons' => array( array( 'sizes' => '48x48' ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 'text', $this->first_content_block( $result )['type'] );
+	}
+
+	public function test_degraded_message_is_logged_with_the_prompt_name(): void {
+		DummyErrorHandler::reset();
+
+		$this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'text',
+							'text' => 123,
+						),
+					),
+				),
+			)
+		);
+
+		$degraded = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $log ): bool {
+					return false !== strpos( $log['message'], 'rejected by the schema' );
+				}
+			)
+		);
+
+		$this->assertNotEmpty( $degraded );
+		$this->assertSame( 'warning', $degraded[0]['type'] );
+		$this->assertSame( 'test-prompt', $degraded[0]['context']['prompt_name'] );
+		$this->assertArrayHasKey( 'exception', $degraded[0]['context'] );
+	}
+
+	/**
+	 * EmbeddedResource takes its contents as given, so these never threw - they
+	 * reached the wire, where a conforming client rejects the whole message and
+	 * nothing tells the author. Opposite failure mode, same remedy.
+	 */
+	public function test_embedded_resource_contents_that_are_a_string_degrade_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => 'just-a-string',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertArrayNotHasKey( 'resource', $block );
+	}
+
+	public function test_embedded_resource_contents_without_a_uri_degrade_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array( 'text' => 'body' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 'text', $this->first_content_block( $result )['type'] );
+	}
+
+	public function test_embedded_resource_contents_without_text_or_blob_degrade_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array( 'uri' => 'WordPress://local/thing' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 'text', $this->first_content_block( $result )['type'] );
+	}
+
+	/**
+	 * A block with no type falls back to its `text`, but only when that is something a
+	 * string cast can represent - an array would raise a conversion warning and emit the
+	 * literal "Array".
+	 */
+	public function test_missing_content_type_with_non_scalar_text_degrades_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array( 'text' => array( 'nested' ) ),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertStringNotContainsString( 'Array', $block['text'] );
+		$this->assertStringContainsString( 'nested', $block['text'] );
+	}
+
+	public function test_missing_content_type_with_scalar_text_keeps_the_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array( 'text' => 'plain body' ),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertSame( 'plain body', $block['text'] );
+	}
+
+	public function test_resource_link_with_a_non_numeric_size_omits_size(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'resource_link',
+							'uri'  => 'WordPress://local/thing',
+							'name' => 'thing',
+							'size' => 'big',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'resource_link', $block['type'] );
+		$this->assertArrayNotHasKey( 'size', $block );
+	}
+
+	/**
+	 * Over-degradation guard: a well-formed embedded resource must survive intact.
+	 */
+	public function test_valid_embedded_resource_is_not_degraded(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array(
+								'uri'  => 'WordPress://local/thing',
+								'text' => 'body',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'resource', $block['type'] );
+		$this->assertSame( 'body', $block['resource']['text'] );
+	}
+
+
 	/**
 	 * Run a prompt whose result is replaced by $shape, so any result shape can be driven
 	 * through the handler's normalization without registering a new ability per case.
@@ -1136,6 +1642,18 @@ final class PromptsHandlerTest extends TestCase {
 	 * @return array
 	 */
 	private function first_content_block( GetPromptResult $result ): array {
-		return $result->getMessages()[0]->getContent()->toArray();
+		return $this->content_block_at( $result, 0 );
+	}
+
+	/**
+	 * The emitted array of the content block of the message at $index.
+	 *
+	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
+	 * @param int                                              $index  Message index.
+	 *
+	 * @return array
+	 */
+	private function content_block_at( GetPromptResult $result, int $index ): array {
+		return $result->getMessages()[ $index ]->getContent()->toArray();
 	}
 }

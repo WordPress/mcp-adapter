@@ -44,7 +44,6 @@ use WP_Error;
  *         ),
  *         'meta' => array(
  *             'mcp' => array('public' => true, 'type' => 'prompt'),
- *             'annotations' => array(...)
  *         )
  *     )
  * );

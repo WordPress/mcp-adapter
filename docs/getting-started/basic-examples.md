@@ -102,9 +102,8 @@ add_action( 'wp_abilities_api_init', function() {
         'meta' => [
             'public' => true, // Expose to clients, including MCP
             'annotations' => [
-                'priority' => 2.0,
-                'readOnlyHint' => false,
-                'destructiveHint' => false
+                'readonly'    => false, // Abilities API name; emitted as readOnlyHint
+                'destructive' => false  // Abilities API name; emitted as destructiveHint
             ]
         ]
     ]);
@@ -124,7 +123,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-
 
 ## Example 2: Resource - Site Configuration
 
-Resources provide access to data. They require a `uri` in the ability meta:
+Resources provide access to data. They require a `uri` under `meta.mcp`:
 
 ```php
 <?php
@@ -149,15 +148,13 @@ add_action( 'wp_abilities_api_init', function() {
         },
         'meta' => [
             'public' => true, // Expose to clients, including MCP
-            'uri' => 'wordpress://site/config',  // Required for resources
-            'annotations' => [
-                'readOnlyHint' => true,
-                'idempotentHint' => true,
-                'audience' => ['user', 'assistant'],
-                'priority' => 0.8
-            ],
             'mcp' => [
-                'type'   => 'resource' // Mark as resource for auto-discovery
+                'type' => 'resource', // Mark as resource for auto-discovery
+                'uri'  => 'wordpress://site/config', // Required for resources
+                'annotations' => [
+                    'audience' => ['user', 'assistant'],
+                    'priority' => 0.8
+                ]
             ]
         ]
     ]);
@@ -213,24 +210,20 @@ add_action( 'wp_abilities_api_init', function() {
         },
         'meta' => [
             'public' => true, // Expose to clients, including MCP
-            'arguments' => [
-                [
-                    'name' => 'code',
-                    'description' => 'Code to review',
-                    'required' => true
-                ],
-                [
-                    'name' => 'focus',
-                    'description' => 'Areas to focus on during review',
-                    'required' => false
-                ]
-            ],
-            'annotations' => [
-                'readOnlyHint' => true,
-                'idempotentHint' => true
-            ],
             'mcp' => [
-                'type'   => 'prompt' // Mark as prompt for auto-discovery
+                'type' => 'prompt', // Mark as prompt for auto-discovery
+                'arguments' => [
+                    [
+                        'name' => 'code',
+                        'description' => 'Code to review',
+                        'required' => true
+                    ],
+                    [
+                        'name' => 'focus',
+                        'description' => 'Areas to focus on during review',
+                        'required' => false
+                    ]
+                ]
             ]
         ]
     ]);
@@ -259,11 +252,16 @@ The MCP Adapter automatically creates a default server that exposes all register
 
 ### Component Types
 - **Tools**: Execute actions (like `tools/call`)
-- **Resources**: Provide data access (like `resources/read`) - require `meta.uri`
+- **Resources**: Provide data access (like `resources/read`) - require `meta.mcp.uri`
 - **Prompts**: Generate messages (like `prompts/get`) - return `messages` array
 
 ### Annotations
-All MCP components may include metadata in `meta.annotations`, which hint at how clients should treat them.
+Annotations hint at how clients should treat a component, and each type reads them from a different place:
+
+- **Tools**: `meta.annotations` — write the Abilities API names `readonly`, `destructive`, `idempotent`, which the adapter maps to `readOnlyHint`, `destructiveHint`, `idempotentHint`. `openWorldHint` and `title` have no Abilities API equivalent, so write those under their MCP names.
+- **Resources**: `meta.mcp.annotations` — `audience`, `priority`, `lastModified`
+- **Prompts**: no descriptor annotations; annotate the message content blocks instead
+
 For full details on annotations, their semantics, and usage guidelines, see the Annotations section of the MCP schema spec: https://modelcontextprotocol.io/specification/2025-06-18/schema#annotations
 
 ### Testing

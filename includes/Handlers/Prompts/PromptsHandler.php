@@ -242,7 +242,7 @@ class PromptsHandler {
 
 		// Tier 2: Simple 'text' shorthand.
 		if ( isset( $result['text'] ) && is_string( $result['text'] ) ) {
-			return $this->normalize_tier2_text( $result, $prompt );
+			return $this->normalize_tier2_text( $result, $prompt, $prompt_name );
 		}
 
 		// Tier 3: Single message with 'role' key.
@@ -322,12 +322,13 @@ class PromptsHandler {
 	 *
 	 * @since 0.5.0
 	 *
-	 * @param array                                 $result Raw result with 'text' key.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO.
+	 * @param array                                 $result      Raw result with 'text' key.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
+	 * @param string                                $prompt_name Prompt name for logging.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
-	private function normalize_tier2_text( array $result, PromptDto $prompt ): GetPromptResult {
+	private function normalize_tier2_text( array $result, PromptDto $prompt, string $prompt_name ): GetPromptResult {
 		$content = array(
 			'type' => 'text',
 			'text' => (string) $result['text'],
@@ -337,6 +338,8 @@ class PromptsHandler {
 		if ( isset( $result['annotations'] ) && is_array( $result['annotations'] ) ) {
 			$content['annotations'] = $result['annotations'];
 		}
+
+		$content = $this->normalize_content_block( $content, $prompt_name );
 
 		$message_dto = PromptMessage::fromArray(
 			array(
@@ -513,35 +516,107 @@ class PromptsHandler {
 		}
 
 		$content = $this->validate_content_type( $content, $prompt_name );
-		$content = $this->normalize_content_block( $content );
+		$content = $this->normalize_content_block( $content, $prompt_name );
 
-		return PromptMessage::fromArray(
-			array(
-				'role'    => $role,
-				'content' => $content,
-			)
+		// normalize_content_block() covers the fields the DTOs are known to refuse, but it
+		// is not a whitelist - a valid type carrying any other malformed payload still
+		// throws here. Without this guard that throw reaches get_prompt()'s catch and the
+		// whole prompt is lost, including the messages that were fine. Degrading matches
+		// what this handler already does for an unknown type and an invalid role.
+		try {
+			return PromptMessage::fromArray(
+				array(
+					'role'    => $role,
+					'content' => $content,
+				)
+			);
+		} catch ( \Throwable $e ) {
+			$this->mcp->get_error_handler()->log(
+				'Prompt message content rejected by the schema, degrading to text',
+				array(
+					'prompt_name' => $prompt_name,
+					'exception'   => $e->getMessage(),
+				),
+				'warning'
+			);
+
+			return PromptMessage::fromArray(
+				array(
+					'role'    => $role,
+					'content' => $this->degrade_content_to_text( $content ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Represent a content block that cannot be rendered as a text block carrying its JSON.
+	 *
+	 * The same substitution validate_content_type() makes for an unrecognized type, so a
+	 * block the schema refuses costs its own fidelity rather than the whole prompt.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array $content The content block that could not be rendered.
+	 *
+	 * @return array{type: string, text: string} A text content block.
+	 */
+	private function degrade_content_to_text( array $content ): array {
+		$json = wp_json_encode( $content, JSON_PRETTY_PRINT );
+
+		return array(
+			'type' => 'text',
+			'text' => false === $json ? '{}' : $json,
 		);
+	}
+
+	/**
+	 * Whether a value is usable as the contents of an embedded resource.
+	 *
+	 * Mirrors what a conforming client accepts: a non-empty uri, plus either text or
+	 * blob. EmbeddedResource takes its contents as given, so nothing else checks this.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed $contents Embedded resource contents as the prompt returned them.
+	 *
+	 * @return bool
+	 */
+	private function is_valid_resource_contents( $contents ): bool {
+		if ( ! is_array( $contents ) ) {
+			return false;
+		}
+
+		if ( ! isset( $contents['uri'] ) || ! is_string( $contents['uri'] ) || '' === $contents['uri'] ) {
+			return false;
+		}
+
+		return ( isset( $contents['text'] ) && is_string( $contents['text'] ) )
+			|| ( isset( $contents['blob'] ) && is_string( $contents['blob'] ) );
 	}
 
 	/**
 	 * Bring a caller-supplied content block into the shape the schema DTOs accept.
 	 *
 	 * Prompt messages carry the same content blocks tool results do, and reach the wire
-	 * through the same DTOs, so they carry the same hazard: a `_meta` that would serialize
-	 * as a JSON array where MCP declares an object.
+	 * through the same DTOs, so they carry the same two hazards: a `_meta` that would
+	 * serialize as a JSON array where MCP declares an object, and an annotations object a
+	 * conforming client rejects along with the block that carries it.
 	 *
 	 * Here the cost is higher than on the tool path. A value the DTO refuses throws, and
-	 * the catch in get_prompt() turns that into an error response - so a `_meta` that is
-	 * not an array at all loses the whole prompt rather than the field. It is dropped so
+	 * the catch in get_prompt() turns that into an error response - so a stored byte count
+	 * that arrived as the string "1024", or a `_meta` that is not an array at all, loses
+	 * the whole prompt rather than the field. Everything below is dropped or coerced so
 	 * that the message survives.
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @param array $content Content block as the prompt returned it.
+	 * @param array  $content     Content block as the prompt returned it.
+	 * @param string $prompt_name Prompt name for logging.
 	 *
 	 * @return array Content block safe to hand to PromptMessage::fromArray().
 	 */
-	private function normalize_content_block( array $content ): array {
+	private function normalize_content_block( array $content, string $prompt_name ): array {
 		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
 		if ( null === $block_meta ) {
 			unset( $content['_meta'] );
@@ -549,10 +624,38 @@ class PromptsHandler {
 			$content['_meta'] = $block_meta;
 		}
 
+		if ( isset( $content['annotations'] ) ) {
+			$annotations = $this->build_content_annotations(
+				$content['annotations'],
+				$this->mcp->get_error_handler(),
+				'Invalid annotations in prompt message, dropping them',
+				array( 'prompt_name' => $prompt_name )
+			);
+
+			if ( null === $annotations ) {
+				unset( $content['annotations'] );
+			} else {
+				$content['annotations'] = $annotations;
+			}
+		}
+
 		// EmbeddedResource takes its resource contents as given, so a nested block never
-		// reaches a DTO that could reject them. This is the only level that inspects them.
-		if ( 'resource' === ( $content['type'] ?? '' ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
-			$resource = $content['resource'];
+		// reaches a DTO that could reject them. This is the only level that inspects them,
+		// and the failure it catches is the quiet one: contents that are not valid
+		// ResourceContents do not throw, they reach the wire, and a conforming client
+		// rejects the message with nothing to tell the author why.
+		if ( 'resource' === ( $content['type'] ?? '' ) ) {
+			$resource = $content['resource'] ?? null;
+
+			if ( ! $this->is_valid_resource_contents( $resource ) ) {
+				$this->mcp->get_error_handler()->log(
+					'Invalid embedded resource contents in prompt message, degrading to text',
+					array( 'prompt_name' => $prompt_name ),
+					'warning'
+				);
+
+				return $this->degrade_content_to_text( $content );
+			}
 
 			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
 			if ( null === $resource_meta ) {
@@ -561,6 +664,16 @@ class PromptsHandler {
 				$resource['_meta'] = $resource_meta;
 			}
 			$content['resource'] = $resource;
+		}
+
+		// A resource_link byte count reaches us as whatever the caller had - "1024" from
+		// stored data, 1024.0 from arithmetic - while the schema asserts a strict int.
+		if ( 'resource_link' === ( $content['type'] ?? '' ) && isset( $content['size'] ) ) {
+			if ( is_numeric( $content['size'] ) && (int) $content['size'] > 0 ) {
+				$content['size'] = (int) $content['size'];
+			} else {
+				unset( $content['size'] );
+			}
 		}
 
 		return $content;
@@ -589,12 +702,14 @@ class PromptsHandler {
 				'warning'
 			);
 
-			$text = isset( $content['text'] ) ? (string) $content['text'] : wp_json_encode( $content, JSON_PRETTY_PRINT );
+			if ( isset( $content['text'] ) && is_scalar( $content['text'] ) ) {
+				return array(
+					'type' => 'text',
+					'text' => (string) $content['text'],
+				);
+			}
 
-			return array(
-				'type' => 'text',
-				'text' => false === $text ? '{}' : $text,
-			);
+			return $this->degrade_content_to_text( $content );
 		}
 
 		// Check if type is valid.
@@ -610,15 +725,7 @@ class PromptsHandler {
 			);
 
 			// Convert the entire content to a text representation.
-			$json_content = wp_json_encode( $content, JSON_PRETTY_PRINT );
-			if ( false === $json_content ) {
-				$json_content = '{}';
-			}
-
-			return array(
-				'type' => 'text',
-				'text' => $json_content,
-			);
+			return $this->degrade_content_to_text( $content );
 		}
 
 		// Type is valid, return content as-is (preserves annotations).

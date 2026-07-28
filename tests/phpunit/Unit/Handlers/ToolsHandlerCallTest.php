@@ -10,6 +10,7 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\Content\DTO\ImageContent;
 use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
@@ -404,6 +405,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$result = $this->call_tool_returning(
 			array(
 				'type'        => 'resource',
+				'annotations' => array( 'audience' => array( 'user' ) ),
 				'_meta'       => array( 'block' => 'level' ),
 				'resource'    => array(
 					'uri'      => 'ui://example/app',
@@ -419,8 +421,10 @@ final class ToolsHandlerCallTest extends TestCase {
 		$content = $result->getContent();
 		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
 
-		// The outer `_meta` belongs to the content block.
+		// Outer keys belong to the content block.
 		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
+		$this->assertNotNull( $content[0]->getAnnotations() );
+		$this->assertSame( array( 'user' ), $content[0]->getAnnotations()->getAudience() );
 
 		// The nested _meta belongs to the resource contents.
 		$resource = $content[0]->getResource();
@@ -485,5 +489,399 @@ final class ToolsHandlerCallTest extends TestCase {
 		$block = $result->getContent()[0]->toArray();
 		$this->assertArrayNotHasKey( '_meta', $block );
 		$this->assertNotEmpty( $block['data'] );
+	}
+
+	public function test_image_result_without_results_key_logs_warning_and_falls_through_to_tool_data(): void {
+		$server  = $this->makeServer( array( 'test/image-without-results' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-image-without-results' ),
+			)
+		);
+
+		// The image branch reads `results`, so this payload stays tool data.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains(
+			'Tool result marked type "image" has no "results" key, returning it as tool data',
+			$messages
+		);
+	}
+
+	/**
+	 * `annotations` has no ResourceContents field to descend into, so it stays on the
+	 * block while `_meta` moves. Pins that only `_meta` follows the flat form's siblings.
+	 */
+	public function test_embedded_resource_flat_shape_keeps_annotations_on_the_content_block(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'ui://example/app',
+				'text'        => '<!doctype html>',
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'_meta'       => array( 'ui' => array( 'prefersBorder' => true ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		$this->assertNotNull( $content[0]->getAnnotations() );
+		$this->assertSame( array( 'user' ), $content[0]->getAnnotations()->getAudience() );
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
+	}
+
+	public function test_embedded_resource_with_invalid_annotations_still_returns_result(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'audience' => 'not-an-array' ),
+			)
+		);
+
+		// Malformed annotations are dropped, not raised: the resource still reaches the client.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertNull( $content[0]->getAnnotations() );
+		$this->assertSame( 'body', $content[0]->getResource()->getText() );
+	}
+
+	/**
+	 * Tool-result annotations are content annotations (audience, priority, lastModified),
+	 * not the ToolAnnotations vocabulary the guide documents for tool descriptors. A tool
+	 * reusing the descriptor vocabulary here must not put an empty `annotations` on the
+	 * wire: PHP serializes an empty array as `[]`, and MCP declares annotations an object.
+	 *
+	 * Asserted on the emitted array rather than getAnnotations(), because the DTO getter
+	 * returns a perfectly good all-null object and cannot see the defect.
+	 */
+	public function test_embedded_resource_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array(
+					'readOnlyHint'  => true,
+					'openWorldHint' => false,
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $block ) );
+	}
+
+	/**
+	 * MCP constrains priority to 0.0-1.0. An out-of-range value is rejected by conforming
+	 * clients along with the whole content block, so it must not reach the wire.
+	 */
+	public function test_embedded_resource_with_out_of_range_priority_omits_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'priority' => 5 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertSame( 'body', $result->getContent()[0]->getResource()->getText() );
+	}
+
+	/**
+	 * MCP declares audience as a list of "user" or "assistant". Anything else is rejected
+	 * by conforming clients along with the whole content block.
+	 */
+	public function test_embedded_resource_with_unknown_audience_role_omits_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'audience' => array( 'robot' ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertArrayNotHasKey( 'annotations', $result->getContent()[0]->toArray() );
+	}
+
+	/**
+	 * A non-string audience entry must be rejected by validation, before it reaches the
+	 * schema DTO. The DTO casts entries to string, which raises a PHP warning rather than
+	 * throwing, so in production execution continues and the literal "Array" goes on the
+	 * wire.
+	 *
+	 * The emitted shape alone cannot prove this: phpunit.xml.dist sets
+	 * convertWarningsToExceptions, so under test the cast throws and the catch below drops
+	 * the annotations anyway. Both the fixed and the unfixed code emit no annotations here.
+	 * What distinguishes them is which path dropped it, so this asserts the log context
+	 * carries validation errors and not a downstream exception.
+	 */
+	public function test_embedded_resource_with_non_string_audience_entry_is_rejected_by_validation(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'audience' => array( array( 'nested' ) ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( 'Array', (string) wp_json_encode( $block ) );
+
+		$dropped = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $entry ): bool {
+					return 'Invalid annotations in tool result, dropping them' === $entry['message'];
+				}
+			)
+		);
+
+		$this->assertCount( 1, $dropped );
+		$this->assertArrayHasKey( 'errors', $dropped[0]['context'] );
+		$this->assertArrayNotHasKey( 'exception', $dropped[0]['context'] );
+	}
+
+	/**
+	 * The guard above must not over-filter: every field MCP's content Annotations models
+	 * still reaches the wire, as a JSON object.
+	 */
+	public function test_embedded_resource_with_valid_annotations_emits_them_as_an_object(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array(
+					'audience'     => array( 'user', 'assistant' ),
+					'priority'     => 0.8,
+					'lastModified' => '2025-01-12T15:00:58Z',
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame(
+			array(
+				'audience'     => array( 'user', 'assistant' ),
+				'priority'     => 0.8,
+				'lastModified' => '2025-01-12T15:00:58Z',
+			),
+			$block['annotations']
+		);
+		$this->assertStringContainsString( '"annotations":{"audience":', (string) wp_json_encode( $block ) );
+	}
+
+	/**
+	 * WordPress hands back numeric values as strings all over the place - get_post_meta()
+	 * and get_option() both do - so a tool computing priority from stored data commonly
+	 * returns "0.5" rather than 0.5. That is a valid priority, and it must reach the wire
+	 * as a JSON number rather than costing the tool its annotations.
+	 */
+	public function test_embedded_resource_with_numeric_string_priority_emits_it_as_a_number(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => array( 'priority' => '0.5' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame( array( 'priority' => 0.5 ), $block['annotations'] );
+		$this->assertStringContainsString( '"priority":0.5', (string) wp_json_encode( $block ) );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid annotations in tool result, dropping them', $messages );
+	}
+
+	/**
+	 * Without a URI the result is not an embedded resource at all, so it falls through to
+	 * the generic JSON path where no annotations were ever going to be attached. Warning
+	 * that annotations were "dropped" there sends the reader after the wrong problem.
+	 */
+	public function test_resource_result_without_uri_does_not_warn_about_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'text'        => 'body',
+				'annotations' => array( 'priority' => 5 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertInstanceOf( TextContent::class, $result->getContent()[0] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid annotations in tool result, dropping them', $messages );
+	}
+
+	/**
+	 * A result filter may hand back an already-built DTO, which is passed through as-is
+	 * rather than re-validated.
+	 */
+	public function test_embedded_resource_accepts_an_already_built_annotations_dto(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'WordPress://local/tool-embedded-text',
+				'text'        => 'body',
+				'annotations' => new Annotations( array( 'assistant' ), 0.4 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame(
+			array(
+				'audience' => array( 'assistant' ),
+				'priority' => 0.4,
+			),
+			$block['annotations']
+		);
+	}
+
+	/**
+	 * `type` marks an image result as a description of a content block, so its sibling
+	 * `annotations` and `_meta` are the block's, exactly as they are for `type: resource`.
+	 */
+	public function test_image_result_emits_valid_annotations_as_an_object(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'image',
+				'results'     => 'binary',
+				'mimeType'    => 'image/png',
+				'annotations' => array(
+					'audience' => array( 'user' ),
+					'priority' => 0.8,
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame(
+			array(
+				'audience' => array( 'user' ),
+				'priority' => 0.8,
+			),
+			$block['annotations']
+		);
+	}
+
+	/**
+	 * The image branch routes annotations through the same seam the resource branch uses,
+	 * so an out-of-range value is dropped as a group and logged rather than reaching the
+	 * wire, where a conforming client rejects the whole content block.
+	 */
+	public function test_image_result_with_out_of_range_priority_omits_annotations_and_logs(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'image',
+				'results'     => 'binary',
+				'mimeType'    => 'image/png',
+				'annotations' => array( 'priority' => 5 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertNotEmpty( $block['data'] );
+
+		$dropped = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $entry ): bool {
+					return 'Invalid annotations in tool result, dropping them' === $entry['message'];
+				}
+			)
+		);
+
+		$this->assertCount( 1, $dropped );
+		$this->assertArrayHasKey( 'errors', $dropped[0]['context'] );
+	}
+
+	/**
+	 * Tool hints describe a tool, not a content block, so the mapper's content vocabulary
+	 * leaves nothing behind and the key is omitted rather than emitted as an empty object.
+	 */
+	public function test_image_result_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'image',
+				'results'     => 'binary',
+				'mimeType'    => 'image/png',
+				'annotations' => array( 'readOnlyHint' => true ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $block ) );
+	}
+
+
+	/**
+	 * The generic JSON fallback carries no `type` marker, so every key it holds is tool
+	 * data. `annotations` there is already emitted inside the text block and in
+	 * `structuredContent`, and reading it as a block annotation would give one key two
+	 * meanings with nothing to tell them apart.
+	 */
+	public function test_untyped_result_treats_annotations_as_data_not_block_annotations(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'rows'        => array( 1, 2 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertSame(
+			array(
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'rows'        => array( 1, 2 ),
+			),
+			$result->getStructuredContent()
+		);
 	}
 }

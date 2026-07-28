@@ -47,6 +47,137 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( 'plain string content', $result );
 	}
 
+	public function test_ability_backed_execute_with_object_input_schema_passes_schema_validation(): void {
+		$this->register_ability_in_hook(
+			'test/resource-object-schema',
+			array(
+				'label'               => 'Resource Object Schema',
+				'description'         => 'Test MCP resource',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'execute_callback'    => static function ( $input ) {
+					return array(
+						'body'  => 'read',
+						'input' => $input,
+					);
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'type' => 'resource',
+						'uri'  => 'WordPress://local/resource-object-schema',
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/resource-object-schema' );
+		$this->assertNotNull( $ability );
+
+		$mcp_resource = McpResource::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_resource );
+
+		$result = $mcp_resource->execute( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
+
+		// Reading this used to fail as "input is not of type object", because the ability
+		// was called with no argument at all and core validated the null default.
+		$this->assertNotWPError( $result );
+		$this->assertSame( 'read', $result['body'] );
+
+		// Read arguments are still not forwarded: the ability sees an empty input, not the URI.
+		$this->assertSame( array(), $result['input'] );
+
+		wp_unregister_ability( 'test/resource-object-schema' );
+	}
+
+	public function test_ability_backed_permission_with_object_input_schema_receives_an_empty_input(): void {
+		$this->register_ability_in_hook(
+			'test/resource-typed-permission',
+			array(
+				'label'               => 'Resource Typed Permission',
+				'description'         => 'Test MCP resource',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(),
+				),
+				'execute_callback'    => static function ( $input ) {
+					return array( 'ok' => true );
+				},
+				'permission_callback' => static function ( array $input ) {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'type' => 'resource',
+						'uri'  => 'WordPress://local/resource-typed-permission',
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/resource-typed-permission' );
+		$this->assertNotNull( $ability );
+
+		$mcp_resource = McpResource::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_resource );
+
+		// Core hands the input to the permission callback whenever the ability declares a
+		// schema, so a callback typed `array $input` used to be called with null and throw.
+		// Permission runs before execution, so this failed the read on its own.
+		$permission = $mcp_resource->check_permission( array( 'uri' => 'WordPress://local/resource-typed-permission' ) );
+		$this->assertTrue( $permission );
+
+		wp_unregister_ability( 'test/resource-typed-permission' );
+	}
+
+	public function test_ability_backed_execute_honors_a_top_level_schema_default(): void {
+		$this->register_ability_in_hook(
+			'test/resource-schema-default',
+			array(
+				'label'               => 'Resource Schema Default',
+				'description'         => 'Test MCP resource',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'    => 'object',
+					'default' => array( 'scope' => 'site' ),
+				),
+				'execute_callback'    => static function ( $input ) {
+					return $input;
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'type' => 'resource',
+						'uri'  => 'WordPress://local/resource-schema-default',
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/resource-schema-default' );
+		$this->assertNotNull( $ability );
+
+		$mcp_resource = McpResource::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_resource );
+
+		$result = $mcp_resource->execute( array( 'uri' => 'WordPress://local/resource-schema-default' ) );
+
+		// A schema default is the author's declared "no input" value, so a read gets it
+		// rather than the empty object.
+		$this->assertNotWPError( $result );
+		$this->assertSame( array( 'scope' => 'site' ), $result );
+
+		wp_unregister_ability( 'test/resource-schema-default' );
+	}
+
 	public function test_permission_callback_supports_zero_arg_callable(): void {
 		$mcp_resource = McpResource::fromArray(
 			array(
@@ -255,22 +386,184 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes Annotations::fromArray() to throw.
-		// The 'priority' field expects a float, not a string.
-		$result = McpResource::fromArray(
+	/**
+	 * An unusable annotation value costs the annotation, not the resource. Registration
+	 * failing outright over a rendering hint takes the whole resource off the server, which
+	 * is a far larger outage than the hint was worth.
+	 */
+	public function test_fromArray_drops_unparseable_annotation_values_instead_of_failing(): void {
+		$resource = McpResource::fromArray(
 			array(
 				'uri'         => 'WordPress://local/invalid-annotations',
 				'handler'     => static fn() => 'content',
+				'permission'  => static fn() => true,
 				'annotations' => array(
-					'priority' => 'not-a-float', // This will cause Annotations::fromArray() to throw.
+					'audience' => array( 'user' ),
+					'priority' => 'not-a-float',
 				),
+			)
+		);
+
+		$this->assertNotWPError( $resource );
+
+		$data = $resource->get_protocol_dto()->toArray();
+
+		// The sibling survives; only the unusable field is dropped.
+		$this->assertSame( array( 'audience' => array( 'user' ) ), $data['annotations'] );
+	}
+
+	/**
+	 * get_post_meta() and get_option() return numbers as strings, so a resource built from
+	 * stored data commonly carries "0.5". It is a valid priority and belongs on the wire as
+	 * a JSON number.
+	 */
+	public function test_fromArray_coerces_numeric_string_priority_to_a_number(): void {
+		$resource = McpResource::fromArray(
+			array(
+				'uri'         => 'WordPress://local/string-priority',
+				'handler'     => static fn() => 'content',
+				'permission'  => static fn() => true,
+				'annotations' => array( 'priority' => '0.5' ),
+			)
+		);
+
+		$this->assertNotWPError( $resource );
+
+		$data = $resource->get_protocol_dto()->toArray();
+		$this->assertSame( array( 'priority' => 0.5 ), $data['annotations'] );
+		$this->assertStringContainsString( '"priority":0.5', (string) wp_json_encode( $data ) );
+	}
+
+	/**
+	 * Mapping fixes the value's type but says nothing about its range. MCP constrains
+	 * priority to 0.0-1.0 and audience to "user"/"assistant", and a conforming client
+	 * rejects the whole resource over either - so a well-typed but out-of-spec value must
+	 * not reach the wire.
+	 *
+	 * @dataProvider data_out_of_spec_annotations
+	 *
+	 * @param array<string, mixed> $annotations Caller-supplied annotations.
+	 */
+	public function test_fromArray_omits_annotations_that_are_out_of_spec( array $annotations ): void {
+		$resource = McpResource::fromArray(
+			array(
+				'uri'         => 'WordPress://local/out-of-spec',
+				'handler'     => static fn() => 'content',
+				'permission'  => static fn() => true,
+				'annotations' => $annotations,
+			)
+		);
+
+		$this->assertNotWPError( $resource );
+		$this->assertArrayNotHasKey( 'annotations', $resource->get_protocol_dto()->toArray() );
+	}
+
+	/**
+	 * @return array<string, array{array<string, mixed>}>
+	 */
+	public function data_out_of_spec_annotations(): array {
+		return array(
+			'priority above range' => array( array( 'priority' => 5 ) ),
+			'priority below range' => array( array( 'priority' => -1 ) ),
+			'unknown audience'     => array( array( 'audience' => array( 'robot' ) ) ),
+			'bad lastModified'     => array( array( 'lastModified' => 'not-a-timestamp' ) ),
+		);
+	}
+
+	/**
+	 * Coercion is deliberately limited to values whose intent is unambiguous - a number
+	 * written as a string, a boolean written as "1". A field given an entirely wrong kind
+	 * of value has no defensible reading, so the DTO guard still catches it and the caller
+	 * gets a WP_Error naming the problem rather than a silently mangled resource.
+	 */
+	public function test_fromArray_returns_wp_error_for_a_wrongly_typed_field(): void {
+		$result = McpResource::fromArray(
+			array(
+				'uri'        => 'WordPress://local/bad-title',
+				'handler'    => static fn() => 'content',
+				'permission' => static fn() => true,
+				'title'      => array( 'not', 'a', 'string' ),
 			)
 		);
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_resource_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected float', $result->get_error_message() );
+		$this->assertStringContainsString( 'Expected string', $result->get_error_message() );
+	}
+
+	/**
+	 * size is the other field the schema asserts a strict type on, and it is a byte count -
+	 * exactly the sort of value that arrives from stored data as "1024", or from arithmetic
+	 * as 1024.0. Both are usable sizes and neither should cost the resource its
+	 * registration.
+	 *
+	 * @dataProvider data_loosely_typed_sizes
+	 *
+	 * @param mixed $size Caller-supplied size value.
+	 */
+	public function test_fromArray_coerces_loosely_typed_size_to_an_integer( $size ): void {
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'WordPress://local/loose-size',
+				'handler'    => static fn() => 'content',
+				'permission' => static fn() => true,
+				'size'       => $size,
+			)
+		);
+
+		$this->assertNotWPError( $resource );
+		$this->assertSame( 1024, $resource->get_protocol_dto()->getSize() );
+	}
+
+	/**
+	 * @return array<string, array{mixed}>
+	 */
+	public function data_loosely_typed_sizes(): array {
+		return array(
+			'integer'        => array( 1024 ),
+			'numeric string' => array( '1024' ),
+			'float'          => array( 1024.0 ),
+		);
+	}
+
+	/**
+	 * A size that is not a number at all has no usable value to fall back to, so it is
+	 * dropped rather than guessed at - and still must not fail the registration.
+	 */
+	public function test_fromArray_drops_non_numeric_size_instead_of_failing(): void {
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'WordPress://local/bad-size',
+				'handler'    => static fn() => 'content',
+				'permission' => static fn() => true,
+				'size'       => 'not-a-number',
+			)
+		);
+
+		$this->assertNotWPError( $resource );
+		$this->assertArrayNotHasKey( 'size', $resource->get_protocol_dto()->toArray() );
+	}
+
+	/**
+	 * Resources carry the shared Annotations vocabulary. Handing them the tool-descriptor
+	 * hints leaves nothing the type models, and an empty PHP array serializes to `[]` where
+	 * MCP declares an object - which a conforming client rejects along with the resource.
+	 */
+	public function test_fromArray_omits_annotations_for_unmodelled_vocabulary(): void {
+		$resource = McpResource::fromArray(
+			array(
+				'uri'         => 'WordPress://local/tool-vocabulary',
+				'handler'     => static fn() => 'content',
+				'permission'  => static fn() => true,
+				'annotations' => array( 'readOnlyHint' => true ),
+			)
+		);
+
+		$this->assertNotWPError( $resource );
+
+		$data = $resource->get_protocol_dto()->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $data );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $data ) );
 	}
 
 	// =========================================================================

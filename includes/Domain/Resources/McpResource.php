@@ -11,6 +11,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -157,9 +159,11 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		// Include size only when > 0.
-		if ( isset( $config['size'] ) && $config['size'] > 0 ) {
-			$resource_data['size'] = $config['size'];
+		// Include size only when > 0. A byte count reaches us as whatever the caller had -
+		// "1024" from stored data, 1024.0 from arithmetic - while the schema asserts a
+		// strict int, so cast rather than let a usable value fail the whole resource.
+		if ( isset( $config['size'] ) && is_numeric( $config['size'] ) && (int) $config['size'] > 0 ) {
+			$resource_data['size'] = (int) $config['size'];
 		}
 
 		// Validate and include icons if set.
@@ -175,11 +179,30 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
-		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
+		// Annotations go through the mapper before the DTO sees them: it keeps only the
+		// fields the shared Annotations type models and coerces each to the type that type
+		// asserts. Without it, vocabulary the type does not model leaves an all-null DTO
+		// that serializes to `[]` where MCP declares an object, and a loosely typed value -
+		// the string "0.5" WordPress hands back from post meta - fails the DTO's strict
+		// float assertion and takes the whole resource down with it. A rendering hint must
+		// not cost the resource its registration.
+		$annotations = isset( $config['annotations'] ) && is_array( $config['annotations'] )
+			? McpAnnotationMapper::map( $config['annotations'], 'resource' )
+			: array();
+
+		// Mapping fixes each value's type but says nothing about its range. A well-typed but
+		// out-of-spec value - priority outside 0.0-1.0, an audience role MCP does not define -
+		// is rejected by a conforming client along with the whole resource, so drop the
+		// annotations rather than publish something unusable. Matches what
+		// RegisterAbilityAsMcpResource already does on the ability-backed path.
+		if ( ! empty( $annotations ) && ! empty( McpValidator::get_annotation_validation_errors( $annotations ) ) ) {
+			$annotations = array();
+		}
+
+		// Create the Resource DTO - wrap in try-catch since ResourceDto::fromArray() can throw.
 		try {
-			// Process annotations inside try-catch since Annotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
+			if ( ! empty( $annotations ) ) {
+				$resource_data['annotations'] = Annotations::fromArray( $annotations );
 			}
 
 			$resource = ResourceDto::fromArray( $resource_data );
@@ -269,10 +292,9 @@ final class McpResource implements McpComponentInterface {
 	 * @return mixed
 	 */
 	public function execute( $arguments ) {
-		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
 			try {
-				return $this->ability->execute();
+				return $this->ability->execute( $this->no_arguments_input( $this->ability ) );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_execution_failed',
@@ -298,6 +320,36 @@ final class McpResource implements McpComponentInterface {
 	}
 
 	/**
+	 * Build the input an ability-backed resource is invoked with.
+	 *
+	 * A resource is content addressed by its URI, so `resources/read` carries no arguments
+	 * to forward: its params are the URI and nothing the ability's `input_schema` describes.
+	 * What the ability still needs is an input the Abilities API will accept for a call that
+	 * has none. Both entry points default to null, and core validates null against a schema
+	 * of type object as "input is not of type object", so every ability-backed resource
+	 * declaring one failed its read.
+	 *
+	 * The normalizer answers what a zero-argument call looks like for this ability: null with
+	 * no schema, or with one that declares a top-level default or permits null, and an empty
+	 * array otherwise. That is the same question `tools/call` asks, and {@see McpTool} routes
+	 * both its `execute()` and its `check_permissions()` through the same helper.
+	 *
+	 * Permission needs this as much as execution does, and hits it first. Core passes the
+	 * input to the `permission_callback` whenever the ability declares a schema, so a
+	 * callback typed `array $input` receives null and throws before the read gets as far
+	 * as executing.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param \WP_Ability $ability The ability backing this resource.
+	 *
+	 * @return mixed The input to invoke the ability with.
+	 */
+	private function no_arguments_input( \WP_Ability $ability ) {
+		return AbilityArgumentNormalizer::normalize( $ability, null );
+	}
+
+	/**
 	 * Check whether the current request has permission to read this resource.
 	 *
 	 * @param mixed $arguments Read arguments (may be empty).
@@ -305,10 +357,9 @@ final class McpResource implements McpComponentInterface {
 	 * @return bool|\WP_Error
 	 */
 	public function check_permission( $arguments ) {
-		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
 			try {
-				return $this->ability->check_permissions();
+				return $this->ability->check_permissions( $this->no_arguments_input( $this->ability ) );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_permission_check_failed',
