@@ -516,7 +516,7 @@ class McpValidator {
 	 *
 	 * @param mixed $meta The raw `_meta` value.
 	 *
-	 * @return array<string, mixed>|null The value if it serializes as a JSON object, null otherwise.
+	 * @return array<array-key, mixed>|null A non-empty, non-list array suitable for JSON-object encoding, or null if absent/invalid.
 	 */
 	public static function normalize_meta( $meta ): ?array {
 		if ( ! is_array( $meta ) || array() === $meta ) {
