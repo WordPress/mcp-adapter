@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Resources\ResourcesHandler;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
@@ -464,6 +465,65 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$contents = $result->getContents();
 		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
 		$this->assertNull( $contents[0]->get_meta() );
+	}
+
+	/**
+	 * A client strips metadata it does not recognize, so nothing downstream reports a
+	 * `_meta` that could not be emitted. The log is the only place it surfaces.
+	 */
+	public function test_read_resource_with_list_meta_logs_the_drop(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'   => 'WordPress://local/resource-1',
+					'text'  => 'body',
+					'_meta' => array( 'a', 'b' ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on resource contents, dropping it', $messages );
+	}
+
+	/**
+	 * An absent `_meta` is the ordinary case and must stay quiet, or the log fills with
+	 * noise from every resource that never asked for metadata.
+	 */
+	public function test_read_resource_without_meta_does_not_log(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'  => 'WordPress://local/resource-1',
+					'text' => 'body',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on resource contents, dropping it', $messages );
 	}
 
 	/**

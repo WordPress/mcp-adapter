@@ -11,7 +11,6 @@ namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -260,8 +259,20 @@ class ToolsHandler {
 					$uri = trim( $uri );
 				}
 
-				$block_meta    = $is_nested ? McpValidator::normalize_meta( $result['_meta'] ?? null ) : null;
-				$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
+				$block_meta    = $is_nested
+					? $this->normalize_content_meta(
+						$result['_meta'] ?? null,
+						$this->mcp->get_error_handler(),
+						'Invalid _meta on tool result content block, dropping it',
+						array( 'tool_name' => $tool_name )
+					)
+					: null;
+				$resource_meta = $this->normalize_content_meta(
+					$resource_item['_meta'] ?? null,
+					$this->mcp->get_error_handler(),
+					'Invalid _meta on tool result resource contents, dropping it',
+					array( 'tool_name' => $tool_name )
+				);
 
 				// Only return an EmbeddedResource if we have a valid URI and some content.
 				if ( is_string( $uri ) && '' !== $uri ) {
@@ -336,7 +347,12 @@ class ToolsHandler {
 								$image_data,
 								$mime_type,
 								$annotations,
-								McpValidator::normalize_meta( $result['_meta'] ?? null )
+								$this->normalize_content_meta(
+									$result['_meta'] ?? null,
+									$this->mcp->get_error_handler(),
+									'Invalid _meta on tool result content block, dropping it',
+									array( 'tool_name' => $tool_name )
+								)
 							),
 						),
 						'structuredContent' => null,

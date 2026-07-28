@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
@@ -281,7 +280,8 @@ class ResourcesHandler {
 	 *
 	 * A `_meta` that would not serialize as a JSON object is dropped rather than
 	 * forwarded, so a malformed one costs the client its metadata and not the resource.
-	 * See {@see McpValidator::normalize_meta()}.
+	 * The drop is logged, since a conforming client strips metadata it does not
+	 * recognize and would report nothing. See {@see HandlerHelperTrait::normalize_content_meta()}.
 	 *
 	 * @param array $item The content item array.
 	 * @param string $default_uri The default URI to use if not specified.
@@ -291,7 +291,12 @@ class ResourcesHandler {
 	private function create_content_dto( array $item, string $default_uri ) {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
-		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
+		$meta      = $this->normalize_content_meta(
+			$item['_meta'] ?? null,
+			$this->mcp->get_error_handler(),
+			'Invalid _meta on resource contents, dropping it',
+			array( 'uri' => $item_uri )
+		);
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {

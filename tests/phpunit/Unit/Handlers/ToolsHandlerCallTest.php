@@ -778,6 +778,47 @@ final class ToolsHandlerCallTest extends TestCase {
 	}
 
 	/**
+	 * A conforming client strips metadata it does not recognize, so a `_meta` that could
+	 * not be emitted is reported nowhere else. Both levels of an embedded resource log
+	 * separately, because they name different objects.
+	 */
+	public function test_embedded_resource_with_list_meta_logs_the_drop_at_each_level(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'_meta'    => array( 'a', 'b' ),
+				'resource' => array(
+					'uri'   => 'WordPress://local/tool-embedded-text',
+					'text'  => 'body',
+					'_meta' => array( 'c', 'd' ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
+		$this->assertContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
+
+	public function test_embedded_resource_without_meta_does_not_log(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type' => 'resource',
+				'uri'  => 'WordPress://local/tool-embedded-text',
+				'text' => 'body',
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on tool result content block, dropping it', $messages );
+		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
+
+	/**
 	 * `type` marks an image result as a description of a content block, so its sibling
 	 * `annotations` and `_meta` are the block's, exactly as they are for `type: resource`.
 	 */
@@ -881,7 +922,7 @@ final class ToolsHandlerCallTest extends TestCase {
 	 * MCP declares `_meta` an object, so a list is omitted rather than emitted as a JSON
 	 * array, which a conforming client rejects along with the block carrying it.
 	 */
-	public function test_image_result_with_list_meta_omits_meta(): void {
+	public function test_image_result_with_list_meta_omits_meta_and_logs(): void {
 		$result = $this->call_tool_returning(
 			array(
 				'type'     => 'image',
@@ -896,6 +937,9 @@ final class ToolsHandlerCallTest extends TestCase {
 		$block = $result->getContent()[0]->toArray();
 		$this->assertArrayNotHasKey( '_meta', $block );
 		$this->assertNotEmpty( $block['data'] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
 	}
 
 	/**

@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
@@ -617,7 +616,12 @@ class PromptsHandler {
 	 * @return array Content block safe to hand to PromptMessage::fromArray().
 	 */
 	private function normalize_content_block( array $content, string $prompt_name ): array {
-		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
+		$block_meta = $this->normalize_content_meta(
+			$content['_meta'] ?? null,
+			$this->mcp->get_error_handler(),
+			'Invalid _meta on prompt message content block, dropping it',
+			array( 'prompt_name' => $prompt_name )
+		);
 		if ( null === $block_meta ) {
 			unset( $content['_meta'] );
 		} else {
@@ -657,7 +661,12 @@ class PromptsHandler {
 				return $this->degrade_content_to_text( $content );
 			}
 
-			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
+			$resource_meta = $this->normalize_content_meta(
+				$resource['_meta'] ?? null,
+				$this->mcp->get_error_handler(),
+				'Invalid _meta on prompt message resource contents, dropping it',
+				array( 'prompt_name' => $prompt_name )
+			);
 			if ( null === $resource_meta ) {
 				unset( $resource['_meta'] );
 			} else {

@@ -1730,4 +1730,62 @@ final class PromptsHandlerTest extends TestCase {
 	private function content_block_at( GetPromptResult $result, int $index ): array {
 		return $result->getMessages()[ $index ]->getContent()->toArray();
 	}
+
+	/**
+	 * A conforming client strips metadata it does not recognize, so a `_meta` that could
+	 * not be emitted is reported nowhere else. Both levels of an embedded resource log
+	 * separately, because they name different objects.
+	 */
+	public function test_message_content_meta_that_is_a_list_logs_the_drop_at_each_level(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'_meta'    => array( 'a', 'b' ),
+							'resource' => array(
+								'uri'   => 'WordPress://local/prompt-embedded',
+								'text'  => 'body',
+								'_meta' => array( 'c', 'd' ),
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on prompt message content block, dropping it', $messages );
+		$this->assertContains( 'Invalid _meta on prompt message resource contents, dropping it', $messages );
+	}
+
+	/**
+	 * An absent `_meta` is the ordinary case and must stay quiet, or the log fills with
+	 * noise from every message that never asked for metadata.
+	 */
+	public function test_message_content_without_meta_does_not_log(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'text',
+							'text' => 'body',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on prompt message content block, dropping it', $messages );
+		$this->assertNotContains( 'Invalid _meta on prompt message resource contents, dropping it', $messages );
+	}
 }
