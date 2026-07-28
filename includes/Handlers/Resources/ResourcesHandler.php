@@ -283,8 +283,12 @@ class ResourcesHandler {
 	 * The drop is logged, since a conforming client strips metadata it does not
 	 * recognize and would report nothing. See {@see HandlerHelperTrait::normalize_content_meta()}.
 	 *
-	 * @param array $item The content item array.
-	 * @param string $default_uri The default URI to use if not specified.
+	 * Every key is optional and read defensively, because a handler returns whatever
+	 * WordPress handed it: `blob` and `text` are cast to string, `mimeType` is kept
+	 * only when it already is one, and an absent `uri` falls back to $default_uri.
+	 *
+	 * @param array{uri?: mixed, mimeType?: mixed, text?: mixed, blob?: mixed, _meta?: mixed} $item The content item array.
+	 * @param string $default_uri The URI to use when the item names none.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents
 	 */

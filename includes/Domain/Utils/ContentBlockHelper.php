@@ -45,7 +45,7 @@ final class ContentBlockHelper {
 	 * @param string $data Base64-encoded image data.
 	 * @param string $mime_type The MIME type of the image (e.g., 'image/png').
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\ImageContent The created ImageContent DTO.
 	 */
@@ -67,7 +67,7 @@ final class ContentBlockHelper {
 	 * @param string $data Base64-encoded audio data.
 	 * @param string $mime_type The MIME type of the audio (e.g., 'audio/mp3').
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\AudioContent The created AudioContent DTO.
 	 */
@@ -92,6 +92,8 @@ final class ContentBlockHelper {
 	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
 	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
 	 * the spec and are not interchangeable.
+	 *
+	 * @since n.e.x.t Added the optional $resource_meta parameter.
 	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $text The text content of the resource.
@@ -139,6 +141,8 @@ final class ContentBlockHelper {
 	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
 	 * the spec and are not interchangeable.
 	 *
+	 * @since n.e.x.t Added the optional $resource_meta parameter.
+	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $blob Base64-encoded binary data.
 	 * @param string|null $mime_type Optional MIME type of the resource.
@@ -183,7 +187,7 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $message The error message.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
@@ -196,7 +200,7 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $text The text content.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
@@ -220,7 +224,7 @@ final class ContentBlockHelper {
 	 * @param mixed $data The data to JSON-encode.
 	 * @param int $flags JSON encoding flags (default: 0).
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
