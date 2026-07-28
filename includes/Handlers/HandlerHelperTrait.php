@@ -78,7 +78,9 @@ trait HandlerHelperTrait {
 	 *
 	 * Dropping is logged rather than raised. Annotations are a rendering hint, and
 	 * failing the whole response over one would be a worse outcome for a payload that is
-	 * otherwise valid.
+	 * otherwise valid. Both losses are logged: a value the schema rejects, and a
+	 * non-empty annotations object whose every field belongs to another vocabulary. An
+	 * input that was already empty is not a loss and stays quiet.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -112,6 +114,17 @@ trait HandlerHelperTrait {
 		// DTO's strict float assertion.
 		$mapped = McpAnnotationMapper::map( $annotations, 'resource' );
 		if ( empty( $mapped ) ) {
+			// An empty input is nothing to report. A non-empty one that maps to nothing is:
+			// every field was written in a vocabulary this block does not carry - most likely
+			// the tool hints - and the annotations disappear with no other trace.
+			if ( ! empty( $annotations ) ) {
+				$error_handler->log(
+					$log_message,
+					array_merge( $log_context, array( 'reason' => 'no field belongs to the content annotations vocabulary' ) ),
+					'warning'
+				);
+			}
+
 			return null;
 		}
 

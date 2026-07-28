@@ -508,9 +508,53 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		$messages = array_column( DummyErrorHandler::$logs, 'message' );
 		$this->assertContains(
-			'Tool result marked type "image" has no "results" key, returning it as tool data',
+			'Tool result marked type "image" has no usable string in "results", returning it as tool data',
 			$messages
 		);
+	}
+
+	public function test_image_result_with_non_string_results_logs_warning_and_falls_through_to_tool_data(): void {
+		$server  = $this->makeServer( array( 'test/image-non-string-results' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-image-non-string-results' ),
+			)
+		);
+
+		// Only a string is image bytes. Encoding anything else would throw and cost the
+		// call the payload it was carrying, so the result stays tool data.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains(
+			'Tool result marked type "image" has no usable string in "results", returning it as tool data',
+			$messages
+		);
+	}
+
+	public function test_image_result_annotated_with_tool_hint_vocabulary_logs_warning_and_omits_annotations(): void {
+		$server  = $this->makeServer( array( 'test/image-tool-hint-annotations' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-image-tool-hint-annotations' ),
+			)
+		);
+
+		// The image itself is fine, so the block is emitted; the annotations are not part
+		// of the content vocabulary and would serialize as `[]`, so they are dropped.
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content, 'Content array should not be empty' );
+		$this->assertInstanceOf( ImageContent::class, $content[0] );
+		$this->assertNull( $content[0]->getAnnotations() );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid annotations in tool result, dropping them', $messages );
 	}
 
 	/**

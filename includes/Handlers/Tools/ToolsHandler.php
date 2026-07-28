@@ -325,18 +325,25 @@ class ToolsHandler {
 			// reading the `resource` branch above already applies to the same two keys.
 			$is_image_result = isset( $result['type'] ) && 'image' === $result['type'];
 
-			// The image bytes are read from `results`. Without that key there is nothing to
-			// encode, so the result falls through to the generic path and reaches the client
-			// as a text block; say so rather than letting the `type` marker go unanswered.
-			if ( $is_image_result && ! isset( $result['results'] ) ) {
+			// The image bytes are read from `results`, and only a string is bytes. A missing
+			// key, a null, or any other type leaves nothing to encode, so the result falls
+			// through to the generic path and reaches the client as a text block; say so
+			// rather than letting the `type` marker go unanswered. Encoding a non-string
+			// would instead throw and cost the whole call the payload it was carrying.
+			$has_image_bytes = isset( $result['results'] ) && is_string( $result['results'] );
+
+			if ( $is_image_result && ! $has_image_bytes ) {
 				$this->mcp->get_error_handler()->log(
-					'Tool result marked type "image" has no "results" key, returning it as tool data',
-					array( 'tool_name' => $tool_name ),
+					'Tool result marked type "image" has no usable string in "results", returning it as tool data',
+					array(
+						'tool_name'    => $tool_name,
+						'results_type' => array_key_exists( 'results', $result ) ? gettype( $result['results'] ) : 'missing',
+					),
 					'warning'
 				);
 			}
 
-			if ( $is_image_result && isset( $result['results'] ) ) {
+			if ( $is_image_result && $has_image_bytes ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
