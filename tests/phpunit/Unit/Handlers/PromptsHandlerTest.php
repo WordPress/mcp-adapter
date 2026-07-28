@@ -1027,4 +1027,417 @@ final class PromptsHandlerTest extends TestCase {
 
 		remove_filter( 'mcp_adapter_prompts_list', $filter );
 	}
+
+	// =========================================================================
+	// Message Content Block Normalization
+	//
+	// Prompt messages carry the same content blocks tool results do, so they carry
+	// the same two hazards: a `_meta` that would serialize as a JSON array, and an
+	// annotations object a conforming client rejects. Here the cost is higher than
+	// on the tool path - a value the schema DTO refuses throws, and the catch in
+	// get_prompt() turns that into an error response, so one bad hint loses the
+	// whole prompt rather than the hint.
+	// =========================================================================
+
+	public function test_message_content_meta_that_is_a_list_is_omitted(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'  => 'text',
+							'text'  => 'body',
+							'_meta' => array( 'a', 'b' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( '_meta', $block );
+		$this->assertSame( 'body', $block['text'] );
+		$this->assertStringNotContainsString( '"_meta":[', (string) wp_json_encode( $block ) );
+	}
+
+	public function test_message_content_meta_object_is_preserved(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'  => 'text',
+							'text'  => 'body',
+							'_meta' => array( 'ui' => array( 'prefersBorder' => true ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame(
+			array( 'ui' => array( 'prefersBorder' => true ) ),
+			$this->first_content_block( $result )['_meta']
+		);
+	}
+
+	/**
+	 * A `_meta` of the wrong type reaches asArrayOrNull() and throws, which get_prompt()
+	 * catches and turns into an error response. Metadata must not cost the message.
+	 */
+	public function test_message_content_meta_that_is_not_an_array_still_returns_the_prompt(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'  => 'text',
+							'text'  => 'body',
+							'_meta' => 'not-an-object',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertArrayNotHasKey( '_meta', $this->first_content_block( $result ) );
+	}
+
+	/**
+	 * The nested form of a resource content block has two levels that each carry
+	 * `_meta`, and the DTO never sees the inner one - EmbeddedResource takes the
+	 * resource contents as given.
+	 */
+	public function test_embedded_resource_contents_meta_that_is_a_list_is_omitted(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'_meta'    => array( 'a', 'b' ),
+							'resource' => array(
+								'uri'   => 'WordPress://local/prompt-embedded',
+								'text'  => 'body',
+								'_meta' => array( 'c', 'd' ),
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( '_meta', $block );
+		$this->assertArrayNotHasKey( '_meta', $block['resource'] );
+		$this->assertSame( 'body', $block['resource']['text'] );
+	}
+
+	public function test_embedded_resource_contents_meta_object_is_preserved(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array(
+								'uri'   => 'WordPress://local/prompt-embedded',
+								'text'  => 'body',
+								'_meta' => array( 'ui' => array( 'prefersBorder' => true ) ),
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame(
+			array( 'ui' => array( 'prefersBorder' => true ) ),
+			$this->first_content_block( $result )['resource']['_meta']
+		);
+	}
+
+	/**
+	 * Content blocks take the shared Annotations vocabulary. Tool hints belong on the
+	 * tool descriptor, and leave an all-null DTO here that serializes as a JSON array.
+	 */
+	public function test_message_content_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'readOnlyHint' => true ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $block ) );
+	}
+
+	public function test_message_content_with_out_of_range_priority_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'priority' => 5 ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertArrayNotHasKey( 'annotations', $this->first_content_block( $result ) );
+	}
+
+	public function test_message_content_with_unknown_audience_role_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'audience' => array( 'robot' ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertArrayNotHasKey( 'annotations', $this->first_content_block( $result ) );
+	}
+
+	/**
+	 * A non-string audience entry is cast to the literal "Array" by the schema DTO.
+	 * Validation has to reject it before the DTO sees it.
+	 */
+	public function test_message_content_with_non_string_audience_entry_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'audience' => array( array( 'nested' ) ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertStringNotContainsString( 'Array', (string) wp_json_encode( $block ) );
+	}
+
+	/**
+	 * WordPress hands stored numbers back as strings. The schema asserts a strict float,
+	 * so without normalization a usable priority throws and loses the whole prompt.
+	 */
+	public function test_message_content_with_loosely_typed_priority_is_normalized(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'priority' => '0.5' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 0.5, $this->first_content_block( $result )['annotations']['priority'] );
+	}
+
+	public function test_message_content_with_valid_annotations_emits_them_as_an_object(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array(
+								'audience'     => array( 'user' ),
+								'priority'     => 0.8,
+								'lastModified' => '2026-07-28T00:00:00Z',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame(
+			array(
+				'audience'     => array( 'user' ),
+				'priority'     => 0.8,
+				'lastModified' => '2026-07-28T00:00:00Z',
+			),
+			$this->first_content_block( $result )['annotations']
+		);
+	}
+
+	/**
+	 * A resource_link size is the other caller-supplied number the schema asserts as a
+	 * strict int, so it needs the same treatment stored byte counts get elsewhere.
+	 */
+	public function test_resource_link_content_with_numeric_string_size_is_normalized(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'resource_link',
+							'uri'  => 'WordPress://local/prompt-link',
+							'name' => 'Linked resource',
+							'size' => '1024',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 1024, $this->first_content_block( $result )['size'] );
+	}
+
+	/**
+	 * Tier 2 builds its own content block but copies the caller's annotations into it,
+	 * so it needs the same normalization the message tiers get.
+	 */
+	public function test_tier2_text_with_tool_annotation_vocabulary_omits_annotations(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'text'        => 'body',
+				'annotations' => array( 'readOnlyHint' => true ),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( 'annotations', $block );
+		$this->assertSame( 'body', $block['text'] );
+	}
+
+	public function test_dropped_message_annotations_are_logged_with_the_prompt_name(): void {
+		DummyErrorHandler::reset();
+
+		$this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'        => 'text',
+							'text'        => 'body',
+							'annotations' => array( 'priority' => 5 ),
+						),
+					),
+				),
+			)
+		);
+
+		$dropped = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $log ): bool {
+					return false !== strpos( $log['message'], 'Invalid annotations' );
+				}
+			)
+		);
+
+		$this->assertNotEmpty( $dropped );
+		$this->assertSame( 'warning', $dropped[0]['type'] );
+		$this->assertSame( 'test-prompt', $dropped[0]['context']['prompt_name'] );
+		$this->assertArrayHasKey( 'errors', $dropped[0]['context'] );
+	}
+
+	/**
+	 * Run a prompt whose result is replaced by $shape, so any result shape can be driven
+	 * through the handler's normalization without registering a new ability per case.
+	 *
+	 * @param array $shape The prompt result to normalize.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	private function get_prompt_returning( array $shape ) {
+		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
+		$handler = new PromptsHandler( $server );
+
+		$filter = static function () use ( $shape ) {
+			return $shape;
+		};
+		add_filter( 'mcp_adapter_prompt_get_result', $filter );
+
+		$result = $handler->get_prompt(
+			array(
+				'params' => array(
+					'name'      => 'test-prompt',
+					'arguments' => array( 'code' => 'x' ),
+				),
+			),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_prompt_get_result', $filter );
+
+		return $result;
+	}
+
+	/**
+	 * The emitted array of the first message's content block.
+	 *
+	 * Asserts on what goes on the wire rather than on DTO getters, which report a
+	 * healthy object for input that serializes to a JSON array.
+	 *
+	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
+	 *
+	 * @return array
+	 */
+	private function first_content_block( GetPromptResult $result ): array {
+		return $result->getMessages()[0]->getContent()->toArray();
+	}
 }

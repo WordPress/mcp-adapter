@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
@@ -241,7 +242,7 @@ class PromptsHandler {
 
 		// Tier 2: Simple 'text' shorthand.
 		if ( isset( $result['text'] ) && is_string( $result['text'] ) ) {
-			return $this->normalize_tier2_text( $result, $prompt );
+			return $this->normalize_tier2_text( $result, $prompt, $prompt_name );
 		}
 
 		// Tier 3: Single message with 'role' key.
@@ -321,12 +322,13 @@ class PromptsHandler {
 	 *
 	 * @since 0.5.0
 	 *
-	 * @param array                                 $result Raw result with 'text' key.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO.
+	 * @param array                                 $result      Raw result with 'text' key.
+	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
+	 * @param string                                $prompt_name Prompt name for logging.
 	 *
 	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
 	 */
-	private function normalize_tier2_text( array $result, PromptDto $prompt ): GetPromptResult {
+	private function normalize_tier2_text( array $result, PromptDto $prompt, string $prompt_name ): GetPromptResult {
 		$content = array(
 			'type' => 'text',
 			'text' => (string) $result['text'],
@@ -336,6 +338,8 @@ class PromptsHandler {
 		if ( isset( $result['annotations'] ) && is_array( $result['annotations'] ) ) {
 			$content['annotations'] = $result['annotations'];
 		}
+
+		$content = $this->normalize_content_block( $content, $prompt_name );
 
 		$message_dto = PromptMessage::fromArray(
 			array(
@@ -512,6 +516,7 @@ class PromptsHandler {
 		}
 
 		$content = $this->validate_content_type( $content, $prompt_name );
+		$content = $this->normalize_content_block( $content, $prompt_name );
 
 		return PromptMessage::fromArray(
 			array(
@@ -519,6 +524,77 @@ class PromptsHandler {
 				'content' => $content,
 			)
 		);
+	}
+
+	/**
+	 * Bring a caller-supplied content block into the shape the schema DTOs accept.
+	 *
+	 * Prompt messages carry the same content blocks tool results do, and reach the wire
+	 * through the same DTOs, so they carry the same two hazards: a `_meta` that would
+	 * serialize as a JSON array where MCP declares an object, and an annotations object a
+	 * conforming client rejects along with the block that carries it.
+	 *
+	 * Here the cost is higher than on the tool path. A value the DTO refuses throws, and
+	 * the catch in get_prompt() turns that into an error response - so a stored byte count
+	 * that arrived as the string "1024", or a `_meta` that is not an array at all, loses
+	 * the whole prompt rather than the field. Everything below is dropped or coerced so
+	 * that the message survives.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array  $content     Content block as the prompt returned it.
+	 * @param string $prompt_name Prompt name for logging.
+	 *
+	 * @return array Content block safe to hand to PromptMessage::fromArray().
+	 */
+	private function normalize_content_block( array $content, string $prompt_name ): array {
+		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
+		if ( null === $block_meta ) {
+			unset( $content['_meta'] );
+		} else {
+			$content['_meta'] = $block_meta;
+		}
+
+		if ( isset( $content['annotations'] ) ) {
+			$annotations = $this->build_content_annotations(
+				$content['annotations'],
+				$this->mcp->get_error_handler(),
+				'Invalid annotations in prompt message, dropping them',
+				array( 'prompt_name' => $prompt_name )
+			);
+
+			if ( null === $annotations ) {
+				unset( $content['annotations'] );
+			} else {
+				$content['annotations'] = $annotations;
+			}
+		}
+
+		// EmbeddedResource takes its resource contents as given, so a nested block never
+		// reaches a DTO that could reject its `_meta`. This is the only level that
+		// normalizes it.
+		if ( isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
+			$resource      = $content['resource'];
+			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
+			if ( null === $resource_meta ) {
+				unset( $resource['_meta'] );
+			} else {
+				$resource['_meta'] = $resource_meta;
+			}
+			$content['resource'] = $resource;
+		}
+
+		// A resource_link byte count reaches us as whatever the caller had - "1024" from
+		// stored data, 1024.0 from arithmetic - while the schema asserts a strict int.
+		if ( 'resource_link' === ( $content['type'] ?? '' ) && isset( $content['size'] ) ) {
+			if ( is_numeric( $content['size'] ) && (int) $content['size'] > 0 ) {
+				$content['size'] = (int) $content['size'];
+			} else {
+				unset( $content['size'] );
+			}
+		}
+
+		return $content;
 	}
 
 	/**
