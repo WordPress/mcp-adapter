@@ -512,6 +512,7 @@ class PromptsHandler {
 		}
 
 		$content = $this->validate_content_type( $content, $prompt_name );
+		$content = $this->normalize_content_block( $content, $prompt_name );
 
 		return PromptMessage::fromArray(
 			array(
@@ -519,6 +520,60 @@ class PromptsHandler {
 				'content' => $content,
 			)
 		);
+	}
+
+	/**
+	 * Bring a caller-supplied content block into the shape the schema DTOs accept.
+	 *
+	 * Prompt messages carry the same content blocks tool results do, and reach the wire
+	 * through the same DTOs, so they carry the same hazard: a `_meta` that would serialize
+	 * as a JSON array where MCP declares an object.
+	 *
+	 * Here the cost is higher than on the tool path. A value the DTO refuses throws, and
+	 * the catch in get_prompt() turns that into an error response - so a `_meta` that is
+	 * not an array at all loses the whole prompt rather than the field. It is dropped so
+	 * that the message survives.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array  $content     Content block as the prompt returned it.
+	 * @param string $prompt_name Prompt name for logging.
+	 *
+	 * @return array Content block safe to hand to PromptMessage::fromArray().
+	 */
+	private function normalize_content_block( array $content, string $prompt_name ): array {
+		$block_meta = $this->normalize_content_meta(
+			$content['_meta'] ?? null,
+			$this->mcp->get_error_handler(),
+			'Invalid _meta on prompt message content block, dropping it',
+			array( 'prompt_name' => $prompt_name )
+		);
+		if ( null === $block_meta ) {
+			unset( $content['_meta'] );
+		} else {
+			$content['_meta'] = $block_meta;
+		}
+
+		// EmbeddedResource takes its resource contents as given, so a nested block never
+		// reaches a DTO that could reject them. This is the only level that inspects them.
+		if ( 'resource' === ( $content['type'] ?? '' ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
+			$resource = $content['resource'];
+
+			$resource_meta = $this->normalize_content_meta(
+				$resource['_meta'] ?? null,
+				$this->mcp->get_error_handler(),
+				'Invalid _meta on prompt message resource contents, dropping it',
+				array( 'prompt_name' => $prompt_name )
+			);
+			if ( null === $resource_meta ) {
+				unset( $resource['_meta'] );
+			} else {
+				$resource['_meta'] = $resource_meta;
+			}
+			$content['resource'] = $resource;
+		}
+
+		return $content;
 	}
 
 	/**

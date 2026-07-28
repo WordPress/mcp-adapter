@@ -10,6 +10,7 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\Content\DTO\ImageContent;
 use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
@@ -367,5 +368,231 @@ final class ToolsHandlerCallTest extends TestCase {
 		// Missing arguments should default to empty array and succeed.
 		$this->assertInstanceOf( CallToolResult::class, $result );
 		$this->assertFalse( (bool) $result->getIsError() );
+	}
+
+	/**
+	 * Runs a tool whose raw result is replaced by the given embedded-resource shape.
+	 *
+	 * @param array $shape The embedded resource result to substitute.
+	 *
+	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	private function call_tool_returning( array $shape ) {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function () use ( $shape ) {
+			return $shape;
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		return $result;
+	}
+
+	public function test_embedded_resource_nested_shape_preserves_meta_on_both_levels(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'_meta'       => array( 'block' => 'level' ),
+				'resource'    => array(
+					'uri'      => 'ui://example/app',
+					'mimeType' => 'text/html;profile=mcp-app',
+					'text'     => '<!doctype html>',
+					'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		// The outer `_meta` belongs to the content block.
+		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
+
+		// The nested _meta belongs to the resource contents.
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( TextResourceContents::class, $resource );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $resource->get_meta() );
+	}
+
+	public function test_embedded_resource_nested_blob_shape_preserves_meta_on_both_levels(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'_meta'    => array( 'block' => 'level' ),
+				'resource' => array(
+					'uri'      => 'WordPress://local/tool-embedded-blob',
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+					'_meta'    => array( 'pages' => 3 ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
+
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( BlobResourceContents::class, $resource );
+		$this->assertSame( array( 'pages' => 3 ), $resource->get_meta() );
+	}
+
+	public function test_embedded_resource_flat_shape_assigns_meta_to_the_resource_contents(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'uri'      => 'ui://example/app',
+				'mimeType' => 'text/html;profile=mcp-app',
+				'text'     => '<!doctype html>',
+				'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		// Strip `type` and the flat shape is a ResourceContents literal, so its `_meta`
+		// describes the resource. The block carries none; the nested form is how a caller
+		// addresses the block level.
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
+	}
+
+	public function test_embedded_resource_flat_blob_shape_assigns_meta_to_the_resource_contents(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'uri'      => 'WordPress://local/tool-embedded-blob',
+				'mimeType' => 'application/pdf',
+				'blob'     => 'ZGF0YQ==',
+				'_meta'    => array( 'pages' => 3 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertSame( array( 'pages' => 3 ), $content[0]->getResource()->get_meta() );
+	}
+
+	public function test_embedded_resource_without_meta_leaves_both_levels_null(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type' => 'resource',
+				'uri'  => 'WordPress://local/tool-embedded-text',
+				'text' => 'body',
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertNull( $content[0]->getResource()->get_meta() );
+	}
+
+	/**
+	 * A conforming client strips metadata it does not recognize, so a `_meta` that could
+	 * not be emitted is reported nowhere else. Both levels of an embedded resource log
+	 * separately, because they name different objects.
+	 */
+	public function test_embedded_resource_with_list_meta_logs_the_drop_at_each_level(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'_meta'    => array( 'a', 'b' ),
+				'resource' => array(
+					'uri'   => 'WordPress://local/tool-embedded-text',
+					'text'  => 'body',
+					'_meta' => array( 'c', 'd' ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
+		$this->assertContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
+
+	public function test_embedded_resource_without_meta_does_not_log(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type' => 'resource',
+				'uri'  => 'WordPress://local/tool-embedded-text',
+				'text' => 'body',
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on tool result content block, dropping it', $messages );
+		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
+
+	public function test_image_result_carries_meta(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'image',
+				'results'  => 'binary',
+				'mimeType' => 'image/png',
+				'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $block['_meta'] );
+	}
+
+	/**
+	 * MCP declares `_meta` an object, so a list is omitted rather than emitted as a JSON
+	 * array, which a conforming client rejects along with the block carrying it.
+	 */
+	public function test_image_result_with_list_meta_omits_meta_and_logs(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'image',
+				'results'  => 'binary',
+				'mimeType' => 'image/png',
+				'_meta'    => array( 'a', 'b' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$block = $result->getContent()[0]->toArray();
+		$this->assertArrayNotHasKey( '_meta', $block );
+		$this->assertNotEmpty( $block['data'] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
 	}
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Resources\ResourcesHandler;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
@@ -326,5 +327,303 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertStringContainsString( 'Failed to read resource', $result->getError()->getMessage() );
 
 		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+	}
+
+	public function test_read_resource_preserves_meta_on_text_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'      => 'ui://example/app',
+					'mimeType' => 'text/html;profile=mcp-app',
+					'text'     => '<!doctype html>',
+					'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $contents[0]->get_meta() );
+	}
+
+	public function test_read_resource_preserves_meta_on_blob_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'      => 'WordPress://local/resource-1',
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+					'_meta'    => array( 'pages' => 3 ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertSame( array( 'pages' => 3 ), $contents[0]->get_meta() );
+	}
+
+	public function test_read_resource_with_non_array_meta_still_returns_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'   => 'WordPress://local/resource-1',
+					'text'  => 'body',
+					'_meta' => 'not-an-object',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		// A malformed _meta is dropped, not raised: the resource body still reaches the client.
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( 'body', $contents[0]->getText() );
+		$this->assertNull( $contents[0]->get_meta() );
+	}
+
+	public function test_read_resource_with_list_meta_omits_it_from_the_wire(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'   => 'WordPress://local/resource-1',
+					'text'  => 'body',
+					'_meta' => array( 'a', 'b' ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertNull( $contents[0]->get_meta() );
+
+		// MCP declares _meta as a JSON object; a list would serialize as `"_meta": ["a","b"]`.
+		$this->assertArrayNotHasKey( '_meta', $contents[0]->toArray() );
+	}
+
+	public function test_read_resource_without_meta_leaves_contents_meta_null(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertNull( $contents[0]->get_meta() );
+	}
+
+	/**
+	 * A client strips metadata it does not recognize, so nothing downstream reports a
+	 * `_meta` that could not be emitted. The log is the only place it surfaces.
+	 */
+	public function test_read_resource_with_list_meta_logs_the_drop(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'   => 'WordPress://local/resource-1',
+					'text'  => 'body',
+					'_meta' => array( 'a', 'b' ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on resource contents, dropping it', $messages );
+	}
+
+	/**
+	 * An absent `_meta` is the ordinary case and must stay quiet, or the log fills with
+	 * noise from every resource that never asked for metadata.
+	 */
+	public function test_read_resource_without_meta_does_not_log(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'  => 'WordPress://local/resource-1',
+					'text' => 'body',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on resource contents, dropping it', $messages );
+	}
+
+	/**
+	 * `blob` alone is enough to describe resource contents: the URI falls back to the
+	 * resource's own, and binary contents carry no `text`.
+	 */
+	public function test_read_resource_with_blob_only_item_returns_blob_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertSame( 'ZGF0YQ==', $contents[0]->getBlob() );
+		$this->assertSame( 'application/pdf', $contents[0]->getMimeType() );
+		$this->assertSame( 'WordPress://local/resource-1', $contents[0]->getUri() );
+	}
+
+	public function test_read_resource_with_blob_only_item_preserves_meta(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+					'_meta'    => array( 'pages' => 3 ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertSame( array( 'pages' => 3 ), $contents[0]->get_meta() );
+	}
+
+	/**
+	 * Only the first item is inspected to decide whether the return is a list of content
+	 * items, so a first item the check does not recognize costs every sibling as well.
+	 */
+	public function test_read_resource_with_blob_only_first_item_keeps_its_siblings(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+				),
+				array(
+					'uri'  => 'WordPress://local/resource-2',
+					'text' => 'sibling',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertCount( 2, $contents );
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[1] );
+		$this->assertSame( 'sibling', $contents[1]->getText() );
 	}
 }

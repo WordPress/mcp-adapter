@@ -62,6 +62,74 @@ final class McpToolTest extends TestCase {
 		wp_unregister_ability( 'test/mcptool-from-ability' );
 	}
 
+	public function test_fromAbility_with_list_shaped_meta_omits_meta(): void {
+		$this->register_ability_in_hook(
+			'test/mcptool-list-meta',
+			array(
+				'label'               => 'McpTool List Meta',
+				'description'         => 'Test MCP tool',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'ok' => true );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'_meta' => array( 'first', 'second' ),
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/mcptool-list-meta' );
+		$this->assertNotNull( $ability );
+
+		$mcp_tool = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_tool );
+
+		$data = $mcp_tool->get_protocol_dto()->toArray();
+
+		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
+		$this->assertArrayNotHasKey( '_meta', $data );
+
+		wp_unregister_ability( 'test/mcptool-list-meta' );
+	}
+
+	public function test_fromArray_with_list_shaped_meta_omits_meta(): void {
+		$mcp_tool = McpTool::fromArray(
+			array(
+				'name'    => 'list-meta-tool',
+				'meta'    => array( 'first', 'second' ),
+				'handler' => static fn() => 'ok',
+			)
+		);
+		$this->assertNotWPError( $mcp_tool );
+
+		$data = $mcp_tool->get_protocol_dto()->toArray();
+
+		$this->assertArrayNotHasKey( '_meta', $data );
+	}
+
+	public function test_fromArray_with_numeric_string_keyed_meta_keeps_meta(): void {
+		$mcp_tool = McpTool::fromArray(
+			array(
+				'name'    => 'numeric-key-meta-tool',
+				'meta'    => array( 1 => 'value' ),
+				'handler' => static fn() => 'ok',
+			)
+		);
+		$this->assertNotWPError( $mcp_tool );
+
+		$data = $mcp_tool->get_protocol_dto()->toArray();
+
+		// Not a list, so it still serializes as the JSON object {"1":"value"}.
+		$this->assertArrayHasKey( '_meta', $data );
+		$this->assertSame( 'value', $data['_meta'][1] );
+	}
+
 	public function test_execute_unwraps_input_and_wraps_output_when_transformed(): void {
 		$this->register_ability_in_hook(
 			'test/mcptool-flat-schemas',

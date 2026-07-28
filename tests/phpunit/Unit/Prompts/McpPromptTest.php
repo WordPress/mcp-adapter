@@ -166,6 +166,57 @@ final class McpPromptTest extends TestCase {
 		$this->assertSame( array( 'allowed' => true ), $arr['_meta']['mcp_adapter'] );
 	}
 
+	public function test_from_ability_with_list_shaped_meta_omits_meta(): void {
+		$this->register_ability_in_hook(
+			'test/prompt-list-meta',
+			array(
+				'label'               => 'Prompt List Meta',
+				'description'         => 'Test MCP prompt',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'messages' => array() );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'_meta' => array( 'first', 'second' ),
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/prompt-list-meta' );
+		$this->assertNotNull( $ability );
+
+		$mcp_prompt = McpPrompt::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_prompt );
+
+		$arr = $mcp_prompt->get_protocol_dto()->toArray();
+
+		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
+		$this->assertArrayNotHasKey( '_meta', $arr );
+
+		wp_unregister_ability( 'test/prompt-list-meta' );
+	}
+
+	public function test_fromArray_with_list_shaped_meta_omits_meta(): void {
+		$prompt = McpPrompt::fromArray(
+			array(
+				'name'    => 'list-meta-prompt',
+				'handler' => static fn( $args ) => array(),
+				'meta'    => array( 'first', 'second' ),
+			)
+		);
+
+		$arr = $prompt->get_protocol_dto()->toArray();
+
+		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
+		$this->assertArrayNotHasKey( '_meta', $arr );
+	}
+
 	public function test_fromArray_returns_WP_Error_without_name(): void {
 		$result = McpPrompt::fromArray(
 			array(

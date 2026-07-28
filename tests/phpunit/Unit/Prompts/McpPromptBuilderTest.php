@@ -87,6 +87,21 @@ class TestPromptWithMeta extends McpPromptBuilder {
 	}
 }
 
+// Test prompt whose _meta is a list, which cannot serialize as a JSON object
+class TestPromptWithListMeta extends McpPromptBuilder {
+
+	protected function configure(): void {
+		$this->name        = 'test-prompt-list-meta';
+		$this->title       = 'Test Prompt List Meta';
+		$this->description = 'A test prompt whose _meta is a list';
+		$this->set_meta( array( 'first', 'second' ) );
+	}
+
+	public function handle( array $arguments ): array {
+		return array( 'result' => 'success' );
+	}
+}
+
 // Test prompt with both icons and _meta
 class TestPromptWithIconsAndMeta extends McpPromptBuilder {
 
@@ -339,6 +354,16 @@ final class McpPromptBuilderTest extends TestCase {
 
 		$arr = $prompt->toArray();
 
+		$this->assertArrayNotHasKey( '_meta', $arr );
+	}
+
+	public function test_builder_with_list_shaped_meta_omits_meta(): void {
+		$builder = new TestPromptWithListMeta();
+		$prompt  = $builder->build();
+
+		$arr = $prompt->toArray();
+
+		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
 		$this->assertArrayNotHasKey( '_meta', $arr );
 	}
 

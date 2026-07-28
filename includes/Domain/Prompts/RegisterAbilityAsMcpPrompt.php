@@ -182,11 +182,8 @@ class RegisterAbilityAsMcpPrompt {
 		}
 
 		// Preserve user-provided _meta from ability.meta.mcp._meta.
-		$prompt_meta = array();
-		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$prompt_meta = $mcp_meta['_meta'];
-		}
-		if ( ! empty( $prompt_meta ) ) {
+		$prompt_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
+		if ( null !== $prompt_meta ) {
 			$data['_meta'] = $prompt_meta;
 		}
 

@@ -209,11 +209,8 @@ class RegisterAbilityAsMcpResource {
 		// Build Resource `_meta`:
 		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
 		// - Adapter metadata is NEVER included in protocol DTO meta; it is returned separately in adapter_meta.
-		$resource_meta = array();
-		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$resource_meta = $mcp_meta['_meta'];
-		}
-		if ( ! empty( $resource_meta ) ) {
+		$resource_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
+		if ( null !== $resource_meta ) {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
