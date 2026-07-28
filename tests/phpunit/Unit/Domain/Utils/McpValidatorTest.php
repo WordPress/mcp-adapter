@@ -984,7 +984,7 @@ final class McpValidatorTest extends TestCase {
 	}
 
 	/**
-	 * @dataProvider provide_non_object_meta
+	 * @dataProvider data_non_object_meta
 	 *
 	 * @param mixed $meta The value to normalize.
 	 */
@@ -995,7 +995,7 @@ final class McpValidatorTest extends TestCase {
 	/**
 	 * @return array<string, array{0: mixed}>
 	 */
-	public function provide_non_object_meta(): array {
+	public function data_non_object_meta(): array {
 		return array(
 			'null'          => array( null ),
 			'string'        => array( 'not-an-object' ),
