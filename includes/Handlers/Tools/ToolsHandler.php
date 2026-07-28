@@ -264,10 +264,13 @@ class ToolsHandler {
 					? McpValidator::normalize_meta( $resource_item['_meta'] ?? null )
 					: null;
 
-				$annotations = $this->build_annotations( $result['annotations'] ?? null, $tool_name );
-
 				// Only return an EmbeddedResource if we have a valid URI and some content.
 				if ( is_string( $uri ) && '' !== $uri ) {
+					// Built inside the guard: without a URI this result falls through to the
+					// generic JSON path, where annotations were never going to be attached,
+					// so warning that they were dropped would point at the wrong problem.
+					$annotations = $this->build_annotations( $result['annotations'] ?? null, $tool_name );
+
 					if ( isset( $resource_item['text'] ) && is_string( $resource_item['text'] ) ) {
 						return CallToolResult::fromArray(
 							array(
@@ -349,10 +352,18 @@ class ToolsHandler {
 	/**
 	 * Build an Annotations DTO from a tool result's `annotations` key.
 	 *
-	 * Malformed annotations are logged and dropped rather than raised. Annotations are
-	 * a rendering hint, and before they were read here a tool returning a malformed one
-	 * still got its result delivered; failing the whole call now would be a regression
-	 * for tools whose output is otherwise valid.
+	 * Tool results carry *content* annotations (`audience`, `priority`, `lastModified`),
+	 * not the ToolAnnotations vocabulary used on tool descriptors. Anything a conforming
+	 * client would reject is dropped here, because it is validated as part of the content
+	 * block that carries it, so a bad annotation costs the whole block rather than only
+	 * itself. Two shapes have to be kept off the wire: a value outside what the schema
+	 * allows, and an annotations object with nothing left in it, which PHP serializes as
+	 * a JSON array where MCP declares an object.
+	 *
+	 * Dropping is logged rather than raised. Annotations are a rendering hint, and before
+	 * they were read here a tool returning a malformed one still got its result delivered;
+	 * failing the whole call now would be a regression for tools whose output is otherwise
+	 * valid.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -370,8 +381,31 @@ class ToolsHandler {
 			return null;
 		}
 
+		// Tool output is untrusted, and a value the schema rejects costs the whole content
+		// block rather than just the annotation. Validate before building the DTO.
+		$errors = McpValidator::get_annotation_validation_errors( $annotations );
+		if ( ! empty( $errors ) ) {
+			$this->mcp->get_error_handler()->log(
+				'Invalid annotations in tool result, dropping them',
+				array(
+					'tool_name' => $tool_name,
+					'errors'    => $errors,
+				),
+				'warning'
+			);
+
+			return null;
+		}
+
+		// Validation above should leave nothing for fromArray() to reject, but it lives in a
+		// separately versioned package, so the guard stays.
 		try {
-			return Annotations::fromArray( $annotations );
+			$dto = Annotations::fromArray( $annotations );
+
+			// Vocabulary the content Annotations type does not model - most likely the tool
+			// hints, which belong on the descriptor - leaves an all-null DTO behind. That
+			// serializes to `[]`, so omit the field rather than emit a JSON array.
+			return array() === $dto->toArray() ? null : $dto;
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Invalid annotations in tool result, dropping them',
