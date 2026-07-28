@@ -518,12 +518,81 @@ class PromptsHandler {
 		$content = $this->validate_content_type( $content, $prompt_name );
 		$content = $this->normalize_content_block( $content, $prompt_name );
 
-		return PromptMessage::fromArray(
-			array(
-				'role'    => $role,
-				'content' => $content,
-			)
+		// normalize_content_block() covers the fields the DTOs are known to refuse, but it
+		// is not a whitelist - a valid type carrying any other malformed payload still
+		// throws here. Without this guard that throw reaches get_prompt()'s catch and the
+		// whole prompt is lost, including the messages that were fine. Degrading matches
+		// what this handler already does for an unknown type and an invalid role.
+		try {
+			return PromptMessage::fromArray(
+				array(
+					'role'    => $role,
+					'content' => $content,
+				)
+			);
+		} catch ( \Throwable $e ) {
+			$this->mcp->get_error_handler()->log(
+				'Prompt message content rejected by the schema, degrading to text',
+				array(
+					'prompt_name' => $prompt_name,
+					'exception'   => $e->getMessage(),
+				),
+				'warning'
+			);
+
+			return PromptMessage::fromArray(
+				array(
+					'role'    => $role,
+					'content' => $this->degrade_content_to_text( $content ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Represent a content block that cannot be rendered as a text block carrying its JSON.
+	 *
+	 * The same substitution validate_content_type() makes for an unrecognized type, so a
+	 * block the schema refuses costs its own fidelity rather than the whole prompt.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array $content The content block that could not be rendered.
+	 *
+	 * @return array{type: string, text: string} A text content block.
+	 */
+	private function degrade_content_to_text( array $content ): array {
+		$json = wp_json_encode( $content, JSON_PRETTY_PRINT );
+
+		return array(
+			'type' => 'text',
+			'text' => false === $json ? '{}' : $json,
 		);
+	}
+
+	/**
+	 * Whether a value is usable as the contents of an embedded resource.
+	 *
+	 * Mirrors what a conforming client accepts: a non-empty uri, plus either text or
+	 * blob. EmbeddedResource takes its contents as given, so nothing else checks this.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed $contents Embedded resource contents as the prompt returned them.
+	 *
+	 * @return bool
+	 */
+	private function is_valid_resource_contents( $contents ): bool {
+		if ( ! is_array( $contents ) ) {
+			return false;
+		}
+
+		if ( ! isset( $contents['uri'] ) || ! is_string( $contents['uri'] ) || '' === $contents['uri'] ) {
+			return false;
+		}
+
+		return ( isset( $contents['text'] ) && is_string( $contents['text'] ) )
+			|| ( isset( $contents['blob'] ) && is_string( $contents['blob'] ) );
 	}
 
 	/**
@@ -571,10 +640,23 @@ class PromptsHandler {
 		}
 
 		// EmbeddedResource takes its resource contents as given, so a nested block never
-		// reaches a DTO that could reject its `_meta`. This is the only level that
-		// normalizes it.
-		if ( isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
-			$resource      = $content['resource'];
+		// reaches a DTO that could reject them. This is the only level that inspects them,
+		// and the failure it catches is the quiet one: contents that are not valid
+		// ResourceContents do not throw, they reach the wire, and a conforming client
+		// rejects the message with nothing to tell the author why.
+		if ( 'resource' === ( $content['type'] ?? '' ) ) {
+			$resource = $content['resource'] ?? null;
+
+			if ( ! $this->is_valid_resource_contents( $resource ) ) {
+				$this->mcp->get_error_handler()->log(
+					'Invalid embedded resource contents in prompt message, degrading to text',
+					array( 'prompt_name' => $prompt_name ),
+					'warning'
+				);
+
+				return $this->degrade_content_to_text( $content );
+			}
+
 			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
 			if ( null === $resource_meta ) {
 				unset( $resource['_meta'] );
@@ -620,12 +702,14 @@ class PromptsHandler {
 				'warning'
 			);
 
-			$text = isset( $content['text'] ) ? (string) $content['text'] : wp_json_encode( $content, JSON_PRETTY_PRINT );
+			if ( isset( $content['text'] ) && is_scalar( $content['text'] ) ) {
+				return array(
+					'type' => 'text',
+					'text' => (string) $content['text'],
+				);
+			}
 
-			return array(
-				'type' => 'text',
-				'text' => false === $text ? '{}' : $text,
-			);
+			return $this->degrade_content_to_text( $content );
 		}
 
 		// Check if type is valid.
@@ -641,15 +725,7 @@ class PromptsHandler {
 			);
 
 			// Convert the entire content to a text representation.
-			$json_content = wp_json_encode( $content, JSON_PRETTY_PRINT );
-			if ( false === $json_content ) {
-				$json_content = '{}';
-			}
-
-			return array(
-				'type' => 'text',
-				'text' => $json_content,
-			);
+			return $this->degrade_content_to_text( $content );
 		}
 
 		// Type is valid, return content as-is (preserves annotations).

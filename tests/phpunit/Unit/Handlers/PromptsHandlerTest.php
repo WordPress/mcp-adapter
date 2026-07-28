@@ -1395,6 +1395,265 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertArrayHasKey( 'errors', $dropped[0]['context'] );
 	}
 
+	// =========================================================================
+	// Message-Level Degradation
+	//
+	// A content block the schema DTOs refuse used to throw, and get_prompt()'s
+	// catch turned that into an error response - so one unrenderable message
+	// cost every message in the prompt. The handler already degrades an unknown
+	// content type and an invalid role to a text representation; these pin the
+	// same rule for a valid type carrying a payload the DTO rejects.
+	// =========================================================================
+
+	public function test_message_with_non_string_text_degrades_only_that_message(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'text',
+							'text' => 'Summarise this post.',
+						),
+					),
+					array(
+						'role'    => 'assistant',
+						'content' => array(
+							'type' => 'text',
+							'text' => 123,
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertCount( 2, $result->getMessages() );
+
+		$this->assertSame( 'Summarise this post.', $this->first_content_block( $result )['text'] );
+
+		$degraded = $this->content_block_at( $result, 1 );
+		$this->assertSame( 'text', $degraded['type'] );
+		$this->assertStringContainsString( '123', $degraded['text'] );
+	}
+
+	public function test_message_with_image_missing_data_degrades_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'image',
+							'mimeType' => 'image/png',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertStringContainsString( '"type": "image"', $block['text'] );
+	}
+
+	public function test_message_with_malformed_icon_entry_degrades_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'  => 'resource_link',
+							'uri'   => 'WordPress://local/thing',
+							'name'  => 'thing',
+							'icons' => array( array( 'sizes' => '48x48' ) ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 'text', $this->first_content_block( $result )['type'] );
+	}
+
+	public function test_degraded_message_is_logged_with_the_prompt_name(): void {
+		DummyErrorHandler::reset();
+
+		$this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'text',
+							'text' => 123,
+						),
+					),
+				),
+			)
+		);
+
+		$degraded = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static function ( array $log ): bool {
+					return false !== strpos( $log['message'], 'rejected by the schema' );
+				}
+			)
+		);
+
+		$this->assertNotEmpty( $degraded );
+		$this->assertSame( 'warning', $degraded[0]['type'] );
+		$this->assertSame( 'test-prompt', $degraded[0]['context']['prompt_name'] );
+		$this->assertArrayHasKey( 'exception', $degraded[0]['context'] );
+	}
+
+	/**
+	 * EmbeddedResource takes its contents as given, so these never threw - they
+	 * reached the wire, where a conforming client rejects the whole message and
+	 * nothing tells the author. Opposite failure mode, same remedy.
+	 */
+	public function test_embedded_resource_contents_that_are_a_string_degrade_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => 'just-a-string',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertArrayNotHasKey( 'resource', $block );
+	}
+
+	public function test_embedded_resource_contents_without_a_uri_degrade_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array( 'text' => 'body' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 'text', $this->first_content_block( $result )['type'] );
+	}
+
+	public function test_embedded_resource_contents_without_text_or_blob_degrade_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array( 'uri' => 'WordPress://local/thing' ),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( 'text', $this->first_content_block( $result )['type'] );
+	}
+
+	/**
+	 * A block with no type falls back to its `text`, but only when that is something a
+	 * string cast can represent - an array would raise a conversion warning and emit the
+	 * literal "Array".
+	 */
+	public function test_missing_content_type_with_non_scalar_text_degrades_to_text(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array( 'text' => array( 'nested' ) ),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'text', $block['type'] );
+		$this->assertStringNotContainsString( 'Array', $block['text'] );
+		$this->assertStringContainsString( 'nested', $block['text'] );
+	}
+
+	public function test_resource_link_with_a_non_numeric_size_omits_size(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type' => 'resource_link',
+							'uri'  => 'WordPress://local/thing',
+							'name' => 'thing',
+							'size' => 'big',
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'resource_link', $block['type'] );
+		$this->assertArrayNotHasKey( 'size', $block );
+	}
+
+	/**
+	 * Over-degradation guard: a well-formed embedded resource must survive intact.
+	 */
+	public function test_valid_embedded_resource_is_not_degraded(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'resource' => array(
+								'uri'  => 'WordPress://local/thing',
+								'text' => 'body',
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertSame( 'resource', $block['type'] );
+		$this->assertSame( 'body', $block['resource']['text'] );
+	}
+
 	/**
 	 * Run a prompt whose result is replaced by $shape, so any result shape can be driven
 	 * through the handler's normalization without registering a new ability per case.
@@ -1438,6 +1697,18 @@ final class PromptsHandlerTest extends TestCase {
 	 * @return array
 	 */
 	private function first_content_block( GetPromptResult $result ): array {
-		return $result->getMessages()[0]->getContent()->toArray();
+		return $this->content_block_at( $result, 0 );
+	}
+
+	/**
+	 * The emitted array of the content block of the message at $index.
+	 *
+	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
+	 * @param int                                              $index  Message index.
+	 *
+	 * @return array
+	 */
+	private function content_block_at( GetPromptResult $result, int $index ): array {
+		return $result->getMessages()[ $index ]->getContent()->toArray();
 	}
 }
