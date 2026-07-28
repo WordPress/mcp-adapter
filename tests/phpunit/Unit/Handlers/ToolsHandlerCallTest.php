@@ -457,7 +457,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( array( 'pages' => 3 ), $resource->get_meta() );
 	}
 
-	public function test_embedded_resource_flat_shape_assigns_meta_to_content_block_only(): void {
+	public function test_embedded_resource_flat_shape_assigns_meta_to_the_resource_contents(): void {
 		$result = $this->call_tool_returning(
 			array(
 				'type'     => 'resource',
@@ -473,10 +473,57 @@ final class ToolsHandlerCallTest extends TestCase {
 		$content = $result->getContent();
 		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
 
-		// The flat shape has one level, so _meta lands on the block and is not duplicated
-		// onto the nested contents.
-		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->get_meta() );
-		$this->assertNull( $content[0]->getResource()->get_meta() );
+		// Strip `type` and the flat shape is a ResourceContents literal, so its `_meta`
+		// describes the resource. The block carries none; the nested form is how a caller
+		// addresses the block level.
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
+	}
+
+	public function test_embedded_resource_flat_blob_shape_assigns_meta_to_the_resource_contents(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'     => 'resource',
+				'uri'      => 'WordPress://local/tool-embedded-blob',
+				'mimeType' => 'application/pdf',
+				'blob'     => 'ZGF0YQ==',
+				'_meta'    => array( 'pages' => 3 ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertSame( array( 'pages' => 3 ), $content[0]->getResource()->get_meta() );
+	}
+
+	/**
+	 * `annotations` has no ResourceContents field to descend into, so it stays on the
+	 * block while `_meta` moves. Pins that only `_meta` follows the flat form's siblings.
+	 */
+	public function test_embedded_resource_flat_shape_keeps_annotations_on_the_content_block(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'        => 'resource',
+				'uri'         => 'ui://example/app',
+				'text'        => '<!doctype html>',
+				'annotations' => array( 'audience' => array( 'user' ) ),
+				'_meta'       => array( 'ui' => array( 'prefersBorder' => true ) ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+
+		$this->assertNotNull( $content[0]->getAnnotations() );
+		$this->assertSame( array( 'user' ), $content[0]->getAnnotations()->getAudience() );
+		$this->assertNull( $content[0]->get_meta() );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
 	}
 
 	public function test_embedded_resource_with_invalid_annotations_still_returns_result(): void {

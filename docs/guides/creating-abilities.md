@@ -694,21 +694,31 @@ The example above returns a plain array, which the adapter JSON-encodes into a s
 
 MCP declares `_meta` as a JSON object, so it must be a non-empty PHP associative array — a sequential array (including an empty one) would serialize as a JSON array. This holds wherever the adapter emits `_meta`: resource contents, content blocks, and the `_meta` a tool, resource or prompt declares under `mcp._meta`. A value that would not serialize as an object is dropped, and whatever it travelled with is still returned. Key names may carry an optional reverse-DNS prefix (`com.example/hint`); prefixes whose second label is `modelcontextprotocol` or `mcp` are reserved by the specification.
 
-Tools can return the same contents embedded in a `resource` content block. The nested form keeps the two `_meta` levels distinct — the outer one belongs to the content block, the inner one to the resource contents:
+Tools can return the same contents embedded in a `resource` content block. Two levels each carry their own `_meta`: the content block, and the resource contents nested inside it. The flat form is a content item with a `type` tag added, so its `_meta` describes the resource exactly as it does above:
 
 ```php
 return [
-    'type'     => 'resource',
-    '_meta'    => ['block' => 'level'],
-    'resource' => [
-        'uri'   => 'ui://my-plugin/app',
-        'text'  => '<!doctype html>...',
-        '_meta' => ['ui' => ['prefersBorder' => true]],
-    ],
+    'type'  => 'resource',
+    'uri'   => 'ui://my-plugin/app',
+    'text'  => '<!doctype html>...',
+    '_meta' => ['ui' => ['prefersBorder' => true]],  // resource contents
 ];
 ```
 
-The flat form (`['type' => 'resource', 'uri' => ..., 'text' => ..., '_meta' => ...]`) has only one level, so its `_meta` belongs to the content block.
+Write the nested form to address both levels. `annotations` describes the block in either form, because resource contents have no `annotations` field:
+
+```php
+return [
+    'type'        => 'resource',
+    'annotations' => ['audience' => ['user']],
+    '_meta'       => ['block' => 'level'],           // content block
+    'resource'    => [
+        'uri'   => 'ui://my-plugin/app',
+        'text'  => '<!doctype html>...',
+        '_meta' => ['ui' => ['prefersBorder' => true]],  // resource contents
+    ],
+];
+```
 
 ## Creating Prompts
 

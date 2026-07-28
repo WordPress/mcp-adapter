@@ -241,15 +241,17 @@ class ToolsHandler {
 			// - Nested `{ type, resource: { uri, text, _meta }, annotations, _meta }` maps
 			//   one-to-one onto the DTO tree, so the outer keys belong to the content block
 			//   and the inner `_meta` to the resource contents.
-			// - Flat `{ type, uri, text, _meta }` is the content block itself, written with
-			//   its resource fields inlined. There is only one level for `_meta` to mean, so
-			//   it belongs to the block. Reading it into the contents as well would duplicate
-			//   the same metadata on both levels of the response.
+			// - Flat `{ type, uri, mimeType, text, _meta }` is a resource-contents literal
+			//   carrying a `type` tag: every key beside `type` and `annotations` is a
+			//   `ResourceContents` field, and `_meta` is declared there alongside them. Its
+			//   `_meta` therefore describes the resource, which is what the same literal
+			//   already means to `ResourcesHandler::create_content_dto()`. `annotations`
+			//   stays on the block because resource contents have no such field. A caller
+			//   who needs block-level `_meta` writes the nested form, which exists to
+			//   express that distinction.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
-				$resource_item = $result;
-				if ( isset( $result['resource'] ) && is_array( $result['resource'] ) ) {
-					$resource_item = $result['resource'];
-				}
+				$is_nested     = isset( $result['resource'] ) && is_array( $result['resource'] );
+				$resource_item = $is_nested ? $result['resource'] : $result;
 
 				$uri       = $resource_item['uri'] ?? null;
 				$mime_type = $resource_item['mimeType'] ?? null;
@@ -258,10 +260,8 @@ class ToolsHandler {
 					$uri = trim( $uri );
 				}
 
-				$block_meta    = McpValidator::normalize_meta( $result['_meta'] ?? null );
-				$resource_meta = $resource_item !== $result
-					? McpValidator::normalize_meta( $resource_item['_meta'] ?? null )
-					: null;
+				$block_meta    = $is_nested ? McpValidator::normalize_meta( $result['_meta'] ?? null ) : null;
+				$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 				// Only return an EmbeddedResource if we have a valid URI and some content.
 				if ( is_string( $uri ) && '' !== $uri ) {
