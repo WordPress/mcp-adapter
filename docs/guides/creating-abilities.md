@@ -747,6 +747,47 @@ What you write there is a request to the client, not a control the adapter appli
 
 MCP declares `_meta` as a JSON object, so it must be a non-empty PHP associative array — a sequential array (including an empty one) would serialize as a JSON array. This holds wherever the adapter emits `_meta`: resource contents, content blocks, and the `_meta` a tool, resource or prompt declares under `mcp._meta`. A value that would not serialize as an object is dropped, and whatever it travelled with is still returned. Key names may carry an optional reverse-DNS prefix (`com.example/hint`); prefixes whose second label is `modelcontextprotocol` or `mcp` are reserved by the specification.
 
+### Serving an Image or Binary File as a Resource
+
+Binary contents go in `blob` instead of `text`. **The adapter does not encode them for you** — write base64 yourself:
+
+```php
+wp_register_ability('my-plugin/site-logo', [
+    'label' => 'Site Logo',
+    'description' => 'The site logo as a PNG image',
+    'category' => 'site',
+    'execute_callback' => function() {
+        $path = get_attached_file(get_theme_mod('custom_logo'));
+
+        return [
+            [
+                'blob'     => base64_encode(file_get_contents($path)),
+                'mimeType' => 'image/png',
+            ],
+        ];
+    },
+    'permission_callback' => function() {
+        return current_user_can('read');
+    },
+    'meta' => [
+        'public' => true,
+        'mcp' => [
+            'type'     => 'resource',
+            'uri'      => 'wordpress://site/logo',
+            // Declared here, `resources/list` tells a client this is a PNG
+            // before it ever reads the resource.
+            'mimeType' => 'image/png',
+        ],
+    ],
+]);
+```
+
+An item that omits `uri` inherits the resource's own, so `blob` and `mimeType` are all a binary item needs. Return several items to serve several files from one resource.
+
+> **Watch the direction of encoding.** A resource's `blob` must arrive already base64-encoded, but a tool's image result takes **raw** bytes in `results` and the adapter encodes them — see [Returning an Image](#returning-an-image). Base64-encoding both, or neither, is the usual mistake.
+
+Only the **first** item is inspected to decide whether you returned content items or a single payload: it must carry `uri`, `text` or `blob`. If it does not, the whole list is JSON-encoded into one text block instead, siblings included.
+
 Embedding a resource in a tool result is a general content-block capability, not the route to an MCP App. An MCP App is predeclared: register the UI resource so it appears in `resources/list` under its `ui://` URI, then bind it from the tool descriptor with `mcp._meta.ui.resourceUri`. The host fetches the template itself over `resources/read` and renders it in a sandboxed frame, and the tool result carries only data. A tool result that embeds the UI resource instead is rendered as plain text.
 
 Tools can return the same contents embedded in a `resource` content block. Two levels each carry their own `_meta`: the content block, and the resource contents nested inside it. The flat form is a content item with a `type` tag added, so its `_meta` describes the resource exactly as it does above:
@@ -794,6 +835,119 @@ A tool returns an image by marking the result `type` as `image` and putting the 
 `mimeType` defaults to `image/png` when omitted. `annotations` and `_meta` describe the content block, exactly as in the `resource` form above.
 
 `results` is the only key the image branch reads. A result marked `type: 'image'` that carries the encoded bytes under `data` instead is returned as ordinary tool data — a JSON text block — and the adapter logs a warning naming the tool.
+
+## Building a Tool with a UI (MCP Apps)
+
+[MCP Apps](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp) lets a tool render an interactive HTML interface in the client instead of returning text the model reads aloud. It takes **two abilities**:
+
+1. a **resource** holding the HTML template, published under a `ui://` URI;
+2. a **tool** that points at that URI from its descriptor and returns only data.
+
+The host fetches the template itself over `resources/read`, renders it in a sandboxed iframe, and feeds it the tool's result. Keeping the two apart is deliberate: the host can prefetch and security-review the template before the tool ever runs.
+
+### Step 1: Register the UI resource
+
+```php
+wp_register_ability('my-plugin/sales-dashboard-ui', [
+    'label' => 'Sales Dashboard UI',
+    'description' => 'HTML template that renders the sales dashboard',
+    'category' => 'site',
+    'execute_callback' => function() {
+        return [
+            [
+                'uri'      => 'ui://my-plugin/sales-dashboard',
+                'mimeType' => 'text/html;profile=mcp-app',
+                'text'     => file_get_contents(
+                    plugin_dir_path(__FILE__) . 'ui/sales-dashboard.html'
+                ),
+                '_meta'    => [
+                    'ui' => [
+                        'prefersBorder' => true,
+                        'csp' => [
+                            'connectDomains'  => ['https://api.example.com'],
+                            'resourceDomains' => ['https://cdn.example.com'],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    },
+    'permission_callback' => function() {
+        return current_user_can('view_woocommerce_reports');
+    },
+    'meta' => [
+        'public' => true,
+        'mcp' => [
+            'type'     => 'resource',
+            'uri'      => 'ui://my-plugin/sales-dashboard',
+            'mimeType' => 'text/html;profile=mcp-app',
+        ],
+    ],
+]);
+```
+
+The `mimeType` carries an RFC 2045 parameter (`;profile=mcp-app`) and is emitted exactly as written, on both the `resources/list` descriptor and the contents.
+
+`_meta.ui` is how the template states its rendering needs. The specification defines four keys:
+
+| Key | Type | Purpose |
+|---|---|---|
+| `csp` | object | Domains the frame may reach: `connectDomains`, `resourceDomains`, `frameDomains`, `baseUriDomains` |
+| `permissions` | object | Browser capabilities to request — camera, microphone, geolocation, clipboardWrite |
+| `domain` | string | A dedicated sandbox origin for the frame |
+| `prefersBorder` | bool | Whether the host should draw a visual boundary |
+
+These are requests to the host, not controls the adapter enforces. It checks only that `_meta` serializes as a JSON object and forwards it verbatim — a client is free to ignore any key, and the CSP is applied by whatever renders the frame.
+
+### Step 2: Point a tool at it
+
+```php
+wp_register_ability('my-plugin/get-sales-summary', [
+    'label' => 'Get Sales Summary',
+    'description' => 'Sales totals for a date range, rendered as a dashboard',
+    'category' => 'site',
+    'input_schema' => [
+        'type' => 'object',
+        'properties' => [
+            'days' => ['type' => 'integer', 'default' => 30],
+        ],
+    ],
+    'execute_callback' => function($input) {
+        // Return plain data. The template renders it; do not embed HTML here.
+        return [
+            'total_revenue' => my_plugin_revenue_since($input['days'] ?? 30),
+            'order_count'   => my_plugin_order_count_since($input['days'] ?? 30),
+        ];
+    },
+    'permission_callback' => function() {
+        return current_user_can('view_woocommerce_reports');
+    },
+    'meta' => [
+        'public' => true,
+        'annotations' => [
+            'readonly' => true,
+        ],
+        'mcp' => [
+            '_meta' => [
+                'ui' => [
+                    'resourceUri' => 'ui://my-plugin/sales-dashboard',
+                    'visibility'  => ['model', 'app'],
+                ],
+            ],
+        ],
+    ],
+]);
+```
+
+`meta.mcp._meta` is passed through to the tool's descriptor in `tools/list` untouched, which is what makes the binding possible.
+
+`visibility` governs both who sees the tool and who may call it — `model` the language model, `app` the rendered UI. It defaults to `['model', 'app']`, so the example above states the default explicitly for clarity. The case worth reaching for is `['app']`: a host must leave such a tool out of the model's tool list entirely, which lets the dashboard call back for a refresh or a drill-down without those operations cluttering what the model sees.
+
+The same `meta.mcp._meta` passthrough exists on all three component types — tool, resource and prompt — for any metadata you need to reach a client. As everywhere else, a value that would not serialize as a JSON object is dropped.
+
+> **Do not embed the UI in the tool result.** Returning the `ui://` resource as a `resource` content block is a rejected alternative in the specification, not a shortcut — hosts render it as plain text. The tool result carries data; the template is fetched separately.
+
+MCP Apps is an optional extension a client negotiates. A client that does not support it still gets your tool and its data normally, so the tool must stand on its own without the UI.
 
 ## Creating Prompts
 
@@ -931,6 +1085,76 @@ wp_register_ability('my-plugin/analysis-prompt', [
     ]
 ]);
 ```
+
+### Messages Carrying Resources and Images
+
+A message's `content` is not limited to text. Five block types are accepted — `text`, `image`, `audio`, `resource` and `resource_link` — so a prompt can hand the model a file, a screenshot or a pointer alongside its instructions:
+
+```php
+'execute_callback' => function($input) {
+    $post = get_post($input['post_id']);
+
+    return [
+        'messages' => [
+            [
+                'role' => 'user',
+                'content' => [
+                    'type' => 'text',
+                    'text' => 'Review the post below against our style guide.',
+                ],
+            ],
+
+            // An embedded resource: the content travels with the message.
+            [
+                'role' => 'user',
+                'content' => [
+                    'type' => 'resource',
+                    'resource' => [
+                        'uri'      => 'wordpress://post/' . $post->ID,
+                        'mimeType' => 'text/markdown',
+                        'text'     => $post->post_content,
+                    ],
+                    'annotations' => ['audience' => ['assistant']],
+                ],
+            ],
+
+            // A resource link: a pointer the client fetches if it wants to.
+            [
+                'role' => 'user',
+                'content' => [
+                    'type'     => 'resource_link',
+                    'uri'      => 'wordpress://style-guide',
+                    'name'     => 'Editorial style guide',
+                    'mimeType' => 'text/markdown',
+                    'size'     => 4096,
+                ],
+            ],
+
+            // An image: base64 in `data`.
+            [
+                'role' => 'user',
+                'content' => [
+                    'type'     => 'image',
+                    'data'     => base64_encode(file_get_contents($screenshot)),
+                    'mimeType' => 'image/png',
+                ],
+            ],
+        ],
+    ];
+},
+```
+
+Three details decide whether these arrive intact:
+
+- **An embedded `resource` needs a non-empty `uri`, plus `text` or `blob`.** These are the same resource contents a resource ability returns, and they take `_meta` the same way. A block missing them is delivered as a text block holding the block's JSON, with a warning logged — the surrounding messages are unaffected, so one bad block never costs the whole prompt.
+- **`image` and `audio` blocks take base64 in `data`**, not raw bytes, and `mimeType` is required on both. This differs from a tool's image result, which takes raw bytes in `results`.
+- **`resource_link` carries a pointer, not content** — no `text` or `blob`. Both `uri` and `name` are required. Its `size` is the byte count of the target; a value that is not a positive number is dropped rather than emitted, so a count read from stored data as `"4096"` still works.
+
+Any block the schema refuses — a `resource_link` with no `name`, an `image` with no `mimeType` — is delivered as a text block carrying its JSON rather than failing the response, and the reason is logged.
+
+`annotations` and `_meta` sit on the block itself in every case, exactly as on a tool result.
+
+> `resource_link` and `audio` are prompt-message block types. A tool result only recognises `resource` and `image`; anything else it returns becomes ordinary tool data in a JSON text block.
 
 ### Prompt Annotations Summary
 
