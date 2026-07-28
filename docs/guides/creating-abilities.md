@@ -430,6 +430,28 @@ Tools support these MCP specification annotations:
 - `destructive` → `destructiveHint`
 - `idempotent` → `idempotentHint`
 
+### Tool Result Annotations
+
+The annotations above describe the tool itself and belong on its descriptor, in the ability's `meta.annotations`. A content block a tool *returns* is a different object, and it takes the content vocabulary — the same `audience`, `priority` and `lastModified` that Resources and Prompts use:
+
+```php
+'execute_callback' => function() {
+    return [
+        'type'        => 'resource',
+        'annotations' => [
+            'audience' => ['user'],  // who the block is for
+            'priority' => 0.8,       // 0.0 (lowest) to 1.0 (highest)
+        ],
+        'resource'   => [
+            'uri'  => 'wordpress://report/latest',
+            'text' => 'Report body',
+        ],
+    ];
+},
+```
+
+A tool hint written on a result is dropped: `readOnlyHint` and its siblings describe a tool, and a content block is not one. Values outside what MCP allows — a `priority` beyond 0.0–1.0, an `audience` role other than `user` or `assistant`, a `lastModified` that is not a valid timestamp — cause the annotations to be dropped as a group and logged, and the result is still returned.
+
 ### Resource & Prompt Annotations (Annotations)
 
 Resources and Prompts share the same annotation schema per MCP specification:
@@ -451,7 +473,7 @@ Resources and Prompts share the same annotation schema per MCP specification:
 
 ### Annotation Usage by Component Type
 
-- **Tools**: Use annotations to describe tool behavior and execution characteristics
+- **Tools**: Support two types of annotations — `meta.annotations` describes the tool's behavior and execution characteristics on its descriptor, while a returned content block takes content annotations
 - **Resources**: Use annotations for content metadata and access patterns  
 - **Prompts**: Support two types of annotations (template-level and message content-level)
 
