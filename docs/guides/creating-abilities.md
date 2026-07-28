@@ -714,6 +714,8 @@ The example above returns a plain array, which the adapter JSON-encodes into a s
 
 `_meta` travels with the resource but is not part of its body. MCP Apps UI resources use it for CSP config and rendering hints.
 
+What you write there is a request to the client, not a control the adapter applies. The adapter checks only that `_meta` can serialize as a JSON object and forwards it as written; it does not interpret the keys, and a client is free to ignore any of them. A CSP declared here is enforced by whatever renders the resource, so treat it as a hint to that renderer rather than as a boundary around your own content.
+
 MCP declares `_meta` as a JSON object, so it must be a non-empty PHP associative array — a sequential array (including an empty one) would serialize as a JSON array. This holds wherever the adapter emits `_meta`: resource contents, content blocks, and the `_meta` a tool, resource or prompt declares under `mcp._meta`. A value that would not serialize as an object is dropped, and whatever it travelled with is still returned. Key names may carry an optional reverse-DNS prefix (`com.example/hint`); prefixes whose second label is `modelcontextprotocol` or `mcp` are reserved by the specification.
 
 Tools can return the same contents embedded in a `resource` content block. Two levels each carry their own `_meta`: the content block, and the resource contents nested inside it. The flat form is a content item with a `type` tag added, so its `_meta` describes the resource exactly as it does above:
