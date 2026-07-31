@@ -167,11 +167,10 @@ class ToolsHandler {
 			}
 
 			/**
-			 * Filters tool arguments before execution, or short-circuits execution entirely.
+			 * Filters tool arguments before execution, or rejects execution.
 			 *
 			 * Return the (optionally modified) arguments array to proceed with execution,
-			 * a WP_Error to block execution and return an error to the client, or a
-			 * PreToolCallDecision to explicitly proceed, complete, or reject the call.
+			 * or return a WP_Error to block execution and return an error to the client.
 			 *
 			 * @since 0.5.0
 			 *
@@ -179,29 +178,75 @@ class ToolsHandler {
 			 * @param string                       $tool_name The tool name being called.
 			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
 			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
-			 * @return array|\WP_Error|\WP\MCP\Handlers\Tools\PreToolCallDecision
 			 */
 			$args = apply_filters( 'mcp_adapter_pre_tool_call', $args, $tool_name, $mcp_tool, $this->mcp );
 
-			if ( $args instanceof PreToolCallDecision ) {
-				if ( $args->should_complete() ) {
-					return $args->get_result();
-				}
-
-				if ( ! $args->should_proceed() ) {
-					return $this->create_error_result( $args->get_error()->get_error_message() );
-				}
-
-				$args = $args->get_args();
-			}
-
-			// Preserve the legacy WP_Error short-circuit behavior.
+			// Allow pre-filter to reject execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
 				return $this->create_error_result( $args->get_error_message() );
 			}
 
 			if ( ! is_array( $args ) ) {
-				return $this->create_error_result( __( 'Invalid pre-tool-call filter return value', 'mcp-adapter' ) );
+				return $this->create_error_result(
+					sprintf(
+						/* translators: %s: PHP type returned by the filter. */
+						__( 'Invalid mcp_adapter_pre_tool_call return value: expected an array or WP_Error, received %s.', 'mcp-adapter' ),
+						is_object( $args ) ? get_class( $args ) : gettype( $args )
+					)
+				);
+			}
+
+			/**
+			 * Filters callbacks that may complete a tool call successfully before execution.
+			 *
+			 * Each callback receives the final filtered arguments, tool name, tool instance,
+			 * and server. It must return null to continue to the next callback, or a
+			 * successful CallToolResult to complete the call. Callbacks run in array order;
+			 * the first result is returned immediately and the remaining callbacks and tool
+			 * executor are not invoked.
+			 *
+			 * @since 0.6.0
+			 *
+			 * @param array<callable>                  $callbacks Completion callbacks.
+			 * @param string                           $tool_name The tool name being called.
+			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 */
+			$completion_callbacks = apply_filters( 'mcp_adapter_pre_tool_call_completion_callbacks', array(), $tool_name, $mcp_tool, $this->mcp );
+
+			if ( ! is_array( $completion_callbacks ) ) {
+				return $this->create_error_result(
+					sprintf(
+						/* translators: %s: PHP type returned by the filter. */
+						__( 'Invalid mcp_adapter_pre_tool_call_completion_callbacks return value: expected an array, received %s.', 'mcp-adapter' ),
+						is_object( $completion_callbacks ) ? get_class( $completion_callbacks ) : gettype( $completion_callbacks )
+					)
+				);
+			}
+
+			foreach ( $completion_callbacks as $completion_callback ) {
+				if ( ! is_callable( $completion_callback ) ) {
+					return $this->create_error_result( __( 'Invalid pre-tool-call completion callback: expected a callable.', 'mcp-adapter' ) );
+				}
+
+				$completion = $completion_callback( $args, $tool_name, $mcp_tool, $this->mcp );
+				if ( $completion instanceof CallToolResult ) {
+					if ( $completion->getIsError() ) {
+						return $this->create_error_result( __( 'Invalid pre-tool-call completion result: expected isError to be false.', 'mcp-adapter' ) );
+					}
+
+					return $completion;
+				}
+
+				if ( null !== $completion ) {
+					return $this->create_error_result(
+						sprintf(
+							/* translators: %s: PHP type returned by the callback. */
+							__( 'Invalid pre-tool-call completion callback return value: expected null or CallToolResult, received %s.', 'mcp-adapter' ),
+							is_object( $completion ) ? get_class( $completion ) : gettype( $completion )
+						)
+					);
+				}
 			}
 
 			$result = $mcp_tool->execute( $args );

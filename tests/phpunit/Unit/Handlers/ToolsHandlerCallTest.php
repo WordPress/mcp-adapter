@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Handlers;
 
-use WP\MCP\Handlers\Tools\PreToolCallDecision;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
@@ -175,7 +174,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$handler = new ToolsHandler( $server );
 
 		$received_args = null;
-		$filter        = static function ( array $args ) use ( &$received_args ): array {
+		$filter        = static function ( array $args, string $tool_name ) use ( &$received_args ): array {
 			$received_args              = $args;
 			$args['injected_by_filter'] = true;
 
@@ -248,26 +247,6 @@ final class ToolsHandlerCallTest extends TestCase {
 		wp_unregister_ability( 'test/pre-tool-call-array' );
 	}
 
-	public function test_pre_tool_call_decision_proceeds_with_arguments_and_executes_once(): void {
-		$execution_count = 0;
-		$received_args   = array();
-		$this->register_counted_tool( 'test/pre-tool-call-proceed', $execution_count, $received_args );
-		$handler = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-proceed' ) ) );
-
-		$filter = static function (): PreToolCallDecision {
-			return PreToolCallDecision::proceed( array( 'decided' => true ) );
-		};
-		add_filter( 'mcp_adapter_pre_tool_call', $filter );
-
-		$handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-proceed' ) ) );
-
-		$this->assertSame( 1, $execution_count );
-		$this->assertSame( array( 'decided' => true ), $received_args );
-
-		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
-		wp_unregister_ability( 'test/pre-tool-call-proceed' );
-	}
-
 	public function test_pre_tool_call_filter_wp_error_prevents_execution(): void {
 		$execution_count = 0;
 		$received_args   = array();
@@ -289,28 +268,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		wp_unregister_ability( 'test/pre-tool-call-error' );
 	}
 
-	public function test_pre_tool_call_decision_rejects_without_execution(): void {
-		$execution_count = 0;
-		$received_args   = array();
-		$this->register_counted_tool( 'test/pre-tool-call-reject', $execution_count, $received_args );
-		$handler = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-reject' ) ) );
-
-		$filter = static function (): PreToolCallDecision {
-			return PreToolCallDecision::reject( new \WP_Error( 'rejected', 'Rejected by middleware' ) );
-		};
-		add_filter( 'mcp_adapter_pre_tool_call', $filter );
-
-		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-reject' ) ) );
-
-		$this->assertTrue( $result->getIsError() );
-		$this->assertSame( 0, $execution_count );
-		$this->assertStringContainsString( 'Rejected by middleware', $result->getContent()[0]->getText() );
-
-		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
-		wp_unregister_ability( 'test/pre-tool-call-reject' );
-	}
-
-	public function test_pre_tool_call_decision_completes_without_execution(): void {
+	public function test_pre_tool_call_completion_uses_filtered_arguments_without_execution(): void {
 		$execution_count = 0;
 		$received_args   = array();
 		$this->register_counted_tool( 'test/pre-tool-call-complete', $execution_count, $received_args );
@@ -327,10 +285,24 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$filter = static function () use ( $completed_result ): PreToolCallDecision {
-			return PreToolCallDecision::complete( $completed_result );
+		$argument_filter = static function ( array $args ): array {
+			$args['filtered'] = true;
+
+			return $args;
 		};
-		add_filter( 'mcp_adapter_pre_tool_call', $filter );
+		$completion_filter = static function ( array $callbacks ) use ( $completed_result ): array {
+			$callbacks[] = static function ( array $args ) use ( $completed_result ): CallToolResult {
+				if ( empty( $args['filtered'] ) ) {
+					throw new \RuntimeException( 'Completion callback did not receive filtered arguments.' );
+				}
+
+				return $completed_result;
+			};
+
+			return $callbacks;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call', $argument_filter );
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $completion_filter );
 
 		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-complete' ) ) );
 
@@ -338,8 +310,52 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertFalse( (bool) $result->getIsError() );
 		$this->assertSame( 0, $execution_count );
 
-		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+		remove_filter( 'mcp_adapter_pre_tool_call', $argument_filter );
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $completion_filter );
 		wp_unregister_ability( 'test/pre-tool-call-complete' );
+	}
+
+	public function test_pre_tool_call_completion_stops_remaining_callbacks(): void {
+		$execution_count     = 0;
+		$received_args       = array();
+		$second_callback_ran = false;
+		$this->register_counted_tool( 'test/pre-tool-call-terminal', $execution_count, $received_args );
+		$handler          = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-terminal' ) ) );
+		$completed_result = CallToolResult::fromArray(
+			array(
+				'content' => array( array( 'type' => 'text', 'text' => 'Context required' ) ),
+				'isError' => false,
+			)
+		);
+
+		$first_registration = static function ( array $callbacks ) use ( $completed_result ): array {
+			$callbacks[] = static function () use ( $completed_result ): CallToolResult {
+				return $completed_result;
+			};
+
+			return $callbacks;
+		};
+		$second_registration = static function ( array $callbacks ) use ( &$second_callback_ran ): array {
+			$callbacks[] = static function () use ( &$second_callback_ran ): ?CallToolResult {
+				$second_callback_ran = true;
+
+				return null;
+			};
+
+			return $callbacks;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $first_registration, 10 );
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $second_registration, 20 );
+
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-terminal' ) ) );
+
+		$this->assertSame( $completed_result, $result );
+		$this->assertFalse( $second_callback_ran );
+		$this->assertSame( 0, $execution_count );
+
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $first_registration, 10 );
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $second_registration, 20 );
+		wp_unregister_ability( 'test/pre-tool-call-terminal' );
 	}
 
 	public function test_permission_denial_prevents_pre_tool_call_completion(): void {
@@ -349,24 +365,12 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->register_counted_tool( 'test/pre-tool-call-denied', $execution_count, $received_args, false );
 		$handler = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-denied' ) ) );
 
-		$filter = static function () use ( &$middleware_ran ): PreToolCallDecision {
+		$filter = static function ( array $callbacks ) use ( &$middleware_ran ): array {
 			$middleware_ran = true;
 
-			return PreToolCallDecision::complete(
-				CallToolResult::fromArray(
-					array(
-						'content' => array(
-							array(
-								'type' => 'text',
-								'text' => 'Should not complete',
-							),
-						),
-						'isError' => false,
-					)
-				)
-			);
+			return $callbacks;
 		};
-		add_filter( 'mcp_adapter_pre_tool_call', $filter );
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
 
 		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-denied' ) ) );
 
@@ -374,7 +378,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertFalse( $middleware_ran );
 		$this->assertSame( 0, $execution_count );
 
-		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
 		wp_unregister_ability( 'test/pre-tool-call-denied' );
 	}
 
@@ -393,10 +397,35 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		$this->assertTrue( $result->getIsError() );
 		$this->assertSame( 0, $execution_count );
-		$this->assertStringContainsString( 'Invalid pre-tool-call filter return value', $result->getContent()[0]->getText() );
+		$this->assertStringContainsString( 'expected an array or WP_Error, received string', $result->getContent()[0]->getText() );
 
 		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
 		wp_unregister_ability( 'test/pre-tool-call-invalid' );
+	}
+
+	public function test_invalid_pre_tool_call_completion_callback_return_prevents_execution(): void {
+		$execution_count = 0;
+		$received_args   = array();
+		$this->register_counted_tool( 'test/pre-tool-call-invalid-completion', $execution_count, $received_args );
+		$handler = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-invalid-completion' ) ) );
+
+		$filter = static function ( array $callbacks ): array {
+			$callbacks[] = static function (): string {
+				return 'invalid';
+			};
+
+			return $callbacks;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-invalid-completion' ) ) );
+
+		$this->assertTrue( $result->getIsError() );
+		$this->assertSame( 0, $execution_count );
+		$this->assertStringContainsString( 'expected null or CallToolResult, received string', $result->getContent()[0]->getText() );
+
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+		wp_unregister_ability( 'test/pre-tool-call-invalid-completion' );
 	}
 
 	public function test_tool_call_result_filter_can_modify_result(): void {
