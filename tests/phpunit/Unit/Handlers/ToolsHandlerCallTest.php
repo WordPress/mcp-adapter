@@ -403,6 +403,81 @@ final class ToolsHandlerCallTest extends TestCase {
 		wp_unregister_ability( 'test/pre-tool-call-invalid' );
 	}
 
+	public function test_invalid_pre_tool_call_completion_callbacks_filter_return_prevents_execution(): void {
+		$execution_count = 0;
+		$received_args   = array();
+		$this->register_counted_tool( 'test/pre-tool-call-invalid-callbacks', $execution_count, $received_args );
+		$handler = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-invalid-callbacks' ) ) );
+
+		$filter = static function (): string {
+			return 'invalid';
+		};
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-invalid-callbacks' ) ) );
+
+		$this->assertTrue( $result->getIsError() );
+		$this->assertSame( 0, $execution_count );
+		$this->assertStringContainsString( 'expected an array, received string', $result->getContent()[0]->getText() );
+
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+		wp_unregister_ability( 'test/pre-tool-call-invalid-callbacks' );
+	}
+
+	public function test_non_callable_pre_tool_call_completion_callback_prevents_execution(): void {
+		$execution_count = 0;
+		$received_args   = array();
+		$this->register_counted_tool( 'test/pre-tool-call-non-callable-completion', $execution_count, $received_args );
+		$handler = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-non-callable-completion' ) ) );
+
+		$filter = static function ( array $callbacks ): array {
+			$callbacks[] = 'not-callable';
+
+			return $callbacks;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-non-callable-completion' ) ) );
+
+		$this->assertTrue( $result->getIsError() );
+		$this->assertSame( 0, $execution_count );
+		$this->assertStringContainsString( 'expected a callable', $result->getContent()[0]->getText() );
+
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+		wp_unregister_ability( 'test/pre-tool-call-non-callable-completion' );
+	}
+
+	public function test_error_pre_tool_call_completion_result_prevents_execution(): void {
+		$execution_count = 0;
+		$received_args   = array();
+		$this->register_counted_tool( 'test/pre-tool-call-error-completion', $execution_count, $received_args );
+		$handler      = new ToolsHandler( $this->makeServer( array( 'test/pre-tool-call-error-completion' ) ) );
+		$error_result = CallToolResult::fromArray(
+			array(
+				'content' => array( array( 'type' => 'text', 'text' => 'Invalid completion' ) ),
+				'isError' => true,
+			)
+		);
+
+		$filter = static function ( array $callbacks ) use ( $error_result ): array {
+			$callbacks[] = static function () use ( $error_result ): CallToolResult {
+				return $error_result;
+			};
+
+			return $callbacks;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-pre-tool-call-error-completion' ) ) );
+
+		$this->assertTrue( $result->getIsError() );
+		$this->assertSame( 0, $execution_count );
+		$this->assertStringContainsString( 'expected isError to be false', $result->getContent()[0]->getText() );
+
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $filter );
+		wp_unregister_ability( 'test/pre-tool-call-error-completion' );
+	}
+
 	public function test_invalid_pre_tool_call_completion_callback_return_prevents_execution(): void {
 		$execution_count = 0;
 		$received_args   = array();
