@@ -23,6 +23,7 @@ use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 use WP_REST_Request;
 
 /**
@@ -33,6 +34,8 @@ final class RequestRouterTest extends TestCase {
 	private RequestRouter $router;
 	private McpTransportContext $context;
 	private int $test_user_id;
+	private int $context_tool_execution_count = 0;
+	private array $context_tool_received_args = array();
 
 	public function set_up(): void {
 		parent::set_up();
@@ -40,6 +43,28 @@ final class RequestRouterTest extends TestCase {
 		// Create a test user
 		$this->test_user_id = wp_create_user( 'router_test_user', 'test_password', 'router_test@example.com' );
 		wp_set_current_user( $this->test_user_id );
+
+		$this->register_ability_in_hook(
+			'test/context-required',
+			array(
+				'label'               => 'Context Required Tool',
+				'description'         => 'Executes after required context has been delivered',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => function ( array $args ): array {
+					++$this->context_tool_execution_count;
+					$this->context_tool_received_args = $args;
+
+					return array( 'executed' => true );
+				},
+				'permission_callback' => static function (): bool {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array( 'public' => true ),
+				),
+			)
+		);
 
 		// Create MCP server
 		$server = new McpServer(
@@ -52,7 +77,7 @@ final class RequestRouterTest extends TestCase {
 			array(),
 			DummyErrorHandler::class,
 			DummyObservabilityHandler::class,
-			array( 'test/always-allowed', 'test/meta-leak', 'test/permission-denied' ),
+			array( 'test/always-allowed', 'test/meta-leak', 'test/permission-denied', 'test/context-required' ),
 			array( 'test/resource' ),
 			array( 'test/prompt' )
 		);
@@ -68,6 +93,7 @@ final class RequestRouterTest extends TestCase {
 			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions' );
 			wp_delete_user( $this->test_user_id );
 		}
+		wp_unregister_ability( 'test/context-required' );
 
 		parent::tear_down();
 	}
@@ -158,6 +184,67 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		// Should either have content or error
 		$this->assertTrue( isset( $result['content'] ) || isset( $result['error'] ) );
+	}
+
+	public function test_route_request_context_required_then_retry_executes_once(): void {
+		$receipt            = 'context-receipt-123';
+		$completion_result  = CallToolResult::fromArray(
+			array(
+				'content'           => array( array( 'type' => 'text', 'text' => 'Review the supplied content guidelines, then retry with the receipt.' ) ),
+				'structuredContent' => array(
+					'status'  => 'context_required',
+					'context' => array( 'guideline' => 'Use concise headings.' ),
+					'receipt' => $receipt,
+				),
+				'isError'           => false,
+			)
+		);
+		$completion_filter = static function ( array $callbacks ) use ( $receipt, $completion_result ): array {
+			$callbacks[] = static function ( array $args, string $tool_name ) use ( $receipt, $completion_result ): ?CallToolResult {
+				if ( 'test-context-required' !== $tool_name ) {
+					return null;
+				}
+
+				return ( $args['context_receipt'] ?? null ) === $receipt ? null : $completion_result;
+			};
+
+			return $callbacks;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $completion_filter );
+
+		$first_result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-context-required',
+				'arguments' => array( 'title' => 'First attempt' ),
+			),
+			1
+		);
+
+		$this->assertFalse( $first_result['isError'] );
+		$this->assertSame( 'context_required', $first_result['structuredContent']['status'] );
+		$this->assertSame( $receipt, $first_result['structuredContent']['receipt'] );
+		$this->assertSame( 0, $this->context_tool_execution_count );
+
+		$second_args = array(
+			'title'           => 'Revised after context',
+			'context_receipt' => $receipt,
+		);
+		$second_result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-context-required',
+				'arguments' => $second_args,
+			),
+			2
+		);
+
+		$this->assertFalse( $second_result['isError'] );
+		$this->assertSame( array( 'executed' => true ), $second_result['structuredContent'] );
+		$this->assertSame( 1, $this->context_tool_execution_count );
+		$this->assertSame( $second_args, $this->context_tool_received_args );
+
+		remove_filter( 'mcp_adapter_pre_tool_call_completion_callbacks', $completion_filter );
 	}
 
 	public function test_route_request_tools_call_preserves_meta_in_text_content(): void {
