@@ -35,7 +35,7 @@ final class HttpSessionValidatorTest extends TestCase {
 	public function tear_down(): void {
 		// Clean up all sessions for test user
 		if ( $this->test_user_id ) {
-			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions' );
+			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id() );
 			wp_delete_user( $this->test_user_id );
 		}
 

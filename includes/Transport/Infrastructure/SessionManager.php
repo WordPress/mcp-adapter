@@ -27,11 +27,26 @@ use WP_Error;
 final class SessionManager {
 
 	/**
-	 * User meta key for storing sessions
+	 * Base user meta key for storing sessions.
+	 *
+	 * The stored key is blog-scoped via {@see session_meta_key()} because
+	 * user meta is network-global on multisite. Without a blog suffix, two
+	 * site-local MCP connectors for the same user share one session map.
 	 *
 	 * @var string
 	 */
 	private const SESSION_META_KEY = 'mcp_adapter_sessions';
+
+	/**
+	 * User meta key for the current blog's session map.
+	 *
+	 * @since n.e.x.t
+	 */
+	private static function session_meta_key(): string {
+		$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0;
+
+		return self::SESSION_META_KEY . '_' . $blog_id;
+	}
 
 	/**
 	 * Maximum sessions per user.
@@ -147,7 +162,7 @@ final class SessionManager {
 				return true;
 			}
 
-			$updated = update_user_meta( $user_id, self::SESSION_META_KEY, $updated_sessions, $previous_sessions );
+			$updated = update_user_meta( $user_id, self::session_meta_key(), $updated_sessions, $previous_sessions );
 			if ( false !== $updated ) {
 				return true;
 			}
@@ -217,7 +232,7 @@ final class SessionManager {
 			return array();
 		}
 
-		$sessions = get_user_meta( $user_id, self::SESSION_META_KEY, true );
+		$sessions = get_user_meta( $user_id, self::session_meta_key(), true );
 
 		if ( ! is_array( $sessions ) ) {
 			return array();

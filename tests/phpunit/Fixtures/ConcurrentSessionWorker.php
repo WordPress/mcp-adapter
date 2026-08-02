@@ -20,7 +20,7 @@ try {
 	add_filter(
 		'update_user_metadata',
 		static function ( $check, $object_id, $meta_key ) use ( $wp_mcp_test_barrier_dir, $wp_mcp_test_user_id, $wp_mcp_test_worker_id ) {
-			if ( $wp_mcp_test_user_id !== $object_id || 'mcp_adapter_sessions' !== $meta_key ) {
+			if ( $wp_mcp_test_user_id !== $object_id || 'mcp_adapter_sessions_' . get_current_blog_id() !== $meta_key ) {
 				return $check;
 			}
 

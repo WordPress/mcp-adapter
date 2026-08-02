@@ -66,7 +66,7 @@ final class RequestRouterTest extends TestCase {
 	public function tear_down(): void {
 		// Clean up test user
 		if ( $this->test_user_id ) {
-			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions' );
+			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id() );
 			wp_delete_user( $this->test_user_id );
 		}
 
@@ -144,7 +144,7 @@ final class RequestRouterTest extends TestCase {
 	public function test_route_request_logs_exhausted_session_update_retries(): void {
 		$attempts              = 0;
 		$block_session_updates = static function ( $check, $object_id, $meta_key ) use ( &$attempts ) {
-			if ( 'mcp_adapter_sessions' !== $meta_key ) {
+			if ( 'mcp_adapter_sessions_' . get_current_blog_id() !== $meta_key ) {
 				return $check;
 			}
 

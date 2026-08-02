@@ -49,7 +49,7 @@ final class McpSessionManagerTest extends TestCase {
 	public function tear_down(): void {
 		// Clean up all sessions for test user
 		if ( $this->test_user_id ) {
-			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions' );
+			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id() );
 			wp_delete_user( $this->test_user_id );
 		}
 
@@ -75,6 +75,19 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertCount( 1, $sessions );
 		$this->assertArrayHasKey( $session_id, $sessions );
 		$this->assertSame( $client_info, $sessions[ $session_id ]['client_params'] );
+	}
+
+	/**
+	 * Sessions must live under a blog-scoped meta key (user meta is network-global).
+	 */
+	public function test_create_session_uses_blog_scoped_meta_key(): void {
+		$session_id = SessionManager::create_session( $this->test_user_id, array() );
+		$this->assertIsString( $session_id );
+
+		$blog_key = 'mcp_adapter_sessions_' . get_current_blog_id();
+		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, $blog_key ) );
+		$this->assertFalse( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
+		$this->assertArrayHasKey( $session_id, get_user_meta( $this->test_user_id, $blog_key, true ) );
 	}
 
 	/**
@@ -157,8 +170,8 @@ final class McpSessionManagerTest extends TestCase {
 		// Verify session is gone
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertCount( 0, $sessions );
-		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
-		$this->assertSame( array(), get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', true ) );
+		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id() ) );
+		$this->assertSame( array(), get_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), true ) );
 	}
 
 	/**
@@ -221,7 +234,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Manually modify one session to be expired
 		$sessions                                   = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $session_id_1 ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 ); // Over 24 hours ago
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), $sessions );
 
 		// Run cleanup
 		$removed = SessionManager::cleanup_expired_sessions( $this->test_user_id );
@@ -274,7 +287,7 @@ final class McpSessionManagerTest extends TestCase {
 		$sessions                                 = \WP\MCP\Transport\Infrastructure\SessionManager::get_all_user_sessions( $this->test_user_id );
 		$old_timestamp                            = time() - 61;
 		$sessions[ $session_id ]['last_activity'] = $old_timestamp;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), $sessions );
 
 		// Validate session (should update last_activity)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
@@ -319,7 +332,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Manually expire the session by backdating its last_activity
 		$sessions                                    = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $short_session ]['last_activity'] = time() - 3;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), $sessions );
 
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $short_session );
 		$this->assertFalse( $is_valid ); // Should be expired
@@ -360,7 +373,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Backdate one session to make it expired
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $expired_session_id ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 );
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), $sessions );
 
 		// Validate the valid session
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $valid_session_id );
@@ -389,7 +402,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Backdate last_activity by 16s (more than half of 30s timeout = clamped interval of 15s)
 		$sessions                                 = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $session_id ]['last_activity'] = time() - 16;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), $sessions );
 
 		// Validate — should succeed AND update last_activity because 16s > clamped interval (15s)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
