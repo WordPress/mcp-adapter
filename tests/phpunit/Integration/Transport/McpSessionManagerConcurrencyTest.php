@@ -147,7 +147,7 @@ final class McpSessionManagerConcurrencyTest extends TestCase {
 			foreach ( $session_ids as $session_id ) {
 				$this->assertArrayHasKey( $session_id, $sessions );
 			}
-			$this->assertCount( 1, get_user_meta( $this->test_user_id, 'mcp_adapter_sessions_' . get_current_blog_id(), false ) );
+			$this->assertCount( 1, get_user_meta( $this->test_user_id, self::session_meta_key(), false ) );
 		} finally {
 			if ( ! file_exists( $barrier_dir . '/go' ) ) {
 				// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Releases test-owned worker processes during cleanup.

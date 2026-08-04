@@ -29,30 +29,36 @@ final class SessionManager {
 	/**
 	 * Base user meta key for storing sessions.
 	 *
-	 * The stored key is blog-scoped via {@see session_meta_key()} because
-	 * user meta is network-global on multisite. Without a blog suffix, two
-	 * site-local MCP connectors for the same user share one session map.
+	 * On multisite the stored key is blog-scoped via {@see session_meta_key()}
+	 * because user meta is network-global. Without a blog suffix, two site-local
+	 * MCP connectors for the same user share one session map. Single-site keeps
+	 * the unsuffixed legacy key for upgrade compatibility.
 	 *
 	 * @var string
 	 */
 	private const SESSION_META_KEY = 'mcp_adapter_sessions';
 
 	/**
-	 * User meta key for the current blog's session map.
+	 * User meta key for the current site's session map.
 	 *
-	 * On multisite, user meta is network-global, so the key is suffixed with the
-	 * current blog ID. When no positive blog ID is available yet, fall back to the
-	 * unsuffixed legacy key so reads/writes do not land under an orphaned
-	 * `mcp_adapter_sessions_0` row (see session_meta_key_for_blog()).
+	 * Single-site keeps the unsuffixed legacy key so in-flight sessions survive
+	 * upgrade. On multisite, user meta is network-global, so the key is suffixed
+	 * with the current blog ID. When no positive blog ID is available yet, fall
+	 * back to the unsuffixed legacy key so reads/writes do not land under an
+	 * orphaned `mcp_adapter_sessions_0` row (see session_meta_key_for_blog()).
 	 *
 	 * @since n.e.x.t
 	 */
 	private static function session_meta_key(): string {
+		if ( ! is_multisite() ) {
+			return self::SESSION_META_KEY;
+		}
+
 		return self::session_meta_key_for_blog( (int) get_current_blog_id() );
 	}
 
 	/**
-	 * Resolve the session meta key for a blog ID.
+	 * Resolve the session meta key for a blog ID (multisite).
 	 *
 	 * @since n.e.x.t
 	 *
@@ -67,7 +73,7 @@ final class SessionManager {
 	}
 
 	/**
-	 * Maximum sessions per user.
+	 * Maximum sessions per user on the current site.
 	 *
 	 * @var int
 	 */
@@ -239,7 +245,7 @@ final class SessionManager {
 	}
 
 	/**
-	 * Get all sessions for a user
+	 * Get all sessions for a user on the current site.
 	 *
 	 * @param int $user_id The user ID.
 	 *
@@ -266,14 +272,14 @@ final class SessionManager {
 	 */
 	private static function get_config(): array {
 		/**
-		 * Filters the maximum number of MCP sessions allowed per user.
+		 * Filters the maximum number of MCP sessions allowed per user on the current site.
 		 *
-		 * When a user exceeds this limit, the oldest inactive session is
-		 * automatically removed to make room for new sessions.
+		 * When a user exceeds this limit on the current site, the oldest inactive
+		 * session is automatically removed to make room for new sessions.
 		 *
 		 * @since 0.3.0
 		 *
-		 * @param int $max_sessions Maximum sessions per user. Default 32.
+		 * @param int $max_sessions Maximum sessions per user on the current site. Default 32.
 		 */
 		$max_sessions = (int) apply_filters( 'mcp_adapter_session_max_per_user', self::DEFAULT_MAX_SESSIONS );
 
