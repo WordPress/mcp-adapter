@@ -84,10 +84,26 @@ final class McpSessionManagerTest extends TestCase {
 		$session_id = SessionManager::create_session( $this->test_user_id, array() );
 		$this->assertIsString( $session_id );
 
-		$blog_key = 'mcp_adapter_sessions_' . get_current_blog_id();
+		$blog_id = (int) get_current_blog_id();
+		$this->assertGreaterThanOrEqual( 1, $blog_id );
+
+		$blog_key = 'mcp_adapter_sessions_' . $blog_id;
 		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, $blog_key ) );
 		$this->assertFalse( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
 		$this->assertArrayHasKey( $session_id, get_user_meta( $this->test_user_id, $blog_key, true ) );
+	}
+
+	/**
+	 * When no positive blog ID is available, use the unsuffixed legacy key (not *_0).
+	 */
+	public function test_session_meta_key_falls_back_to_unsuffixed_when_blog_id_invalid(): void {
+		$method = new \ReflectionMethod( SessionManager::class, 'session_meta_key_for_blog' );
+		$method->setAccessible( true );
+
+		$this->assertSame( 'mcp_adapter_sessions', $method->invoke( null, 0 ) );
+		$this->assertSame( 'mcp_adapter_sessions', $method->invoke( null, -1 ) );
+		$this->assertSame( 'mcp_adapter_sessions_1', $method->invoke( null, 1 ) );
+		$this->assertSame( 'mcp_adapter_sessions_2', $method->invoke( null, 2 ) );
 	}
 
 	/**

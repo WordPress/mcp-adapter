@@ -40,10 +40,30 @@ final class SessionManager {
 	/**
 	 * User meta key for the current blog's session map.
 	 *
+	 * On multisite, user meta is network-global, so the key is suffixed with the
+	 * current blog ID. When no positive blog ID is available yet (or outside a
+	 * normal request), fall back to the unsuffixed legacy key so reads/writes
+	 * do not land under an orphaned `mcp_adapter_sessions_0` row.
+	 *
 	 * @since n.e.x.t
 	 */
 	private static function session_meta_key(): string {
 		$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0;
+
+		return self::session_meta_key_for_blog( $blog_id );
+	}
+
+	/**
+	 * Resolve the session meta key for a blog ID.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int $blog_id Blog ID; values below 1 use the unsuffixed legacy key.
+	 */
+	private static function session_meta_key_for_blog( int $blog_id ): string {
+		if ( $blog_id < 1 ) {
+			return self::SESSION_META_KEY;
+		}
 
 		return self::SESSION_META_KEY . '_' . $blog_id;
 	}
