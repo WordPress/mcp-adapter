@@ -48,9 +48,11 @@ final class SessionManager {
 	 * @since n.e.x.t
 	 */
 	private static function session_meta_key(): string {
-		$blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 0;
+		if ( ! function_exists( 'get_current_blog_id' ) ) {
+			return self::SESSION_META_KEY;
+		}
 
-		return self::session_meta_key_for_blog( $blog_id );
+		return self::session_meta_key_for_blog( (int) get_current_blog_id() );
 	}
 
 	/**
