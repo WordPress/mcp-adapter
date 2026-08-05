@@ -319,7 +319,6 @@ Extended validation for MCP component data per the MCP 2025-11-25 specification:
 
 - `validate_name()` -- Name charset and length validation
 - `validate_resource_uri()` -- URI format per RFC 3986
-- `validate_mime_type()` -- MIME type format validation
 - `validate_icons_array()` -- Icon object validation (src, mimeType, sizes, theme)
 - `get_annotation_validation_errors()` -- Annotation field validation (audience, priority, lastModified)
 - `validate_base64()` -- Base64 content validation

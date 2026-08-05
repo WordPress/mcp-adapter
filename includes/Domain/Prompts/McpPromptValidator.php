@@ -344,16 +344,11 @@ class McpPromptValidator {
 					);
 				}
 
+				// mimeType is required. Its value is not checked.
 				if ( empty( $content['mimeType'] ) || ! is_string( $content['mimeType'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d image content must have a mimeType field', 'mcp-adapter' ),
-						$message_index
-					);
-				} elseif ( ! McpValidator::validate_image_mime_type( $content['mimeType'] ) ) {
-					$errors[] = sprintf(
-					/* translators: %d: message index */
-						__( 'Message %d image content must have a valid image MIME type', 'mcp-adapter' ),
 						$message_index
 					);
 				}
@@ -374,16 +369,11 @@ class McpPromptValidator {
 					);
 				}
 
+				// mimeType is required. Its value is not checked.
 				if ( empty( $content['mimeType'] ) || ! is_string( $content['mimeType'] ) ) {
 					$errors[] = sprintf(
 					/* translators: %d: message index */
 						__( 'Message %d audio content must have a mimeType field', 'mcp-adapter' ),
-						$message_index
-					);
-				} elseif ( ! McpValidator::validate_audio_mime_type( $content['mimeType'] ) ) {
-					$errors[] = sprintf(
-					/* translators: %d: message index */
-						__( 'Message %d audio content must have a valid audio MIME type', 'mcp-adapter' ),
 						$message_index
 					);
 				}
@@ -413,20 +403,12 @@ class McpPromptValidator {
 					);
 				}
 
-				if ( isset( $content['mimeType'] ) ) {
-					if ( ! is_string( $content['mimeType'] ) ) {
-						$errors[] = sprintf(
-						/* translators: %d: message index */
-							__( 'Message %d resource_link content mimeType must be a string if provided', 'mcp-adapter' ),
-							$message_index
-						);
-					} elseif ( ! McpValidator::validate_mime_type( $content['mimeType'] ) ) {
-						$errors[] = sprintf(
-						/* translators: %d: message index */
-							__( 'Message %d resource_link content mimeType must be a valid MIME type format', 'mcp-adapter' ),
-							$message_index
-						);
-					}
+				if ( isset( $content['mimeType'] ) && ! is_string( $content['mimeType'] ) ) {
+					$errors[] = sprintf(
+					/* translators: %d: message index */
+						__( 'Message %d resource_link content mimeType must be a string if provided', 'mcp-adapter' ),
+						$message_index
+					);
 				}
 
 				if ( isset( $content['size'] ) && ! is_int( $content['size'] ) ) {

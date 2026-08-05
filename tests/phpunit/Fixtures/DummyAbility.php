@@ -913,12 +913,12 @@ final class DummyAbility {
 			)
 		);
 
-		// Resource with invalid mimeType - should silently skip mimeType
+		// Resource with a parameterized mimeType - should emit it as declared.
 		wp_register_ability(
-			'test/resource-invalid-mimetype',
+			'test/resource-parameterized-mimetype',
 			array(
-				'label'               => 'Resource Invalid MimeType',
-				'description'         => 'A resource with invalid mimeType for testing validation',
+				'label'               => 'Resource Parameterized MimeType',
+				'description'         => 'A resource with a parameterized mimeType for testing pass-through behavior',
 				'category'            => 'test',
 				'execute_callback'    => static function () {
 					return 'content';
@@ -930,8 +930,8 @@ final class DummyAbility {
 					'mcp' => array(
 						'public'   => true,
 						'type'     => 'resource',
-						'uri'      => 'WordPress://local/resource-invalid-mimetype',
-						'mimeType' => 'not//valid',  // Invalid mime type.
+						'uri'      => 'WordPress://local/resource-parameterized-mimetype',
+						'mimeType' => 'text/html;profile=mcp-app',
 					),
 				),
 			)
