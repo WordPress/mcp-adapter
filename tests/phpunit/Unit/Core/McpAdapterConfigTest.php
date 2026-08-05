@@ -251,7 +251,7 @@ final class McpAdapterConfigTest extends TestCase {
 				'test/resource',
 				'test/resource-new-meta',
 				'test/resource-invalid-uri',
-				'test/resource-invalid-mimetype',
+				'test/resource-parameterized-mimetype',
 				'test/resource-with-size',
 				'test/resource-with-icons',
 				'test/resource-missing-uri',

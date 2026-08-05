@@ -212,9 +212,9 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertSame( 'resource_uri_invalid', $resource->get_error_code() );
 	}
 
-	public function test_unusual_mimetype_is_emitted_as_declared(): void {
-		$ability = wp_get_ability( 'test/resource-invalid-mimetype' );
-		$this->assertNotNull( $ability, 'Ability test/resource-invalid-mimetype should be registered' );
+	public function test_parameterized_mimetype_is_emitted_as_declared(): void {
+		$ability = wp_get_ability( 'test/resource-parameterized-mimetype' );
+		$this->assertNotNull( $ability, 'Ability test/resource-parameterized-mimetype should be registered' );
 
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
@@ -223,7 +223,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
 		// The descriptor carries whatever the author declared.
 		$this->assertArrayHasKey( 'mimeType', $arr );
-		$this->assertSame( 'not//valid', $arr['mimeType'] );
+		$this->assertSame( 'text/html;profile=mcp-app', $arr['mimeType'] );
 	}
 
 	public function test_size_field_is_included(): void {

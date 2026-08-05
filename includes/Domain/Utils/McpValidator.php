@@ -146,7 +146,7 @@ class McpValidator {
 	 *
 	 * Validates icon fields per MCP 2025-11-25 specification:
 	 * - src (required): Valid URL or data: URI
-	 * - mimeType (optional): One of allowed image MIME types
+	 * - mimeType (optional): String emitted as declared
 	 * - sizes (optional): Array of size strings in WxH format or "any"
 	 * - theme (optional): "light" or "dark"
 	 *
