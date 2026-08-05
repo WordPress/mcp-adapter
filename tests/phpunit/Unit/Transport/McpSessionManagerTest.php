@@ -49,7 +49,7 @@ final class McpSessionManagerTest extends TestCase {
 	public function tear_down(): void {
 		// Clean up all sessions for test user
 		if ( $this->test_user_id ) {
-			delete_user_meta( $this->test_user_id, 'mcp_adapter_sessions' );
+			delete_user_meta( $this->test_user_id, self::session_meta_key() );
 			wp_delete_user( $this->test_user_id );
 		}
 
@@ -75,6 +75,83 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertCount( 1, $sessions );
 		$this->assertArrayHasKey( $session_id, $sessions );
 		$this->assertSame( $client_info, $sessions[ $session_id ]['client_params'] );
+	}
+
+	/**
+	 * Single-site keeps the unsuffixed legacy key (blog ID is still 1).
+	 */
+	public function test_create_session_uses_legacy_meta_key_on_single_site(): void {
+		if ( is_multisite() ) {
+			$this->markTestSkipped( 'Legacy unsuffixed key applies on single-site only.' );
+		}
+
+		$session_id = SessionManager::create_session( $this->test_user_id, array() );
+		$this->assertIsString( $session_id );
+
+		$this->assertSame( 1, (int) get_current_blog_id() );
+		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
+		$this->assertFalse( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions_1' ) );
+		$this->assertArrayHasKey( $session_id, get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', true ) );
+	}
+
+	/**
+	 * Multisite sessions must live under a blog-scoped meta key (user meta is network-global).
+	 */
+	public function test_create_session_uses_blog_scoped_meta_key_on_multisite(): void {
+		if ( ! is_multisite() ) {
+			$this->markTestSkipped( 'Blog-scoped keys apply on multisite only.' );
+		}
+
+		$session_id = SessionManager::create_session( $this->test_user_id, array() );
+		$this->assertIsString( $session_id );
+
+		$blog_id = (int) get_current_blog_id();
+		$this->assertGreaterThanOrEqual( 1, $blog_id );
+
+		$blog_key = 'mcp_adapter_sessions_' . $blog_id;
+		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, $blog_key ) );
+		$this->assertFalse( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
+		$this->assertArrayHasKey( $session_id, get_user_meta( $this->test_user_id, $blog_key, true ) );
+	}
+
+	/**
+	 * Pre-upgrade single-site sessions under the unsuffixed key remain valid.
+	 */
+	public function test_legacy_single_site_session_remains_valid(): void {
+		if ( is_multisite() ) {
+			$this->markTestSkipped( 'Legacy unsuffixed key applies on single-site only.' );
+		}
+
+		$session_id = wp_generate_uuid4();
+		$now        = time();
+		update_user_meta(
+			$this->test_user_id,
+			'mcp_adapter_sessions',
+			array(
+				$session_id => array(
+					'created_at'    => $now,
+					'last_activity' => $now,
+					'client_params' => array( 'name' => 'legacy-client' ),
+				),
+			)
+		);
+
+		$this->assertTrue( SessionManager::validate_session( $this->test_user_id, $session_id ) );
+		$this->assertArrayHasKey( $session_id, SessionManager::get_all_user_sessions( $this->test_user_id ) );
+		$this->assertFalse( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions_1' ) );
+	}
+
+	/**
+	 * When no positive blog ID is available, use the unsuffixed legacy key (not *_0).
+	 */
+	public function test_session_meta_key_falls_back_to_unsuffixed_when_blog_id_invalid(): void {
+		$method = new \ReflectionMethod( SessionManager::class, 'session_meta_key_for_blog' );
+		$method->setAccessible( true );
+
+		$this->assertSame( 'mcp_adapter_sessions', $method->invoke( null, 0 ) );
+		$this->assertSame( 'mcp_adapter_sessions', $method->invoke( null, -1 ) );
+		$this->assertSame( 'mcp_adapter_sessions_1', $method->invoke( null, 1 ) );
+		$this->assertSame( 'mcp_adapter_sessions_2', $method->invoke( null, 2 ) );
 	}
 
 	/**
@@ -157,8 +234,8 @@ final class McpSessionManagerTest extends TestCase {
 		// Verify session is gone
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$this->assertCount( 0, $sessions );
-		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, 'mcp_adapter_sessions' ) );
-		$this->assertSame( array(), get_user_meta( $this->test_user_id, 'mcp_adapter_sessions', true ) );
+		$this->assertTrue( metadata_exists( 'user', $this->test_user_id, self::session_meta_key() ) );
+		$this->assertSame( array(), get_user_meta( $this->test_user_id, self::session_meta_key(), true ) );
 	}
 
 	/**
@@ -221,7 +298,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Manually modify one session to be expired
 		$sessions                                   = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $session_id_1 ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 ); // Over 24 hours ago
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, self::session_meta_key(), $sessions );
 
 		// Run cleanup
 		$removed = SessionManager::cleanup_expired_sessions( $this->test_user_id );
@@ -274,7 +351,7 @@ final class McpSessionManagerTest extends TestCase {
 		$sessions                                 = \WP\MCP\Transport\Infrastructure\SessionManager::get_all_user_sessions( $this->test_user_id );
 		$old_timestamp                            = time() - 61;
 		$sessions[ $session_id ]['last_activity'] = $old_timestamp;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, self::session_meta_key(), $sessions );
 
 		// Validate session (should update last_activity)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );
@@ -319,7 +396,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Manually expire the session by backdating its last_activity
 		$sessions                                    = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $short_session ]['last_activity'] = time() - 3;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, self::session_meta_key(), $sessions );
 
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $short_session );
 		$this->assertFalse( $is_valid ); // Should be expired
@@ -360,7 +437,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Backdate one session to make it expired
 		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $expired_session_id ]['last_activity'] = time() - ( DAY_IN_SECONDS + 3600 );
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, self::session_meta_key(), $sessions );
 
 		// Validate the valid session
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $valid_session_id );
@@ -389,7 +466,7 @@ final class McpSessionManagerTest extends TestCase {
 		// Backdate last_activity by 16s (more than half of 30s timeout = clamped interval of 15s)
 		$sessions                                 = SessionManager::get_all_user_sessions( $this->test_user_id );
 		$sessions[ $session_id ]['last_activity'] = time() - 16;
-		update_user_meta( $this->test_user_id, 'mcp_adapter_sessions', $sessions );
+		update_user_meta( $this->test_user_id, self::session_meta_key(), $sessions );
 
 		// Validate — should succeed AND update last_activity because 16s > clamped interval (15s)
 		$is_valid = SessionManager::validate_session( $this->test_user_id, $session_id );

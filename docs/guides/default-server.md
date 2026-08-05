@@ -160,10 +160,10 @@ curl -s -X DELETE \
 
 Two filters control session behavior:
 
-**`mcp_adapter_session_max_per_user`** — Maximum number of concurrent sessions a single user can have. When the limit is reached the oldest session is automatically evicted. Default: `32`.
+**`mcp_adapter_session_max_per_user`** — Maximum number of concurrent sessions a single user can have on the current site. When the limit is reached the oldest session is automatically evicted. Default: `32`.
 
 ```php
-// Allow at most 5 concurrent sessions per user
+// Allow at most 5 concurrent sessions per user on the current site
 add_filter( 'mcp_adapter_session_max_per_user', function () {
     return 5;
 } );

@@ -87,6 +87,18 @@ abstract class TestCase extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Resolve the session user_meta key the same way SessionManager does.
+	 *
+	 * @return string
+	 */
+	protected static function session_meta_key(): string {
+		$method = new \ReflectionMethod( \WP\MCP\Transport\Infrastructure\SessionManager::class, 'session_meta_key' );
+		$method->setAccessible( true );
+
+		return (string) $method->invoke( null );
+	}
+
+	/**
 	 * Registers an ability inside the wp_abilities_api_init hook.
 	 *
 	 * This helper ensures abilities are registered during the hook execution,

@@ -497,7 +497,7 @@ final class HttpRequestHandlerTest extends TestCase {
 
 		// The session header is set via a rest_post_dispatch filter which doesn't
 		// fire in unit tests. Read the session ID directly from user meta instead.
-		$sessions = get_user_meta( get_current_user_id(), 'mcp_adapter_sessions', true );
+		$sessions = get_user_meta( get_current_user_id(), self::session_meta_key(), true );
 		$this->assertNotEmpty( $sessions, 'Initialize must create a session in user meta' );
 
 		// Return the most recently created session ID.
