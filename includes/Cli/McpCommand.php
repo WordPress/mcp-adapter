@@ -27,14 +27,12 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 * using the JSON-RPC 2.0 protocol. It's designed to be launched as a subprocess
 	 * by MCP clients.
 	 *
+	 * Use the global `--user` flag to specify the user context for the server. If not provided, runs as unauthenticated (limited capabilities).
+	 *
 	 * ## OPTIONS
 	 *
 	 * [--server=<server-id>]
 	 * : The ID of the MCP server to serve. If not specified, uses the first available server.
-	 *
-	 * [--user=<id|login|email>]
-	 * : Run as a specific WordPress user for permission checks.
-	 * : Without this, runs as unauthenticated (limited capabilities).
 	 *
 	 * ## EXAMPLES
 	 *
@@ -48,7 +46,7 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 *     wp mcp serve --server=public-server
 	 *
 	 * @when after_wp_load
-	 * @synopsis [--server=<server-id>] [--user=<id|login|email>]
+	 * @synopsis [--server=<server-id>]
 	 */
 	public function serve( array $args, array $assoc_args ): void {
 
@@ -75,20 +73,7 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 			// Use the first available server
 			$server    = array_values( $servers )[0];
 			$server_id = $server->get_server_id();
-			\WP_CLI::debug( sprintf( 'Using server: %s', $server_id ) );
-		}
-
-		// Set user context if specified
-		if ( isset( $assoc_args['user'] ) ) {
-			$user = $this->get_user( $assoc_args['user'] );
-			if ( ! $user ) {
-				\WP_CLI::error( sprintf( 'User "%s" not found.', $assoc_args['user'] ) );
-			}
-
-			wp_set_current_user( $user->ID );
-			\WP_CLI::debug( sprintf( 'Running as user: %s (ID: %d)', $user->user_login, $user->ID ) );
-		} else {
-			\WP_CLI::debug( 'Running without authentication. Some capabilities may be limited.' );
+			\WP_CLI::line( sprintf( 'Using server: %s', $server_id ) );
 		}
 
 		// Create and start STDIO server bridge
@@ -105,29 +90,6 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 		} catch ( \Throwable $e ) {
 			\WP_CLI::error( 'Failed to start STDIO bridge: ' . $e->getMessage() );
 		}
-	}
-
-	/**
-	 * Get a user by ID, login, or email.
-	 *
-	 * @param string $user User identifier (ID, login, or email).
-	 *
-	 * @return \WP_User|false User object or false if not found.
-	 */
-	private function get_user( string $user ) {
-		// Try as ID first
-		if ( is_numeric( $user ) ) {
-			return get_user_by( 'id', (int) $user );
-		}
-
-		// Try as login
-		$user_obj = get_user_by( 'login', $user );
-		if ( $user_obj ) {
-			return $user_obj;
-		}
-
-		// Try as email
-		return get_user_by( 'email', $user );
 	}
 
 	/**
