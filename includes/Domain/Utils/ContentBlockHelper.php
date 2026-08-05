@@ -29,6 +29,12 @@ use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
  * ContentBlockInterface. These DTOs are used in tool call results, prompt messages,
  * and resource contents throughout the MCP protocol.
  *
+ * Every `_meta` argument passes through {@see McpValidator::normalize_meta()}, so a
+ * value that would not serialize as a JSON object arrives at the client as an absent
+ * field rather than as a JSON array. MCP declares `_meta` an object, and clients
+ * validate it as part of the enclosing response, so a non-object there risks the
+ * whole payload rather than just the metadata.
+ *
  * @since 0.5.0
  */
 final class ContentBlockHelper {
@@ -39,7 +45,7 @@ final class ContentBlockHelper {
 	 * @param string $data Base64-encoded image data.
 	 * @param string $mime_type The MIME type of the image (e.g., 'image/png').
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\ImageContent The created ImageContent DTO.
 	 */
@@ -50,7 +56,7 @@ final class ContentBlockHelper {
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -61,7 +67,7 @@ final class ContentBlockHelper {
 	 * @param string $data Base64-encoded audio data.
 	 * @param string $mime_type The MIME type of the audio (e.g., 'audio/mp3').
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\AudioContent The created AudioContent DTO.
 	 */
@@ -72,7 +78,7 @@ final class ContentBlockHelper {
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -82,11 +88,19 @@ final class ContentBlockHelper {
 	 *
 	 * Use this for embedding text-based resources (files, documents, etc.) in content.
 	 *
+	 * The DTO tree has two levels that each carry their own `_meta`: the content
+	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
+	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
+	 * the spec and are not interchangeable.
+	 *
+	 * @since n.e.x.t Added the optional $resource_meta parameter.
+	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $text The text content of the resource.
 	 * @param string|null $mime_type Optional MIME type of the resource.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
+	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
 	 */
@@ -95,13 +109,15 @@ final class ContentBlockHelper {
 		string $text,
 		?string $mime_type = null,
 		?Annotations $annotations = null,
-		?array $_meta = null
+		?array $_meta = null,
+		?array $resource_meta = null
 	): EmbeddedResource {
 		$resource = TextResourceContents::fromArray(
 			array(
 				'uri'      => $uri,
 				'text'     => $text,
 				'mimeType' => $mime_type,
+				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
 			)
 		);
 
@@ -110,7 +126,7 @@ final class ContentBlockHelper {
 				'type'        => EmbeddedResource::TYPE,
 				'resource'    => $resource,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -120,11 +136,19 @@ final class ContentBlockHelper {
 	 *
 	 * Use this for embedding binary resources (images, PDFs, etc.) in content.
 	 *
+	 * The DTO tree has two levels that each carry their own `_meta`: the content
+	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
+	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
+	 * the spec and are not interchangeable.
+	 *
+	 * @since n.e.x.t Added the optional $resource_meta parameter.
+	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $blob Base64-encoded binary data.
 	 * @param string|null $mime_type Optional MIME type of the resource.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
+	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
 	 */
@@ -133,13 +157,15 @@ final class ContentBlockHelper {
 		string $blob,
 		?string $mime_type = null,
 		?Annotations $annotations = null,
-		?array $_meta = null
+		?array $_meta = null,
+		?array $resource_meta = null
 	): EmbeddedResource {
 		$resource = BlobResourceContents::fromArray(
 			array(
 				'uri'      => $uri,
 				'blob'     => $blob,
 				'mimeType' => $mime_type,
+				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
 			)
 		);
 
@@ -148,7 +174,7 @@ final class ContentBlockHelper {
 				'type'        => EmbeddedResource::TYPE,
 				'resource'    => $resource,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -161,7 +187,7 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $message The error message.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
@@ -174,7 +200,7 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $text The text content.
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */
@@ -184,7 +210,7 @@ final class ContentBlockHelper {
 				'type'        => TextContent::TYPE,
 				'text'        => $text,
 				'annotations' => $annotations,
-				'_meta'       => $_meta,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
 		);
 	}
@@ -198,7 +224,7 @@ final class ContentBlockHelper {
 	 * @param mixed $data The data to JSON-encode.
 	 * @param int $flags JSON encoding flags (default: 0).
 	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata.
+	 * @param array|null $_meta Optional metadata for the content block.
 	 *
 	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
 	 */

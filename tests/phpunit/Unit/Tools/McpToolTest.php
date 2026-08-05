@@ -62,6 +62,74 @@ final class McpToolTest extends TestCase {
 		wp_unregister_ability( 'test/mcptool-from-ability' );
 	}
 
+	public function test_fromAbility_with_list_shaped_meta_omits_meta(): void {
+		$this->register_ability_in_hook(
+			'test/mcptool-list-meta',
+			array(
+				'label'               => 'McpTool List Meta',
+				'description'         => 'Test MCP tool',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array( 'ok' => true );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'_meta' => array( 'first', 'second' ),
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/mcptool-list-meta' );
+		$this->assertNotNull( $ability );
+
+		$mcp_tool = McpTool::fromAbility( $ability );
+		$this->assertNotWPError( $mcp_tool );
+
+		$data = $mcp_tool->get_protocol_dto()->toArray();
+
+		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
+		$this->assertArrayNotHasKey( '_meta', $data );
+
+		wp_unregister_ability( 'test/mcptool-list-meta' );
+	}
+
+	public function test_fromArray_with_list_shaped_meta_omits_meta(): void {
+		$mcp_tool = McpTool::fromArray(
+			array(
+				'name'    => 'list-meta-tool',
+				'meta'    => array( 'first', 'second' ),
+				'handler' => static fn() => 'ok',
+			)
+		);
+		$this->assertNotWPError( $mcp_tool );
+
+		$data = $mcp_tool->get_protocol_dto()->toArray();
+
+		$this->assertArrayNotHasKey( '_meta', $data );
+	}
+
+	public function test_fromArray_with_numeric_string_keyed_meta_keeps_meta(): void {
+		$mcp_tool = McpTool::fromArray(
+			array(
+				'name'    => 'numeric-key-meta-tool',
+				'meta'    => array( 1 => 'value' ),
+				'handler' => static fn() => 'ok',
+			)
+		);
+		$this->assertNotWPError( $mcp_tool );
+
+		$data = $mcp_tool->get_protocol_dto()->toArray();
+
+		// Not a list, so it still serializes as the JSON object {"1":"value"}.
+		$this->assertArrayHasKey( '_meta', $data );
+		$this->assertSame( 'value', $data['_meta'][1] );
+	}
+
 	public function test_execute_unwraps_input_and_wraps_output_when_transformed(): void {
 		$this->register_ability_in_hook(
 			'test/mcptool-flat-schemas',
@@ -488,22 +556,116 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes ToolAnnotations::fromArray() to throw.
-		// The 'readOnlyHint' field expects a bool, not a string.
+	/**
+	 * Coercion is deliberately limited to values whose intent is unambiguous - a boolean
+	 * written as "1", a number written as a string. A field given an entirely wrong kind of
+	 * value has no defensible reading, so the DTO guard still catches it and the caller
+	 * gets a WP_Error naming the problem rather than a silently mangled tool.
+	 */
+	public function test_fromArray_returns_wp_error_for_a_wrongly_typed_field(): void {
 		$result = McpTool::fromArray(
 			array(
-				'name'        => 'invalid-annotations-tool',
-				'handler'     => static fn( $args ) => array( 'ok' => true ),
-				'annotations' => array(
-					'readOnlyHint' => 'not-a-boolean', // This will cause ToolAnnotations::fromArray() to throw.
-				),
+				'name'    => 'bad-title-tool',
+				'handler' => static fn( $args ) => array( 'ok' => true ),
+				'title'   => array( 'not', 'a', 'string' ),
 			)
 		);
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'mcp_tool_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected bool', $result->get_error_message() );
+		$this->assertStringContainsString( 'Expected string', $result->get_error_message() );
+	}
+
+	/**
+	 * Tool hints are booleans in the schema, but WordPress stores and returns them as "1"
+	 * and "0". A hint written from stored data must still register, and must reach the wire
+	 * as a JSON boolean.
+	 *
+	 * @dataProvider data_loosely_typed_hints
+	 *
+	 * @param mixed $value    Caller-supplied hint value.
+	 * @param bool  $expected Boolean the hint should normalize to.
+	 */
+	public function test_fromArray_coerces_loosely_typed_hints_to_booleans( $value, bool $expected ): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'loose-hint-tool',
+				'handler'     => static fn( $args ) => array( 'ok' => true ),
+				'annotations' => array( 'readOnlyHint' => $value ),
+			)
+		);
+
+		$this->assertNotWPError( $tool );
+
+		$data = $tool->get_protocol_dto()->toArray();
+		$this->assertSame( $expected, $data['annotations']['readOnlyHint'] );
+	}
+
+	/**
+	 * @return array<string, array{mixed, bool}>
+	 */
+	public function data_loosely_typed_hints(): array {
+		return array(
+			'boolean true'  => array( true, true ),
+			'integer one'   => array( 1, true ),
+			'string one'    => array( '1', true ),
+			'string true'   => array( 'true', true ),
+			'boolean false' => array( false, false ),
+			'integer zero'  => array( 0, false ),
+			'string zero'   => array( '0', false ),
+			'string false'  => array( 'false', false ),
+		);
+	}
+
+	/**
+	 * A hint value with no defensible boolean reading is dropped. Failing registration over
+	 * a rendering hint would take the whole tool off the server, which is a far larger
+	 * outage than the hint was worth.
+	 */
+	public function test_fromArray_drops_unusable_hint_values_instead_of_failing(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'invalid-annotations-tool',
+				'handler'     => static fn( $args ) => array( 'ok' => true ),
+				'annotations' => array(
+					'readOnlyHint'   => 'not-a-boolean',
+					'idempotentHint' => true,
+				),
+			)
+		);
+
+		$this->assertNotWPError( $tool );
+
+		$data = $tool->get_protocol_dto()->toArray();
+
+		// The usable sibling survives; only the unreadable hint is dropped.
+		$this->assertArrayNotHasKey( 'readOnlyHint', $data['annotations'] );
+		$this->assertTrue( $data['annotations']['idempotentHint'] );
+	}
+
+	/**
+	 * Tools carry ToolAnnotations, which does not model the shared content vocabulary.
+	 * Handing it those fields leaves nothing behind, and an empty PHP array serializes to
+	 * `[]` where MCP declares an object - which a conforming client rejects along with the
+	 * whole tool.
+	 */
+	public function test_fromArray_omits_annotations_for_unmodelled_vocabulary(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'resource-vocabulary-tool',
+				'handler'     => static fn( $args ) => array( 'ok' => true ),
+				'annotations' => array(
+					'audience' => array( 'user' ),
+					'priority' => 0.8,
+				),
+			)
+		);
+
+		$this->assertNotWPError( $tool );
+
+		$data = $tool->get_protocol_dto()->toArray();
+		$this->assertArrayNotHasKey( 'annotations', $data );
+		$this->assertStringNotContainsString( '"annotations":[]', (string) wp_json_encode( $data ) );
 	}
 
 	// =========================================================================

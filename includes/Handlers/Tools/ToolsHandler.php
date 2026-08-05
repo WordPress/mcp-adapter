@@ -234,11 +234,23 @@ class ToolsHandler {
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
+			//
+			// Two shapes are accepted, and they place `_meta` differently:
+			//
+			// - Nested `{ type, resource: { uri, text, _meta }, annotations, _meta }` maps
+			//   one-to-one onto the DTO tree, so the outer keys belong to the content block
+			//   and the inner `_meta` to the resource contents.
+			// - Flat `{ type, uri, mimeType, text, _meta }` is a resource-contents literal
+			//   carrying a `type` tag: every key beside `type` and `annotations` is a
+			//   `ResourceContents` field, and `_meta` is declared there alongside them. Its
+			//   `_meta` therefore describes the resource, which is what the same literal
+			//   already means to `ResourcesHandler::create_content_dto()`. `annotations`
+			//   stays on the block because resource contents have no such field. A caller
+			//   who needs block-level `_meta` writes the nested form, which exists to
+			//   express that distinction.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
-				$resource_item = $result;
-				if ( isset( $result['resource'] ) && is_array( $result['resource'] ) ) {
-					$resource_item = $result['resource'];
-				}
+				$is_nested     = isset( $result['resource'] ) && is_array( $result['resource'] );
+				$resource_item = $is_nested ? $result['resource'] : $result;
 
 				$uri       = $resource_item['uri'] ?? null;
 				$mime_type = $resource_item['mimeType'] ?? null;
@@ -247,8 +259,33 @@ class ToolsHandler {
 					$uri = trim( $uri );
 				}
 
+				$block_meta    = $is_nested
+					? $this->normalize_content_meta(
+						$result['_meta'] ?? null,
+						$this->mcp->get_error_handler(),
+						'Invalid _meta on tool result content block, dropping it',
+						array( 'tool_name' => $tool_name )
+					)
+					: null;
+				$resource_meta = $this->normalize_content_meta(
+					$resource_item['_meta'] ?? null,
+					$this->mcp->get_error_handler(),
+					'Invalid _meta on tool result resource contents, dropping it',
+					array( 'tool_name' => $tool_name )
+				);
+
 				// Only return an EmbeddedResource if we have a valid URI and some content.
 				if ( is_string( $uri ) && '' !== $uri ) {
+					// Built inside the guard: without a URI this result falls through to the
+					// generic JSON path, where annotations were never going to be attached,
+					// so warning that they were dropped would point at the wrong problem.
+					$annotations = $this->build_content_annotations(
+						$result['annotations'] ?? null,
+						$this->mcp->get_error_handler(),
+						'Invalid annotations in tool result, dropping them',
+						array( 'tool_name' => $tool_name )
+					);
+
 					if ( isset( $resource_item['text'] ) && is_string( $resource_item['text'] ) ) {
 						return CallToolResult::fromArray(
 							array(
@@ -256,7 +293,10 @@ class ToolsHandler {
 									ContentBlockHelper::embedded_text_resource(
 										$uri,
 										$resource_item['text'],
-										is_string( $mime_type ) ? $mime_type : null
+										is_string( $mime_type ) ? $mime_type : null,
+										$annotations,
+										$block_meta,
+										$resource_meta
 									),
 								),
 								'isError' => false,
@@ -271,7 +311,10 @@ class ToolsHandler {
 									ContentBlockHelper::embedded_blob_resource(
 										$uri,
 										$resource_item['blob'],
-										is_string( $mime_type ) ? $mime_type : null
+										is_string( $mime_type ) ? $mime_type : null,
+										$annotations,
+										$block_meta,
+										$resource_meta
 									),
 								),
 								'isError' => false,
@@ -282,18 +325,59 @@ class ToolsHandler {
 			}
 
 			// Handle image results.
-			if ( isset( $result['type'] ) && 'image' === $result['type'] && isset( $result['results'] ) ) {
+			//
+			// `type` marks this result as a description of a content block rather than tool
+			// data, so its sibling `annotations` and `_meta` are the block's, which is the
+			// reading the `resource` branch above already applies to the same two keys.
+			$is_image_result = isset( $result['type'] ) && 'image' === $result['type'];
+
+			// The image bytes are read from `results`. Without that key there is nothing to
+			// encode, so the result falls through to the generic path and reaches the client
+			// as a text block; say so rather than letting the `type` marker go unanswered.
+			if ( $is_image_result && ! isset( $result['results'] ) ) {
+				$this->mcp->get_error_handler()->log(
+					'Tool result marked type "image" has no "results" key, returning it as tool data',
+					array( 'tool_name' => $tool_name ),
+					'warning'
+				);
+			}
+
+			if ( $is_image_result && isset( $result['results'] ) ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
+				$annotations = $this->build_content_annotations(
+					$result['annotations'] ?? null,
+					$this->mcp->get_error_handler(),
+					'Invalid annotations in tool result, dropping them',
+					array( 'tool_name' => $tool_name )
+				);
+
 				return CallToolResult::fromArray(
 					array(
-						'content'           => array( ContentBlockHelper::image( $image_data, $mime_type ) ),
+						'content'           => array(
+							ContentBlockHelper::image(
+								$image_data,
+								$mime_type,
+								$annotations,
+								$this->normalize_content_meta(
+									$result['_meta'] ?? null,
+									$this->mcp->get_error_handler(),
+									'Invalid _meta on tool result content block, dropping it',
+									array( 'tool_name' => $tool_name )
+								)
+							),
+						),
 						'structuredContent' => null,
 						'isError'           => false,
 					)
 				);
 			}
+
+			// The generic fallback carries no `type` marker, so every key it holds is tool
+			// data: the result is JSON-encoded into the text block and returned verbatim as
+			// `structuredContent`. Reading `annotations` or `_meta` off it would give one key
+			// two meanings, with nothing to tell a rendering hint from a domain field.
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
 			$json_text = wp_json_encode( $result );

@@ -156,11 +156,12 @@ class RegisterAbilityAsMcpResource {
 			$resource_data['description'] = $description;
 		}
 
-		// Optional: mimeType from ability meta (with validation).
+		// Optional: mimeType from ability meta. Emitted as written - MCP treats it as an
+		// opaque string, so only a non-empty value is required.
 		$mime_type = $this->get_mcp_meta( 'mimeType', 'string' );
 		if ( null !== $mime_type ) {
 			$mime_type = trim( $mime_type );
-			if ( McpValidator::validate_mime_type( $mime_type ) ) {
+			if ( '' !== $mime_type ) {
 				$resource_data['mimeType'] = $mime_type;
 			}
 		}
@@ -207,11 +208,8 @@ class RegisterAbilityAsMcpResource {
 		// Build Resource `_meta`:
 		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
 		// - Adapter metadata is NEVER included in protocol DTO meta; it is returned separately in adapter_meta.
-		$resource_meta = array();
-		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$resource_meta = $mcp_meta['_meta'];
-		}
-		if ( ! empty( $resource_meta ) ) {
+		$resource_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
+		if ( null !== $resource_meta ) {
 			$resource_data['_meta'] = $resource_meta;
 		}
 

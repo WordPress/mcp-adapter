@@ -45,7 +45,7 @@ final class McpResourceValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'URI must be a valid URI', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_dto_rejects_invalid_mime_type(): void {
+	public function test_validate_resource_dto_accepts_any_mime_type_string(): void {
 		$resource = ResourceDto::fromArray(
 			array(
 				'uri'      => 'test://resource',
@@ -54,9 +54,7 @@ final class McpResourceValidatorTest extends TestCase {
 			)
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
-		$this->assertWPError( $result );
-		$this->assertStringContainsString( 'MIME type is invalid', $result->get_error_message() );
+		$this->assertTrue( McpResourceValidator::validate_resource_dto( $resource ) );
 	}
 
 	public function test_validate_resource_dto_accepts_valid_mime_type(): void {
@@ -299,16 +297,14 @@ final class McpResourceValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'mimeType must be a string', $errors[0] );
 	}
 
-	public function test_get_validation_errors_with_invalid_mime_type_format(): void {
+	public function test_get_validation_errors_accepts_any_mime_type_string(): void {
 		$resource_data = array(
 			'uri'      => 'test://resource',
 			'text'     => 'Content',
 			'mimeType' => 'invalid-mime',
 		);
 
-		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'mimeType must be a valid MIME type format', $errors[0] );
+		$this->assertSame( array(), McpResourceValidator::get_validation_errors( $resource_data ) );
 	}
 
 	public function test_get_validation_errors_with_valid_mime_type(): void {
@@ -329,12 +325,12 @@ final class McpResourceValidatorTest extends TestCase {
 	public function test_get_validation_errors_reports_multiple_errors(): void {
 		$resource_data = array(
 			'uri'      => 'invalid uri',
-			'mimeType' => 'invalid-mime',
+			'mimeType' => 123, // Not a string.
 			// Missing text/blob content
 		);
 
 		$errors = McpResourceValidator::get_validation_errors( $resource_data );
-		$this->assertCount( 3, $errors, 'Should report all validation errors: invalid URI, invalid mimeType, and missing content' );
+		$this->assertCount( 3, $errors, 'Should report all validation errors: invalid URI, non-string mimeType, and missing content' );
 	}
 
 	public function test_get_validation_errors_allows_empty_string_text(): void {

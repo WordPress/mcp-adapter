@@ -183,11 +183,8 @@ class RegisterAbilityAsMcpTool {
 		// Build Tool `_meta`:
 		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
 		// - Adapter metadata is NEVER included in protocol DTO meta; it is returned separately in adapter_meta.
-		$tool_meta = array();
-		if ( ! empty( $mcp_meta['_meta'] ) && is_array( $mcp_meta['_meta'] ) ) {
-			$tool_meta = $mcp_meta['_meta'];
-		}
-		if ( ! empty( $tool_meta ) ) {
+		$tool_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
+		if ( null !== $tool_meta ) {
 			$tool_data['_meta'] = $tool_meta;
 		}
 

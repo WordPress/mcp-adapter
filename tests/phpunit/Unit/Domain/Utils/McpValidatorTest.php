@@ -188,163 +188,6 @@ final class McpValidatorTest extends TestCase {
 		$this->assertFalse( McpValidator::validate_name( 'namespace/tool' ) );
 	}
 
-	// MIME Type Validation Tests
-
-	public function test_validate_mime_type_with_valid_types(): void {
-		$valid_types = array(
-			'text/plain',
-			'application/json',
-			'image/png',
-			'audio/mpeg',
-			'video/mp4',
-			'application/xml',
-		);
-
-		foreach ( $valid_types as $type ) {
-			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
-		}
-	}
-
-	public function test_validate_mime_type_rejects_invalid_format(): void {
-		$invalid_types = array(
-			'invalid',
-			'text',
-			'/plain',
-			'text/',
-			'',
-			'text plain',
-			'text@plain',
-		);
-
-		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be invalid" );
-		}
-	}
-
-	public function test_validate_mime_type_with_structured_syntax_suffix(): void {
-		// RFC 6839: Structured syntax suffixes like +json, +xml are valid.
-		$valid_suffix_types = array(
-			'application/vnd.api+json',
-			'image/svg+xml',
-			'application/atom+xml',
-			'application/hal+json',
-		);
-
-		foreach ( $valid_suffix_types as $type ) {
-			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
-		}
-	}
-
-	public function test_validate_mime_type_with_vendor_types(): void {
-		// RFC 2045: Vendor-specific types with dots and other characters.
-		$valid_vendor_types = array(
-			'application/vnd.ms-excel',
-			'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-			'text/vnd.example.custom',
-		);
-
-		foreach ( $valid_vendor_types as $type ) {
-			$this->assertTrue( McpValidator::validate_mime_type( $type ), "MIME type '{$type}' should be valid" );
-		}
-	}
-
-	public function test_validate_mime_type_rejects_parameters(): void {
-		// MIME type parameters (after ;) are not supported by the validator.
-		$types_with_parameters = array(
-			'text/html; charset=utf-8',
-			'text/plain; format=flowed',
-		);
-
-		foreach ( $types_with_parameters as $type ) {
-			$this->assertFalse( McpValidator::validate_mime_type( $type ), "MIME type with parameter '{$type}' should be rejected" );
-		}
-	}
-
-	// Image MIME Type Validation Tests
-
-	public function test_validate_image_mime_type_with_valid_types(): void {
-		$valid_image_types = array(
-			'image/jpeg',
-			'image/jpg',
-			'image/png',
-			'image/gif',
-			'image/webp',
-			'image/bmp',
-			'image/svg+xml',
-			'image/avif',
-			'image/heic',
-			'image/tiff',
-		);
-
-		foreach ( $valid_image_types as $type ) {
-			$this->assertTrue( McpValidator::validate_image_mime_type( $type ), "Image MIME type '{$type}' should be valid" );
-		}
-	}
-
-	public function test_validate_image_mime_type_case_insensitive(): void {
-		$this->assertTrue( McpValidator::validate_image_mime_type( 'IMAGE/PNG' ) );
-		$this->assertTrue( McpValidator::validate_image_mime_type( 'Image/Jpeg' ) );
-	}
-
-	public function test_validate_image_mime_type_rejects_invalid(): void {
-		$invalid_types = array(
-			'text/plain',
-			'application/json',
-			'audio/mp3',
-			'video/mp4',
-			'',
-			'not-an-image',
-			'image',           // Missing subtype
-			'images/png',      // Wrong prefix
-		);
-
-		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpValidator::validate_image_mime_type( $type ), "Type '{$type}' should not be a valid image MIME type" );
-		}
-	}
-
-	// Audio MIME Type Validation Tests
-
-	public function test_validate_audio_mime_type_with_valid_types(): void {
-		$valid_audio_types = array(
-			'audio/wav',
-			'audio/mp3',
-			'audio/mpeg',
-			'audio/ogg',
-			'audio/webm',
-			'audio/aac',
-			'audio/flac',
-			'audio/opus',
-			'audio/m4a',
-		);
-
-		foreach ( $valid_audio_types as $type ) {
-			$this->assertTrue( McpValidator::validate_audio_mime_type( $type ), "Audio MIME type '{$type}' should be valid" );
-		}
-	}
-
-	public function test_validate_audio_mime_type_case_insensitive(): void {
-		$this->assertTrue( McpValidator::validate_audio_mime_type( 'AUDIO/MP3' ) );
-		$this->assertTrue( McpValidator::validate_audio_mime_type( 'Audio/Mpeg' ) );
-	}
-
-	public function test_validate_audio_mime_type_rejects_invalid(): void {
-		$invalid_types = array(
-			'text/plain',
-			'application/json',
-			'image/jpeg',
-			'video/mp4',
-			'',
-			'not-an-audio',
-			'audio',           // Missing subtype
-			'audios/mp3',      // Wrong prefix
-		);
-
-		foreach ( $invalid_types as $type ) {
-			$this->assertFalse( McpValidator::validate_audio_mime_type( $type ), "Type '{$type}' should not be a valid audio MIME type" );
-		}
-	}
-
 	// Base64 Validation Tests
 
 	public function test_validate_base64_with_valid_content(): void {
@@ -680,35 +523,6 @@ final class McpValidatorTest extends TestCase {
 		$this->assertFalse( McpValidator::validate_icon_src( 'data:image/png' ) );
 	}
 
-	// Icon MIME Type Validation Tests
-
-	public function test_validate_icon_mime_type_with_required_types(): void {
-		// MUST support per MCP spec.
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/png' ) );
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/jpeg' ) );
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/jpg' ) );
-	}
-
-	public function test_validate_icon_mime_type_with_recommended_types(): void {
-		// SHOULD support per MCP spec.
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/svg+xml' ) );
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'image/webp' ) );
-	}
-
-	public function test_validate_icon_mime_type_case_insensitive(): void {
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'IMAGE/PNG' ) );
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'Image/Jpeg' ) );
-		$this->assertTrue( McpValidator::validate_icon_mime_type( 'IMAGE/SVG+XML' ) );
-	}
-
-	public function test_validate_icon_mime_type_rejects_unsupported_types(): void {
-		$this->assertFalse( McpValidator::validate_icon_mime_type( 'image/gif' ) );
-		$this->assertFalse( McpValidator::validate_icon_mime_type( 'image/bmp' ) );
-		$this->assertFalse( McpValidator::validate_icon_mime_type( 'image/tiff' ) );
-		$this->assertFalse( McpValidator::validate_icon_mime_type( 'text/plain' ) );
-		$this->assertFalse( McpValidator::validate_icon_mime_type( 'application/json' ) );
-	}
-
 	// Icon Size Validation Tests
 
 	public function test_validate_icon_size_with_valid_sizes(): void {
@@ -846,14 +660,24 @@ final class McpValidatorTest extends TestCase {
 		$this->assertStringContainsString( 'string', $errors[0] );
 	}
 
-	public function test_get_icon_validation_errors_invalid_mime_type(): void {
+	public function test_get_icon_validation_errors_accepts_any_mime_type_string(): void {
 		$icon = array(
 			'src'      => 'https://example.com/icon.gif',
-			'mimeType' => 'image/gif', // Not in allowed list.
+			'mimeType' => 'image/gif',
+		);
+
+		$this->assertSame( array(), McpValidator::get_icon_validation_errors( $icon ) );
+	}
+
+	public function test_get_icon_validation_errors_rejects_non_string_mime_type(): void {
+		$icon = array(
+			'src'      => 'https://example.com/icon.png',
+			'mimeType' => 123,
 		);
 
 		$errors = McpValidator::get_icon_validation_errors( $icon );
 		$this->assertNotEmpty( $errors );
+		$this->assertStringContainsString( 'Icon mimeType must be a string', implode( ' ', $errors ) );
 	}
 
 	public function test_get_icon_validation_errors_invalid_sizes_not_array(): void {
@@ -965,5 +789,55 @@ final class McpValidatorTest extends TestCase {
 		$this->assertEquals( 'image/png', $result['valid'][0]['mimeType'] );
 		$this->assertEquals( array( '48x48' ), $result['valid'][0]['sizes'] );
 		$this->assertEquals( 'light', $result['valid'][0]['theme'] );
+	}
+
+	public function test_normalize_meta_keeps_associative_array(): void {
+		$meta = array( 'ui' => array( 'prefersBorder' => true ) );
+
+		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
+	}
+
+	public function test_normalize_meta_keeps_prefixed_keys(): void {
+		// Reverse-DNS and vendor prefixes are valid _meta key names per MCP.
+		$meta = array(
+			'com.example/hint'      => 'value',
+			'openai/outputTemplate' => 'ui://example/app',
+		);
+
+		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
+	}
+
+	/**
+	 * @dataProvider data_non_object_meta
+	 *
+	 * @param mixed $meta The value to normalize.
+	 */
+	public function test_normalize_meta_rejects_values_that_are_not_json_objects( $meta ): void {
+		$this->assertNull( McpValidator::normalize_meta( $meta ) );
+	}
+
+	/**
+	 * @return array<string, array{0: mixed}>
+	 */
+	public function data_non_object_meta(): array {
+		return array(
+			'null'          => array( null ),
+			'string'        => array( 'not-an-object' ),
+			'int'           => array( 42 ),
+			'bool'          => array( true ),
+			'object'        => array( new \stdClass() ),
+			// These are arrays, but they serialize to a JSON array rather than an object.
+			'empty array'   => array( array() ),
+			'list'          => array( array( 'a', 'b' ) ),
+			'numeric keys'  => array( array( 0 => 'a', 1 => 'b' ) ),
+			'string digits' => array( array( '0' => 'a', '1' => 'b' ) ),
+		);
+	}
+
+	public function test_normalize_meta_keeps_sparse_numeric_keys(): void {
+		// Not a list, so it serializes as {"1":"a"} — a valid JSON object.
+		$meta = array( 1 => 'a' );
+
+		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
 	}
 }
