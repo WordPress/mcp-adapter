@@ -229,12 +229,12 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'A comprehensive test tool', $dto->getDescription() );
 
 		// Check input schema
-		$input_schema = $dto->getInputSchema()->toArray();
-		$this->assertSame( 'object', $input_schema['type'] );
-		$this->assertArrayHasKey( 'text', $input_schema['properties'] );
-		$this->assertContains( 'text', $input_schema['required'] );
-		$this->assertSame( 'string', $input_schema['$defs']['text']['type'] );
-		$this->assertSame( '#/$defs/text', ( (array) $input_schema['properties']['text'] )['$ref'] );
+		$this->assertArrayHasKey( 'inputSchema', $data );
+		$this->assertSame( 'object', $data['inputSchema']['type'] );
+		$this->assertArrayHasKey( 'text', $data['inputSchema']['properties'] );
+		$this->assertContains( 'text', $data['inputSchema']['required'] );
+		$this->assertSame( 'string', $data['inputSchema']['$defs']['text']['type'] );
+		$this->assertSame( '#/$defs/text', ( (array) $data['inputSchema']['properties']['text'] )['$ref'] );
 
 		// Check output schema
 		$this->assertArrayHasKey( 'outputSchema', $data );
