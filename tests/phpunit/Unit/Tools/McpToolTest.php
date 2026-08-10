@@ -198,15 +198,21 @@ final class McpToolTest extends TestCase {
 				'description'  => 'A comprehensive test tool',
 				'inputSchema'  => array(
 					'type'       => 'object',
-					'properties' => array(
+					'$defs'      => array(
 						'text' => array( 'type' => 'string' ),
+					),
+					'properties' => array(
+						'text' => array( '$ref' => '#/$defs/text' ),
 					),
 					'required'   => array( 'text' ),
 				),
 				'outputSchema' => array(
 					'type'       => 'object',
-					'properties' => array(
+					'$defs'      => array(
 						'result' => array( 'type' => 'string' ),
+					),
+					'properties' => array(
+						'result' => array( '$ref' => '#/$defs/result' ),
 					),
 				),
 				'meta'         => array( 'custom_key' => 'custom_value' ),
@@ -227,9 +233,13 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'object', $input_schema['type'] );
 		$this->assertArrayHasKey( 'text', $input_schema['properties'] );
 		$this->assertContains( 'text', $input_schema['required'] );
+		$this->assertSame( 'string', $input_schema['$defs']['text']['type'] );
+		$this->assertSame( '#/$defs/text', ( (array) $input_schema['properties']['text'] )['$ref'] );
 
 		// Check output schema
 		$this->assertArrayHasKey( 'outputSchema', $data );
+		$this->assertSame( 'string', $data['outputSchema']['$defs']['result']['type'] );
+		$this->assertSame( '#/$defs/result', ( (array) $data['outputSchema']['properties']['result'] )['$ref'] );
 
 		// Check custom meta preserved
 		$this->assertArrayHasKey( '_meta', $data );

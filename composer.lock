@@ -72,16 +72,16 @@
         },
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "v0.1.2",
+            "version": "v0.1.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/WordPress/php-mcp-schema",
-                "reference": "95df8a50a3bd54f6b7c4869c6e2185db380d4d63"
+                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/95df8a50a3bd54f6b7c4869c6e2185db380d4d63",
-                "reference": "95df8a50a3bd54f6b7c4869c6e2185db380d4d63",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
+                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
                 "shasum": ""
             },
             "require": {
@@ -115,7 +115,7 @@
                 "php",
                 "schema"
             ],
-            "time": "2026-06-05T08:26:32+00:00"
+            "time": "2026-08-10T09:12:14+00:00"
         }
     ],
     "packages-dev": [
