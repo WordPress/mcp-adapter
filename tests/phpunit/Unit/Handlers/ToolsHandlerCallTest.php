@@ -10,7 +10,6 @@ use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Common\Content\DTO\ImageContent;
 use WP\McpSchema\Common\Content\DTO\TextContent;
 use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
