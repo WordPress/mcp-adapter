@@ -673,6 +673,153 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertEquals( -32601, $response['error']['code'] ); // Method not found
 	}
 
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_tolerates_non_utf8_bytes_in_payload(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		$response = array(
+			'jsonrpc' => '2.0',
+			'id'      => 7,
+			'result'  => array(
+				'content' => array(
+					array(
+						'type' => 'text',
+						'text' => "before \x80 after",
+					),
+				),
+			),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringNotContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'jsonrpc', $decoded );
+		$this->assertSame( '2.0', $decoded['jsonrpc'] );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertSame( 7, $decoded['id'] );
+		$this->assertArrayHasKey( 'result', $decoded );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_fallback_preserves_id_when_payload_unencodable(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		// NAN triggers JSON_ERROR_INF_OR_NAN; without PARTIAL_OUTPUT_ON_ERROR
+		// wp_json_encode returns false, hitting the fallback path.
+		$response = array(
+			'jsonrpc' => '2.0',
+			'id'      => 'req-42',
+			'result'  => array( 'value' => NAN ),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'jsonrpc', $decoded );
+		$this->assertSame( '2.0', $decoded['jsonrpc'] );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertSame( 'req-42', $decoded['id'] );
+		$this->assertArrayHasKey( 'error', $decoded );
+	}
+
+	public function test_handle_request_catches_unexpected_throwable_from_router(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+		$router_property       = $reflection->getProperty( 'request_router' );
+		$router_property->setAccessible( true );
+
+		$original_router = $router_property->getValue( $this->bridge );
+		$mock_router     = $this->createMock( \WP\MCP\Transport\Infrastructure\RequestRouter::class );
+		$mock_router->method( 'route_request' )->willThrowException( new \RuntimeException( 'router blew up' ) );
+		$router_property->setValue( $this->bridge, $mock_router );
+
+		try {
+			$result = $handle_request_method->invoke(
+				$this->bridge,
+				wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 1,
+						'method'  => 'tools/list',
+						'params'  => array(),
+					)
+				)
+			);
+		} finally {
+			$router_property->setValue( $this->bridge, $original_router );
+		}
+
+		$this->assertIsString( $result );
+		$decoded = json_decode( $result, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'error', $decoded );
+		$this->assertSame( -32603, $decoded['error']['code'] );
+		$this->assertSame( 'Internal error', $decoded['error']['message'] );
+		$this->assertArrayHasKey( 'data', $decoded['error'] );
+		$this->assertStringContainsString( 'router blew up', $decoded['error']['data'] );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_fallback_emits_null_id_when_response_has_no_id(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		// No 'id' key — exercises the ': "null"' branch of the fallback ternary.
+		$response = array(
+			'jsonrpc' => '2.0',
+			'result'  => array( 'value' => NAN ),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertNull( $decoded['id'] );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_encode_response_fallback_recovers_when_id_itself_unencodable(): void {
+		$reflection             = new \ReflectionClass( $this->bridge );
+		$encode_response_method = $reflection->getMethod( 'encode_response' );
+		$encode_response_method->setAccessible( true );
+
+		// NAN can't be encoded without PARTIAL_OUTPUT_ON_ERROR, so the outer encode
+		// fails AND the inner id encode fails — exercises the recovery assignment.
+		$response = array(
+			'jsonrpc' => '2.0',
+			'id'      => NAN,
+			'result'  => array(),
+		);
+
+		$encoded = $encode_response_method->invoke( $this->bridge, $response );
+
+		$this->assertIsString( $encoded );
+		$this->assertStringContainsString( 'response could not be encoded', $encoded );
+
+		$decoded = json_decode( $encoded, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'id', $decoded );
+		$this->assertNull( $decoded['id'] );
+	}
+
 	public function test_handle_request_with_missing_params(): void {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );

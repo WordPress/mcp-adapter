@@ -368,4 +368,176 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertInstanceOf( CallToolResult::class, $result );
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_non_utf8_byte_in_result_does_not_break_response(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		$filter = static function () {
+			return array(
+				'ok'   => true,
+				'body' => "leading text \x80 trailing text",
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertFalse( (bool) $result->getIsError() );
+
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+
+		$text = $content[0]->getText();
+		$this->assertNotSame( '{}', $text );
+
+		$decoded = json_decode( $text, true );
+		$this->assertIsArray( $decoded );
+		$this->assertArrayHasKey( 'ok', $decoded );
+		$this->assertTrue( $decoded['ok'] );
+		$this->assertArrayHasKey( 'body', $decoded );
+
+		$structured = $result->getStructuredContent();
+		$this->assertIsArray( $structured );
+		$this->assertArrayHasKey( 'ok', $structured );
+		$this->assertTrue( $structured['ok'] );
+		$this->assertArrayHasKey( 'body', $structured );
+		// structuredContent re-derived from sanitized text — no raw 0x80 reaches the outer envelope.
+		$this->assertStringNotContainsString( "\x80", $structured['body'] );
+	}
+
+	public function test_embedded_resource_nested_shape_is_unwrapped(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// Inject the nested EmbeddedResource shape (resource keyed under 'resource').
+		$filter = static function () {
+			return array(
+				'type'     => 'resource',
+				'resource' => array(
+					'uri'      => 'WordPress://local/nested-resource',
+					'text'     => 'nested payload',
+					'mimeType' => 'text/plain',
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$resource = $content[0]->getResource();
+		$this->assertInstanceOf( TextResourceContents::class, $resource );
+		$this->assertSame( 'WordPress://local/nested-resource', $resource->getUri() );
+		$this->assertSame( 'nested payload', $resource->getText() );
+	}
+
+	public function test_throwable_from_filter_triggers_outer_catch(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// Throwing from a filter inside the try escapes McpTool::execute's own catch
+		// and hits the outer try/catch in ToolsHandler::call_tool. Use the pre_tool_call
+		// hook (not tool_call_result) so a callback exception leaving WP_Hook in a
+		// half-iterated state cannot leak into other tests that use tool_call_result.
+		$filter = static function () {
+			throw new \RuntimeException( 'filter blew up' );
+		};
+		add_filter( 'mcp_adapter_pre_tool_call', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+		}
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$error = $result->getError();
+		$this->assertNotNull( $error );
+		$this->assertSame( -32603, $error->getCode() );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Error calling tool', $messages );
+	}
+
+	/** @see https://github.com/WordPress/mcp-adapter/issues/195 */
+	public function test_unencodable_result_emits_empty_payload_and_logs(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+
+		// NAN triggers JSON_ERROR_INF_OR_NAN; without PARTIAL_OUTPUT_ON_ERROR
+		// wp_json_encode returns false and we hit the empty-payload fallback.
+		$filter = static function () {
+			return array( 'value' => NAN );
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+		$this->assertFalse( (bool) $result->getIsError() );
+
+		$content = $result->getContent();
+		$this->assertNotEmpty( $content );
+		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertSame( '{}', $content[0]->getText() );
+
+		$this->assertNull( $result->getStructuredContent() );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$matched  = array_filter(
+			$messages,
+			static fn ( string $m ): bool => false !== strpos( $m, 'could not be JSON-encoded' )
+		);
+		$this->assertNotEmpty( $matched );
+	}
 }
