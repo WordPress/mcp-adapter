@@ -438,8 +438,10 @@ class McpValidator {
 	 *
 	 * MCP declares `_meta` as `{ [key: string]: unknown }` — a JSON object. PHP has one
 	 * array type for both JSON shapes, so a sequential array (including an empty one)
-	 * would serialize to a JSON array and put non-conformant output on the wire. Those
-	 * are treated as absent, as is any non-array value.
+	 * would serialize to a JSON array and put non-conformant output on the wire. An
+	 * associative array can still contain values JSON cannot represent, such as a
+	 * resource, recursion or a non-finite float. Those are treated as absent too, as is
+	 * any non-array value.
 	 *
 	 * Returns null rather than raising: `_meta` is metadata travelling alongside a
 	 * payload, and a malformed one is not a reason to withhold the payload itself.
@@ -457,6 +459,20 @@ class McpValidator {
 
 		// A list serializes to a JSON array. array_is_list() needs PHP 8.1; the floor is 7.4.
 		if ( array_keys( $meta ) === range( 0, count( $meta ) - 1 ) ) {
+			return null;
+		}
+
+		// A JSON-object shape can still contain a value that makes serialization fail.
+		// Probe the same encoder WordPress uses at the transport boundary so malformed
+		// metadata cannot withhold the payload it accompanies. JsonSerializable values
+		// may throw from jsonSerialize(), so failure includes an exception here too.
+		try {
+			$encoded = wp_json_encode( $meta );
+		} catch ( \Throwable $exception ) {
+			return null;
+		}
+
+		if ( false === $encoded ) {
 			return null;
 		}
 

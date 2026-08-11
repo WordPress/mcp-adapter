@@ -290,6 +290,18 @@ final class ContentBlockHelperTest extends TestCase {
 	}
 
 	/**
+	 * An object-shaped `_meta` can still contain a value JSON cannot encode. The helper
+	 * must omit it so the content block remains serializable and its text still arrives.
+	 */
+	public function test_text_with_non_encodable_meta_omits_meta(): void {
+		$content = ContentBlockHelper::text( 'Test message', null, array( 'score' => NAN ) );
+
+		$this->assertNull( $content->get_meta() );
+		$this->assertSame( 'Test message', $content->getText() );
+		$this->assertIsString( wp_json_encode( $content->toArray() ) );
+	}
+
+	/**
 	 * Test that a list-shaped _meta is treated as absent by image().
 	 */
 	public function test_image_with_list_shaped_meta_omits_meta(): void {

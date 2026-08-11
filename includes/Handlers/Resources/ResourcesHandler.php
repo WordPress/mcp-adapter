@@ -235,13 +235,24 @@ class ResourcesHandler {
 	private function convert_contents_to_dtos( $contents, string $uri ): array {
 		// If contents is already an array of properly structured items, convert each.
 		if ( is_array( $contents ) && ! empty( $contents ) ) {
-			// Check if this is an array of content items, by looking for a field the first
-			// item would be built from. `blob` counts alongside `uri` and `text`: binary
-			// contents carry no text, and the URI falls back to the resource's own, so a
-			// blob is all a caller has to write. Only the first item is inspected, so a
-			// field missing here costs every sibling too.
-			$first_item = reset( $contents );
-			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) || isset( $first_item['blob'] ) ) ) {
+			// A protocol contents collection is a JSON list whose every member carries at
+			// least one field create_content_dto() builds from. Checking the whole list keeps
+			// an ordinary associative payload, or a data list whose first value merely looks
+			// like resource contents, on the JSON-text fallback path.
+			$is_list   = array_keys( $contents ) === range( 0, count( $contents ) - 1 );
+			$all_items = $is_list;
+
+			foreach ( $contents as $item ) {
+				if (
+					! is_array( $item )
+					|| ( ! isset( $item['uri'] ) && ! isset( $item['text'] ) && ! isset( $item['blob'] ) )
+				) {
+					$all_items = false;
+					break;
+				}
+			}
+
+			if ( $all_items ) {
 				return array_map(
 					function ( $item ) use ( $uri ) {
 						return $this->create_content_dto( $item, $uri );

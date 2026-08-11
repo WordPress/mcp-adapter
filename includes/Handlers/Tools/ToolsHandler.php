@@ -257,24 +257,30 @@ class ToolsHandler {
 					$uri = trim( $uri );
 				}
 
-				$block_meta    = $is_nested
-					? $this->normalize_content_meta(
-						$result['_meta'] ?? null,
-						$this->mcp->get_error_handler(),
-						'Invalid _meta on tool result content block, dropping it',
-						array( 'tool_name' => $tool_name )
-					)
-					: null;
-				$resource_meta = $this->normalize_content_meta(
-					$resource_item['_meta'] ?? null,
-					$this->mcp->get_error_handler(),
-					'Invalid _meta on tool result resource contents, dropping it',
-					array( 'tool_name' => $tool_name )
-				);
-
 				// Only return an EmbeddedResource if we have a valid URI and some content.
-				if ( is_string( $uri ) && '' !== $uri ) {
-					if ( isset( $resource_item['text'] ) && is_string( $resource_item['text'] ) ) {
+				$has_text = isset( $resource_item['text'] ) && is_string( $resource_item['text'] );
+				$has_blob = isset( $resource_item['blob'] ) && is_string( $resource_item['blob'] );
+
+				if ( is_string( $uri ) && '' !== $uri && ( $has_text || $has_blob ) ) {
+					// Normalize only once this branch owns the result. Below this point the
+					// generic path returns every key verbatim, so a `_meta` reported as
+					// dropped there would still be on the wire.
+					$block_meta    = $is_nested
+						? $this->normalize_content_meta(
+							$result['_meta'] ?? null,
+							$this->mcp->get_error_handler(),
+							'Invalid _meta on tool result content block, dropping it',
+							array( 'tool_name' => $tool_name )
+						)
+						: null;
+					$resource_meta = $this->normalize_content_meta(
+						$resource_item['_meta'] ?? null,
+						$this->mcp->get_error_handler(),
+						'Invalid _meta on tool result resource contents, dropping it',
+						array( 'tool_name' => $tool_name )
+					);
+
+					if ( $has_text ) {
 						return CallToolResult::fromArray(
 							array(
 								'content' => array(
@@ -292,7 +298,7 @@ class ToolsHandler {
 						);
 					}
 
-					if ( isset( $resource_item['blob'] ) && is_string( $resource_item['blob'] ) ) {
+					if ( $has_blob ) {
 						return CallToolResult::fromArray(
 							array(
 								'content' => array(

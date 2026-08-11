@@ -594,4 +594,48 @@ final class ToolsHandlerCallTest extends TestCase {
 		$messages = array_column( DummyErrorHandler::$logs, 'message' );
 		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
 	}
+
+	/**
+	 * The `resource` branch normalizes both `_meta` levels before it knows whether it can
+	 * build an EmbeddedResource. When the URI is empty the result falls through to the
+	 * generic path, which returns every key verbatim - so the `_meta` is still on the wire
+	 * and the warning names a drop that never happened.
+	 */
+	public function test_resource_result_that_falls_back_does_not_log_a_drop(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'  => 'resource',
+				'uri'   => '',
+				'text'  => 'body',
+				'_meta' => array( 'a', 'b' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		// The generic path keeps the result verbatim, so nothing was dropped.
+		$this->assertSame( array( 'a', 'b' ), $result->getStructuredContent()['_meta'] );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
+
+	/**
+	 * Same fall-through, reached through the content check rather than the URI check.
+	 */
+	public function test_resource_result_with_non_string_text_does_not_log_a_drop(): void {
+		$result = $this->call_tool_returning(
+			array(
+				'type'  => 'resource',
+				'uri'   => 'ui://example/app',
+				'text'  => array( 'not', 'a', 'string' ),
+				'_meta' => array( 'a', 'b' ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
 }

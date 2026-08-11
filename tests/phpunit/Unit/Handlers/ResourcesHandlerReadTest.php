@@ -626,4 +626,107 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertInstanceOf( TextResourceContents::class, $contents[1] );
 		$this->assertSame( 'sibling', $contents[1]->getText() );
 	}
+
+	/**
+	 * Checking only that every value is an array still mistakes an associative payload
+	 * for the protocol's contents list. Besides changing its meaning, preserving those
+	 * string keys would serialize `contents` as an object rather than a JSON array.
+	 */
+	public function test_read_resource_with_associative_all_array_payload_uses_text_fallback(): void {
+		$shape = array(
+			'thumbnail' => array(
+				'blob'     => 'ZGF0YQ==',
+				'mimeType' => 'image/png',
+			),
+			'metadata'  => array(
+				'title' => 'Photo',
+			),
+		);
+
+		$result = $this->read_resource_returning( $shape );
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertCount( 1, $contents );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( $shape, json_decode( $contents[0]->getText(), true ) );
+		$this->assertSame( array( 0 ), array_keys( $result->toArray()['contents'] ) );
+	}
+
+	/**
+	 * A list is only a protocol contents list when every member carries a field from
+	 * which a content DTO can be built. Otherwise the complete data list is preserved.
+	 */
+	public function test_read_resource_with_unstructured_array_sibling_uses_text_fallback(): void {
+		$shape = array(
+			array(
+				'blob'     => 'ZGF0YQ==',
+				'mimeType' => 'image/png',
+			),
+			array(
+				'title' => 'Photo',
+			),
+		);
+
+		$result = $this->read_resource_returning( $shape );
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertCount( 1, $contents );
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( $shape, json_decode( $contents[0]->getText(), true ) );
+	}
+
+	/**
+	 * An object-shaped `_meta` may still contain a value JSON cannot encode. Dropping it
+	 * must preserve the resource body and report the lost metadata to the author.
+	 */
+	public function test_read_resource_with_non_encodable_meta_drops_it_and_logs(): void {
+		$result = $this->read_resource_returning(
+			array(
+				array(
+					'uri'   => 'WordPress://local/resource-1',
+					'text'  => 'body',
+					'_meta' => array( 'score' => NAN ),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( 'body', $contents[0]->getText() );
+		$this->assertNull( $contents[0]->get_meta() );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertContains( 'Invalid _meta on resource contents, dropping it', $messages );
+	}
+
+	/**
+	 * Read the test resource after replacing its handler result with an arbitrary shape.
+	 *
+	 * @param mixed $shape Resource handler result to return.
+	 *
+	 * @return \WP\McpSchema\Server\Resources\DTO\ReadResourceResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	private function read_resource_returning( $shape ) {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () use ( $shape ) {
+			return $shape;
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		try {
+			return $handler->read_resource(
+				array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_resource_read_result', $filter );
+		}
+	}
+
 }

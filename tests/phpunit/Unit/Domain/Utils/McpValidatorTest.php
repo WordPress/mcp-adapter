@@ -840,4 +840,21 @@ final class McpValidatorTest extends TestCase {
 
 		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
 	}
+
+	public function test_normalize_meta_rejects_a_value_json_cannot_encode(): void {
+		$meta = array( 'value' => NAN );
+
+		$this->assertFalse( wp_json_encode( $meta ) );
+		$this->assertNull( McpValidator::normalize_meta( $meta ) );
+	}
+
+	public function test_normalize_meta_handles_a_throwing_json_serializable_value(): void {
+		$value = new class() implements \JsonSerializable {
+			public function jsonSerialize(): array {
+				throw new \RuntimeException( 'Cannot serialize' );
+			}
+		};
+
+		$this->assertNull( McpValidator::normalize_meta( array( 'value' => $value ) ) );
+	}
 }
