@@ -137,7 +137,7 @@ if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
 // Check in your plugin
 if ( ! function_exists( 'wp_register_ability' ) ) {
     add_action( 'admin_notices', function() {
-        echo '<div class="notice notice-error"><p>WordPress Abilities API is required.</p></div>';
+        echo '<div class="notice notice-error"><p>MCP Adapter requires WordPress 6.9 or newer. The Abilities API is included in core.</p></div>';
     });
     return;
 }

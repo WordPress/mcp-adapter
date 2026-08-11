@@ -49,7 +49,7 @@ For a full breakdown of the component structure, see the [Architecture Overview]
 ## Dependencies
 
 - **PHP**: >= 7.4
-- **WordPress**: >= 6.9
+- **WordPress**: >= 6.9 (includes the [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) in core — no separate plugin)
 - **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types — installed automatically via Composer
 
 ## Installation
