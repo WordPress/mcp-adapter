@@ -260,6 +260,8 @@ final class McpAdapterConfigTest extends TestCase {
 				'test/resource-multiple-contents',
 				'test/resource-text-with-mimetype',
 				'test/resource-plain-string',
+				'test/resource-text-with-meta',
+				'test/resource-blob-with-meta',
 			),
 			$received_config['resources']
 		);
