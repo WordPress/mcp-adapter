@@ -162,9 +162,10 @@ final class McpTool implements McpComponentInterface {
 			}
 		}
 
-		// Preserve user-provided _meta as-is.
-		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
-			$tool_data['_meta'] = $config['meta'];
+		// Preserve user-provided _meta.
+		$tool_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
+		if ( null !== $tool_meta ) {
+			$tool_data['_meta'] = $tool_meta;
 		}
 
 		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.

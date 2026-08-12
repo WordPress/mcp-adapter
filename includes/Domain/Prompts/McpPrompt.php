@@ -161,8 +161,9 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['title'] = $config['title'];
 		}
 
-		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
-			$prompt_data['_meta'] = $config['meta'];
+		$prompt_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
+		if ( null !== $prompt_meta ) {
+			$prompt_data['_meta'] = $prompt_meta;
 		}
 
 		if ( null !== $valid_icons ) {

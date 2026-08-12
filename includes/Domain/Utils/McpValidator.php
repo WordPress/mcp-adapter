@@ -434,6 +434,36 @@ class McpValidator {
 	}
 
 	/**
+	 * Normalize a `_meta` value for inclusion in a protocol DTO.
+	 *
+	 * MCP declares `_meta` as `{ [key: string]: unknown }` — a JSON object. PHP has one
+	 * array type for both JSON shapes, so a sequential array (including an empty one)
+	 * would serialize to a JSON array and put non-conformant output on the wire. Those
+	 * are treated as absent, as is any non-array value.
+	 *
+	 * Returns null rather than raising so an incorrectly shaped optional `_meta` does
+	 * not withhold the payload it accompanies.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed $meta The raw `_meta` value.
+	 *
+	 * @return array<array-key, mixed>|null A non-empty, non-list array suitable for JSON-object encoding, or null if absent/invalid.
+	 */
+	public static function normalize_meta( $meta ): ?array {
+		if ( ! is_array( $meta ) || array() === $meta ) {
+			return null;
+		}
+
+		// A list serializes to a JSON array. array_is_list() needs PHP 8.1; the floor is 7.4.
+		if ( array_keys( $meta ) === range( 0, count( $meta ) - 1 ) ) {
+			return null;
+		}
+
+		return $meta;
+	}
+
+	/**
 	 * Validate a resource URI format.
 	 *
 	 * Per MCP spec: "The URI can use any protocol; it is up to the server how to interpret it."

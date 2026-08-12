@@ -170,8 +170,9 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
-			$resource_data['_meta'] = $config['meta'];
+		$resource_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
+		if ( null !== $resource_meta ) {
+			$resource_data['_meta'] = $resource_meta;
 		}
 
 		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.

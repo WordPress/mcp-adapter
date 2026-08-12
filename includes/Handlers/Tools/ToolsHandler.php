@@ -11,6 +11,7 @@ namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -234,11 +235,21 @@ class ToolsHandler {
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
+			//
+			// Two shapes are accepted, and they place `_meta` differently:
+			//
+			// - Nested `{ type, resource: { uri, text, _meta }, _meta }` maps one-to-one onto
+			//   the DTO tree, so the outer `_meta` belongs to the content block and the inner
+			//   one to the resource contents.
+			// - Flat `{ type, uri, mimeType, text, _meta }` is a resource-contents literal
+			//   carrying a `type` tag: every key beside `type` is a `ResourceContents` field,
+			//   and `_meta` is declared there alongside them. Its `_meta` therefore describes
+			//   the resource, which is what the same literal already means to
+			//   `ResourcesHandler::create_content_dto()`. A caller who needs block-level
+			//   `_meta` writes the nested form, which exists to express that distinction.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
-				$resource_item = $result;
-				if ( isset( $result['resource'] ) && is_array( $result['resource'] ) ) {
-					$resource_item = $result['resource'];
-				}
+				$is_nested     = isset( $result['resource'] ) && is_array( $result['resource'] );
+				$resource_item = $is_nested ? $result['resource'] : $result;
 
 				$uri       = $resource_item['uri'] ?? null;
 				$mime_type = $resource_item['mimeType'] ?? null;
@@ -248,15 +259,26 @@ class ToolsHandler {
 				}
 
 				// Only return an EmbeddedResource if we have a valid URI and some content.
-				if ( is_string( $uri ) && '' !== $uri ) {
-					if ( isset( $resource_item['text'] ) && is_string( $resource_item['text'] ) ) {
+				$has_text = isset( $resource_item['text'] ) && is_string( $resource_item['text'] );
+				$has_blob = isset( $resource_item['blob'] ) && is_string( $resource_item['blob'] );
+
+				if ( is_string( $uri ) && '' !== $uri && ( $has_text || $has_blob ) ) {
+					$block_meta    = $is_nested
+						? McpValidator::normalize_meta( $result['_meta'] ?? null )
+						: null;
+					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
+
+					if ( $has_text ) {
 						return CallToolResult::fromArray(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_text_resource(
 										$uri,
 										$resource_item['text'],
-										is_string( $mime_type ) ? $mime_type : null
+										is_string( $mime_type ) ? $mime_type : null,
+										null,
+										$block_meta,
+										$resource_meta
 									),
 								),
 								'isError' => false,
@@ -264,14 +286,17 @@ class ToolsHandler {
 						);
 					}
 
-					if ( isset( $resource_item['blob'] ) && is_string( $resource_item['blob'] ) ) {
+					if ( $has_blob ) {
 						return CallToolResult::fromArray(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_blob_resource(
 										$uri,
 										$resource_item['blob'],
-										is_string( $mime_type ) ? $mime_type : null
+										is_string( $mime_type ) ? $mime_type : null,
+										null,
+										$block_meta,
+										$resource_meta
 									),
 								),
 								'isError' => false,
@@ -282,18 +307,34 @@ class ToolsHandler {
 			}
 
 			// Handle image results.
+			//
+			// `type` marks this result as a description of a content block rather than tool
+			// data, so its sibling `_meta` is the block's, which is the reading the `resource`
+			// branch above already applies to the same key.
 			if ( isset( $result['type'] ) && 'image' === $result['type'] && isset( $result['results'] ) ) {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
 				return CallToolResult::fromArray(
 					array(
-						'content'           => array( ContentBlockHelper::image( $image_data, $mime_type ) ),
+						'content'           => array(
+							ContentBlockHelper::image(
+								$image_data,
+								$mime_type,
+								null,
+								McpValidator::normalize_meta( $result['_meta'] ?? null )
+							),
+						),
 						'structuredContent' => null,
 						'isError'           => false,
 					)
 				);
 			}
+
+			// The generic fallback carries no `type` marker, so every key it holds is tool
+			// data: the result is JSON-encoded into the text block and returned verbatim as
+			// `structuredContent`. Reading `_meta` off it would give one key two meanings,
+			// with nothing to tell metadata from a domain field.
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
 			$json_text = wp_json_encode( $result );

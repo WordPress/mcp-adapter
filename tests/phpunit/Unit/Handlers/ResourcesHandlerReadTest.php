@@ -327,4 +327,95 @@ final class ResourcesHandlerReadTest extends TestCase {
 
 		remove_filter( 'mcp_adapter_resource_read_result', $filter );
 	}
+
+	public function test_read_resource_preserves_meta_on_text_contents(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'      => 'ui://example/app',
+					'mimeType' => 'text/html;profile=mcp-app',
+					'text'     => '<!doctype html>',
+					'_meta'    => array( 'ui' => array( 'prefersBorder' => true ) ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $contents[0]->get_meta() );
+	}
+
+	public function test_read_resource_with_list_meta_omits_it_from_the_wire(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'uri'   => 'WordPress://local/resource-1',
+					'text'  => 'body',
+					'_meta' => array( 'a', 'b' ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertNull( $contents[0]->get_meta() );
+
+		// MCP declares _meta as a JSON object; a list would serialize as `"_meta": ["a","b"]`.
+		$this->assertArrayNotHasKey( '_meta', $contents[0]->toArray() );
+	}
+
+	public function test_read_resource_with_blob_only_item_preserves_meta(): void {
+		wp_set_current_user( 1 );
+		$server  = $this->makeServer( array(), array( 'test/resource' ) );
+		$handler = new ResourcesHandler( $server );
+
+		$filter = static function () {
+			return array(
+				array(
+					'mimeType' => 'application/pdf',
+					'blob'     => 'ZGF0YQ==',
+					'_meta'    => array( 'pages' => 3 ),
+				),
+			);
+		};
+		add_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$result = $handler->read_resource(
+			array( 'params' => array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+
+		remove_filter( 'mcp_adapter_resource_read_result', $filter );
+
+		$this->assertInstanceOf( ReadResourceResult::class, $result );
+
+		$contents = $result->getContents();
+		$this->assertInstanceOf( BlobResourceContents::class, $contents[0] );
+		$this->assertSame( 'WordPress://local/resource-1', $contents[0]->getUri() );
+		$this->assertSame( array( 'pages' => 3 ), $contents[0]->get_meta() );
+	}
 }

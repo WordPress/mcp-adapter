@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
@@ -512,6 +513,7 @@ class PromptsHandler {
 		}
 
 		$content = $this->validate_content_type( $content, $prompt_name );
+		$content = $this->normalize_content_block( $content );
 
 		return PromptMessage::fromArray(
 			array(
@@ -519,6 +521,49 @@ class PromptsHandler {
 				'content' => $content,
 			)
 		);
+	}
+
+	/**
+	 * Bring a caller-supplied content block into the shape the schema DTOs accept.
+	 *
+	 * Prompt messages carry the same content blocks tool results do, and reach the wire
+	 * through the same DTOs, so they carry the same hazard: a `_meta` that would serialize
+	 * as a JSON array where MCP declares an object.
+	 *
+	 * Here the cost is higher than on the tool path. A value the DTO refuses throws, and
+	 * the catch in get_prompt() turns that into an error response - so a `_meta` that is
+	 * not an array at all loses the whole prompt rather than the field. It is dropped so
+	 * that the message survives.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array $content Content block as the prompt returned it.
+	 *
+	 * @return array Content block safe to hand to PromptMessage::fromArray().
+	 */
+	private function normalize_content_block( array $content ): array {
+		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
+		if ( null === $block_meta ) {
+			unset( $content['_meta'] );
+		} else {
+			$content['_meta'] = $block_meta;
+		}
+
+		// EmbeddedResource takes its resource contents as given, so a nested block never
+		// reaches a DTO that could reject them. This is the only level that inspects them.
+		if ( 'resource' === ( $content['type'] ?? '' ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
+			$resource = $content['resource'];
+
+			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
+			if ( null === $resource_meta ) {
+				unset( $resource['_meta'] );
+			} else {
+				$resource['_meta'] = $resource_meta;
+			}
+			$content['resource'] = $resource;
+		}
+
+		return $content;
 	}
 
 	/**

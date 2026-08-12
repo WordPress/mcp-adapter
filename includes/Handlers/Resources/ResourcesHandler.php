@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
@@ -235,9 +236,9 @@ class ResourcesHandler {
 	private function convert_contents_to_dtos( $contents, string $uri ): array {
 		// If contents is already an array of properly structured items, convert each.
 		if ( is_array( $contents ) && ! empty( $contents ) ) {
-			// Check if this is an array of content items (has 'uri' or 'text' keys in first item).
+			// Check if this is an array of content items (has 'uri', 'text', or 'blob' in first item).
 			$first_item = reset( $contents );
-			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) ) ) {
+			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) || isset( $first_item['blob'] ) ) ) {
 				return array_map(
 					function ( $item ) use ( $uri ) {
 						return $this->create_content_dto( $item, $uri );
@@ -270,14 +271,25 @@ class ResourcesHandler {
 	/**
 	 * Create a content DTO from an array item.
 	 *
-	 * @param array $item The content item array.
-	 * @param string $default_uri The default URI to use if not specified.
+	 * `_meta` is carried through from the item so metadata a handler attaches to its
+	 * resource contents reaches the client. MCP Apps UI resources rely on this: they
+	 * put CSP config and border hints under `_meta.ui` alongside the HTML body.
+	 *
+	 * A list-shaped `_meta` is omitted because MCP declares this field as a JSON object.
+	 *
+	 * Every key is optional and read defensively, because a handler returns whatever
+	 * WordPress handed it: `blob` and `text` are cast to string, `mimeType` is kept
+	 * only when it already is one, and an absent `uri` falls back to $default_uri.
+	 *
+	 * @param array{uri?: mixed, mimeType?: mixed, text?: mixed, blob?: mixed, _meta?: mixed} $item The content item array.
+	 * @param string $default_uri The URI to use when the item names none.
 	 *
 	 * @return \WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents
 	 */
 	private function create_content_dto( array $item, string $default_uri ) {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
+		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {
@@ -286,6 +298,7 @@ class ResourcesHandler {
 					'uri'      => $item_uri,
 					'blob'     => (string) $item['blob'],
 					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+					'_meta'    => $meta,
 				)
 			);
 		}
@@ -298,6 +311,7 @@ class ResourcesHandler {
 				'uri'      => $item_uri,
 				'text'     => (string) $text,
 				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
+				'_meta'    => $meta,
 			)
 		);
 	}

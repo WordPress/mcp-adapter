@@ -1027,4 +1027,115 @@ final class PromptsHandlerTest extends TestCase {
 
 		remove_filter( 'mcp_adapter_prompts_list', $filter );
 	}
+
+	// =========================================================================
+	// Message Content Block Normalization
+	//
+	// Prompt messages already accept protocol-shaped content blocks. These tests pin
+	// valid `_meta` passthrough and omission of PHP lists at both metadata levels.
+	// =========================================================================
+
+	/**
+	 * The nested form of a resource content block has two levels that each carry
+	 * `_meta`, and the DTO never sees the inner one - EmbeddedResource takes the
+	 * resource contents as given.
+	 */
+	public function test_embedded_resource_contents_meta_that_is_a_list_is_omitted(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'_meta'    => array( 'a', 'b' ),
+							'resource' => array(
+								'uri'   => 'WordPress://local/prompt-embedded',
+								'text'  => 'body',
+								'_meta' => array( 'c', 'd' ),
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+
+		$block = $this->first_content_block( $result );
+		$this->assertArrayNotHasKey( '_meta', $block );
+		$this->assertArrayNotHasKey( '_meta', $block['resource'] );
+		$this->assertSame( 'body', $block['resource']['text'] );
+	}
+
+	public function test_embedded_resource_contents_meta_object_is_preserved(): void {
+		$result = $this->get_prompt_returning(
+			array(
+				'messages' => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							'type'     => 'resource',
+							'_meta'    => array( 'block' => 'level' ),
+							'resource' => array(
+								'uri'   => 'WordPress://local/prompt-embedded',
+								'text'  => 'body',
+								'_meta' => array( 'ui' => array( 'prefersBorder' => true ) ),
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( array( 'block' => 'level' ), $this->first_content_block( $result )['_meta'] );
+		$this->assertSame(
+			array( 'ui' => array( 'prefersBorder' => true ) ),
+			$this->first_content_block( $result )['resource']['_meta']
+		);
+	}
+
+	/**
+	 * Run a prompt whose result is replaced by $shape, so any result shape can be driven
+	 * through the handler's normalization without registering a new ability per case.
+	 *
+	 * @param array $shape The prompt result to normalize.
+	 *
+	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	private function get_prompt_returning( array $shape ) {
+		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
+		$handler = new PromptsHandler( $server );
+
+		$filter = static function () use ( $shape ) {
+			return $shape;
+		};
+		add_filter( 'mcp_adapter_prompt_get_result', $filter );
+
+		$result = $handler->get_prompt(
+			array(
+				'params' => array(
+					'name'      => 'test-prompt',
+					'arguments' => array( 'code' => 'x' ),
+				),
+			),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_prompt_get_result', $filter );
+
+		return $result;
+	}
+
+	/**
+	 * The emitted array of the first message's content block.
+	 *
+	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
+	 *
+	 * @return array
+	 */
+	private function first_content_block( GetPromptResult $result ): array {
+		return $result->getMessages()[0]->getContent()->toArray();
+	}
 }
