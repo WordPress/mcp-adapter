@@ -12,7 +12,6 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 - **[Default Server](guides/default-server.md)** - Understanding the built-in MCP server and core abilities
 - **[Creating Abilities](guides/creating-abilities.md)** - Build tools, resources, and prompts with annotations
-- **[Tools with a UI (MCP Apps)](guides/creating-abilities.md#building-a-tool-with-a-ui-mcp-apps)** - Render an interactive interface from a tool
 - **[Transport Permissions](guides/transport-permissions.md)** - Custom authentication and access control
 - **[Custom Transports](guides/custom-transports.md)** - Specialized communication protocols
 - **[Error Handling](guides/error-handling.md)** - Custom error logging and monitoring

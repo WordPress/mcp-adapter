@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
@@ -502,27 +503,21 @@ class PromptsHandler {
 	 * @return \WP\McpSchema\Server\Prompts\DTO\PromptMessage
 	 */
 	private function validate_and_create_message( array $message, string $prompt_name ): PromptMessage {
-		// Validate and normalize role.
 		$role = $this->validate_role( $message['role'] ?? self::$default_role, $prompt_name );
 
-		// Validate and normalize content.
 		$content = $message['content'] ?? array();
 		if ( ! is_array( $content ) ) {
-			// If content is a string, wrap it as text.
+			$text    = is_scalar( $content ) ? (string) $content : wp_json_encode( $content, JSON_PRETTY_PRINT );
 			$content = array(
 				'type' => 'text',
-				'text' => is_string( $content ) ? $content : (string) $content,
+				'text' => false === $text ? '{}' : $text,
 			);
 		}
 
 		$content = $this->validate_content_type( $content, $prompt_name );
 		$content = $this->normalize_content_block( $content, $prompt_name );
 
-		// normalize_content_block() covers the fields the DTOs are known to refuse, but it
-		// is not a whitelist - a valid type carrying any other malformed payload still
-		// throws here. Without this guard that throw reaches get_prompt()'s catch and the
-		// whole prompt is lost, including the messages that were fine. Degrading matches
-		// what this handler already does for an unknown type and an invalid role.
+		// Degrade only the rejected message so valid siblings remain available.
 		try {
 			return PromptMessage::fromArray(
 				array(
@@ -550,10 +545,7 @@ class PromptsHandler {
 	}
 
 	/**
-	 * Represent a content block that cannot be rendered as a text block carrying its JSON.
-	 *
-	 * The same substitution validate_content_type() makes for an unrecognized type, so a
-	 * block the schema refuses costs its own fidelity rather than the whole prompt.
+	 * Serialize a rejected content block into fallback text.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -571,43 +563,7 @@ class PromptsHandler {
 	}
 
 	/**
-	 * Whether a value is usable as the contents of an embedded resource.
-	 *
-	 * Mirrors what a conforming client accepts: a non-empty uri, plus either text or
-	 * blob. EmbeddedResource takes its contents as given, so nothing else checks this.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param mixed $contents Embedded resource contents as the prompt returned them.
-	 *
-	 * @return bool
-	 */
-	private function is_valid_resource_contents( $contents ): bool {
-		if ( ! is_array( $contents ) ) {
-			return false;
-		}
-
-		if ( ! isset( $contents['uri'] ) || ! is_string( $contents['uri'] ) || '' === $contents['uri'] ) {
-			return false;
-		}
-
-		return ( isset( $contents['text'] ) && is_string( $contents['text'] ) )
-			|| ( isset( $contents['blob'] ) && is_string( $contents['blob'] ) );
-	}
-
-	/**
 	 * Bring a caller-supplied content block into the shape the schema DTOs accept.
-	 *
-	 * Prompt messages carry the same content blocks tool results do, and reach the wire
-	 * through the same DTOs, so they carry the same two hazards: a `_meta` that would
-	 * serialize as a JSON array where MCP declares an object, and an annotations object a
-	 * conforming client rejects along with the block that carries it.
-	 *
-	 * Here the cost is higher than on the tool path. A value the DTO refuses throws, and
-	 * the catch in get_prompt() turns that into an error response - so a stored byte count
-	 * that arrived as the string "1024", or a `_meta` that is not an array at all, loses
-	 * the whole prompt rather than the field. Everything below is dropped or coerced so
-	 * that the message survives.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -635,22 +591,23 @@ class PromptsHandler {
 			if ( null === $annotations ) {
 				unset( $content['annotations'] );
 			} else {
-				$content['annotations'] = $annotations;
+				$content['annotations'] = $annotations->toArray();
 			}
 		}
 
-		// EmbeddedResource takes its resource contents as given, so a nested block never
-		// reaches a DTO that could reject them. This is the only level that inspects them,
-		// and the failure it catches is the quiet one: contents that are not valid
-		// ResourceContents do not throw, they reach the wire, and a conforming client
-		// rejects the message with nothing to tell the author why.
 		if ( 'resource' === ( $content['type'] ?? '' ) ) {
 			$resource = $content['resource'] ?? null;
+			$errors   = is_array( $resource )
+				? McpResourceValidator::get_validation_errors( $resource )
+				: array( __( 'Resource contents must be an array', 'mcp-adapter' ) );
 
-			if ( ! $this->is_valid_resource_contents( $resource ) ) {
+			if ( ! empty( $errors ) ) {
 				$this->mcp->get_error_handler()->log(
 					'Invalid embedded resource contents in prompt message, degrading to text',
-					array( 'prompt_name' => $prompt_name ),
+					array(
+						'prompt_name' => $prompt_name,
+						'errors'      => $errors,
+					),
 					'warning'
 				);
 
@@ -666,11 +623,10 @@ class PromptsHandler {
 			$content['resource'] = $resource;
 		}
 
-		// A resource_link byte count reaches us as whatever the caller had - "1024" from
-		// stored data, 1024.0 from arithmetic - while the schema asserts a strict int.
 		if ( 'resource_link' === ( $content['type'] ?? '' ) && isset( $content['size'] ) ) {
-			if ( is_numeric( $content['size'] ) && (int) $content['size'] > 0 ) {
-				$content['size'] = (int) $content['size'];
+			$size = McpValidator::normalize_size( $content['size'] );
+			if ( null !== $size ) {
+				$content['size'] = $size;
 			} else {
 				unset( $content['size'] );
 			}
@@ -737,13 +693,13 @@ class PromptsHandler {
 	 *
 	 * @since 0.5.0
 	 *
-	 * @param string $role        Role value to validate.
+	 * @param mixed  $role        Role value to validate.
 	 * @param string $prompt_name Prompt name for logging (empty to skip logging).
 	 *
 	 * @return string Valid role value.
 	 */
-	private function validate_role( string $role, string $prompt_name ): string {
-		if ( in_array( $role, self::$valid_roles, true ) ) {
+	private function validate_role( $role, string $prompt_name ): string {
+		if ( is_string( $role ) && in_array( $role, self::$valid_roles, true ) ) {
 			return $role;
 		}
 

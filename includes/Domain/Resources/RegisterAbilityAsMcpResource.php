@@ -169,7 +169,7 @@ class RegisterAbilityAsMcpResource {
 
 		// Optional: size from ability meta (bytes count for UI display).
 		$size = $this->get_mcp_meta( 'size', 'int' );
-		if ( null !== $size && $size > 0 ) {
+		if ( null !== $size ) {
 			$resource_data['size'] = $size;
 		}
 

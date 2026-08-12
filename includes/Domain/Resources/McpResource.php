@@ -159,11 +159,9 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		// Include size only when > 0. A byte count reaches us as whatever the caller had -
-		// "1024" from stored data, 1024.0 from arithmetic - while the schema asserts a
-		// strict int, so cast rather than let a usable value fail the whole resource.
-		if ( isset( $config['size'] ) && is_numeric( $config['size'] ) && (int) $config['size'] > 0 ) {
-			$resource_data['size'] = (int) $config['size'];
+		$size = McpValidator::normalize_size( $config['size'] ?? null );
+		if ( null !== $size ) {
+			$resource_data['size'] = $size;
 		}
 
 		// Validate and include icons if set.
@@ -179,27 +177,15 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
-		// Annotations go through the mapper before the DTO sees them: it keeps only the
-		// fields the shared Annotations type models and coerces each to the type that type
-		// asserts. Without it, vocabulary the type does not model leaves an all-null DTO
-		// that serializes to `[]` where MCP declares an object, and a loosely typed value -
-		// the string "0.5" WordPress hands back from post meta - fails the DTO's strict
-		// float assertion and takes the whole resource down with it. A rendering hint must
-		// not cost the resource its registration.
+		// Normalize optional annotations before constructing the strict DTO.
 		$annotations = isset( $config['annotations'] ) && is_array( $config['annotations'] )
 			? McpAnnotationMapper::map( $config['annotations'], 'resource' )
 			: array();
 
-		// Mapping fixes each value's type but says nothing about its range. A well-typed but
-		// out-of-spec value - priority outside 0.0-1.0, an audience role MCP does not define -
-		// is rejected by a conforming client along with the whole resource, so drop the
-		// annotations rather than publish something unusable. Matches what
-		// RegisterAbilityAsMcpResource already does on the ability-backed path.
 		if ( ! empty( $annotations ) && ! empty( McpValidator::get_annotation_validation_errors( $annotations ) ) ) {
 			$annotations = array();
 		}
 
-		// Create the Resource DTO - wrap in try-catch since ResourceDto::fromArray() can throw.
 		try {
 			if ( ! empty( $annotations ) ) {
 				$resource_data['annotations'] = Annotations::fromArray( $annotations );
@@ -320,24 +306,7 @@ final class McpResource implements McpComponentInterface {
 	}
 
 	/**
-	 * Build the input an ability-backed resource is invoked with.
-	 *
-	 * A resource is content addressed by its URI, so `resources/read` carries no arguments
-	 * to forward: its params are the URI and nothing the ability's `input_schema` describes.
-	 * What the ability still needs is an input the Abilities API will accept for a call that
-	 * has none. Both entry points default to null, and core validates null against a schema
-	 * of type object as "input is not of type object", so every ability-backed resource
-	 * declaring one failed its read.
-	 *
-	 * The normalizer answers what a zero-argument call looks like for this ability: null with
-	 * no schema, or with one that declares a top-level default or permits null, and an empty
-	 * array otherwise. That is the same question `tools/call` asks, and {@see McpTool} routes
-	 * both its `execute()` and its `check_permissions()` through the same helper.
-	 *
-	 * Permission needs this as much as execution does, and hits it first. Core passes the
-	 * input to the `permission_callback` whenever the ability declares a schema, so a
-	 * callback typed `array $input` receives null and throws before the read gets as far
-	 * as executing.
+	 * Build the zero-argument input for an ability-backed resource.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -359,7 +328,9 @@ final class McpResource implements McpComponentInterface {
 	public function check_permission( $arguments ) {
 		if ( null !== $this->ability ) {
 			try {
-				return $this->ability->check_permissions( $this->no_arguments_input( $this->ability ) );
+				$input = $this->ability->normalize_input( $this->no_arguments_input( $this->ability ) );
+
+				return $this->ability->check_permissions( $input );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_permission_check_failed',

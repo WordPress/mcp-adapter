@@ -259,7 +259,7 @@ The MCP Adapter automatically creates a default server that exposes all register
 Annotations hint at how clients should treat a component, and each type reads them from a different place:
 
 - **Tools**: `meta.annotations` — write the Abilities API names `readonly`, `destructive`, `idempotent`, which the adapter maps to `readOnlyHint`, `destructiveHint`, `idempotentHint`. `openWorldHint` and `title` have no Abilities API equivalent, so write those under their MCP names.
-- **Resources**: `meta.mcp.annotations` — `audience`, `priority`, `lastModified`
+- **Resources**: `meta.mcp.annotations` — `audience`, `priority`, and `lastModified` for MCP 2025-06-18 or later
 - **Prompts**: no descriptor annotations; annotate the message content blocks instead
 
 For full details on annotations, their semantics, and usage guidelines, see the Annotations section of the MCP schema spec: https://modelcontextprotocol.io/specification/2025-06-18/schema#annotations

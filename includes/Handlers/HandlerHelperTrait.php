@@ -68,19 +68,7 @@ trait HandlerHelperTrait {
 	/**
 	 * Build an Annotations DTO for a content block from raw handler output.
 	 *
-	 * Content blocks carry the shared annotations vocabulary (`audience`, `priority`,
-	 * `lastModified`), not the tool-hint vocabulary that belongs on a tool descriptor.
-	 * Anything a conforming client would reject is dropped here, because annotations are
-	 * validated as part of the block that carries them, so a bad annotation costs the
-	 * whole block rather than only itself. Two shapes have to be kept off the wire: a
-	 * value outside what the schema allows, and an annotations object with nothing left
-	 * in it, which PHP serializes as a JSON array where MCP declares an object.
-	 *
-	 * Dropping is logged rather than raised. Annotations are a rendering hint, and
-	 * failing the whole response over one would be a worse outcome for a payload that is
-	 * otherwise valid. Both losses are logged: a value the schema rejects, and a
-	 * non-empty annotations object whose every field belongs to another vocabulary. An
-	 * input that was already empty is not a loss and stays quiet.
+	 * Invalid optional annotations are logged and omitted so they do not cost the block.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -98,29 +86,14 @@ trait HandlerHelperTrait {
 		array $log_context = array()
 	): ?Annotations {
 		if ( $annotations instanceof Annotations ) {
-			return $annotations;
+			$annotations = $annotations->toArray();
 		}
 
 		if ( ! is_array( $annotations ) ) {
-			return null;
-		}
-
-		// The mapper is the single seam where raw annotation input becomes DTO-ready: it
-		// keeps only the fields the shared Annotations type models, and coerces each to the
-		// type that type asserts. Both matter here. Vocabulary it drops - most likely the
-		// tool hints, which belong on the descriptor - would otherwise leave an all-null DTO
-		// that serializes to `[]`. And a loosely typed but valid value, such as the string
-		// "0.5" WordPress hands back from post meta, would otherwise be rejected by the
-		// DTO's strict float assertion.
-		$mapped = McpAnnotationMapper::map( $annotations, 'resource' );
-		if ( empty( $mapped ) ) {
-			// An empty input is nothing to report. A non-empty one that maps to nothing is:
-			// every field was written in a vocabulary this block does not carry - most likely
-			// the tool hints - and the annotations disappear with no other trace.
-			if ( ! empty( $annotations ) ) {
+			if ( null !== $annotations ) {
 				$error_handler->log(
 					$log_message,
-					array_merge( $log_context, array( 'reason' => 'no field belongs to the content annotations vocabulary' ) ),
+					array_merge( $log_context, array( 'reason' => 'annotations must be an array or Annotations DTO' ) ),
 					'warning'
 				);
 			}
@@ -128,8 +101,19 @@ trait HandlerHelperTrait {
 			return null;
 		}
 
-		// Handler output is untrusted, and a value the schema rejects costs the whole
-		// content block rather than just the annotation. Validate before building the DTO.
+		$mapped = McpAnnotationMapper::map( $annotations, 'resource' );
+		if ( empty( $mapped ) ) {
+			if ( ! empty( $annotations ) ) {
+				$error_handler->log(
+					$log_message,
+					array_merge( $log_context, array( 'reason' => 'no usable content annotation fields remained after mapping' ) ),
+					'warning'
+				);
+			}
+
+			return null;
+		}
+
 		$errors = McpValidator::get_annotation_validation_errors( $mapped );
 		if ( ! empty( $errors ) ) {
 			$error_handler->log(
@@ -141,7 +125,6 @@ trait HandlerHelperTrait {
 			return null;
 		}
 
-		// Mapping and validation between them leave nothing for fromArray() to reject.
 		return Annotations::fromArray( $mapped );
 	}
 }

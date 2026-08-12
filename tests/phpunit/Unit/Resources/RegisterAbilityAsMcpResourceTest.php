@@ -239,6 +239,35 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$this->assertSame( 2048, $arr['size'] );
 	}
 
+	public function test_zero_size_is_preserved(): void {
+		$this->register_ability_in_hook(
+			'test/resource-with-zero-size',
+			array(
+				'label'               => 'Empty Resource',
+				'description'         => 'Resource with an empty body',
+				'category'            => 'test',
+				'execute_callback'    => static fn() => '',
+				'permission_callback' => '__return_true',
+				'meta'                => array(
+					'mcp' => array(
+						'type' => 'resource',
+						'uri'  => 'WordPress://local/empty',
+						'size' => 0,
+					),
+				),
+			)
+		);
+
+		$ability = wp_get_ability( 'test/resource-with-zero-size' );
+		$this->assertNotNull( $ability );
+
+		$resource = RegisterAbilityAsMcpResource::make( $ability );
+		$this->assertNotWPError( $resource );
+		$this->assertSame( 0, $resource->getSize() );
+
+		wp_unregister_ability( 'test/resource-with-zero-size' );
+	}
+
 	public function test_icons_are_included_from_new_meta_structure(): void {
 		$ability = wp_get_ability( 'test/resource-with-icons' );
 		$this->assertNotNull( $ability, 'Ability test/resource-with-icons should be registered' );

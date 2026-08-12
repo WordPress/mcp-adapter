@@ -434,6 +434,45 @@ class McpValidator {
 	}
 
 	/**
+	 * Normalize a non-negative byte count for an MCP size field.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed $size Raw size value.
+	 *
+	 * @return int|null Normalized size, or null when the value is not an exact integer.
+	 */
+	public static function normalize_size( $size ): ?int {
+		if ( is_int( $size ) ) {
+			return $size >= 0 ? $size : null;
+		}
+
+		if ( is_float( $size ) ) {
+			if ( ! is_finite( $size ) || $size < 0 || floor( $size ) !== $size || $size >= (float) PHP_INT_MAX ) {
+				return null;
+			}
+
+			return (int) $size;
+		}
+
+		if ( ! is_string( $size ) || 1 !== preg_match( '/^[0-9]+$/D', $size ) ) {
+			return null;
+		}
+
+		$normalized = ltrim( $size, '0' );
+		if ( '' === $normalized ) {
+			return 0;
+		}
+
+		$maximum = (string) PHP_INT_MAX;
+		if ( strlen( $normalized ) > strlen( $maximum ) || ( strlen( $normalized ) === strlen( $maximum ) && strcmp( $normalized, $maximum ) > 0 ) ) {
+			return null;
+		}
+
+		return (int) $normalized;
+	}
+
+	/**
 	 * Normalize a `_meta` value for inclusion in a protocol DTO.
 	 *
 	 * MCP declares `_meta` as `{ [key: string]: unknown }` — a JSON object. PHP has one

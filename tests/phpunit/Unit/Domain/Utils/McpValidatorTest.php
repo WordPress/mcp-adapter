@@ -829,8 +829,18 @@ final class McpValidatorTest extends TestCase {
 			// These are arrays, but they serialize to a JSON array rather than an object.
 			'empty array'   => array( array() ),
 			'list'          => array( array( 'a', 'b' ) ),
-			'numeric keys'  => array( array( 0 => 'a', 1 => 'b' ) ),
-			'string digits' => array( array( '0' => 'a', '1' => 'b' ) ),
+			'numeric keys'  => array(
+				array(
+					0 => 'a',
+					1 => 'b',
+				),
+			),
+			'string digits' => array(
+				array(
+					'0' => 'a',
+					'1' => 'b',
+				),
+			),
 		);
 	}
 
@@ -841,4 +851,37 @@ final class McpValidatorTest extends TestCase {
 		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
 	}
 
+	/**
+	 * @dataProvider data_sizes_to_normalize
+	 *
+	 * @param mixed    $size     Raw size value.
+	 * @param int|null $expected Expected normalized value.
+	 */
+	public function test_normalize_size( $size, ?int $expected ): void {
+		$this->assertSame( $expected, McpValidator::normalize_size( $size ) );
+	}
+
+	/**
+	 * @return array<string, array{mixed, int|null}>
+	 */
+	public function data_sizes_to_normalize(): array {
+		return array(
+			'integer'          => array( 1024, 1024 ),
+			'integral float'   => array( 1024.0, 1024 ),
+			'integer string'   => array( '1024', 1024 ),
+			'leading zeroes'   => array( '001024', 1024 ),
+			'zero'             => array( 0, 0 ),
+			'zero string'      => array( '0', 0 ),
+			'maximum integer'  => array( (string) PHP_INT_MAX, PHP_INT_MAX ),
+			'fraction'         => array( '1.9', null ),
+			'exponent string'  => array( '1e3', null ),
+			'negative'         => array( -1, null ),
+			'overflow'         => array( (string) PHP_INT_MAX . '0', null ),
+			'maximum as float' => array( (float) PHP_INT_MAX, null ),
+			'infinity'         => array( INF, null ),
+			'not a number'     => array( NAN, null ),
+			'boolean'          => array( true, null ),
+			'whitespace'       => array( ' 1024 ', null ),
+		);
+	}
 }

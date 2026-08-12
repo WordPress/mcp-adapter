@@ -169,18 +169,11 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Annotations go through the mapper before the DTO sees them: it keeps only the
-		// fields ToolAnnotations models and coerces each to the type that type asserts.
-		// Without it, the shared content vocabulary leaves an all-null DTO that serializes
-		// to `[]` where MCP declares an object, and a hint stored as "1" - which is how
-		// WordPress hands booleans back - fails the DTO's strict bool assertion and takes
-		// the whole tool down with it. A rendering hint must not cost the tool its
-		// registration.
+		// Normalize optional annotations before constructing the strict DTO.
 		$annotations = isset( $config['annotations'] ) && is_array( $config['annotations'] )
 			? McpAnnotationMapper::map( $config['annotations'], 'tool' )
 			: array();
 
-		// Create the Tool DTO - wrap in try-catch since ToolDto::fromArray() can throw.
 		try {
 			if ( ! empty( $annotations ) ) {
 				$tool_data['annotations'] = ToolAnnotations::fromArray( $annotations );
