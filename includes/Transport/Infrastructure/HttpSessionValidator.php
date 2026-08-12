@@ -37,7 +37,7 @@ class HttpSessionValidator {
 	/**
 	 * Validate a session and report storage failures to an error handler.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 * @internal
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext                  $context       The HTTP request context.
@@ -100,7 +100,7 @@ class HttpSessionValidator {
 	/**
 	 * Create a session and report storage failures to an error handler.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 * @internal
 	 *
 	 * @param array                                                 $params        The client parameters from initialize request.
@@ -140,7 +140,7 @@ class HttpSessionValidator {
 	/**
 	 * Terminate a session and report storage failures to an error handler.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 * @internal
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext                  $context       The HTTP request context.

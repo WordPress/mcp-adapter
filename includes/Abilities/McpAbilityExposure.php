@@ -22,7 +22,7 @@ use WP_Ability;
  * last. Resolving from the stored ability instead happens after registration is
  * complete, so the metadata is final.
  *
- * @since n.e.x.t
+ * @since 0.6.0
  */
 final class McpAbilityExposure {
 
@@ -33,7 +33,7 @@ final class McpAbilityExposure {
 	 * inherited from the high-level `meta.public` flag. Malformed `meta.mcp`
 	 * fails closed.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @param \WP_Ability $ability The ability to check.
 	 *
@@ -46,7 +46,7 @@ final class McpAbilityExposure {
 	/**
 	 * Determines whether ability metadata resolves to MCP exposure.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @param array<string, mixed> $meta Ability metadata.
 	 *

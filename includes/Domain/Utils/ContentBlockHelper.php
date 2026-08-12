@@ -90,7 +90,7 @@ final class ContentBlockHelper {
 	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
 	 * the spec and are not interchangeable.
 	 *
-	 * @since n.e.x.t Added the optional $resource_meta parameter.
+	 * @since 0.6.0 Added the optional $resource_meta parameter.
 	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $text The text content of the resource.
@@ -138,7 +138,7 @@ final class ContentBlockHelper {
 	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
 	 * the spec and are not interchangeable.
 	 *
-	 * @since n.e.x.t Added the optional $resource_meta parameter.
+	 * @since 0.6.0 Added the optional $resource_meta parameter.
 	 *
 	 * @param string $uri The URI of the resource.
 	 * @param string $blob Base64-encoded binary data.

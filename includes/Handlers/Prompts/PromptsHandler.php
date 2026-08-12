@@ -535,7 +535,7 @@ class PromptsHandler {
 	 * not an array at all loses the whole prompt rather than the field. It is dropped so
 	 * that the message survives.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @param array $content Content block as the prompt returned it.
 	 *

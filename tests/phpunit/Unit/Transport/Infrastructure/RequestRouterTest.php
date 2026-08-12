@@ -139,7 +139,7 @@ final class RequestRouterTest extends TestCase {
 	/**
 	 * Test exhausted session update retries are reported to the configured error handler.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 */
 	public function test_route_request_logs_exhausted_session_update_retries(): void {
 		$attempts              = 0;

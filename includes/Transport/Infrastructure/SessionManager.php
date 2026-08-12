@@ -47,7 +47,7 @@ final class SessionManager {
 	 * back to the unsuffixed legacy key so reads/writes do not land under an
 	 * orphaned `mcp_adapter_sessions_0` row (see session_meta_key_for_blog()).
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 */
 	private static function session_meta_key(): string {
 		if ( ! is_multisite() ) {
@@ -60,7 +60,7 @@ final class SessionManager {
 	/**
 	 * Resolve the session meta key for a blog ID (multisite).
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @param int $blog_id Blog ID; values below 1 use the unsuffixed legacy key.
 	 */
@@ -96,7 +96,7 @@ final class SessionManager {
 	/**
 	 * Maximum attempts for a concurrent session mutation.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @var int
 	 */
@@ -105,7 +105,7 @@ final class SessionManager {
 	/**
 	 * Create a new session for a user
 	 *
-	 * @since n.e.x.t Added the optional error handler.
+	 * @since 0.6.0 Added the optional error handler.
 	 *
 	 * @param int                                                   $user_id      The user ID.
 	 * @param array                                                 $params       Client parameters from initialize request.
@@ -169,7 +169,7 @@ final class SessionManager {
 	 * therefore still overwrite each other, but subsequent writes retry when the
 	 * previously read non-empty map has changed.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @param int                                                   $user_id       The user ID.
 	 * @param callable                                              $mutation      Receives the latest sessions and returns the updated sessions.
@@ -376,7 +376,7 @@ final class SessionManager {
 	/**
 	 * Validate a session and update last activity
 	 *
-	 * @since n.e.x.t Added the optional error handler.
+	 * @since 0.6.0 Added the optional error handler.
 	 *
 	 * @param int                                                   $user_id      The user ID.
 	 * @param string                                                $session_id   The session ID.
@@ -424,7 +424,7 @@ final class SessionManager {
 	/**
 	 * Delete a specific session
 	 *
-	 * @since n.e.x.t Added the optional error handler.
+	 * @since 0.6.0 Added the optional error handler.
 	 *
 	 * @param int                                                   $user_id      The user ID.
 	 * @param string                                                $session_id   The session ID.

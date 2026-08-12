@@ -26,7 +26,7 @@ class McpValidator {
 	 * Shared by URI validation and scheme folding so the two can never drift
 	 * apart on what counts as a scheme.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @var string
 	 */
@@ -444,7 +444,7 @@ class McpValidator {
 	 * Returns null rather than raising so an incorrectly shaped optional `_meta` does
 	 * not withhold the payload it accompanies.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 *
 	 * @param mixed $meta The raw `_meta` value.
 	 *
@@ -500,7 +500,7 @@ class McpValidator {
 	 * @param string $uri Resource URI.
 	 *
 	 * @return string Same URI with a lowercased scheme.
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 */
 	public static function fold_uri_scheme( string $uri ): string {
 		// On PCRE failure preg_replace_callback() returns null; keep the URI as-is.
