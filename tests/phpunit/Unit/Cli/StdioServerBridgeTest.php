@@ -376,6 +376,39 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'tools', $response['result'] );
 	}
 
+	public function test_modern_tools_call_uses_request_scoped_codec_without_mutating_bridge_context(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$protocol_property     = $reflection->getProperty( 'protocol_context' );
+		$handle_request_method->setAccessible( true );
+		$protocol_property->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 20,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'_meta'     => array(
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::MODERN_SCHEMA_REVISION,
+						'io.modelcontextprotocol/clientCapabilities' => array(),
+					),
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				),
+			)
+		);
+
+		$result   = $handle_request_method->invoke( $this->bridge, $json_input );
+		$response = json_decode( $result, true );
+
+		$this->assertSame( 'complete', $response['result']['resultType'] );
+		$this->assertSame(
+			McpProtocolContext::LEGACY_SCHEMA_REVISION,
+			$protocol_property->getValue( $this->bridge )->get_protocol_version()
+		);
+	}
+
 	public function test_handle_request_with_object_params(): void {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\V20251125\Common\Content\DTO\ImageContent;
@@ -256,6 +257,28 @@ final class ToolsHandlerCallTest extends TestCase {
 		remove_filter( 'mcp_adapter_tool_call_result', $filter );
 	}
 
+	public function test_public_call_tool_keeps_legacy_error_for_scalar_filter_result(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$filter  = static function (): string {
+			return 'scalar-after-normalization';
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-always-allowed' ),
+			),
+			7
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $result->getError()->getCode() );
+		$this->assertStringContainsString( 'Failed to execute tool', $result->getError()->getMessage() );
+	}
+
 	public function test_tool_call_preserves_meta_in_text_and_structured_content(): void {
 		$server  = $this->makeServer( array( 'test/meta-leak' ) );
 		$handler = new ToolsHandler( $server );
@@ -403,9 +426,9 @@ final class ToolsHandlerCallTest extends TestCase {
 	public function test_embedded_resource_nested_shape_preserves_meta_on_both_levels(): void {
 		$result = $this->call_tool_returning(
 			array(
-				'type'        => 'resource',
-				'_meta'       => array( 'block' => 'level' ),
-				'resource'    => array(
+				'type'     => 'resource',
+				'_meta'    => array( 'block' => 'level' ),
+				'resource' => array(
 					'uri'      => 'ui://example/app',
 					'mimeType' => 'text/html;profile=mcp-app',
 					'text'     => '<!doctype html>',

@@ -10,11 +10,15 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Tools\ToolCallOutcome;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\V20251125\Common\Protocol\Factory\ContentBlockFactory;
 use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
 use WP\McpSchema\V20251125\Server\Tools\DTO\ListToolsResult;
 
@@ -118,6 +122,54 @@ class ToolsHandler {
 	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	public function call_tool( array $params, $request_id = 0 ) {
+		$outcome = $this->call_tool_outcome( $params, $request_id );
+
+		if ( ! $outcome instanceof ToolCallOutcome ) {
+			return $outcome;
+		}
+
+		try {
+			$content = array_map( array( $this, 'hydrate_legacy_content_block' ), $outcome->get_content() );
+			$data    = array(
+				'content' => $content,
+				'isError' => $outcome->is_error(),
+			);
+
+			if ( $outcome->has_structured_content() ) {
+				$data['structuredContent'] = $outcome->get_structured_content();
+			}
+
+			return CallToolResult::fromArray( $data );
+		} catch ( \Throwable $exception ) {
+			$request_params = $this->extract_params( $params );
+			$this->mcp->get_error_handler()->log(
+				'Error calling tool',
+				array(
+					'tool'      => $request_params['name'] ?? null,
+					'exception' => $exception->getMessage(),
+				)
+			);
+
+			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
+		}
+	}
+
+	/**
+	 * Execute and classify a tool call before revision-specific encoding.
+	 *
+	 * This is the internal entry point used by RequestRouter. The public
+	 * call_tool() method remains a compatibility wrapper that returns the
+	 * 2025-11-25 CallToolResult DTO documented since 0.5.0.
+	 *
+	 * @internal
+	 * @since n.e.x.t
+	 *
+	 * @param array           $params Request params.
+	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 *
+	 * @return \WP\MCP\Domain\Tools\ToolCallOutcome|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	public function call_tool_outcome( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -164,7 +216,7 @@ class ToolsHandler {
 					);
 				}
 
-				return $this->create_error_result( $error_message );
+				return $this->create_error_outcome( $error_message );
 			}
 
 			/**
@@ -184,7 +236,7 @@ class ToolsHandler {
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
-				return $this->create_error_result( $args->get_error_message() );
+				return $this->create_error_outcome( $args->get_error_message() );
 			}
 
 			$result = $mcp_tool->execute( $args );
@@ -216,7 +268,7 @@ class ToolsHandler {
 					)
 				);
 
-				return $this->create_error_result( $result->get_error_message() );
+				return $this->create_error_outcome( $result->get_error_message() );
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
@@ -228,7 +280,7 @@ class ToolsHandler {
 				&& is_string( $result['error'] )
 				&& '' !== trim( $result['error'] )
 			) {
-				return $this->create_error_result( $result['error'] );
+				return $this->create_error_outcome( $result['error'] );
 			}
 
 			// Successful tool execution - build CallToolResult DTO.
@@ -269,37 +321,31 @@ class ToolsHandler {
 					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
-						return CallToolResult::fromArray(
+						return ToolCallOutcome::complete(
 							array(
-								'content' => array(
-									ContentBlockHelper::embedded_text_resource(
-										$uri,
-										$resource_item['text'],
-										is_string( $mime_type ) ? $mime_type : null,
-										null,
-										$block_meta,
-										$resource_meta
-									),
-								),
-								'isError' => false,
+								ContentBlockHelper::embedded_text_resource(
+									$uri,
+									$resource_item['text'],
+									is_string( $mime_type ) ? $mime_type : null,
+									null,
+									$block_meta,
+									$resource_meta
+								)->toArray(),
 							)
 						);
 					}
 
 					if ( $has_blob ) {
-						return CallToolResult::fromArray(
+						return ToolCallOutcome::complete(
 							array(
-								'content' => array(
-									ContentBlockHelper::embedded_blob_resource(
-										$uri,
-										$resource_item['blob'],
-										is_string( $mime_type ) ? $mime_type : null,
-										null,
-										$block_meta,
-										$resource_meta
-									),
-								),
-								'isError' => false,
+								ContentBlockHelper::embedded_blob_resource(
+									$uri,
+									$resource_item['blob'],
+									is_string( $mime_type ) ? $mime_type : null,
+									null,
+									$block_meta,
+									$resource_meta
+								)->toArray(),
 							)
 						);
 					}
@@ -315,18 +361,14 @@ class ToolsHandler {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
-				return CallToolResult::fromArray(
+				return ToolCallOutcome::complete(
 					array(
-						'content'           => array(
-							ContentBlockHelper::image(
-								$image_data,
-								$mime_type,
-								null,
-								McpValidator::normalize_meta( $result['_meta'] ?? null )
-							),
-						),
-						'structuredContent' => null,
-						'isError'           => false,
+						ContentBlockHelper::image(
+							$image_data,
+							$mime_type,
+							null,
+							McpValidator::normalize_meta( $result['_meta'] ?? null )
+						)->toArray(),
 					)
 				);
 			}
@@ -342,12 +384,10 @@ class ToolsHandler {
 				$json_text = '{}';
 			}
 
-			return CallToolResult::fromArray(
-				array(
-					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $result,
-					'isError'           => false,
-				)
+			return ToolCallOutcome::complete(
+				array( ContentBlockHelper::text( $json_text )->toArray() ),
+				$result,
+				true
 			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
@@ -363,21 +403,39 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Create an error CallToolResult from a message string.
+	 * Create an error outcome from a message string.
 	 *
 	 * @since 0.5.0
 	 *
 	 * @param string $message The error message.
 	 *
-	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult
+	 * @return \WP\MCP\Domain\Tools\ToolCallOutcome
 	 */
-	private function create_error_result( string $message ): CallToolResult {
-		return CallToolResult::fromArray(
-			array(
-				'content'           => array( ContentBlockHelper::text( $message ) ),
-				'structuredContent' => null,
-				'isError'           => true,
-			)
-		);
+	private function create_error_outcome( string $message ): ToolCallOutcome {
+		return ToolCallOutcome::error( $message );
+	}
+
+	/**
+	 * Hydrate one legacy content block for the public call_tool() DTO contract.
+	 *
+	 * EmbeddedResource's generated fromArray() expects its nested union member
+	 * to already be hydrated, so handle that one level before the block factory.
+	 * Revision codecs intentionally keep using arrays at the wire boundary.
+	 *
+	 * @param array<string, mixed> $content Content block data.
+	 *
+	 * @return \WP\McpSchema\V20251125\Common\Protocol\Union\ContentBlockInterface
+	 */
+	private function hydrate_legacy_content_block( array $content ) {
+		if ( 'resource' === ( $content['type'] ?? null ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
+			$resource = $content['resource'];
+			if ( array_key_exists( 'text', $resource ) ) {
+				$content['resource'] = TextResourceContents::fromArray( $resource );
+			} elseif ( array_key_exists( 'blob', $resource ) ) {
+				$content['resource'] = BlobResourceContents::fromArray( $resource );
+			}
+		}
+
+		return ContentBlockFactory::fromArray( $content );
 	}
 }

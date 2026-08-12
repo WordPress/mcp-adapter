@@ -12,6 +12,7 @@ namespace WP\MCP\Infrastructure\ErrorHandling;
 use WP\McpSchema\V20251125\Common\JsonRpc\DTO\Error;
 use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\V20251125\Common\McpConstants;
+use WP\McpSchema\V20260728\Common\McpConstants as ModernMcpConstants;
 
 /**
  * Factory for creating standardized MCP error responses.
@@ -35,14 +36,16 @@ class McpErrorFactory {
 	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
 	 * Using conservative, well-established error codes only.
 	 */
-	public const SERVER_ERROR       = -32000; // Generic server error (includes MCP disabled)
-	public const TIMEOUT_ERROR      = -32001; // Request timeout
-	public const RESOURCE_NOT_FOUND = -32002; // Resource not found
-	public const TOOL_NOT_FOUND     = -32003; // Tool not found
-	public const PROMPT_NOT_FOUND   = -32004; // Prompt not found
-	public const SESSION_NOT_FOUND  = -32005; // Session not found or expired
-	public const PERMISSION_DENIED  = -32008; // Access denied/forbidden
-	public const UNAUTHORIZED       = -32010; // Authentication required
+	public const SERVER_ERROR                 = -32000; // Generic server error (includes MCP disabled)
+	public const TIMEOUT_ERROR                = -32001; // Request timeout
+	public const RESOURCE_NOT_FOUND           = -32002; // Resource not found
+	public const TOOL_NOT_FOUND               = -32003; // Tool not found
+	public const PROMPT_NOT_FOUND             = -32004; // Prompt not found
+	public const SESSION_NOT_FOUND            = -32005; // Session not found or expired
+	public const PERMISSION_DENIED            = -32008; // Access denied/forbidden
+	public const UNAUTHORIZED                 = -32010; // Authentication required
+	public const HEADER_MISMATCH              = ModernMcpConstants::HEADER_MISMATCH;
+	public const UNSUPPORTED_PROTOCOL_VERSION = ModernMcpConstants::UNSUPPORTED_PROTOCOL_VERSION;
 
 	/**
 	 * Create a parse error response.
@@ -152,6 +155,18 @@ class McpErrorFactory {
 		}
 
 		return self::create_error_response( $id, self::INTERNAL_ERROR, $message );
+	}
+
+	/**
+	 * Create an unsupported modern protocol-version error response.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string|int|null $id The request ID.
+	 * @param string          $details Error details.
+	 */
+	public static function unsupported_protocol_version( $id, string $details ): JSONRPCErrorResponse {
+		return self::create_error_response( $id, self::UNSUPPORTED_PROTOCOL_VERSION, $details );
 	}
 
 	/**
@@ -389,6 +404,8 @@ class McpErrorFactory {
 				return 400;
 
 			case self::INVALID_REQUEST:  // Invalid JSON-RPC structure - syntactic error
+			case self::HEADER_MISMATCH:
+			case self::UNSUPPORTED_PROTOCOL_VERSION:
 				return 400;
 
 			// Authentication and authorization errors

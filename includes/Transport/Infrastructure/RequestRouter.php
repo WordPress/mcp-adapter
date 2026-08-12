@@ -10,12 +10,11 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Core\McpProtocolContext;
+use WP\MCP\Domain\Tools\ToolCallOutcome;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
 use WP\McpSchema\V20251125\Common\AbstractDataTransferObject;
-use WP\McpSchema\V20251125\Common\Content\DTO\TextContent;
 use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -24,6 +23,20 @@ use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
  * all transport implementations via dependency injection.
  */
 class RequestRouter {
+
+	/**
+	 * Modern request metadata key carrying the protocol revision.
+	 *
+	 * @var string
+	 */
+	private const PROTOCOL_VERSION_META_KEY = 'io.modelcontextprotocol/protocolVersion';
+
+	/**
+	 * Modern request metadata key carrying per-request client capabilities.
+	 *
+	 * @var string
+	 */
+	private const CLIENT_CAPABILITIES_META_KEY = 'io.modelcontextprotocol/clientCapabilities';
 
 	/**
 	 * The transport context.
@@ -80,7 +93,7 @@ class RequestRouter {
 			'ping'                     => fn() => $this->context->system_handler->ping(),
 			'tools/list'               => fn() => $this->context->tools_handler->list_tools(),
 			'tools/list/all'           => fn() => $this->context->tools_handler->list_all_tools(),
-			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
+			'tools/call'               => fn() => $this->handle_tool_call( $params, $request_id, $protocol_context ),
 			'resources/list'           => fn() => $this->context->resources_handler->list_resources(),
 			'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates(),
 			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
@@ -108,6 +121,44 @@ class RequestRouter {
 				return $result;
 			}
 
+			if ( $handler_result instanceof ToolCallOutcome ) {
+				try {
+					$result = ToolCallResultCodecFactory::for_context( $protocol_context )->encode( $handler_result );
+				} catch ( \WP\MCP\Transport\Infrastructure\ToolCallCodecException $exception ) {
+					$this->context->error_handler->log(
+						'Tool result could not be encoded for the selected protocol revision',
+						array(
+							'protocol_version' => $protocol_context->get_protocol_version(),
+							'error'            => $exception->getMessage(),
+						)
+					);
+
+					$encoding_error           = McpErrorFactory::internal_error( $request_id, $exception->getMessage() );
+					$result                   = array( 'error' => $encoding_error->getError()->toArray() );
+					$tags                     = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
+					$tags['error_code']       = $encoding_error->getError()->getCode();
+					$tags['failure_reason']   = $exception->getMessage();
+					$tags['protocol_version'] = $protocol_context->get_protocol_version();
+					$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+
+					return $result;
+				}
+
+				$status = $handler_result->is_error() ? 'error' : 'success';
+				if ( $handler_result->is_error() && ! isset( $component_tags['failure_reason'] ) ) {
+					$failure_reason = $handler_result->get_failure_reason();
+					if ( null !== $failure_reason ) {
+						$component_tags['failure_reason'] = $failure_reason;
+					}
+				}
+
+				$tags                     = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
+				$tags['protocol_version'] = $protocol_context->get_protocol_version();
+				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+
+				return $result;
+			}
+
 			if ( $handler_result instanceof AbstractDataTransferObject ) {
 				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
 				// Note: If a future schema version ever returns nested DTO objects inside `toArray()`,
@@ -121,19 +172,7 @@ class RequestRouter {
 					$result['_session_id']            = $new_session_id;
 				}
 
-				$status = 'success';
-				if ( $handler_result instanceof CallToolResult && true === $handler_result->getIsError() ) {
-					$status = 'error';
-
-					if ( ! isset( $component_tags['failure_reason'] ) ) {
-						$content = $handler_result->getContent();
-						if ( isset( $content[0] ) && $content[0] instanceof TextContent ) {
-							$component_tags['failure_reason'] = $content[0]->getText();
-						}
-					}
-				}
-
-				$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
+				$tags = array_merge( $common_tags, $component_tags, array( 'status' => 'success' ) );
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;
@@ -176,6 +215,85 @@ class RequestRouter {
 
 			return array( 'error' => $unexpected_error->getError()->toArray() );
 		}
+	}
+
+	/**
+	 * Validate, execute, and classify a tools/call request.
+	 *
+	 * Modern continuation fields are rejected before permission checks or
+	 * ability execution because the current Adapter does not implement MRTR.
+	 *
+	 * @param array                         $params Request parameters.
+	 * @param string|int|null               $request_id Request ID.
+	 * @param \WP\MCP\Core\McpProtocolContext $protocol_context Request protocol context.
+	 *
+	 * @return \WP\MCP\Domain\Tools\ToolCallOutcome|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 */
+	private function handle_tool_call( array $params, $request_id, McpProtocolContext $protocol_context ) {
+		$request_params = $params['params'] ?? $params;
+		if ( ! is_array( $request_params ) ) {
+			$request_params = array();
+		}
+
+		if ( array_key_exists( 'inputResponses', $request_params ) || array_key_exists( 'requestState', $request_params ) ) {
+			return McpErrorFactory::invalid_params( $request_id, 'Multi round-trip tools/call requests are not supported.' );
+		}
+
+		$meta = $request_params['_meta'] ?? null;
+		if ( $protocol_context->is_modern() ) {
+			if ( ! is_array( $meta ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires params._meta.' );
+			}
+
+			$declared_version = $meta[ self::PROTOCOL_VERSION_META_KEY ] ?? null;
+			if ( McpProtocolContext::MODERN_SCHEMA_REVISION !== $declared_version ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The request metadata protocol version must be 2026-07-28.' );
+			}
+
+			if ( ! array_key_exists( self::CLIENT_CAPABILITIES_META_KEY, $meta ) || ! is_array( $meta[ self::CLIENT_CAPABILITIES_META_KEY ] ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires clientCapabilities metadata.' );
+			}
+
+			if ( self::is_non_empty_list( $meta[ self::CLIENT_CAPABILITIES_META_KEY ] ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 clientCapabilities metadata must be a JSON object.' );
+			}
+
+			if ( ! isset( $request_params['name'] ) || ! is_string( $request_params['name'] ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires a string name.' );
+			}
+
+			if ( isset( $request_params['arguments'] ) && ( ! is_array( $request_params['arguments'] ) || self::is_non_empty_list( $request_params['arguments'] ) ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call arguments must be a JSON object.' );
+			}
+
+			if ( array_key_exists( 'task', $request_params ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request does not support the legacy task field.' );
+			}
+		} elseif ( is_array( $meta ) && array_key_exists( self::PROTOCOL_VERSION_META_KEY, $meta ) ) {
+			$declared_version = $meta[ self::PROTOCOL_VERSION_META_KEY ];
+			if ( McpProtocolContext::MODERN_SCHEMA_REVISION === $declared_version ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The request protocol context does not match the 2026-07-28 request metadata.' );
+			}
+
+			return McpErrorFactory::unsupported_protocol_version(
+				$request_id,
+				sprintf( 'Unsupported protocol version: %s', is_scalar( $declared_version ) ? (string) $declared_version : gettype( $declared_version ) )
+			);
+		}
+
+		return $this->context->tools_handler->call_tool_outcome( $params, $request_id );
+	}
+
+	/**
+	 * Whether a non-empty PHP array represents a JSON list.
+	 *
+	 * Empty JSON objects decode to an empty PHP array in the current WordPress
+	 * request pipeline, so empty arrays remain valid object representations.
+	 *
+	 * @param array<mixed> $value Value to inspect.
+	 */
+	private static function is_non_empty_list( array $value ): bool {
+		return array() !== $value && array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
 
 	/**

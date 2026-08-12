@@ -503,6 +503,128 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
+	public function test_modern_tools_call_is_stateless_and_uses_modern_codec(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 21,
+				'method'  => 'tools/call',
+				'params'  => $this->modernToolCallParams(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::MODERN_SCHEMA_REVISION );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+		$result   = (array) $data['result'];
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 21, $data['id'] );
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertArrayHasKey( 'structuredContent', $result );
+	}
+
+	public function test_legacy_http_tools_call_keeps_legacy_result_shape(): void {
+		$session_id = $this->initializeAndGetSessionId();
+		$request    = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 22,
+				'method'  => 'tools/call',
+				'params'  => array( 'name' => 'test-always-allowed' ),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::LEGACY_SCHEMA_REVISION );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+		$result   = (array) $data['result'];
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayNotHasKey( 'resultType', $result );
+	}
+
+	public function test_modern_tools_call_requires_matching_protocol_header(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 23,
+				'method'  => 'tools/call',
+				'params'  => $this->modernToolCallParams(),
+			)
+		);
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $data['error']['code'] );
+		$this->assertStringContainsString( 'must match', $data['error']['message'] );
+	}
+
+	public function test_modern_header_requires_matching_request_metadata(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 24,
+				'method'  => 'tools/call',
+				'params'  => array( 'name' => 'test-always-allowed' ),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::MODERN_SCHEMA_REVISION );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $data['error']['code'] );
+		$this->assertStringContainsString( 'matching protocol-version request metadata', $data['error']['message'] );
+	}
+
+	public function test_unknown_revisioned_request_version_fails_before_legacy_session_handling(): void {
+		$params = $this->modernToolCallParams();
+		$params['_meta']['io.modelcontextprotocol/protocolVersion'] = '2099-01-01';
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 25,
+				'method'  => 'tools/call',
+				'params'  => $params,
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2099-01-01' );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $data['error']['code'] );
+		$this->assertStringContainsString( '2099-01-01', $data['error']['message'] );
+	}
+
+	public function test_modern_revision_is_explicitly_bounded_to_tools_call(): void {
+		$params  = $this->modernToolCallParams();
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 26,
+				'method'  => 'tools/list',
+				'params'  => array( '_meta' => $params['_meta'] ),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::MODERN_SCHEMA_REVISION );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $data['error']['code'] );
+		$this->assertStringContainsString( 'not supported for method tools/list', $data['error']['message'] );
+	}
+
 	// Helper methods
 
 	/**
@@ -557,6 +679,22 @@ final class HttpRequestHandlerTest extends TestCase {
 		$protocol_context = $resolver->invoke( $this->handler, $method, $params, $context );
 
 		return $protocol_context;
+	}
+
+	/**
+	 * Build a valid request for the supported modern tools/call subset.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function modernToolCallParams(): array {
+		return array(
+			'_meta'     => array(
+				'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::MODERN_SCHEMA_REVISION,
+				'io.modelcontextprotocol/clientCapabilities' => array(),
+			),
+			'name'      => 'test-always-allowed',
+			'arguments' => array(),
+		);
 	}
 
 	private function createPostRequest( array $body ): WP_REST_Request {
