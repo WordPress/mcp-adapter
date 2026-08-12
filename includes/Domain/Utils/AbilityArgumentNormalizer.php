@@ -45,7 +45,7 @@ class AbilityArgumentNormalizer {
 	 *
 	 * @return mixed Normalized parameters (null when no schema and params are empty; empty array when a schema is present and params are empty or null, unless the schema declares a top-level default or its type permits null, in which case null is returned).
 	 * @since 0.5.0
-	 * @since n.e.x.t Empty or null parameters for schema-defining abilities normalize to an empty array, except when the schema declares a top-level default (honored for both null and empty {} input) or its type explicitly permits null.
+	 * @since 0.6.0 Empty or null parameters for schema-defining abilities normalize to an empty array, except when the schema declares a top-level default (honored for both null and empty {} input) or its type explicitly permits null.
 	 */
 	public static function normalize( \WP_Ability $ability, $parameters ) {
 		$input_schema = $ability->get_input_schema();
@@ -93,7 +93,7 @@ class AbilityArgumentNormalizer {
 	 * @param array<string,mixed> $input_schema The ability input schema.
 	 *
 	 * @return bool True when null is a valid top-level value for the schema.
-	 * @since n.e.x.t
+	 * @since 0.6.0
 	 */
 	private static function schema_permits_null( array $input_schema ): bool {
 		$type = $input_schema['type'] ?? null;
