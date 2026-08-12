@@ -15,9 +15,9 @@ use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\V20251125\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\V20251125\Server\Tools\DTO\Tool as ToolDto;
 
 // Test prompt builder for registry testing
 // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound

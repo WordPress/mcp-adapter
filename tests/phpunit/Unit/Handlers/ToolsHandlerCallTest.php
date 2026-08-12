@@ -7,13 +7,13 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\DTO\ImageContent;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\V20251125\Common\Content\DTO\ImageContent;
+use WP\McpSchema\V20251125\Common\Content\DTO\TextContent;
+use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\EmbeddedResource;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
 
 final class ToolsHandlerCallTest extends TestCase {
 
@@ -374,7 +374,7 @@ final class ToolsHandlerCallTest extends TestCase {
 	 *
 	 * @param array $shape The embedded resource result to substitute.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	private function call_tool_returning( array $shape ) {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );

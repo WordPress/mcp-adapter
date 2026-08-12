@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Cli;
 
 use WP\MCP\Cli\StdioServerBridge;
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
@@ -54,6 +55,41 @@ final class StdioServerBridgeTest extends TestCase {
 	public function test_bridge_constructor(): void {
 		$this->assertInstanceOf( StdioServerBridge::class, $this->bridge );
 		$this->assertSame( $this->server, $this->bridge->get_server() );
+	}
+
+	public function test_bridge_protocol_context_defaults_to_legacy(): void {
+		$reflection = new \ReflectionClass( $this->bridge );
+		$property   = $reflection->getProperty( 'protocol_context' );
+		$property->setAccessible( true );
+
+		$context = $property->getValue( $this->bridge );
+
+		$this->assertInstanceOf( McpProtocolContext::class, $context );
+		$this->assertSame( McpProtocolContext::LEGACY_SCHEMA_REVISION, $context->get_protocol_version() );
+	}
+
+	public function test_initialize_updates_only_this_bridge_protocol_context(): void {
+		$other_bridge = new StdioServerBridge( $this->server );
+		$reflection   = new \ReflectionClass( $this->bridge );
+		$handler      = $reflection->getMethod( 'handle_request' );
+		$property     = $reflection->getProperty( 'protocol_context' );
+		$handler->setAccessible( true );
+		$property->setAccessible( true );
+
+		$handler->invoke(
+			$this->bridge,
+			wp_json_encode(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 1,
+					'method'  => 'initialize',
+					'params'  => array( 'protocolVersion' => '2024-11-05' ),
+				)
+			)
+		);
+
+		$this->assertSame( '2024-11-05', $property->getValue( $this->bridge )->get_protocol_version() );
+		$this->assertSame( McpProtocolContext::LEGACY_SCHEMA_REVISION, $property->getValue( $other_bridge )->get_protocol_version() );
 	}
 
 	public function test_get_server(): void {

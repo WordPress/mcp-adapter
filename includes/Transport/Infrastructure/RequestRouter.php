@@ -9,12 +9,13 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
-use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\V20251125\Common\AbstractDataTransferObject;
+use WP\McpSchema\V20251125\Common\Content\DTO\TextContent;
+use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -50,12 +51,14 @@ class RequestRouter {
 	 * @param mixed $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @param \WP\MCP\Core\McpProtocolContext|null $protocol_context Request-scoped protocol context. Defaults to legacy for custom transports.
 	 *
 	 * @return array
 	 */
-	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null ): array {
+	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null, ?McpProtocolContext $protocol_context = null ): array {
 		// Track request start time.
-		$start_time = microtime( true );
+		$start_time       = microtime( true );
+		$protocol_context = $protocol_context ?? McpProtocolContext::legacy_default();
 
 		$new_session_id = null;
 		$component_tags = $this->resolve_component_observability_context( $method, $params );
@@ -313,7 +316,7 @@ class RequestRouter {
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
 	 * @param string|null $new_session_id Newly created session id, if any.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 * @return \WP\McpSchema\V20251125\Common\AbstractDataTransferObject
 	 */
 	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
 		// Extract client protocol version from params, defaulting to empty string if missing.
@@ -350,7 +353,7 @@ class RequestRouter {
 	 * @param string $method The method that was not found.
 	 * @param mixed $request_id The request ID.
 	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
 		return McpErrorFactory::method_not_found( $request_id, $method );

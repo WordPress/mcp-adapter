@@ -18,7 +18,7 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -338,7 +338,7 @@ class McpServer {
 	/**
 	 * Get all tools registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Tools\DTO\Tool>
+	 * @return array<string, \WP\McpSchema\V20251125\Server\Tools\DTO\Tool>
 	 */
 	public function get_tools(): array {
 		return $this->component_registry->get_tools();
@@ -347,7 +347,7 @@ class McpServer {
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Resources\DTO\Resource>
+	 * @return array<string, \WP\McpSchema\V20251125\Server\Resources\DTO\Resource>
 	 */
 	public function get_resources(): array {
 		return $this->component_registry->get_resources();
@@ -356,7 +356,7 @@ class McpServer {
 	/**
 	 * Get all prompts registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Prompts\DTO\Prompt>
+	 * @return array<string, \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt>
 	 */
 	public function get_prompts(): array {
 		return $this->component_registry->get_prompts();
@@ -395,7 +395,7 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|null
+	 * @return \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt|null
 	 */
 	public function get_prompt( string $prompt_name ): ?PromptDto {
 		$mcp_prompt = $this->component_registry->get_mcp_prompt( $prompt_name );

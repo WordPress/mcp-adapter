@@ -12,7 +12,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Cli;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
@@ -41,6 +43,13 @@ class StdioServerBridge {
 	private RequestRouter $request_router;
 
 	/**
+	 * Protocol context negotiated by this bridge instance.
+	 *
+	 * @var \WP\MCP\Core\McpProtocolContext
+	 */
+	private McpProtocolContext $protocol_context;
+
+	/**
 	 * Whether the bridge is currently running.
 	 *
 	 * @var bool
@@ -56,7 +65,8 @@ class StdioServerBridge {
 		$this->server = $server;
 
 		// Create request router using server's infrastructure
-		$this->request_router = $this->create_request_router();
+		$this->request_router   = $this->create_request_router();
+		$this->protocol_context = McpProtocolContext::legacy_default();
 	}
 
 	/**
@@ -231,12 +241,19 @@ class StdioServerBridge {
 				$params = array();
 			}
 
+			if ( 'initialize' === $method ) {
+				$client_version         = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] ) ? $params['protocolVersion'] : '';
+				$this->protocol_context = new McpProtocolContext( McpVersionNegotiator::negotiate( $client_version ) );
+			}
+
 			// Route the request to the appropriate handler
 			$result = $this->request_router->route_request(
 				$method,
 				$params,
 				$id,
-				'stdio'
+				'stdio',
+				null,
+				$this->protocol_context
 			);
 
 			// If this is a notification (no id), don't send a response

@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Resources;
 
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\V20251125\Server\Resources\DTO\Resource as ResourceDto;
 
 final class RegisterAbilityAsMcpResourceTest extends TestCase {
 

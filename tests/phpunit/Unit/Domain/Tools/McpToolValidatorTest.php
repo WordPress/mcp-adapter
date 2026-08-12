@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Domain\Tools;
 
 use WP\MCP\Domain\Tools\McpToolValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\V20251125\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * Tests for McpToolValidator class.

@@ -11,9 +11,9 @@ namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Core\McpVersionNegotiator;
-use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
-use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
-use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
+use WP\McpSchema\V20251125\Common\Lifecycle\DTO\Implementation;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\InitializeResult;
+use WP\McpSchema\V20251125\Server\Lifecycle\DTO\ServerCapabilities;
 
 /**
  * Handles the initialize MCP method.
@@ -46,7 +46,7 @@ class InitializeHandler {
 	 *
 	 * @param string $client_protocol_version The protocol version requested by the client.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
+	 * @return \WP\McpSchema\V20251125\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
 	 */
 	public function handle( string $client_protocol_version ): InitializeResult {
 		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
@@ -92,7 +92,7 @@ class InitializeHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
+		 * @param \WP\McpSchema\V20251125\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
 		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
 		 */
 		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );

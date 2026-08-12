@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
@@ -216,7 +217,8 @@ class HttpRequestHandler {
 			$params,
 			$request_id,
 			$this->get_transport_name(),
-			$context
+			$context,
+			$this->resolve_protocol_context( $method, $params, $context )
 		);
 
 		// Handle session header if provided by router
@@ -240,6 +242,44 @@ class HttpRequestHandler {
 	 */
 	private function get_transport_name(): string {
 		return 'HTTP';
+	}
+
+	/**
+	 * Resolve the protocol revision selected for one HTTP request.
+	 *
+	 * Explicit request headers take precedence. When a legacy client omits the
+	 * header, recover the revision negotiated during initialize from the session.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string                                                        $method  MCP method name.
+	 * @param array<string, mixed>                                          $params  MCP request parameters.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context HTTP request context.
+	 */
+	private function resolve_protocol_context( string $method, array $params, HttpRequestContext $context ): McpProtocolContext {
+		if ( 'initialize' === $method ) {
+			$client_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] )
+				? $params['protocolVersion']
+				: '';
+
+			return new McpProtocolContext( McpVersionNegotiator::negotiate( $client_version ) );
+		}
+
+		if ( null !== $context->protocol_version ) {
+			return new McpProtocolContext( $context->protocol_version );
+		}
+
+		if ( null !== $context->session_id ) {
+			$session = SessionManager::get_session( get_current_user_id(), $context->session_id );
+			if ( is_array( $session ) ) {
+				$client_params = $session['client_params'] ?? null;
+				if ( is_array( $client_params ) && isset( $client_params['protocolVersion'] ) && is_string( $client_params['protocolVersion'] ) ) {
+					return new McpProtocolContext( McpVersionNegotiator::negotiate( $client_params['protocolVersion'] ) );
+				}
+			}
+		}
+
+		return McpProtocolContext::legacy_default();
 	}
 
 	/**

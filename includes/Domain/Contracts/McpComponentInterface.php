@@ -9,7 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Contracts;
 
-use WP\McpSchema\Common\AbstractDataTransferObject;
+use WP\McpSchema\V20251125\Common\AbstractDataTransferObject;
 
 /**
  * Interface McpComponentInterface.
@@ -33,7 +33,7 @@ interface McpComponentInterface {
 	 * This DTO is used only for protocol serialization and MUST NOT include
 	 * internal adapter metadata or execution wiring.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Protocol-only DTO.
+	 * @return \WP\McpSchema\V20251125\Common\AbstractDataTransferObject Protocol-only DTO.
 	 * @since 0.5.0
 	 *
 	 */

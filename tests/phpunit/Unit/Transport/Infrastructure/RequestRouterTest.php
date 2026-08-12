@@ -23,7 +23,7 @@ use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\SessionManager;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\V20251125\Common\McpConstants;
 use WP_REST_Request;
 
 /**

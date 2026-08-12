@@ -15,8 +15,8 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
-use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
+use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\V20251125\Server\Tools\DTO\ListToolsResult;
 
 /**
  * Handles tools-related MCP methods.
@@ -55,7 +55,7 @@ class ToolsHandler {
 	 *
 	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with all tools.
+	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\ListToolsResult Response with all tools.
 	 */
 	public function list_all_tools(): ListToolsResult {
 		// Return the standard tools list.
@@ -69,7 +69,7 @@ class ToolsHandler {
 	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with tools list.
+	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\ListToolsResult Response with tools list.
 	 */
 	public function list_tools(): ListToolsResult {
 		$tools = array_values( $this->mcp->get_tools() );
@@ -82,7 +82,7 @@ class ToolsHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
+		 * @param array<\WP\McpSchema\V20251125\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
 		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
 		 */
 		$tools = $this->validate_filtered_list(
@@ -115,7 +115,7 @@ class ToolsHandler {
 	 * @param array $params Request params.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	public function call_tool( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
@@ -369,7 +369,7 @@ class ToolsHandler {
 	 *
 	 * @param string $message The error message.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult
+	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult
 	 */
 	private function create_error_result( string $message ): CallToolResult {
 		return CallToolResult::fromArray(

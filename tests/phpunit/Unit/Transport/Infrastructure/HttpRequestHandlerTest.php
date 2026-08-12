@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
@@ -407,6 +408,42 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
+	public function test_protocol_context_uses_explicit_header_before_session_version(): void {
+		$session_id = $this->initializeAndGetSessionId( '2024-11-05' );
+		$request    = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$request->set_header( 'Mcp-Protocol-Version', '2025-11-25' );
+
+		$protocol_context = $this->resolveProtocolContext( 'tools/list', array(), new HttpRequestContext( $request ) );
+
+		$this->assertSame( '2025-11-25', $protocol_context->get_protocol_version() );
+	}
+
+	public function test_protocol_context_recovers_version_from_legacy_session(): void {
+		$session_id = $this->initializeAndGetSessionId( '2024-11-05' );
+		$request    = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		$protocol_context = $this->resolveProtocolContext( 'tools/list', array(), new HttpRequestContext( $request ) );
+
+		$this->assertSame( '2024-11-05', $protocol_context->get_protocol_version() );
+		$this->assertSame( McpProtocolContext::LEGACY_SCHEMA_REVISION, $protocol_context->get_schema_revision() );
+	}
+
 	public function test_handle_request_post_withUnsupportedProtocolVersionHeader_returnsError(): void {
 		// Create session first.
 		$session_id = $this->initializeAndGetSessionId();
@@ -473,14 +510,14 @@ final class HttpRequestHandlerTest extends TestCase {
 	 *
 	 * @return string The session ID.
 	 */
-	private function initializeAndGetSessionId(): string {
+	private function initializeAndGetSessionId( string $protocol_version = '2025-11-25' ): string {
 		$init_request  = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
 				'id'      => 1,
 				'method'  => 'initialize',
 				'params'  => array(
-					'protocolVersion' => '2025-11-25',
+					'protocolVersion' => $protocol_version,
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -504,11 +541,29 @@ final class HttpRequestHandlerTest extends TestCase {
 		return (string) array_key_last( $sessions );
 	}
 
+	/**
+	 * Invoke the internal protocol-context resolver.
+	 *
+	 * @param string                                                        $method  MCP method name.
+	 * @param array<string, mixed>                                          $params  MCP request parameters.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context HTTP request context.
+	 */
+	private function resolveProtocolContext( string $method, array $params, HttpRequestContext $context ): McpProtocolContext {
+		$reflection = new \ReflectionClass( $this->handler );
+		$resolver   = $reflection->getMethod( 'resolve_protocol_context' );
+		$resolver->setAccessible( true );
+
+		/** @var \WP\MCP\Core\McpProtocolContext $protocol_context */
+		$protocol_context = $resolver->invoke( $this->handler, $method, $params, $context );
+
+		return $protocol_context;
+	}
+
 	private function createPostRequest( array $body ): WP_REST_Request {
 		$request = new WP_REST_Request( 'POST', '/test-mcp' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_header( 'Accept', 'application/json, text/event-stream' );
-		$request->set_body( json_encode( $body ) );
+		$request->set_body( wp_json_encode( $body ) );
 
 		return $request;
 	}
