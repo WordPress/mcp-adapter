@@ -478,6 +478,33 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertStringContainsString( 'only for tools/call', $response['error']['message'] );
 	}
 
+	public function test_unknown_request_protocol_version_returns_protocol_error(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 23,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'_meta' => array(
+						'io.modelcontextprotocol/protocolVersion' => '2099-01-01',
+					),
+					'name'  => 'test-always-allowed',
+				),
+			)
+		);
+
+		$result   = $handle_request_method->invoke( $this->bridge, $json_input );
+		$response = json_decode( $result, true );
+
+		$this->assertSame( 23, $response['id'] );
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $response['error']['code'] );
+		$this->assertStringContainsString( '2099-01-01', $response['error']['message'] );
+	}
+
 	public function test_handle_request_with_object_params(): void {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );

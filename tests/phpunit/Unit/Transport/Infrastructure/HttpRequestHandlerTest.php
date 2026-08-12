@@ -654,6 +654,26 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertStringContainsString( '2099-01-01', $data['error']['message'] );
 	}
 
+	public function test_non_string_request_version_returns_protocol_error(): void {
+		$params = $this->toolCallParams20260728();
+		$params['_meta'][ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] = null;
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 29,
+				'method'  => 'tools/call',
+				'params'  => $params,
+			)
+		);
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $data['error']['code'] );
+		$this->assertStringContainsString( 'Unsupported protocol version: NULL', $data['error']['message'] );
+	}
+
 	public function test_2026_07_28_revision_is_explicitly_bounded_to_tools_call(): void {
 		$params  = $this->toolCallParams20260728();
 		$request = $this->createPostRequest(

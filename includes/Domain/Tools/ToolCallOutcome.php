@@ -21,27 +21,6 @@ namespace WP\MCP\Domain\Tools;
 final class ToolCallOutcome {
 
 	/**
-	 * Completed tool call result type.
-	 *
-	 * @var string
-	 */
-	public const RESULT_TYPE_COMPLETE = 'complete';
-
-	/**
-	 * Multi round-trip result type, currently unsupported by the Adapter.
-	 *
-	 * @var string
-	 */
-	public const RESULT_TYPE_INPUT_REQUIRED = 'input_required';
-
-	/**
-	 * Result type.
-	 *
-	 * @var string
-	 */
-	private string $result_type;
-
-	/**
 	 * Wire-ready content blocks.
 	 *
 	 * @var array<int, array<string, mixed>>
@@ -76,14 +55,12 @@ final class ToolCallOutcome {
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @param string                           $result_type Result type.
 	 * @param array<int, array<string, mixed>> $content Content blocks.
 	 * @param mixed                            $structured_content Structured content.
 	 * @param bool                             $has_structured_content Whether structured content is present.
 	 * @param bool                             $is_error Whether execution failed.
 	 */
-	private function __construct( string $result_type, array $content, $structured_content, bool $has_structured_content, bool $is_error ) {
-		$this->result_type            = $result_type;
+	private function __construct( array $content, $structured_content, bool $has_structured_content, bool $is_error ) {
 		$this->content                = $content;
 		$this->structured_content     = $structured_content;
 		$this->has_structured_content = $has_structured_content;
@@ -100,7 +77,7 @@ final class ToolCallOutcome {
 	 * @param bool                             $has_structured_content Whether structured content is present.
 	 */
 	public static function complete( array $content, $structured_content = null, bool $has_structured_content = false ): self {
-		return new self( self::RESULT_TYPE_COMPLETE, $content, $structured_content, $has_structured_content, false );
+		return new self( $content, $structured_content, $has_structured_content, false );
 	}
 
 	/**
@@ -112,7 +89,6 @@ final class ToolCallOutcome {
 	 */
 	public static function error( string $message ): self {
 		return new self(
-			self::RESULT_TYPE_COMPLETE,
 			array(
 				array(
 					'type' => 'text',
@@ -123,29 +99,6 @@ final class ToolCallOutcome {
 			false,
 			true
 		);
-	}
-
-	/**
-	 * Create a synthetic multi round-trip outcome for boundary tests.
-	 *
-	 * The Adapter does not currently expose an ability convention that can
-	 * produce this outcome. Both codecs reject it explicitly.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param array<int, array<string, mixed>> $content Content blocks.
-	 */
-	public static function input_required( array $content = array() ): self {
-		return new self( self::RESULT_TYPE_INPUT_REQUIRED, $content, null, false, false );
-	}
-
-	/**
-	 * Get the protocol result type.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function get_result_type(): string {
-		return $this->result_type;
 	}
 
 	/**

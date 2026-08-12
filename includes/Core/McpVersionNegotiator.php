@@ -22,18 +22,6 @@ namespace WP\MCP\Core;
 final class McpVersionNegotiator {
 
 	/**
-	 * Protocol versions supported by this server, ordered newest-first.
-	 *
-	 * @var array<int, string>
-	 */
-	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
-	public const SUPPORTED_PROTOCOL_VERSIONS = array(
-		'2025-11-25',
-		'2025-06-18',
-		'2024-11-05',
-	);
-
-	/**
 	 * Negotiate the protocol version to use for a session.
 	 *
 	 * If the client-requested version is in the supported list it is echoed
@@ -46,23 +34,25 @@ final class McpVersionNegotiator {
 	 * @return string The negotiated protocol version.
 	 */
 	public static function negotiate( string $client_version ): string {
-		if ( in_array( $client_version, self::SUPPORTED_PROTOCOL_VERSIONS, true ) ) {
+		$initialize_versions = McpProtocolContext::get_initialize_protocol_versions();
+
+		if ( in_array( $client_version, $initialize_versions, true ) ) {
 			return $client_version;
 		}
 
-		return self::SUPPORTED_PROTOCOL_VERSIONS[0];
+		return $initialize_versions[0];
 	}
 
 	/**
-	 * Check whether a given version string is supported.
+	 * Check whether a version participates in initialize negotiation.
 	 *
 	 * @since 0.5.0
 	 *
 	 * @param string $version The protocol version to check.
 	 *
-	 * @return bool True when the version is in the supported list, false otherwise.
+	 * @return bool True for initialize-lifecycle versions, false otherwise.
 	 */
-	public static function is_supported( string $version ): bool {
-		return in_array( $version, self::SUPPORTED_PROTOCOL_VERSIONS, true );
+	public static function is_supported_for_initialize( string $version ): bool {
+		return in_array( $version, McpProtocolContext::get_initialize_protocol_versions(), true );
 	}
 }

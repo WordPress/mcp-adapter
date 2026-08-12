@@ -26,10 +26,6 @@ final class V20251125ToolCallResultCodec implements ToolCallResultCodecInterface
 	 * @since n.e.x.t
 	 */
 	public function encode( ToolCallOutcome $outcome ): array {
-		if ( ToolCallOutcome::RESULT_TYPE_COMPLETE !== $outcome->get_result_type() ) {
-			throw new \WP\MCP\Transport\Infrastructure\ToolCallCodecException( 'Multi round-trip tool results are not supported.' );
-		}
-
 		$data = array(
 			'content' => $outcome->get_content(),
 			'isError' => $outcome->is_error(),
