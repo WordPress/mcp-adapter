@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
@@ -235,24 +236,9 @@ class ResourcesHandler {
 	private function convert_contents_to_dtos( $contents, string $uri ): array {
 		// If contents is already an array of properly structured items, convert each.
 		if ( is_array( $contents ) && ! empty( $contents ) ) {
-			// A protocol contents collection is a JSON list whose every member carries at
-			// least one field create_content_dto() builds from. Checking the whole list keeps
-			// an ordinary associative payload, or a data list whose first value merely looks
-			// like resource contents, on the JSON-text fallback path.
-			$is_list   = array_keys( $contents ) === range( 0, count( $contents ) - 1 );
-			$all_items = $is_list;
-
-			foreach ( $contents as $item ) {
-				if (
-					! is_array( $item )
-					|| ( ! isset( $item['uri'] ) && ! isset( $item['text'] ) && ! isset( $item['blob'] ) )
-				) {
-					$all_items = false;
-					break;
-				}
-			}
-
-			if ( $all_items ) {
+			// Check if this is an array of content items (has 'uri', 'text', or 'blob' in first item).
+			$first_item = reset( $contents );
+			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) || isset( $first_item['blob'] ) ) ) {
 				return array_map(
 					function ( $item ) use ( $uri ) {
 						return $this->create_content_dto( $item, $uri );
@@ -289,10 +275,7 @@ class ResourcesHandler {
 	 * resource contents reaches the client. MCP Apps UI resources rely on this: they
 	 * put CSP config and border hints under `_meta.ui` alongside the HTML body.
 	 *
-	 * A `_meta` that would not serialize as a JSON object is dropped rather than
-	 * forwarded, so a malformed one costs the client its metadata and not the resource.
-	 * The drop is logged, since a conforming client strips metadata it does not
-	 * recognize and would report nothing. See {@see HandlerHelperTrait::normalize_content_meta()}.
+	 * A list-shaped `_meta` is omitted because MCP declares this field as a JSON object.
 	 *
 	 * Every key is optional and read defensively, because a handler returns whatever
 	 * WordPress handed it: `blob` and `text` are cast to string, `mimeType` is kept
@@ -306,12 +289,7 @@ class ResourcesHandler {
 	private function create_content_dto( array $item, string $default_uri ) {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
-		$meta      = $this->normalize_content_meta(
-			$item['_meta'] ?? null,
-			$this->mcp->get_error_handler(),
-			'Invalid _meta on resource contents, dropping it',
-			array( 'uri' => $item_uri )
-		);
+		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {

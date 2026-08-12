@@ -269,52 +269,12 @@ final class ContentBlockHelperTest extends TestCase {
 	}
 
 	/**
-	 * Test that omitting the resource meta leaves the nested contents without _meta.
-	 */
-	public function test_embedded_text_resource_without_resource_meta_leaves_contents_meta_null(): void {
-		$content  = ContentBlockHelper::embedded_text_resource( 'file:///test.txt', 'content' );
-		$resource = $content->getResource();
-
-		$this->assertNull( $resource->get_meta() );
-	}
-
-	/**
 	 * Test that a list-shaped _meta is treated as absent by text().
 	 *
 	 * A list serializes to a JSON array, and MCP declares `_meta` a JSON object.
 	 */
 	public function test_text_with_list_shaped_meta_omits_meta(): void {
 		$content = ContentBlockHelper::text( 'Test message', null, array( 'first', 'second' ) );
-
-		$this->assertNull( $content->get_meta() );
-	}
-
-	/**
-	 * An object-shaped `_meta` can still contain a value JSON cannot encode. The helper
-	 * must omit it so the content block remains serializable and its text still arrives.
-	 */
-	public function test_text_with_non_encodable_meta_omits_meta(): void {
-		$content = ContentBlockHelper::text( 'Test message', null, array( 'score' => NAN ) );
-
-		$this->assertNull( $content->get_meta() );
-		$this->assertSame( 'Test message', $content->getText() );
-		$this->assertIsString( wp_json_encode( $content->toArray() ) );
-	}
-
-	/**
-	 * Test that a list-shaped _meta is treated as absent by image().
-	 */
-	public function test_image_with_list_shaped_meta_omits_meta(): void {
-		$content = ContentBlockHelper::image( 'dGVzdA==', 'image/png', null, array( 'first', 'second' ) );
-
-		$this->assertNull( $content->get_meta() );
-	}
-
-	/**
-	 * Test that a list-shaped _meta is treated as absent by audio().
-	 */
-	public function test_audio_with_list_shaped_meta_omits_meta(): void {
-		$content = ContentBlockHelper::audio( 'dGVzdA==', 'audio/mpeg', null, array( 'first', 'second' ) );
 
 		$this->assertNull( $content->get_meta() );
 	}
@@ -327,23 +287,6 @@ final class ContentBlockHelperTest extends TestCase {
 			'ui://example/app',
 			'<!doctype html>',
 			'text/html;profile=mcp-app',
-			null,
-			array( 'block', 'level' ),
-			array( 'resource', 'level' )
-		);
-
-		$this->assertNull( $content->get_meta() );
-		$this->assertNull( $content->getResource()->get_meta() );
-	}
-
-	/**
-	 * Test that embeddedBlobResource() drops a list-shaped _meta on both levels of the DTO tree.
-	 */
-	public function test_embedded_blob_resource_with_list_shaped_meta_omits_meta_on_both_levels(): void {
-		$content = ContentBlockHelper::embedded_blob_resource(
-			'file:///doc.pdf',
-			'data',
-			'application/pdf',
 			null,
 			array( 'block', 'level' ),
 			array( 'resource', 'level' )

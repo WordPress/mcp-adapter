@@ -99,58 +99,6 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'result', $response );
 	}
 
-	public function test_resource_meta_is_serialized_once_at_the_stdio_boundary(): void {
-		$value = new class() implements \JsonSerializable {
-			public int $calls = 0;
-
-			public function jsonSerialize(): array {
-				++$this->calls;
-
-				if ( 1 < $this->calls ) {
-					throw new \RuntimeException( 'Cannot serialize twice' );
-				}
-
-				return array( 'phase' => 'first' );
-			}
-		};
-
-		$filter = static function () use ( $value ): array {
-			return array(
-				array(
-					'uri'   => 'WordPress://local/resource-1',
-					'text'  => 'resource body',
-					'_meta' => array( 'stateful' => $value ),
-				),
-			);
-		};
-		add_filter( 'mcp_adapter_resource_read_result', $filter );
-
-		$reflection            = new \ReflectionClass( $this->bridge );
-		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
-
-		$json_input = wp_json_encode(
-			array(
-				'jsonrpc' => '2.0',
-				'id'      => 7,
-				'method'  => 'resources/read',
-				'params'  => array( 'uri' => 'WordPress://local/resource-1' ),
-			)
-		);
-
-		try {
-			$result = $handle_request_method->invoke( $this->bridge, $json_input );
-		} finally {
-			remove_filter( 'mcp_adapter_resource_read_result', $filter );
-		}
-
-		$response = json_decode( $result, true );
-		$this->assertSame( 7, $response['id'] );
-		$this->assertSame( 'resource body', $response['result']['contents'][0]['text'] );
-		$this->assertSame( 'first', $response['result']['contents'][0]['_meta']['stateful']['phase'] );
-		$this->assertSame( 1, $value->calls );
-	}
-
 	public function test_handle_request_with_notification(): void {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );

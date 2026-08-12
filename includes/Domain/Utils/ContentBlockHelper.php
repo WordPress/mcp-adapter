@@ -30,10 +30,7 @@ use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
  * and resource contents throughout the MCP protocol.
  *
  * Every `_meta` argument passes through {@see McpValidator::normalize_meta()}, so a
- * value that would not serialize as a JSON object arrives at the client as an absent
- * field rather than as a JSON array. MCP declares `_meta` an object, and clients
- * validate it as part of the enclosing response, so a non-object there risks the
- * whole payload rather than just the metadata.
+ * PHP list is omitted instead of being serialized where MCP declares a JSON object.
  *
  * @since 0.5.0
  */

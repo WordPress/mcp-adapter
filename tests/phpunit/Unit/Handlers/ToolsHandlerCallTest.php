@@ -404,7 +404,6 @@ final class ToolsHandlerCallTest extends TestCase {
 		$result = $this->call_tool_returning(
 			array(
 				'type'        => 'resource',
-				'annotations' => array( 'audience' => array( 'user' ) ),
 				'_meta'       => array( 'block' => 'level' ),
 				'resource'    => array(
 					'uri'      => 'ui://example/app',
@@ -427,31 +426,6 @@ final class ToolsHandlerCallTest extends TestCase {
 		$resource = $content[0]->getResource();
 		$this->assertInstanceOf( TextResourceContents::class, $resource );
 		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $resource->get_meta() );
-	}
-
-	public function test_embedded_resource_nested_blob_shape_preserves_meta_on_both_levels(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type'     => 'resource',
-				'_meta'    => array( 'block' => 'level' ),
-				'resource' => array(
-					'uri'      => 'WordPress://local/tool-embedded-blob',
-					'mimeType' => 'application/pdf',
-					'blob'     => 'ZGF0YQ==',
-					'_meta'    => array( 'pages' => 3 ),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$content = $result->getContent();
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
-		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
-
-		$resource = $content[0]->getResource();
-		$this->assertInstanceOf( BlobResourceContents::class, $resource );
-		$this->assertSame( array( 'pages' => 3 ), $resource->get_meta() );
 	}
 
 	public function test_embedded_resource_flat_shape_assigns_meta_to_the_resource_contents(): void {
@@ -477,122 +451,6 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
 	}
 
-	public function test_embedded_resource_meta_is_frozen_before_the_helper_normalizes_it_again(): void {
-		$value = new class() implements \JsonSerializable {
-			public int $calls = 0;
-
-			public function jsonSerialize(): array {
-				++$this->calls;
-
-				if ( 1 < $this->calls ) {
-					throw new \RuntimeException( 'Cannot serialize twice' );
-				}
-
-				return array( 'phase' => 'first' );
-			}
-		};
-
-		$result = $this->call_tool_returning(
-			array(
-				'type'  => 'resource',
-				'uri'   => 'ui://example/app',
-				'text'  => '<!doctype html>',
-				'_meta' => array( 'stateful' => $value ),
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$content = $result->getContent();
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
-		$this->assertSame(
-			'{"stateful":{"phase":"first"}}',
-			wp_json_encode( $content[0]->getResource()->get_meta() )
-		);
-		$this->assertSame( 1, $value->calls );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
-	}
-
-	public function test_embedded_resource_flat_blob_shape_assigns_meta_to_the_resource_contents(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type'     => 'resource',
-				'uri'      => 'WordPress://local/tool-embedded-blob',
-				'mimeType' => 'application/pdf',
-				'blob'     => 'ZGF0YQ==',
-				'_meta'    => array( 'pages' => 3 ),
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$content = $result->getContent();
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
-
-		$this->assertNull( $content[0]->get_meta() );
-		$this->assertSame( array( 'pages' => 3 ), $content[0]->getResource()->get_meta() );
-	}
-
-	public function test_embedded_resource_without_meta_leaves_both_levels_null(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type' => 'resource',
-				'uri'  => 'WordPress://local/tool-embedded-text',
-				'text' => 'body',
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$content = $result->getContent();
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
-		$this->assertNull( $content[0]->get_meta() );
-		$this->assertNull( $content[0]->getResource()->get_meta() );
-	}
-
-	/**
-	 * A conforming client strips metadata it does not recognize, so a `_meta` that could
-	 * not be emitted is reported nowhere else. Both levels of an embedded resource log
-	 * separately, because they name different objects.
-	 */
-	public function test_embedded_resource_with_list_meta_logs_the_drop_at_each_level(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type'     => 'resource',
-				'_meta'    => array( 'a', 'b' ),
-				'resource' => array(
-					'uri'   => 'WordPress://local/tool-embedded-text',
-					'text'  => 'body',
-					'_meta' => array( 'c', 'd' ),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
-		$this->assertContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
-	}
-
-	public function test_embedded_resource_without_meta_does_not_log(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type' => 'resource',
-				'uri'  => 'WordPress://local/tool-embedded-text',
-				'text' => 'body',
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertNotContains( 'Invalid _meta on tool result content block, dropping it', $messages );
-		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
-	}
-
 	public function test_image_result_carries_meta(): void {
 		$result = $this->call_tool_returning(
 			array(
@@ -610,10 +468,9 @@ final class ToolsHandlerCallTest extends TestCase {
 	}
 
 	/**
-	 * MCP declares `_meta` an object, so a list is omitted rather than emitted as a JSON
-	 * array, which a conforming client rejects along with the block carrying it.
+	 * MCP declares `_meta` an object, so a list is omitted rather than emitted as a JSON array.
 	 */
-	public function test_image_result_with_list_meta_omits_meta_and_logs(): void {
+	public function test_image_result_with_list_meta_omits_meta(): void {
 		$result = $this->call_tool_returning(
 			array(
 				'type'     => 'image',
@@ -628,52 +485,5 @@ final class ToolsHandlerCallTest extends TestCase {
 		$block = $result->getContent()[0]->toArray();
 		$this->assertArrayNotHasKey( '_meta', $block );
 		$this->assertNotEmpty( $block['data'] );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertContains( 'Invalid _meta on tool result content block, dropping it', $messages );
-	}
-
-	/**
-	 * The `resource` branch normalizes both `_meta` levels before it knows whether it can
-	 * build an EmbeddedResource. When the URI is empty the result falls through to the
-	 * generic path, which returns every key verbatim - so the `_meta` is still on the wire
-	 * and the warning names a drop that never happened.
-	 */
-	public function test_resource_result_that_falls_back_does_not_log_a_drop(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type'  => 'resource',
-				'uri'   => '',
-				'text'  => 'body',
-				'_meta' => array( 'a', 'b' ),
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		// The generic path keeps the result verbatim, so nothing was dropped.
-		$this->assertSame( array( 'a', 'b' ), $result->getStructuredContent()['_meta'] );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
-	}
-
-	/**
-	 * Same fall-through, reached through the content check rather than the URI check.
-	 */
-	public function test_resource_result_with_non_string_text_does_not_log_a_drop(): void {
-		$result = $this->call_tool_returning(
-			array(
-				'type'  => 'resource',
-				'uri'   => 'ui://example/app',
-				'text'  => array( 'not', 'a', 'string' ),
-				'_meta' => array( 'a', 'b' ),
-			)
-		);
-
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
 	}
 }

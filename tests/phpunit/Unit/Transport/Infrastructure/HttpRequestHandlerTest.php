@@ -466,60 +466,6 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
-	public function test_resource_meta_is_serialized_once_at_the_http_encoder_boundary(): void {
-		$session_id = $this->initializeAndGetSessionId();
-		$value      = new class() implements \JsonSerializable {
-			public int $calls = 0;
-
-			public function jsonSerialize(): array {
-				++$this->calls;
-
-				if ( 1 < $this->calls ) {
-					throw new \RuntimeException( 'Cannot serialize twice' );
-				}
-
-				return array( 'phase' => 'first' );
-			}
-		};
-
-		$filter = static function () use ( $value ): array {
-			return array(
-				array(
-					'uri'   => 'WordPress://local/resource-1',
-					'text'  => 'resource body',
-					'_meta' => array( 'stateful' => $value ),
-				),
-			);
-		};
-		add_filter( 'mcp_adapter_resource_read_result', $filter );
-
-		$request = $this->createPostRequest(
-			array(
-				'jsonrpc' => '2.0',
-				'id'      => 7,
-				'method'  => 'resources/read',
-				'params'  => array( 'uri' => 'WordPress://local/resource-1' ),
-			)
-		);
-		$request->set_header( 'Mcp-Session-Id', $session_id );
-		$request->set_header( 'Mcp-Protocol-Version', '2025-11-25' );
-
-		try {
-			$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
-		} finally {
-			remove_filter( 'mcp_adapter_resource_read_result', $filter );
-		}
-
-		$json = wp_json_encode( $response->get_data() );
-		$this->assertNotFalse( $json );
-
-		$data = json_decode( (string) $json, true );
-		$this->assertSame( 7, $data['id'] );
-		$this->assertSame( 'resource body', $data['result']['contents'][0]['text'] );
-		$this->assertSame( 'first', $data['result']['contents'][0]['_meta']['stateful']['phase'] );
-		$this->assertSame( 1, $value->calls );
-	}
-
 	// Helper methods
 
 	/**

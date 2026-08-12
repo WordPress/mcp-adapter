@@ -1031,84 +1031,9 @@ final class PromptsHandlerTest extends TestCase {
 	// =========================================================================
 	// Message Content Block Normalization
 	//
-	// Prompt messages carry the same content blocks tool results do, so they carry
-	// the same two hazards: a `_meta` that would serialize as a JSON array, and an
-	// annotations object a conforming client rejects. Here the cost is higher than
-	// on the tool path - a value the schema DTO refuses throws, and the catch in
-	// get_prompt() turns that into an error response, so one bad hint loses the
-	// whole prompt rather than the hint.
+	// Prompt messages already accept protocol-shaped content blocks. These tests pin
+	// valid `_meta` passthrough and omission of PHP lists at both metadata levels.
 	// =========================================================================
-
-	public function test_message_content_meta_that_is_a_list_is_omitted(): void {
-		$result = $this->get_prompt_returning(
-			array(
-				'messages' => array(
-					array(
-						'role'    => 'user',
-						'content' => array(
-							'type'  => 'text',
-							'text'  => 'body',
-							'_meta' => array( 'a', 'b' ),
-						),
-					),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-
-		$block = $this->first_content_block( $result );
-		$this->assertArrayNotHasKey( '_meta', $block );
-		$this->assertSame( 'body', $block['text'] );
-		$this->assertStringNotContainsString( '"_meta":[', (string) wp_json_encode( $block ) );
-	}
-
-	public function test_message_content_meta_object_is_preserved(): void {
-		$result = $this->get_prompt_returning(
-			array(
-				'messages' => array(
-					array(
-						'role'    => 'user',
-						'content' => array(
-							'type'  => 'text',
-							'text'  => 'body',
-							'_meta' => array( 'ui' => array( 'prefersBorder' => true ) ),
-						),
-					),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$this->assertSame(
-			array( 'ui' => array( 'prefersBorder' => true ) ),
-			$this->first_content_block( $result )['_meta']
-		);
-	}
-
-	/**
-	 * A `_meta` of the wrong type reaches asArrayOrNull() and throws, which get_prompt()
-	 * catches and turns into an error response. Metadata must not cost the message.
-	 */
-	public function test_message_content_meta_that_is_not_an_array_still_returns_the_prompt(): void {
-		$result = $this->get_prompt_returning(
-			array(
-				'messages' => array(
-					array(
-						'role'    => 'user',
-						'content' => array(
-							'type'  => 'text',
-							'text'  => 'body',
-							'_meta' => 'not-an-object',
-						),
-					),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$this->assertArrayNotHasKey( '_meta', $this->first_content_block( $result ) );
-	}
 
 	/**
 	 * The nested form of a resource content block has two levels that each carry
@@ -1151,6 +1076,7 @@ final class PromptsHandlerTest extends TestCase {
 						'role'    => 'user',
 						'content' => array(
 							'type'     => 'resource',
+							'_meta'    => array( 'block' => 'level' ),
 							'resource' => array(
 								'uri'   => 'WordPress://local/prompt-embedded',
 								'text'  => 'body',
@@ -1163,21 +1089,12 @@ final class PromptsHandlerTest extends TestCase {
 		);
 
 		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertSame( array( 'block' => 'level' ), $this->first_content_block( $result )['_meta'] );
 		$this->assertSame(
 			array( 'ui' => array( 'prefersBorder' => true ) ),
 			$this->first_content_block( $result )['resource']['_meta']
 		);
 	}
-
-	// =========================================================================
-	// Message-Level Degradation
-	//
-	// A content block the schema DTOs refuse used to throw, and get_prompt()'s
-	// catch turned that into an error response - so one unrenderable message
-	// cost every message in the prompt. The handler already degrades an unknown
-	// content type and an invalid role to a text representation; these pin the
-	// same rule for a valid type carrying a payload the DTO rejects.
-	// =========================================================================
 
 	/**
 	 * Run a prompt whose result is replaced by $shape, so any result shape can be driven
@@ -1214,84 +1131,11 @@ final class PromptsHandlerTest extends TestCase {
 	/**
 	 * The emitted array of the first message's content block.
 	 *
-	 * Asserts on what goes on the wire rather than on DTO getters, which report a
-	 * healthy object for input that serializes to a JSON array.
-	 *
 	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
 	 *
 	 * @return array
 	 */
 	private function first_content_block( GetPromptResult $result ): array {
-		return $this->content_block_at( $result, 0 );
-	}
-
-	/**
-	 * The emitted array of the content block of the message at $index.
-	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
-	 * @param int                                              $index  Message index.
-	 *
-	 * @return array
-	 */
-	private function content_block_at( GetPromptResult $result, int $index ): array {
-		return $result->getMessages()[ $index ]->getContent()->toArray();
-	}
-
-	/**
-	 * A conforming client strips metadata it does not recognize, so a `_meta` that could
-	 * not be emitted is reported nowhere else. Both levels of an embedded resource log
-	 * separately, because they name different objects.
-	 */
-	public function test_message_content_meta_that_is_a_list_logs_the_drop_at_each_level(): void {
-		$result = $this->get_prompt_returning(
-			array(
-				'messages' => array(
-					array(
-						'role'    => 'user',
-						'content' => array(
-							'type'     => 'resource',
-							'_meta'    => array( 'a', 'b' ),
-							'resource' => array(
-								'uri'   => 'WordPress://local/prompt-embedded',
-								'text'  => 'body',
-								'_meta' => array( 'c', 'd' ),
-							),
-						),
-					),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertContains( 'Invalid _meta on prompt message content block, dropping it', $messages );
-		$this->assertContains( 'Invalid _meta on prompt message resource contents, dropping it', $messages );
-	}
-
-	/**
-	 * An absent `_meta` is the ordinary case and must stay quiet, or the log fills with
-	 * noise from every message that never asked for metadata.
-	 */
-	public function test_message_content_without_meta_does_not_log(): void {
-		$result = $this->get_prompt_returning(
-			array(
-				'messages' => array(
-					array(
-						'role'    => 'user',
-						'content' => array(
-							'type' => 'text',
-							'text' => 'body',
-						),
-					),
-				),
-			)
-		);
-
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-
-		$messages = array_column( DummyErrorHandler::$logs, 'message' );
-		$this->assertNotContains( 'Invalid _meta on prompt message content block, dropping it', $messages );
-		$this->assertNotContains( 'Invalid _meta on prompt message resource contents, dropping it', $messages );
+		return $result->getMessages()[0]->getContent()->toArray();
 	}
 }

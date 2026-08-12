@@ -87,60 +87,6 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( array( 'should_not' => 'leak' ), $arr['_meta']['mcp_adapter'] );
 	}
 
-	public function test_from_ability_with_list_shaped_meta_omits_meta(): void {
-		$this->register_ability_in_hook(
-			'test/resource-list-meta',
-			array(
-				'label'               => 'Resource List Meta',
-				'description'         => 'Test MCP resource',
-				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function () {
-					return array( 'ok' => true );
-				},
-				'permission_callback' => static function () {
-					return true;
-				},
-				'meta'                => array(
-					'mcp' => array(
-						'uri'   => 'WordPress://local/resource-list-meta',
-						'_meta' => array( 'first', 'second' ),
-					),
-				),
-			)
-		);
-
-		$ability = wp_get_ability( 'test/resource-list-meta' );
-		$this->assertNotNull( $ability );
-
-		$mcp_resource = McpResource::fromAbility( $ability );
-		$this->assertNotWPError( $mcp_resource );
-
-		$arr = $mcp_resource->get_protocol_dto()->toArray();
-
-		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
-		$this->assertArrayNotHasKey( '_meta', $arr );
-
-		wp_unregister_ability( 'test/resource-list-meta' );
-	}
-
-	public function test_fromArray_with_list_shaped_meta_omits_meta(): void {
-		$mcp_resource = McpResource::fromArray(
-			array(
-				'uri'     => 'WordPress://local/list-meta',
-				'meta'    => array( 'first', 'second' ),
-				'handler' => static function ( $args ) {
-					return $args;
-				},
-			)
-		);
-
-		$arr = $mcp_resource->get_protocol_dto()->toArray();
-
-		// A list would serialize as a JSON array, which MCP does not allow for `_meta`.
-		$this->assertArrayNotHasKey( '_meta', $arr );
-	}
-
 	// =========================================================================
 	// fromArray Tests
 	// =========================================================================

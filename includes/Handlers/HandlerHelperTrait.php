@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers;
 
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 
 /**
@@ -61,43 +60,5 @@ trait HandlerHelperTrait {
 		);
 
 		return $original;
-	}
-
-	/**
-	 * Normalize a `_meta` value from handler output, logging when one is dropped.
-	 *
-	 * {@see McpValidator::normalize_meta()} answers null both for a `_meta` that was never
-	 * written and for one that could not serialize as a JSON object. The two deserve
-	 * different treatment: the first is the ordinary case, while the second means an author
-	 * wrote metadata that will not reach the client. Passing the raw value separates them
-	 * without a guard at each call site, because an absent key arrives here as null.
-	 *
-	 * Dropping is logged rather than raised: `_meta` travels alongside a payload, and
-	 * withholding the payload over its metadata would be the worse outcome. A client gives
-	 * no signal either, since a conforming one strips metadata it does not recognize, so
-	 * this log is the only place the mistake surfaces.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param mixed                                                                  $meta          The raw `_meta` value.
-	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler The error handler for logging.
-	 * @param string                                                                 $log_message   Message to log when `_meta` is dropped.
-	 * @param array                                                                  $log_context   Context to log alongside the message.
-	 *
-	 * @return array<array-key, mixed>|null The normalized `_meta`, or null when there is nothing conformant to emit.
-	 */
-	protected function normalize_content_meta(
-		$meta,
-		McpErrorHandlerInterface $error_handler,
-		string $log_message,
-		array $log_context = array()
-	): ?array {
-		$normalized = McpValidator::normalize_meta( $meta );
-
-		if ( null === $normalized && null !== $meta ) {
-			$error_handler->log( $log_message, $log_context, 'warning' );
-		}
-
-		return $normalized;
 	}
 }

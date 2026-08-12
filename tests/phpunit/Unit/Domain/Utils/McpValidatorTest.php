@@ -808,18 +808,18 @@ final class McpValidatorTest extends TestCase {
 	}
 
 	/**
-	 * @dataProvider data_non_object_meta
+	 * @dataProvider data_unsupported_meta_values
 	 *
 	 * @param mixed $meta The value to normalize.
 	 */
-	public function test_normalize_meta_rejects_values_that_are_not_json_objects( $meta ): void {
+	public function test_normalize_meta_omits_unsupported_outer_values( $meta ): void {
 		$this->assertNull( McpValidator::normalize_meta( $meta ) );
 	}
 
 	/**
 	 * @return array<string, array{0: mixed}>
 	 */
-	public function data_non_object_meta(): array {
+	public function data_unsupported_meta_values(): array {
 		return array(
 			'null'          => array( null ),
 			'string'        => array( 'not-an-object' ),
@@ -841,49 +841,4 @@ final class McpValidatorTest extends TestCase {
 		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
 	}
 
-	public function test_normalize_meta_rejects_a_value_json_cannot_encode(): void {
-		$meta = array( 'value' => NAN );
-
-		$this->assertFalse( wp_json_encode( $meta ) );
-		$this->assertNull( McpValidator::normalize_meta( $meta ) );
-	}
-
-	public function test_normalize_meta_handles_a_throwing_json_serializable_value(): void {
-		$value = new class() implements \JsonSerializable {
-			public function jsonSerialize(): array {
-				throw new \RuntimeException( 'Cannot serialize' );
-			}
-		};
-
-		$this->assertNull( McpValidator::normalize_meta( array( 'value' => $value ) ) );
-	}
-
-	public function test_normalize_meta_freezes_the_first_successful_json_representation(): void {
-		$value = new class() implements \JsonSerializable {
-			public int $calls = 0;
-
-			public function jsonSerialize(): array {
-				++$this->calls;
-
-				if ( 1 < $this->calls ) {
-					throw new \RuntimeException( 'Cannot serialize twice' );
-				}
-
-				return array(
-					'emptyObject'   => new \stdClass(),
-					'emptyList'     => array(),
-					'numericObject' => (object) array( '0' => 'first', '1' => 'second' ),
-				);
-			}
-		};
-
-		$normalized = McpValidator::normalize_meta( array( 'value' => $value ) );
-
-		$this->assertSame( 1, $value->calls );
-		$this->assertSame(
-			'{"value":{"emptyObject":{},"emptyList":[],"numericObject":{"0":"first","1":"second"}}}',
-			wp_json_encode( $normalized )
-		);
-		$this->assertSame( 1, $value->calls );
-	}
 }

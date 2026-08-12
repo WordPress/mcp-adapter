@@ -438,20 +438,11 @@ class McpValidator {
 	 *
 	 * MCP declares `_meta` as `{ [key: string]: unknown }` — a JSON object. PHP has one
 	 * array type for both JSON shapes, so a sequential array (including an empty one)
-	 * would serialize to a JSON array and put non-conformant output on the wire. An
-	 * associative array can still contain values JSON cannot represent, such as a
-	 * resource, recursion or a non-finite float. Those are treated as absent too, as is
-	 * any non-array value.
+	 * would serialize to a JSON array and put non-conformant output on the wire. Those
+	 * are treated as absent, as is any non-array value.
 	 *
-	 * A successful encoding is decoded into an inert snapshot before it is returned.
-	 * This prevents a stateful JsonSerializable value from changing or throwing when
-	 * the DTO is encoded again at the transport boundary. Nested JSON objects are
-	 * converted back to arrays when that preserves their object shape. Empty objects
-	 * and objects with list-like numeric keys remain inert stdClass instances so they
-	 * cannot turn into JSON arrays on a later encode.
-	 *
-	 * Returns null rather than raising: `_meta` is metadata travelling alongside a
-	 * payload, and a malformed one is not a reason to withhold the payload itself.
+	 * Returns null rather than raising so an incorrectly shaped optional `_meta` does
+	 * not withhold the payload it accompanies.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -469,56 +460,7 @@ class McpValidator {
 			return null;
 		}
 
-		// A JSON-object shape can still contain a value that makes serialization fail.
-		// Probe the same encoder WordPress uses at the transport boundary so malformed
-		// metadata cannot withhold the payload it accompanies. JsonSerializable values
-		// may throw from jsonSerialize(), so failure includes an exception here too.
-		try {
-			$encoded = wp_json_encode( $meta );
-		} catch ( \Throwable $exception ) {
-			return null;
-		}
-
-		if ( false === $encoded ) {
-			return null;
-		}
-
-		$snapshot = json_decode( $encoded );
-		if ( ! $snapshot instanceof \stdClass ) {
-			return null;
-		}
-
-		return array_map( array( self::class, 'freeze_json_value' ), (array) $snapshot );
-	}
-
-	/**
-	 * Convert a decoded JSON value to inert PHP values without changing its wire shape.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param mixed $value A value produced by json_decode().
-	 *
-	 * @return mixed The inert value with JSON object/list identity preserved.
-	 */
-	private static function freeze_json_value( $value ) {
-		if ( is_array( $value ) ) {
-			return array_map( array( self::class, 'freeze_json_value' ), $value );
-		}
-
-		if ( ! $value instanceof \stdClass ) {
-			return $value;
-		}
-
-		$properties = array_map( array( self::class, 'freeze_json_value' ), (array) $value );
-
-		if (
-			array() === $properties
-			|| array_keys( $properties ) === range( 0, count( $properties ) - 1 )
-		) {
-			return (object) $properties;
-		}
-
-		return $properties;
+		return $meta;
 	}
 
 	/**

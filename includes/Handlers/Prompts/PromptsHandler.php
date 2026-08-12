@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
@@ -512,7 +513,7 @@ class PromptsHandler {
 		}
 
 		$content = $this->validate_content_type( $content, $prompt_name );
-		$content = $this->normalize_content_block( $content, $prompt_name );
+		$content = $this->normalize_content_block( $content );
 
 		return PromptMessage::fromArray(
 			array(
@@ -536,18 +537,12 @@ class PromptsHandler {
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @param array  $content     Content block as the prompt returned it.
-	 * @param string $prompt_name Prompt name for logging.
+	 * @param array $content Content block as the prompt returned it.
 	 *
 	 * @return array Content block safe to hand to PromptMessage::fromArray().
 	 */
-	private function normalize_content_block( array $content, string $prompt_name ): array {
-		$block_meta = $this->normalize_content_meta(
-			$content['_meta'] ?? null,
-			$this->mcp->get_error_handler(),
-			'Invalid _meta on prompt message content block, dropping it',
-			array( 'prompt_name' => $prompt_name )
-		);
+	private function normalize_content_block( array $content ): array {
+		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
 		if ( null === $block_meta ) {
 			unset( $content['_meta'] );
 		} else {
@@ -559,12 +554,7 @@ class PromptsHandler {
 		if ( 'resource' === ( $content['type'] ?? '' ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
 			$resource = $content['resource'];
 
-			$resource_meta = $this->normalize_content_meta(
-				$resource['_meta'] ?? null,
-				$this->mcp->get_error_handler(),
-				'Invalid _meta on prompt message resource contents, dropping it',
-				array( 'prompt_name' => $prompt_name )
-			);
+			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
 			if ( null === $resource_meta ) {
 				unset( $resource['_meta'] );
 			} else {
