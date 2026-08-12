@@ -10,7 +10,6 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Core;
 
 use WP\MCP\Core\McpVersionNegotiator;
-use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\V20251125\Common\McpConstants;
 
@@ -37,7 +36,7 @@ final class McpVersionNegotiatorTest extends TestCase {
 	 */
 	public function data_supported_versions(): array {
 		$data = array();
-		foreach ( McpProtocolContext::get_initialize_protocol_versions() as $version ) {
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
 			$data[ $version ] = array( $version );
 		}
 		return $data;
@@ -47,14 +46,18 @@ final class McpVersionNegotiatorTest extends TestCase {
 	 * Test that negotiating with an unsupported version returns the latest supported version.
 	 */
 	public function test_negotiate_withUnsupportedVersion_returnsLatest(): void {
-		$this->assertSame( McpProtocolContext::PROTOCOL_VERSION_2025_11_25, McpVersionNegotiator::negotiate( '9999-99-99' ) );
+		$latest = McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0];
+
+		$this->assertSame( $latest, McpVersionNegotiator::negotiate( '9999-99-99' ) );
 	}
 
 	/**
 	 * Test that negotiating with an empty string returns the latest supported version.
 	 */
 	public function test_negotiate_withEmptyString_returnsLatest(): void {
-		$this->assertSame( McpProtocolContext::PROTOCOL_VERSION_2025_11_25, McpVersionNegotiator::negotiate( '' ) );
+		$latest = McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0];
+
+		$this->assertSame( $latest, McpVersionNegotiator::negotiate( '' ) );
 	}
 
 	/**
@@ -64,23 +67,15 @@ final class McpVersionNegotiatorTest extends TestCase {
 	 *
 	 * @param string $version A supported protocol version.
 	 */
-	public function test_is_supported_for_initialize_with_supported_version_returns_true( string $version ): void {
-		$this->assertTrue( McpVersionNegotiator::is_supported_for_initialize( $version ) );
+	public function test_is_supported_withSupportedVersion_returnsTrue( string $version ): void {
+		$this->assertTrue( McpVersionNegotiator::is_supported( $version ) );
 	}
 
 	/**
 	 * Test that is_supported returns false for an unsupported version.
 	 */
-	public function test_is_supported_for_initialize_with_unsupported_version_returns_false(): void {
-		$this->assertFalse( McpVersionNegotiator::is_supported_for_initialize( '9999-99-99' ) );
-	}
-
-	public function test_discover_version_is_not_treated_as_an_initialize_version(): void {
-		$this->assertFalse( McpVersionNegotiator::is_supported_for_initialize( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 ) );
-		$this->assertSame(
-			McpProtocolContext::PROTOCOL_VERSION_2025_11_25,
-			McpVersionNegotiator::negotiate( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
-		);
+	public function test_is_supported_withUnsupportedVersion_returnsFalse(): void {
+		$this->assertFalse( McpVersionNegotiator::is_supported( '9999-99-99' ) );
 	}
 
 	/**
@@ -92,15 +87,20 @@ final class McpVersionNegotiatorTest extends TestCase {
 	public function test_latest_negotiated_version_matches_2025_11_25_schema_tree(): void {
 		$this->assertSame(
 			McpConstants::LATEST_PROTOCOL_VERSION,
-			McpProtocolContext::get_initialize_protocol_versions()[0],
+			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0],
 			'The latest negotiated lifecycle must match the V20251125 schema tree.'
 		);
 	}
 
 	/**
-	 * Test that initialize negotiation uses exactly the registry's initialize subset.
+	 * Test that SUPPORTED_PROTOCOL_VERSIONS contains exactly the expected set.
+	 *
+	 * This explicit assertion prevents silent test-suite shrinkage: if a version
+	 * is accidentally removed from the constant the data-provider-based tests
+	 * would simply run fewer cases without failing. Locking the list here forces
+	 * a deliberate test update whenever versions are added or removed.
 	 */
-	public function test_initialize_versions_contain_exact_expected_set(): void {
+	public function test_supported_versions_containsExactExpectedSet(): void {
 		$expected = array(
 			'2025-11-25',
 			'2025-06-18',
@@ -109,8 +109,35 @@ final class McpVersionNegotiatorTest extends TestCase {
 
 		$this->assertSame(
 			$expected,
-			McpProtocolContext::get_initialize_protocol_versions(),
-			'Initialize protocol versions do not match the expected registry subset.'
+			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
+			'SUPPORTED_PROTOCOL_VERSIONS does not match the expected set. '
+			. 'If a version was intentionally added or removed, update this test.'
+		);
+	}
+
+	/**
+	 * Test that the first element in SUPPORTED_PROTOCOL_VERSIONS is the latest version.
+	 *
+	 * The constant must be ordered newest-first so that index [0] is always
+	 * the latest protocol version the server supports.
+	 */
+	public function test_supported_versions_firstElementIsLatest(): void {
+		$versions = McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS;
+
+		$this->assertNotEmpty( $versions, 'SUPPORTED_PROTOCOL_VERSIONS must not be empty.' );
+
+		$sorted = $versions;
+		usort(
+			$sorted,
+			static function ( string $a, string $b ): int {
+				return strcmp( $b, $a );
+			}
+		);
+
+		$this->assertSame(
+			$sorted[0],
+			$versions[0],
+			'The first element of SUPPORTED_PROTOCOL_VERSIONS must be the latest (newest) version.'
 		);
 	}
 }

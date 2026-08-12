@@ -260,23 +260,6 @@ final class RequestRouterTest extends TestCase {
 		$this->assertStringContainsString( 'requires params._meta', $result['error']['message'] );
 	}
 
-	public function test_2026_07_28_tools_call_requires_client_capabilities_metadata(): void {
-		$params = $this->tool_call_params_2026_07_28();
-		unset( $params['_meta'][ McpProtocolContext::REQUEST_CLIENT_CAPABILITIES_META_KEY ] );
-
-		$result = $this->router->route_request(
-			'tools/call',
-			$params,
-			1,
-			'test-transport',
-			null,
-			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
-		);
-
-		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
-		$this->assertStringContainsString( 'requires clientCapabilities metadata', $result['error']['message'] );
-	}
-
 	public function test_2026_07_28_tools_call_rejects_non_object_client_capabilities(): void {
 		foreach ( array( array(), array( 'capability' ), null, 'invalid' ) as $index => $value ) {
 			$params = $this->tool_call_params_2026_07_28();
@@ -311,6 +294,20 @@ final class RequestRouterTest extends TestCase {
 			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 			$this->assertStringContainsString( 'arguments must be a JSON object', $result['error']['message'] );
 		}
+	}
+
+	public function test_unknown_protocol_context_fails_before_handler_or_codec_selection(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->tool_call_params_2026_07_28(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( '2099-01-01' )
+		);
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
+		$this->assertStringContainsString( '2099-01-01', $result['error']['message'] );
 	}
 
 	public function test_2026_07_28_context_rejects_methods_outside_tools_call(): void {

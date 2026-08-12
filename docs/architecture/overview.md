@@ -14,9 +14,8 @@ includes/
 │   ├── McpAdapter.php             # Main singleton registry; fires mcp_adapter_init
 │   ├── McpServer.php              # Individual server configuration and component access
 │   ├── McpComponentRegistry.php   # Stores and retrieves McpComponentInterface instances
-│   ├── McpProtocolContext.php      # Request-scoped protocol profile and registry
 │   ├── McpTransportFactory.php    # Instantiates transports with dependency injection
-│   └── McpVersionNegotiator.php   # Initialize-lifecycle version negotiation
+│   └── McpVersionNegotiator.php   # MCP protocol version negotiation
 │
 ├── Abilities/                     # Built-in meta-abilities for the default server
 │   ├── DiscoverAbilitiesAbility.php  # mcp-adapter/discover-abilities
@@ -142,7 +141,7 @@ This separation ensures that:
 
 `McpComponentInterface` is an internal contract (`@internal`). It is not intended for third-party implementation.
 
-Existing component, list, initialize, and public handler DTO contracts use `V20251125`. The bounded dual-revision experiment is limited to `tools/call`: `ToolsHandler` classifies the raw provider result into an Adapter-owned `ToolCallOutcome`, and `RequestRouter` selects the `V20251125` or `V20260728` result codec from the request's `McpProtocolContext`. Content blocks cross that seam as arrays so each codec hydrates only its own revision tree. `ToolCallOutcome` has no protocol result-type state; the `V20260728` codec stamps `resultType: complete`, while the `V20251125` codec omits that field.
+Existing component, list, initialize, and public handler DTO contracts use `V20251125`. The bounded dual-revision experiment is limited to `tools/call`: `ToolsHandler` classifies the raw provider result into an Adapter-owned `ToolCallOutcome`, and `RequestRouter` selects the `V20251125` or `V20260728` result codec from the request's `McpProtocolContext`. Content blocks cross that seam as arrays so each codec hydrates only its own revision tree.
 
 ### Supporting layers
 
@@ -174,19 +173,12 @@ The remaining layers wire the Schema and Adapter layers together:
 
 ### McpVersionNegotiator
 
-Negotiates only the initialize lifecycle. If the client requests a registered initialize version it is echoed back; otherwise the server falls back to the first initialize version in the registry. Registry order is explicit and versions are treated as opaque identifiers, never sorted or compared numerically.
+Negotiates the MCP protocol version between client and server. If the client requests a supported version it is echoed back; otherwise the server falls back to the latest supported version.
 
-`McpProtocolContext` owns the protocol registry and separates these lifecycle subsets:
-
-**Initialize/session profiles** (negotiation preference order):
+**Supported protocol versions** (newest-first):
 - `2025-11-25` (latest — recommended)
 - `2025-06-18`
 - `2024-11-05`
-
-**Discover/stateless profiles:**
-- `2026-07-28` — request-scoped support is intentionally limited to `tools/call`; `server/discover` and other 2026 methods are not implemented
-
-Each registry entry maps the protocol identifier to one exact schema revision and declares its lifecycle, session mode, required per-request metadata, and currently supported methods. HTTP, STDIO, and `RequestRouter` query those properties instead of branching on version strings. Unknown identifiers are rejected where protocol headers or request metadata are resolved and are returned as JSON-RPC protocol errors.
 
 ### McpTransportFactory
 - **Purpose**: Creates transport instances with dependency injection

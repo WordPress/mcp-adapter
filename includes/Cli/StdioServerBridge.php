@@ -249,21 +249,11 @@ class StdioServerBridge {
 
 			$request_protocol_context = $this->protocol_context;
 			$request_meta             = $params['_meta'] ?? null;
-			if ( is_array( $request_meta ) && array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $request_meta ) ) {
-				$request_version = $request_meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
-				try {
-					if ( ! is_string( $request_version ) ) {
-						throw new \InvalidArgumentException(
-							sprintf( 'Unsupported protocol version: %s', gettype( $request_version ) )
-						);
-					}
-
-					$request_protocol_context = new McpProtocolContext( $request_version );
-				} catch ( \InvalidArgumentException $exception ) {
-					$protocol_error = McpErrorFactory::unsupported_protocol_version( $id, $exception->getMessage() );
-
-					return $this->format_response( array( 'error' => $protocol_error->getError()->toArray() ), $id );
-				}
+			if (
+				is_array( $request_meta )
+				&& McpProtocolContext::PROTOCOL_VERSION_2026_07_28 === ( $request_meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null )
+			) {
+				$request_protocol_context = new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 );
 			}
 
 			// Route the request to the appropriate handler

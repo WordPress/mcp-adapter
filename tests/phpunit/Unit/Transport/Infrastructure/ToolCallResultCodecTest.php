@@ -121,6 +121,22 @@ final class ToolCallResultCodecTest extends TestCase {
 	}
 
 	/**
+	 * MRTR emission remains explicitly unsupported in both revisions.
+	 */
+	public function test_both_codecs_reject_input_required_outcomes(): void {
+		$outcome = ToolCallOutcome::input_required();
+
+		foreach ( array( new V20251125ToolCallResultCodec(), new V20260728ToolCallResultCodec() ) as $codec ) {
+			try {
+				$codec->encode( $outcome );
+				$this->fail( 'The codec should reject input_required.' );
+			} catch ( ToolCallCodecException $exception ) {
+				$this->assertSame( 'Multi round-trip tool results are not supported.', $exception->getMessage() );
+			}
+		}
+	}
+
+	/**
 	 * The selector follows the request's exact schema revision.
 	 */
 	public function test_factory_selects_codec_from_protocol_context(): void {
@@ -134,4 +150,10 @@ final class ToolCallResultCodecTest extends TestCase {
 		);
 	}
 
+	public function test_factory_rejects_an_unknown_protocol_version(): void {
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( '2099-01-01' );
+
+		ToolCallResultCodecFactory::for_context( new McpProtocolContext( '2099-01-01' ) );
+	}
 }
