@@ -260,6 +260,20 @@ final class RequestRouterTest extends TestCase {
 		$this->assertStringContainsString( 'requires params._meta', $result['error']['message'] );
 	}
 
+	public function test_modern_context_rejects_methods_outside_tools_call(): void {
+		$result = $this->router->route_request(
+			'tools/list',
+			array(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+		);
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
+		$this->assertStringContainsString( 'only for tools/call', $result['error']['message'] );
+	}
+
 	public function test_modern_continuation_fields_are_rejected_before_tool_execution(): void {
 		$executed = false;
 		$filter   = static function ( array $arguments ) use ( &$executed ): array {

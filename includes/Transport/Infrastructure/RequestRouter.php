@@ -45,6 +45,8 @@ class RequestRouter {
 	/**
 	 * Route a request to the appropriate handler.
 	 *
+	 * @since n.e.x.t Added the optional protocol context parameter.
+	 *
 	 * @param string $method The MCP method name.
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID (for JSON-RPC) - string, number, or null.
@@ -88,7 +90,14 @@ class RequestRouter {
 		);
 
 		try {
-			$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			if ( $protocol_context->is_modern() && 'tools/call' !== $method ) {
+				$handler_result = McpErrorFactory::unsupported_protocol_version(
+					$request_id,
+					'The 2026-07-28 protocol revision is currently supported only for tools/call requests.'
+				);
+			} else {
+				$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			}
 
 			// Calculate request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.

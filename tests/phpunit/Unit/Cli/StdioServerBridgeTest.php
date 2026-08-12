@@ -12,6 +12,7 @@ namespace WP\MCP\Tests\Unit\Cli;
 use WP\MCP\Cli\StdioServerBridge;
 use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -407,6 +408,32 @@ final class StdioServerBridgeTest extends TestCase {
 			McpProtocolContext::LEGACY_SCHEMA_REVISION,
 			$protocol_property->getValue( $this->bridge )->get_protocol_version()
 		);
+	}
+
+	public function test_modern_request_rejects_methods_outside_tools_call(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 21,
+				'method'  => 'tools/list',
+				'params'  => array(
+					'_meta' => array(
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::MODERN_SCHEMA_REVISION,
+						'io.modelcontextprotocol/clientCapabilities' => array(),
+					),
+				),
+			)
+		);
+
+		$result   = $handle_request_method->invoke( $this->bridge, $json_input );
+		$response = json_decode( $result, true );
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $response['error']['code'] );
+		$this->assertStringContainsString( 'only for tools/call', $response['error']['message'] );
 	}
 
 	public function test_handle_request_with_object_params(): void {
