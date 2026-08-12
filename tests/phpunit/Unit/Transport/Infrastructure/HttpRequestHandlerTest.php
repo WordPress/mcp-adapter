@@ -408,42 +408,6 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
-	public function test_protocol_context_uses_explicit_header_before_session_version(): void {
-		$session_id = $this->initializeAndGetSessionId( '2024-11-05' );
-		$request    = $this->createPostRequest(
-			array(
-				'jsonrpc' => '2.0',
-				'id'      => 2,
-				'method'  => 'tools/list',
-				'params'  => array(),
-			)
-		);
-		$request->set_header( 'Mcp-Session-Id', $session_id );
-		$request->set_header( 'Mcp-Protocol-Version', '2025-11-25' );
-
-		$protocol_context = $this->resolveProtocolContext( 'tools/list', array(), new HttpRequestContext( $request ) );
-
-		$this->assertSame( '2025-11-25', $protocol_context->get_protocol_version() );
-	}
-
-	public function test_protocol_context_recovers_2024_11_05_version_from_session(): void {
-		$session_id = $this->initializeAndGetSessionId( '2024-11-05' );
-		$request    = $this->createPostRequest(
-			array(
-				'jsonrpc' => '2.0',
-				'id'      => 2,
-				'method'  => 'tools/list',
-				'params'  => array(),
-			)
-		);
-		$request->set_header( 'Mcp-Session-Id', $session_id );
-
-		$protocol_context = $this->resolveProtocolContext( 'tools/list', array(), new HttpRequestContext( $request ) );
-
-		$this->assertSame( '2024-11-05', $protocol_context->get_protocol_version() );
-		$this->assertSame( McpProtocolContext::SCHEMA_REVISION_2025_11_25, $protocol_context->get_schema_revision() );
-	}
-
 	public function test_handle_request_post_withUnsupportedProtocolVersionHeader_returnsError(): void {
 		// Create session first.
 		$session_id = $this->initializeAndGetSessionId();
@@ -503,7 +467,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
-	public function test_2026_07_28_tools_call_is_stateless_and_uses_2026_07_28_codec(): void {
+	public function test_2026_07_28_tools_call_is_stateless_and_uses_2026_07_28_result_shape(): void {
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
@@ -671,7 +635,7 @@ final class HttpRequestHandlerTest extends TestCase {
 
 		$this->assertSame( 400, $response->get_status() );
 		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $data['error']['code'] );
-		$this->assertStringContainsString( 'not supported for method tools/list', $data['error']['message'] );
+		$this->assertStringContainsString( 'only for tools/call', $data['error']['message'] );
 	}
 
 	// Helper methods
@@ -710,24 +674,6 @@ final class HttpRequestHandlerTest extends TestCase {
 
 		// Return the most recently created session ID.
 		return (string) array_key_last( $sessions );
-	}
-
-	/**
-	 * Invoke the internal protocol-context resolver.
-	 *
-	 * @param string                                                        $method  MCP method name.
-	 * @param array<string, mixed>                                          $params  MCP request parameters.
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context HTTP request context.
-	 */
-	private function resolveProtocolContext( string $method, array $params, HttpRequestContext $context ): McpProtocolContext {
-		$reflection = new \ReflectionClass( $this->handler );
-		$resolver   = $reflection->getMethod( 'resolve_protocol_context' );
-		$resolver->setAccessible( true );
-
-		/** @var \WP\MCP\Core\McpProtocolContext $protocol_context */
-		$protocol_context = $resolver->invoke( $this->handler, $method, $params, $context );
-
-		return $protocol_context;
 	}
 
 	/**

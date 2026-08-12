@@ -70,6 +70,7 @@ class RequestRouter {
 
 		$new_session_id = null;
 		$component_tags = $this->resolve_component_observability_context( $method, $params );
+		$protocol_error = $this->validate_protocol_request( $method, $params, $request_id, $schema_revision );
 
 		// Common tags for all metrics.
 		$common_tags = array(
@@ -97,11 +98,8 @@ class RequestRouter {
 		);
 
 		try {
-			if ( McpProtocolContext::SCHEMA_REVISION_2026_07_28 === $schema_revision && 'tools/call' !== $method ) {
-				$handler_result = McpErrorFactory::unsupported_protocol_version(
-					$request_id,
-					'The 2026-07-28 protocol revision is supported only for tools/call requests.'
-				);
+			if ( null !== $protocol_error ) {
+				$handler_result = $protocol_error;
 			} else {
 				$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
 			}
@@ -125,8 +123,8 @@ class RequestRouter {
 
 			if ( $handler_result instanceof ToolCallOutcome ) {
 				try {
-					$result = ToolCallResultCodecFactory::for_context( $protocol_context )->encode( $handler_result );
-				} catch ( \WP\MCP\Transport\Infrastructure\ToolCallCodecException $exception ) {
+					$result = ToolCallResultEncoder::encode( $protocol_context, $handler_result );
+				} catch ( \UnexpectedValueException $exception ) {
 					$this->context->error_handler->log(
 						'Tool result could not be encoded for the selected protocol revision',
 						array(
@@ -243,15 +241,6 @@ class RequestRouter {
 
 		$meta = $request_params['_meta'] ?? null;
 		if ( McpProtocolContext::SCHEMA_REVISION_2026_07_28 === $schema_revision ) {
-			if ( ! is_array( $meta ) ) {
-				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires params._meta.' );
-			}
-
-			$declared_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null;
-			if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 !== $declared_version ) {
-				return McpErrorFactory::invalid_params( $request_id, 'The request metadata protocol version must be 2026-07-28.' );
-			}
-
 			if ( ! array_key_exists( McpProtocolContext::REQUEST_CLIENT_CAPABILITIES_META_KEY, $meta ) ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires clientCapabilities metadata.' );
 			}
@@ -271,16 +260,6 @@ class RequestRouter {
 			if ( array_key_exists( 'task', $request_params ) ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request does not support the 2025-11-25 task field.' );
 			}
-		} elseif ( is_array( $meta ) && array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $meta ) ) {
-			$declared_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
-			if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 === $declared_version ) {
-				return McpErrorFactory::invalid_params( $request_id, 'The request protocol context does not match the 2026-07-28 request metadata.' );
-			}
-
-			return McpErrorFactory::unsupported_protocol_version(
-				$request_id,
-				sprintf( 'Unsupported protocol version: %s', is_scalar( $declared_version ) ? (string) $declared_version : gettype( $declared_version ) )
-			);
 		}
 
 		if ( isset( $request_params['arguments'] ) && $request_params['arguments'] instanceof \stdClass ) {
@@ -293,6 +272,54 @@ class RequestRouter {
 		}
 
 		return $this->context->tools_handler->call_tool_outcome( $params, $request_id );
+	}
+
+	/**
+	 * Validate protocol rules shared by every transport.
+	 *
+	 * @param string                           $method MCP method name.
+	 * @param array<string, mixed>             $params Request parameters.
+	 * @param string|int|null                  $request_id Request ID.
+	 * @param string                           $schema_revision Exact schema revision.
+	 * @return \WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse|null
+	 */
+	private function validate_protocol_request( string $method, array $params, $request_id, string $schema_revision ): ?JSONRPCErrorResponse {
+		$request_params = $params['params'] ?? $params;
+		$meta           = is_array( $request_params ) ? ( $request_params['_meta'] ?? null ) : null;
+
+		if ( McpProtocolContext::SCHEMA_REVISION_2026_07_28 === $schema_revision ) {
+			if ( 'tools/call' !== $method ) {
+				return McpErrorFactory::unsupported_protocol_version(
+					$request_id,
+					'The 2026-07-28 protocol revision is supported only for tools/call requests.'
+				);
+			}
+
+			if ( ! is_array( $meta ) ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires params._meta.' );
+			}
+
+			$declared_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null;
+			if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 !== $declared_version ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The request metadata protocol version must be 2026-07-28.' );
+			}
+
+			return null;
+		}
+
+		if ( is_array( $meta ) && array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $meta ) ) {
+			$declared_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
+			if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 === $declared_version ) {
+				return McpErrorFactory::invalid_params( $request_id, 'The request protocol context does not match the 2026-07-28 request metadata.' );
+			}
+
+			return McpErrorFactory::unsupported_protocol_version(
+				$request_id,
+				sprintf( 'Unsupported protocol version: %s', is_scalar( $declared_version ) ? (string) $declared_version : gettype( $declared_version ) )
+			);
+		}
+
+		return null;
 	}
 
 	/**

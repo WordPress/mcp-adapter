@@ -58,41 +58,6 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertSame( $this->server, $this->bridge->get_server() );
 	}
 
-	public function test_bridge_protocol_context_defaults_to_2025_11_25(): void {
-		$reflection = new \ReflectionClass( $this->bridge );
-		$property   = $reflection->getProperty( 'protocol_context' );
-		$property->setAccessible( true );
-
-		$context = $property->getValue( $this->bridge );
-
-		$this->assertInstanceOf( McpProtocolContext::class, $context );
-		$this->assertSame( McpProtocolContext::PROTOCOL_VERSION_2025_11_25, $context->get_protocol_version() );
-	}
-
-	public function test_initialize_updates_only_this_bridge_protocol_context(): void {
-		$other_bridge = new StdioServerBridge( $this->server );
-		$reflection   = new \ReflectionClass( $this->bridge );
-		$handler      = $reflection->getMethod( 'handle_request' );
-		$property     = $reflection->getProperty( 'protocol_context' );
-		$handler->setAccessible( true );
-		$property->setAccessible( true );
-
-		$handler->invoke(
-			$this->bridge,
-			wp_json_encode(
-				array(
-					'jsonrpc' => '2.0',
-					'id'      => 1,
-					'method'  => 'initialize',
-					'params'  => array( 'protocolVersion' => '2024-11-05' ),
-				)
-			)
-		);
-
-		$this->assertSame( '2024-11-05', $property->getValue( $this->bridge )->get_protocol_version() );
-		$this->assertSame( McpProtocolContext::PROTOCOL_VERSION_2025_11_25, $property->getValue( $other_bridge )->get_protocol_version() );
-	}
-
 	public function test_get_server(): void {
 		$server = $this->bridge->get_server();
 
@@ -377,12 +342,10 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'tools', $response['result'] );
 	}
 
-	public function test_2026_07_28_tools_call_uses_request_scoped_codec_without_mutating_bridge_context(): void {
+	public function test_2026_07_28_tools_call_does_not_change_the_next_request_result_shape(): void {
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$protocol_property     = $reflection->getProperty( 'protocol_context' );
 		$handle_request_method->setAccessible( true );
-		$protocol_property->setAccessible( true );
 
 		$json_input = wp_json_encode(
 			array(
@@ -404,10 +367,21 @@ final class StdioServerBridgeTest extends TestCase {
 		$response = json_decode( $result, true );
 
 		$this->assertSame( 'complete', $response['result']['resultType'] );
-		$this->assertSame(
-			McpProtocolContext::PROTOCOL_VERSION_2025_11_25,
-			$protocol_property->getValue( $this->bridge )->get_protocol_version()
+
+		$legacy_result = $handle_request_method->invoke(
+			$this->bridge,
+			wp_json_encode(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 21,
+					'method'  => 'tools/call',
+					'params'  => array( 'name' => 'test-always-allowed' ),
+				)
+			)
 		);
+		$legacy_response = json_decode( $legacy_result, true );
+
+		$this->assertArrayNotHasKey( 'resultType', $legacy_response['result'] );
 	}
 
 	public function test_2026_07_28_stdio_tools_call_rejects_non_objects_for_object_fields(): void {

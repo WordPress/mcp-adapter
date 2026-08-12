@@ -296,7 +296,7 @@ final class RequestRouterTest extends TestCase {
 		}
 	}
 
-	public function test_unknown_protocol_context_fails_before_handler_or_codec_selection(): void {
+	public function test_unknown_protocol_context_is_rejected(): void {
 		$result = $this->router->route_request(
 			'tools/call',
 			$this->tool_call_params_2026_07_28(),
@@ -363,7 +363,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertStringContainsString( 'Multi round-trip', $state_result['error']['message'] );
 	}
 
-	public function test_2025_11_25_codec_fails_explicitly_for_list_structured_content(): void {
+	public function test_2025_11_25_result_rejects_list_structured_content(): void {
 		$filter = static function (): array {
 			return array( 'one', 'two' );
 		};
@@ -381,7 +381,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertStringContainsString( 'requires structuredContent to be a JSON object', $result['error']['message'] );
 	}
 
-	public function test_2026_07_28_codec_preserves_list_structured_content(): void {
+	public function test_2026_07_28_result_preserves_list_structured_content(): void {
 		$filter = static function (): array {
 			return array( 'one', 'two' );
 		};

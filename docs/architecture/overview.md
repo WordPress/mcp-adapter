@@ -141,7 +141,7 @@ This separation ensures that:
 
 `McpComponentInterface` is an internal contract (`@internal`). It is not intended for third-party implementation.
 
-Existing component, list, initialize, and public handler DTO contracts use `V20251125`. The bounded dual-revision experiment is limited to `tools/call`: `ToolsHandler` classifies the raw provider result into an Adapter-owned `ToolCallOutcome`, and `RequestRouter` selects the `V20251125` or `V20260728` result codec from the request's `McpProtocolContext`. Content blocks cross that seam as arrays so each codec hydrates only its own revision tree.
+Existing component, list, initialize, and public handler DTO contracts use `V20251125`. The bounded dual-revision experiment is limited to `tools/call`: `ToolsHandler` classifies the raw provider result into an Adapter-owned `ToolCallOutcome`, and `RequestRouter` passes it to one result encoder with the request's `McpProtocolContext`. Content blocks remain arrays until the encoder hydrates the selected revision tree.
 
 ### Supporting layers
 
@@ -186,7 +186,7 @@ Negotiates the MCP protocol version between client and server. If the client req
 - **Validation**: Ensures transport classes implement `McpTransportInterface`
 
 ### RequestRouter
-- **Purpose**: Routes MCP method calls to handlers and selects the request-scoped `tools/call` result codec
+- **Purpose**: Routes MCP method calls, owns shared protocol validation, and selects the request-scoped `tools/call` result shape
 - **DTO serialization boundary**: Converts `V20251125` `AbstractDataTransferObject` results to arrays via `toArray()`, converts `JSONRPCErrorResponse` results to error arrays, and encodes `ToolCallOutcome` through the exact selected schema revision
 - **Observability**: Extracts per-component context from `McpComponentInterface::get_observability_context()` for request tagging
 
@@ -202,18 +202,18 @@ AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface -
 3. **Handler** finds the `McpComponentInterface` component, validates input, and invokes execution
 4. **Component** delegates to a WordPress ability or direct callable, returning a result
 5. **Handler** returns a schema DTO, except `tools/call`, whose internal router path returns `ToolCallOutcome`
-6. **RequestRouter** calls `toArray()` on `V20251125` DTOs or selects an exact-revision `tools/call` codec at the serialization boundary
+6. **RequestRouter** calls `toArray()` on `V20251125` DTOs or encodes `tools/call` through the exact selected schema revision
 7. **Transport** wraps the array in a JSON-RPC envelope and returns it
 
 ### Method routing
 
-The `RequestRouter` maps MCP methods to handlers. Most handlers return `V20251125` schema DTOs; `tools/call` uses the internal outcome seam:
+The `RequestRouter` maps MCP methods to handlers. Most handlers return `V20251125` schema DTOs; `tools/call` returns an internal completed outcome before revision-specific encoding:
 
 | Method | Handler | Return Type |
 |--------|---------|-------------|
 | `initialize` | `InitializeHandler::handle()` | `InitializeResult` |
 | `tools/list` | `ToolsHandler::list_tools()` | `ListToolsResult` |
-| `tools/call` | `ToolsHandler::call_tool_outcome()` | `ToolCallOutcome` or `JSONRPCErrorResponse`; selected codec emits the revision DTO array |
+| `tools/call` | `ToolsHandler::call_tool_outcome()` | `ToolCallOutcome` or `JSONRPCErrorResponse`; the result encoder emits the selected revision DTO array |
 | `resources/list` | `ResourcesHandler::list_resources()` | `ListResourcesResult` |
 | `resources/read` | `ResourcesHandler::read_resource()` | `ReadResourceResult` or `JSONRPCErrorResponse` |
 | `prompts/list` | `PromptsHandler::list_prompts()` | `ListPromptsResult` |

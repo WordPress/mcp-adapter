@@ -392,6 +392,27 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
 
+	public function test_call_tool_rejects_structured_content_that_the_legacy_contract_cannot_represent(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$filter  = static function (): array {
+			return array( 'one', 'two' );
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-always-allowed' ),
+			),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $result->getError()->getCode() );
+	}
+
 	/**
 	 * Runs a tool whose raw result is replaced by the given embedded-resource shape.
 	 *

@@ -16,10 +16,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\V20251125\Common\Protocol\Factory\ContentBlockFactory;
-use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
+use WP\MCP\Transport\Infrastructure\ToolCallResultEncoder;
 use WP\McpSchema\V20251125\Server\Tools\DTO\ListToolsResult;
 
 /**
@@ -129,17 +126,7 @@ class ToolsHandler {
 		}
 
 		try {
-			$content = array_map( array( $this, 'hydrate_2025_11_25_content_block' ), $outcome->get_content() );
-			$data    = array(
-				'content' => $content,
-				'isError' => $outcome->is_error(),
-			);
-
-			if ( $outcome->has_structured_content() ) {
-				$data['structuredContent'] = $outcome->get_structured_content();
-			}
-
-			return CallToolResult::fromArray( $data );
+			return ToolCallResultEncoder::encode_2025_11_25_dto( $outcome );
 		} catch ( \Throwable $exception ) {
 			$request_params = $this->extract_params( $params );
 			$this->mcp->get_error_handler()->log(
@@ -413,29 +400,5 @@ class ToolsHandler {
 	 */
 	private function create_error_outcome( string $message ): ToolCallOutcome {
 		return ToolCallOutcome::error( $message );
-	}
-
-	/**
-	 * Hydrate one 2025-11-25 content block for the public call_tool() DTO contract.
-	 *
-	 * EmbeddedResource's generated fromArray() expects its nested union member
-	 * to already be hydrated, so handle that one level before the block factory.
-	 * Revision codecs intentionally keep using arrays at the wire boundary.
-	 *
-	 * @param array<string, mixed> $content Content block data.
-	 *
-	 * @return \WP\McpSchema\V20251125\Common\Protocol\Union\ContentBlockInterface
-	 */
-	private function hydrate_2025_11_25_content_block( array $content ) {
-		if ( 'resource' === ( $content['type'] ?? null ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
-			$resource = $content['resource'];
-			if ( array_key_exists( 'text', $resource ) ) {
-				$content['resource'] = TextResourceContents::fromArray( $resource );
-			} elseif ( array_key_exists( 'blob', $resource ) ) {
-				$content['resource'] = BlobResourceContents::fromArray( $resource );
-			}
-		}
-
-		return ContentBlockFactory::fromArray( $content );
 	}
 }
