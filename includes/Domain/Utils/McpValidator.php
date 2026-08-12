@@ -443,6 +443,13 @@ class McpValidator {
 	 * resource, recursion or a non-finite float. Those are treated as absent too, as is
 	 * any non-array value.
 	 *
+	 * A successful encoding is decoded into an inert snapshot before it is returned.
+	 * This prevents a stateful JsonSerializable value from changing or throwing when
+	 * the DTO is encoded again at the transport boundary. Nested JSON objects are
+	 * converted back to arrays when that preserves their object shape. Empty objects
+	 * and objects with list-like numeric keys remain inert stdClass instances so they
+	 * cannot turn into JSON arrays on a later encode.
+	 *
 	 * Returns null rather than raising: `_meta` is metadata travelling alongside a
 	 * payload, and a malformed one is not a reason to withhold the payload itself.
 	 *
@@ -476,7 +483,42 @@ class McpValidator {
 			return null;
 		}
 
-		return $meta;
+		$snapshot = json_decode( $encoded );
+		if ( ! $snapshot instanceof \stdClass ) {
+			return null;
+		}
+
+		return array_map( array( self::class, 'freeze_json_value' ), (array) $snapshot );
+	}
+
+	/**
+	 * Convert a decoded JSON value to inert PHP values without changing its wire shape.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed $value A value produced by json_decode().
+	 *
+	 * @return mixed The inert value with JSON object/list identity preserved.
+	 */
+	private static function freeze_json_value( $value ) {
+		if ( is_array( $value ) ) {
+			return array_map( array( self::class, 'freeze_json_value' ), $value );
+		}
+
+		if ( ! $value instanceof \stdClass ) {
+			return $value;
+		}
+
+		$properties = array_map( array( self::class, 'freeze_json_value' ), (array) $value );
+
+		if (
+			array() === $properties
+			|| array_keys( $properties ) === range( 0, count( $properties ) - 1 )
+		) {
+			return (object) $properties;
+		}
+
+		return $properties;
 	}
 
 	/**

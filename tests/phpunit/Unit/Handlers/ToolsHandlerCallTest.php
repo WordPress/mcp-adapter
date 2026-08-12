@@ -477,6 +477,44 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
 	}
 
+	public function test_embedded_resource_meta_is_frozen_before_the_helper_normalizes_it_again(): void {
+		$value = new class() implements \JsonSerializable {
+			public int $calls = 0;
+
+			public function jsonSerialize(): array {
+				++$this->calls;
+
+				if ( 1 < $this->calls ) {
+					throw new \RuntimeException( 'Cannot serialize twice' );
+				}
+
+				return array( 'phase' => 'first' );
+			}
+		};
+
+		$result = $this->call_tool_returning(
+			array(
+				'type'  => 'resource',
+				'uri'   => 'ui://example/app',
+				'text'  => '<!doctype html>',
+				'_meta' => array( 'stateful' => $value ),
+			)
+		);
+
+		$this->assertInstanceOf( CallToolResult::class, $result );
+
+		$content = $result->getContent();
+		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$this->assertSame(
+			'{"stateful":{"phase":"first"}}',
+			wp_json_encode( $content[0]->getResource()->get_meta() )
+		);
+		$this->assertSame( 1, $value->calls );
+
+		$messages = array_column( DummyErrorHandler::$logs, 'message' );
+		$this->assertNotContains( 'Invalid _meta on tool result resource contents, dropping it', $messages );
+	}
+
 	public function test_embedded_resource_flat_blob_shape_assigns_meta_to_the_resource_contents(): void {
 		$result = $this->call_tool_returning(
 			array(

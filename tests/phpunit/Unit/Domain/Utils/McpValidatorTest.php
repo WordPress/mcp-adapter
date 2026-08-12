@@ -857,4 +857,33 @@ final class McpValidatorTest extends TestCase {
 
 		$this->assertNull( McpValidator::normalize_meta( array( 'value' => $value ) ) );
 	}
+
+	public function test_normalize_meta_freezes_the_first_successful_json_representation(): void {
+		$value = new class() implements \JsonSerializable {
+			public int $calls = 0;
+
+			public function jsonSerialize(): array {
+				++$this->calls;
+
+				if ( 1 < $this->calls ) {
+					throw new \RuntimeException( 'Cannot serialize twice' );
+				}
+
+				return array(
+					'emptyObject'   => new \stdClass(),
+					'emptyList'     => array(),
+					'numericObject' => (object) array( '0' => 'first', '1' => 'second' ),
+				);
+			}
+		};
+
+		$normalized = McpValidator::normalize_meta( array( 'value' => $value ) );
+
+		$this->assertSame( 1, $value->calls );
+		$this->assertSame(
+			'{"value":{"emptyObject":{},"emptyList":[],"numericObject":{"0":"first","1":"second"}}}',
+			wp_json_encode( $normalized )
+		);
+		$this->assertSame( 1, $value->calls );
+	}
 }
