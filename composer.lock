@@ -76,7 +76,7 @@
             "dist": {
                 "type": "path",
                 "url": "../php-mcp-schema",
-                "reference": "35716d556ecc406a7dda3fdc86639ac0a8cd4b13"
+                "reference": "9a63860804347ea2383f3e29d98ec616532d948a"
             },
             "require": {
                 "php": ">=7.4"
