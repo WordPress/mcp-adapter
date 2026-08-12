@@ -27,20 +27,6 @@ defined( 'ABSPATH' ) || exit;
 class HttpRequestHandler {
 
 	/**
-	 * Modern request metadata key carrying the protocol revision.
-	 *
-	 * @var string
-	 */
-	private const PROTOCOL_VERSION_META_KEY = 'io.modelcontextprotocol/protocolVersion';
-
-	/**
-	 * Modern request metadata key carrying per-request client capabilities.
-	 *
-	 * @var string
-	 */
-	private const CLIENT_CAPABILITIES_META_KEY = 'io.modelcontextprotocol/clientCapabilities';
-
-	/**
 	 * The transport context.
 	 *
 	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
@@ -289,7 +275,7 @@ class HttpRequestHandler {
 
 		$request_params = $params['params'] ?? $params;
 		if ( is_array( $request_params ) && isset( $request_params['_meta'] ) && is_array( $request_params['_meta'] ) ) {
-			$request_version = $request_params['_meta'][ self::PROTOCOL_VERSION_META_KEY ] ?? null;
+			$request_version = $request_params['_meta'][ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null;
 			if ( is_string( $request_version ) && '' !== $request_version ) {
 				return new McpProtocolContext( $request_version );
 			}
@@ -327,7 +313,7 @@ class HttpRequestHandler {
 			return false;
 		}
 
-		return array_key_exists( self::PROTOCOL_VERSION_META_KEY, $request_params['_meta'] );
+		return array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $request_params['_meta'] );
 	}
 
 	/**
@@ -344,23 +330,16 @@ class HttpRequestHandler {
 	 * @return array<string, mixed>|null Error payload, or null when valid.
 	 */
 	private function validate_modern_http_request( string $method, array $params, HttpRequestContext $context ): ?array {
-		if ( 'tools/call' !== $method ) {
-			return McpErrorFactory::create_error(
-				McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION,
-				sprintf( 'Protocol version 2026-07-28 is not supported for method %s.', $method )
-			)->toArray();
-		}
-
 		$request_params = $params['params'] ?? $params;
 		$meta           = is_array( $request_params ) ? ( $request_params['_meta'] ?? null ) : null;
-		if ( ! is_array( $meta ) || ! array_key_exists( self::PROTOCOL_VERSION_META_KEY, $meta ) ) {
+		if ( ! is_array( $meta ) || ! array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $meta ) ) {
 			return McpErrorFactory::create_error(
 				McpErrorFactory::HEADER_MISMATCH,
 				'The MCP-Protocol-Version header requires matching protocol-version request metadata.'
 			)->toArray();
 		}
 
-		$request_version = $meta[ self::PROTOCOL_VERSION_META_KEY ];
+		$request_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
 		if ( McpProtocolContext::MODERN_SCHEMA_REVISION !== $request_version ) {
 			return McpErrorFactory::create_error(
 				McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION,
@@ -375,10 +354,10 @@ class HttpRequestHandler {
 			)->toArray();
 		}
 
-		if ( ! array_key_exists( self::CLIENT_CAPABILITIES_META_KEY, $meta ) || ! is_array( $meta[ self::CLIENT_CAPABILITIES_META_KEY ] ) ) {
+		if ( 'tools/call' !== $method ) {
 			return McpErrorFactory::create_error(
-				McpErrorFactory::INVALID_PARAMS,
-				'Invalid params: The 2026-07-28 request requires clientCapabilities metadata.'
+				McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION,
+				sprintf( 'Protocol version 2026-07-28 is not supported for method %s.', $method )
 			)->toArray();
 		}
 

@@ -34,6 +34,20 @@ final class McpProtocolContext {
 	public const MODERN_SCHEMA_REVISION = '2026-07-28';
 
 	/**
+	 * Modern request metadata key carrying the protocol revision.
+	 *
+	 * @var string
+	 */
+	public const REQUEST_PROTOCOL_VERSION_META_KEY = 'io.modelcontextprotocol/protocolVersion';
+
+	/**
+	 * Modern request metadata key carrying per-request client capabilities.
+	 *
+	 * @var string
+	 */
+	public const REQUEST_CLIENT_CAPABILITIES_META_KEY = 'io.modelcontextprotocol/clientCapabilities';
+
+	/**
 	 * Selected protocol version.
 	 *
 	 * @var string

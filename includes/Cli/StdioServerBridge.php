@@ -29,13 +29,6 @@ use WP\MCP\Transport\Infrastructure\RequestRouter;
 class StdioServerBridge {
 
 	/**
-	 * Modern request metadata key carrying the protocol revision.
-	 *
-	 * @var string
-	 */
-	private const PROTOCOL_VERSION_META_KEY = 'io.modelcontextprotocol/protocolVersion';
-
-	/**
 	 * The MCP server to expose via STDIO.
 	 *
 	 * @var \WP\MCP\Core\McpServer
@@ -257,7 +250,7 @@ class StdioServerBridge {
 			$request_meta             = $params['_meta'] ?? null;
 			if (
 				is_array( $request_meta )
-				&& McpProtocolContext::MODERN_SCHEMA_REVISION === ( $request_meta[ self::PROTOCOL_VERSION_META_KEY ] ?? null )
+				&& McpProtocolContext::MODERN_SCHEMA_REVISION === ( $request_meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null )
 			) {
 				$request_protocol_context = new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION );
 			}

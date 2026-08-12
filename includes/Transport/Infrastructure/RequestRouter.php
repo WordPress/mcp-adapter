@@ -25,20 +25,6 @@ use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 class RequestRouter {
 
 	/**
-	 * Modern request metadata key carrying the protocol revision.
-	 *
-	 * @var string
-	 */
-	private const PROTOCOL_VERSION_META_KEY = 'io.modelcontextprotocol/protocolVersion';
-
-	/**
-	 * Modern request metadata key carrying per-request client capabilities.
-	 *
-	 * @var string
-	 */
-	private const CLIENT_CAPABILITIES_META_KEY = 'io.modelcontextprotocol/clientCapabilities';
-
-	/**
 	 * The transport context.
 	 *
 	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
@@ -245,16 +231,16 @@ class RequestRouter {
 				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires params._meta.' );
 			}
 
-			$declared_version = $meta[ self::PROTOCOL_VERSION_META_KEY ] ?? null;
+			$declared_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null;
 			if ( McpProtocolContext::MODERN_SCHEMA_REVISION !== $declared_version ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The request metadata protocol version must be 2026-07-28.' );
 			}
 
-			if ( ! array_key_exists( self::CLIENT_CAPABILITIES_META_KEY, $meta ) || ! is_array( $meta[ self::CLIENT_CAPABILITIES_META_KEY ] ) ) {
+			if ( ! array_key_exists( McpProtocolContext::REQUEST_CLIENT_CAPABILITIES_META_KEY, $meta ) || ! is_array( $meta[ McpProtocolContext::REQUEST_CLIENT_CAPABILITIES_META_KEY ] ) ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request requires clientCapabilities metadata.' );
 			}
 
-			if ( self::is_non_empty_list( $meta[ self::CLIENT_CAPABILITIES_META_KEY ] ) ) {
+			if ( self::is_non_empty_list( $meta[ McpProtocolContext::REQUEST_CLIENT_CAPABILITIES_META_KEY ] ) ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 clientCapabilities metadata must be a JSON object.' );
 			}
 
@@ -269,8 +255,8 @@ class RequestRouter {
 			if ( array_key_exists( 'task', $request_params ) ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The 2026-07-28 tools/call request does not support the legacy task field.' );
 			}
-		} elseif ( is_array( $meta ) && array_key_exists( self::PROTOCOL_VERSION_META_KEY, $meta ) ) {
-			$declared_version = $meta[ self::PROTOCOL_VERSION_META_KEY ];
+		} elseif ( is_array( $meta ) && array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $meta ) ) {
+			$declared_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
 			if ( McpProtocolContext::MODERN_SCHEMA_REVISION === $declared_version ) {
 				return McpErrorFactory::invalid_params( $request_id, 'The request protocol context does not match the 2026-07-28 request metadata.' );
 			}
