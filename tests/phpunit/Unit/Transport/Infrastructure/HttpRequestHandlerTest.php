@@ -426,7 +426,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertSame( '2025-11-25', $protocol_context->get_protocol_version() );
 	}
 
-	public function test_protocol_context_recovers_version_from_legacy_session(): void {
+	public function test_protocol_context_recovers_2024_11_05_version_from_session(): void {
 		$session_id = $this->initializeAndGetSessionId( '2024-11-05' );
 		$request    = $this->createPostRequest(
 			array(
@@ -441,7 +441,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$protocol_context = $this->resolveProtocolContext( 'tools/list', array(), new HttpRequestContext( $request ) );
 
 		$this->assertSame( '2024-11-05', $protocol_context->get_protocol_version() );
-		$this->assertSame( McpProtocolContext::LEGACY_SCHEMA_REVISION, $protocol_context->get_schema_revision() );
+		$this->assertSame( McpProtocolContext::SCHEMA_REVISION_2025_11_25, $protocol_context->get_schema_revision() );
 	}
 
 	public function test_handle_request_post_withUnsupportedProtocolVersionHeader_returnsError(): void {
@@ -503,16 +503,16 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
-	public function test_modern_tools_call_is_stateless_and_uses_modern_codec(): void {
+	public function test_2026_07_28_tools_call_is_stateless_and_uses_2026_07_28_codec(): void {
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
 				'id'      => 21,
 				'method'  => 'tools/call',
-				'params'  => $this->modernToolCallParams(),
+				'params'  => $this->toolCallParams20260728(),
 			)
 		);
-		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::MODERN_SCHEMA_REVISION );
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::PROTOCOL_VERSION_2026_07_28 );
 
 		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
 		$data     = $response->get_data();
@@ -525,7 +525,56 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayHasKey( 'structuredContent', $result );
 	}
 
-	public function test_legacy_http_tools_call_keeps_legacy_result_shape(): void {
+	public function test_http_decode_preserves_2026_07_28_object_identity(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 27,
+				'method'  => 'tools/call',
+				'params'  => $this->toolCallParams20260728(),
+			)
+		);
+		$context = new HttpRequestContext( $request );
+		$params  = $context->body['params'] ?? null;
+
+		$this->assertIsArray( $params );
+		$this->assertInstanceOf( \stdClass::class, $params['_meta']['io.modelcontextprotocol/clientCapabilities'] );
+		$this->assertInstanceOf( \stdClass::class, $params['arguments'] );
+	}
+
+	public function test_2026_07_28_http_tools_call_rejects_non_objects_for_object_fields(): void {
+		$wrong_shapes = array( array(), array( 'list-item' ), null, 'invalid' );
+		$request_id   = 28;
+		foreach ( array( 'clientCapabilities', 'arguments' ) as $field ) {
+			foreach ( $wrong_shapes as $wrong_shape ) {
+				$params = $this->toolCallParams20260728();
+				if ( 'clientCapabilities' === $field ) {
+					$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = $wrong_shape;
+				} else {
+					$params['arguments'] = $wrong_shape;
+				}
+
+				$request = $this->createPostRequest(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => $request_id++,
+						'method'  => 'tools/call',
+						'params'  => $params,
+					)
+				);
+				$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::PROTOCOL_VERSION_2026_07_28 );
+
+				$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+				$data     = $response->get_data();
+
+				$this->assertSame( 200, $response->get_status(), $field );
+				$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'], $field );
+				$this->assertStringContainsString( 'must be a JSON object', $data['error']['message'], $field );
+			}
+		}
+	}
+
+	public function test_2025_11_25_http_tools_call_keeps_2025_11_25_result_shape(): void {
 		$session_id = $this->initializeAndGetSessionId();
 		$request    = $this->createPostRequest(
 			array(
@@ -536,7 +585,7 @@ final class HttpRequestHandlerTest extends TestCase {
 			)
 		);
 		$request->set_header( 'Mcp-Session-Id', $session_id );
-		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::LEGACY_SCHEMA_REVISION );
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::PROTOCOL_VERSION_2025_11_25 );
 
 		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
 		$data     = $response->get_data();
@@ -547,13 +596,13 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'resultType', $result );
 	}
 
-	public function test_modern_tools_call_requires_matching_protocol_header(): void {
+	public function test_2026_07_28_tools_call_requires_matching_protocol_header(): void {
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
 				'id'      => 23,
 				'method'  => 'tools/call',
-				'params'  => $this->modernToolCallParams(),
+				'params'  => $this->toolCallParams20260728(),
 			)
 		);
 
@@ -565,7 +614,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'must match', $data['error']['message'] );
 	}
 
-	public function test_modern_header_requires_matching_request_metadata(): void {
+	public function test_2026_07_28_header_requires_matching_request_metadata(): void {
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
@@ -574,7 +623,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'params'  => array( 'name' => 'test-always-allowed' ),
 			)
 		);
-		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::MODERN_SCHEMA_REVISION );
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::PROTOCOL_VERSION_2026_07_28 );
 
 		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
 		$data     = $response->get_data();
@@ -584,8 +633,8 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'matching protocol-version request metadata', $data['error']['message'] );
 	}
 
-	public function test_unknown_revisioned_request_version_fails_before_legacy_session_handling(): void {
-		$params = $this->modernToolCallParams();
+	public function test_unknown_request_version_fails_before_session_handling(): void {
+		$params = $this->toolCallParams20260728();
 		$params['_meta']['io.modelcontextprotocol/protocolVersion'] = '2099-01-01';
 		$request = $this->createPostRequest(
 			array(
@@ -605,8 +654,8 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertStringContainsString( '2099-01-01', $data['error']['message'] );
 	}
 
-	public function test_modern_revision_is_explicitly_bounded_to_tools_call(): void {
-		$params  = $this->modernToolCallParams();
+	public function test_2026_07_28_revision_is_explicitly_bounded_to_tools_call(): void {
+		$params  = $this->toolCallParams20260728();
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
@@ -615,7 +664,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'params'  => array( '_meta' => $params['_meta'] ),
 			)
 		);
-		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::MODERN_SCHEMA_REVISION );
+		$request->set_header( 'Mcp-Protocol-Version', McpProtocolContext::PROTOCOL_VERSION_2026_07_28 );
 
 		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
 		$data     = $response->get_data();
@@ -682,18 +731,18 @@ final class HttpRequestHandlerTest extends TestCase {
 	}
 
 	/**
-	 * Build a valid request for the supported modern tools/call subset.
+	 * Build a valid request for the supported 2026-07-28 tools/call subset.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function modernToolCallParams(): array {
+	private function toolCallParams20260728(): array {
 		return array(
 			'_meta'     => array(
-				'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::MODERN_SCHEMA_REVISION,
-				'io.modelcontextprotocol/clientCapabilities' => array(),
+				'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+				'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
 			),
 			'name'      => 'test-always-allowed',
-			'arguments' => array(),
+			'arguments' => new \stdClass(),
 		);
 	}
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Legacy tools/call result codec.
+ * 2025-11-25 tools/call result codec.
  *
  * @package McpAdapter
  */
@@ -22,6 +22,8 @@ final class V20251125ToolCallResultCodec implements ToolCallResultCodecInterface
 
 	/**
 	 * {@inheritDoc}
+	 *
+	 * @since n.e.x.t
 	 */
 	public function encode( ToolCallOutcome $outcome ): array {
 		if ( ToolCallOutcome::RESULT_TYPE_COMPLETE !== $outcome->get_result_type() ) {

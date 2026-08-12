@@ -58,7 +58,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertSame( $this->server, $this->bridge->get_server() );
 	}
 
-	public function test_bridge_protocol_context_defaults_to_legacy(): void {
+	public function test_bridge_protocol_context_defaults_to_2025_11_25(): void {
 		$reflection = new \ReflectionClass( $this->bridge );
 		$property   = $reflection->getProperty( 'protocol_context' );
 		$property->setAccessible( true );
@@ -66,7 +66,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$context = $property->getValue( $this->bridge );
 
 		$this->assertInstanceOf( McpProtocolContext::class, $context );
-		$this->assertSame( McpProtocolContext::LEGACY_SCHEMA_REVISION, $context->get_protocol_version() );
+		$this->assertSame( McpProtocolContext::PROTOCOL_VERSION_2025_11_25, $context->get_protocol_version() );
 	}
 
 	public function test_initialize_updates_only_this_bridge_protocol_context(): void {
@@ -90,7 +90,7 @@ final class StdioServerBridgeTest extends TestCase {
 		);
 
 		$this->assertSame( '2024-11-05', $property->getValue( $this->bridge )->get_protocol_version() );
-		$this->assertSame( McpProtocolContext::LEGACY_SCHEMA_REVISION, $property->getValue( $other_bridge )->get_protocol_version() );
+		$this->assertSame( McpProtocolContext::PROTOCOL_VERSION_2025_11_25, $property->getValue( $other_bridge )->get_protocol_version() );
 	}
 
 	public function test_get_server(): void {
@@ -377,7 +377,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertArrayHasKey( 'tools', $response['result'] );
 	}
 
-	public function test_modern_tools_call_uses_request_scoped_codec_without_mutating_bridge_context(): void {
+	public function test_2026_07_28_tools_call_uses_request_scoped_codec_without_mutating_bridge_context(): void {
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$protocol_property     = $reflection->getProperty( 'protocol_context' );
@@ -391,11 +391,11 @@ final class StdioServerBridgeTest extends TestCase {
 				'method'  => 'tools/call',
 				'params'  => array(
 					'_meta'     => array(
-						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::MODERN_SCHEMA_REVISION,
-						'io.modelcontextprotocol/clientCapabilities' => array(),
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
 					),
 					'name'      => 'test-always-allowed',
-					'arguments' => array(),
+					'arguments' => new \stdClass(),
 				),
 			)
 		);
@@ -405,12 +405,54 @@ final class StdioServerBridgeTest extends TestCase {
 
 		$this->assertSame( 'complete', $response['result']['resultType'] );
 		$this->assertSame(
-			McpProtocolContext::LEGACY_SCHEMA_REVISION,
+			McpProtocolContext::PROTOCOL_VERSION_2025_11_25,
 			$protocol_property->getValue( $this->bridge )->get_protocol_version()
 		);
 	}
 
-	public function test_modern_request_rejects_methods_outside_tools_call(): void {
+	public function test_2026_07_28_stdio_tools_call_rejects_non_objects_for_object_fields(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$wrong_shapes = array( array(), array( 'list-item' ), null, 'invalid' );
+		$request_id   = 22;
+		foreach ( array( 'clientCapabilities', 'arguments' ) as $field ) {
+			foreach ( $wrong_shapes as $wrong_shape ) {
+				$params = array(
+					'_meta'     => array(
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+					),
+					'name'      => 'test-always-allowed',
+					'arguments' => new \stdClass(),
+				);
+				if ( 'clientCapabilities' === $field ) {
+					$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = $wrong_shape;
+				} else {
+					$params['arguments'] = $wrong_shape;
+				}
+
+				$result = $handle_request_method->invoke(
+					$this->bridge,
+					wp_json_encode(
+						array(
+							'jsonrpc' => '2.0',
+							'id'      => $request_id++,
+							'method'  => 'tools/call',
+							'params'  => $params,
+						)
+					)
+				);
+				$response = json_decode( $result, true );
+
+				$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['error']['code'] );
+				$this->assertStringContainsString( 'must be a JSON object', $response['error']['message'] );
+			}
+		}
+	}
+
+	public function test_2026_07_28_request_rejects_methods_outside_tools_call(): void {
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
@@ -422,8 +464,8 @@ final class StdioServerBridgeTest extends TestCase {
 				'method'  => 'tools/list',
 				'params'  => array(
 					'_meta' => array(
-						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::MODERN_SCHEMA_REVISION,
-						'io.modelcontextprotocol/clientCapabilities' => array(),
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
 					),
 				),
 			)

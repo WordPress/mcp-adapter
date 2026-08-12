@@ -12,7 +12,7 @@ namespace WP\MCP\Infrastructure\ErrorHandling;
 use WP\McpSchema\V20251125\Common\JsonRpc\DTO\Error;
 use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 use WP\McpSchema\V20251125\Common\McpConstants;
-use WP\McpSchema\V20260728\Common\McpConstants as ModernMcpConstants;
+use WP\McpSchema\V20260728\Common\McpConstants as V20260728McpConstants;
 
 /**
  * Factory for creating standardized MCP error responses.
@@ -44,8 +44,8 @@ class McpErrorFactory {
 	public const SESSION_NOT_FOUND            = -32005; // Session not found or expired
 	public const PERMISSION_DENIED            = -32008; // Access denied/forbidden
 	public const UNAUTHORIZED                 = -32010; // Authentication required
-	public const HEADER_MISMATCH              = ModernMcpConstants::HEADER_MISMATCH;
-	public const UNSUPPORTED_PROTOCOL_VERSION = ModernMcpConstants::UNSUPPORTED_PROTOCOL_VERSION;
+	public const HEADER_MISMATCH              = V20260728McpConstants::HEADER_MISMATCH;
+	public const UNSUPPORTED_PROTOCOL_VERSION = V20260728McpConstants::UNSUPPORTED_PROTOCOL_VERSION;
 
 	/**
 	 * Create a parse error response.
@@ -158,7 +158,7 @@ class McpErrorFactory {
 	}
 
 	/**
-	 * Create an unsupported modern protocol-version error response.
+	 * Create an unsupported protocol-version error response.
 	 *
 	 * @since n.e.x.t
 	 *

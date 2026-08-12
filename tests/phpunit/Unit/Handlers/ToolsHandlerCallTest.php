@@ -257,7 +257,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		remove_filter( 'mcp_adapter_tool_call_result', $filter );
 	}
 
-	public function test_public_call_tool_keeps_legacy_error_for_scalar_filter_result(): void {
+	public function test_public_call_tool_keeps_2025_11_25_error_for_scalar_filter_result(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 		$filter  = static function (): string {

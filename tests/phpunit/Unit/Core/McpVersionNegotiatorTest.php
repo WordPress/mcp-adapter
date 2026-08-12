@@ -79,16 +79,16 @@ final class McpVersionNegotiatorTest extends TestCase {
 	}
 
 	/**
-	 * Test that the latest supported legacy version matches its schema tree.
+	 * Test that the latest negotiated version matches its exact schema tree.
 	 *
 	 * Revision constants describe their exact DTO tree. They do not determine
 	 * whether the Adapter supports a newer protocol lifecycle.
 	 */
-	public function test_latest_supported_legacy_version_matches_legacy_schema_tree(): void {
+	public function test_latest_negotiated_version_matches_2025_11_25_schema_tree(): void {
 		$this->assertSame(
 			McpConstants::LATEST_PROTOCOL_VERSION,
 			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0],
-			'The latest supported legacy lifecycle must match the V20251125 schema tree.'
+			'The latest negotiated lifecycle must match the V20251125 schema tree.'
 		);
 	}
 

@@ -129,7 +129,7 @@ class ToolsHandler {
 		}
 
 		try {
-			$content = array_map( array( $this, 'hydrate_legacy_content_block' ), $outcome->get_content() );
+			$content = array_map( array( $this, 'hydrate_2025_11_25_content_block' ), $outcome->get_content() );
 			$data    = array(
 				'content' => $content,
 				'isError' => $outcome->is_error(),
@@ -416,7 +416,7 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Hydrate one legacy content block for the public call_tool() DTO contract.
+	 * Hydrate one 2025-11-25 content block for the public call_tool() DTO contract.
 	 *
 	 * EmbeddedResource's generated fromArray() expects its nested union member
 	 * to already be hydrated, so handle that one level before the block factory.
@@ -426,7 +426,7 @@ class ToolsHandler {
 	 *
 	 * @return \WP\McpSchema\V20251125\Common\Protocol\Union\ContentBlockInterface
 	 */
-	private function hydrate_legacy_content_block( array $content ) {
+	private function hydrate_2025_11_25_content_block( array $content ) {
 		if ( 'resource' === ( $content['type'] ?? null ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
 			$resource = $content['resource'];
 			if ( array_key_exists( 'text', $resource ) ) {

@@ -74,6 +74,8 @@ final class ToolCallOutcome {
 	/**
 	 * Create a classified tool-call outcome.
 	 *
+	 * @since n.e.x.t
+	 *
 	 * @param string                           $result_type Result type.
 	 * @param array<int, array<string, mixed>> $content Content blocks.
 	 * @param mixed                            $structured_content Structured content.
@@ -91,6 +93,8 @@ final class ToolCallOutcome {
 	/**
 	 * Create a completed tool-call outcome.
 	 *
+	 * @since n.e.x.t
+	 *
 	 * @param array<int, array<string, mixed>> $content Content blocks.
 	 * @param mixed                            $structured_content Structured content.
 	 * @param bool                             $has_structured_content Whether structured content is present.
@@ -101,6 +105,8 @@ final class ToolCallOutcome {
 
 	/**
 	 * Create a completed tool execution error.
+	 *
+	 * @since n.e.x.t
 	 *
 	 * @param string $message Client-visible failure message.
 	 */
@@ -125,6 +131,8 @@ final class ToolCallOutcome {
 	 * The Adapter does not currently expose an ability convention that can
 	 * produce this outcome. Both codecs reject it explicitly.
 	 *
+	 * @since n.e.x.t
+	 *
 	 * @param array<int, array<string, mixed>> $content Content blocks.
 	 */
 	public static function input_required( array $content = array() ): self {
@@ -133,6 +141,8 @@ final class ToolCallOutcome {
 
 	/**
 	 * Get the protocol result type.
+	 *
+	 * @since n.e.x.t
 	 */
 	public function get_result_type(): string {
 		return $this->result_type;
@@ -140,6 +150,8 @@ final class ToolCallOutcome {
 
 	/**
 	 * Get wire-ready content blocks.
+	 *
+	 * @since n.e.x.t
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -150,6 +162,8 @@ final class ToolCallOutcome {
 	/**
 	 * Get structured content.
 	 *
+	 * @since n.e.x.t
+	 *
 	 * @return mixed
 	 */
 	public function get_structured_content() {
@@ -158,6 +172,8 @@ final class ToolCallOutcome {
 
 	/**
 	 * Whether structured content is present.
+	 *
+	 * @since n.e.x.t
 	 */
 	public function has_structured_content(): bool {
 		return $this->has_structured_content;
@@ -165,6 +181,8 @@ final class ToolCallOutcome {
 
 	/**
 	 * Whether tool execution failed.
+	 *
+	 * @since n.e.x.t
 	 */
 	public function is_error(): bool {
 		return $this->is_error;
@@ -172,6 +190,8 @@ final class ToolCallOutcome {
 
 	/**
 	 * Get a client-visible text failure reason, when available.
+	 *
+	 * @since n.e.x.t
 	 */
 	public function get_failure_reason(): ?string {
 		$first_block = $this->content[0] ?? null;

@@ -200,10 +200,10 @@ class HttpRequestHandler {
 
 		// Validate session for all requests except initialize (router will handle initialize session creation)
 		if ( 'initialize' !== $method ) {
-			if ( $protocol_context->is_modern() || $this->has_revisioned_protocol_metadata( $params ) ) {
-				$modern_validation_error = $this->validate_modern_http_request( $method, $params, $context );
-				if ( null !== $modern_validation_error ) {
-					return JsonRpcResponseBuilder::create_error_response( $request_id, $modern_validation_error );
+			if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 === $protocol_context->get_protocol_version() || $this->has_protocol_version_metadata( $params ) ) {
+				$revision_validation_error = $this->validate_2026_07_28_http_request( $method, $params, $context );
+				if ( null !== $revision_validation_error ) {
+					return JsonRpcResponseBuilder::create_error_response( $request_id, $revision_validation_error );
 				}
 			} else {
 				$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
@@ -211,7 +211,7 @@ class HttpRequestHandler {
 					return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
 				}
 
-				// Validate MCP-Protocol-Version header for legacy non-initialize requests.
+				// Validate MCP-Protocol-Version header for session-based non-initialize requests.
 				$protocol_version_error = $this->validate_protocol_version_header( $context );
 				if ( null !== $protocol_version_error ) {
 					return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
@@ -255,7 +255,7 @@ class HttpRequestHandler {
 	/**
 	 * Resolve the protocol revision selected for one HTTP request.
 	 *
-	 * Explicit request headers take precedence. When a legacy client omits the
+	 * Explicit request headers take precedence. When a session-based client omits the
 	 * header, recover the revision negotiated during initialize from the session.
 	 *
 	 * @since n.e.x.t
@@ -295,19 +295,19 @@ class HttpRequestHandler {
 			}
 		}
 
-		return McpProtocolContext::legacy_default();
+		return McpProtocolContext::for_2025_11_25();
 	}
 
 	/**
 	 * Whether request metadata opts into the revisioned 2026 protocol shape.
 	 *
 	 * Presence, rather than validity, is checked here so malformed or unknown
-	 * revisions receive a protocol error instead of falling into legacy session
+	 * revisions receive a protocol error instead of falling into session
 	 * handling.
 	 *
 	 * @param array<string, mixed> $params MCP request parameters.
 	 */
-	private function has_revisioned_protocol_metadata( array $params ): bool {
+	private function has_protocol_version_metadata( array $params ): bool {
 		$request_params = $params['params'] ?? $params;
 		if ( ! is_array( $request_params ) || ! isset( $request_params['_meta'] ) || ! is_array( $request_params['_meta'] ) ) {
 			return false;
@@ -319,9 +319,9 @@ class HttpRequestHandler {
 	/**
 	 * Validate the stateless 2026-07-28 HTTP tools/call subset.
 	 *
-	 * The modern schema replaces initialize with discover and requires request
-	 * metadata on every call. This Adapter slice intentionally exposes only
-	 * tools/call, so no legacy session is required or consulted here.
+	 * The 2026-07-28 schema replaces initialize with discover and requires
+	 * request metadata on every call. This Adapter slice intentionally exposes
+	 * only tools/call, so no session is required or consulted here.
 	 *
 	 * @param string                                                        $method MCP method name.
 	 * @param array<string, mixed>                                          $params MCP request parameters.
@@ -329,7 +329,7 @@ class HttpRequestHandler {
 	 *
 	 * @return array<string, mixed>|null Error payload, or null when valid.
 	 */
-	private function validate_modern_http_request( string $method, array $params, HttpRequestContext $context ): ?array {
+	private function validate_2026_07_28_http_request( string $method, array $params, HttpRequestContext $context ): ?array {
 		$request_params = $params['params'] ?? $params;
 		$meta           = is_array( $request_params ) ? ( $request_params['_meta'] ?? null ) : null;
 		if ( ! is_array( $meta ) || ! array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $meta ) ) {
@@ -340,7 +340,7 @@ class HttpRequestHandler {
 		}
 
 		$request_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
-		if ( McpProtocolContext::MODERN_SCHEMA_REVISION !== $request_version ) {
+		if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 !== $request_version ) {
 			return McpErrorFactory::create_error(
 				McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION,
 				sprintf( 'Unsupported protocol version: %s', is_scalar( $request_version ) ? (string) $request_version : gettype( $request_version ) )

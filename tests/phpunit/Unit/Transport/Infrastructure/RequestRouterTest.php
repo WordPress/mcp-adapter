@@ -213,7 +213,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertTrue( isset( $result['content'] ) || isset( $result['error'] ) );
 	}
 
-	public function test_legacy_tools_call_uses_legacy_result_shape(): void {
+	public function test_2025_11_25_tools_call_uses_2025_11_25_result_shape(): void {
 		$result = $this->router->route_request(
 			'tools/call',
 			array(
@@ -223,7 +223,7 @@ final class RequestRouterTest extends TestCase {
 			1,
 			'test-transport',
 			null,
-			McpProtocolContext::legacy_default()
+			McpProtocolContext::for_2025_11_25()
 		);
 
 		$this->assertArrayHasKey( 'content', $result );
@@ -231,14 +231,14 @@ final class RequestRouterTest extends TestCase {
 		$this->assertArrayNotHasKey( 'resultType', $result );
 	}
 
-	public function test_modern_tools_call_uses_modern_result_shape(): void {
+	public function test_2026_07_28_tools_call_uses_2026_07_28_result_shape(): void {
 		$result = $this->router->route_request(
 			'tools/call',
-			$this->modern_tool_call_params(),
+			$this->tool_call_params_2026_07_28(),
 			1,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
 
 		$this->assertArrayHasKey( 'content', $result );
@@ -246,35 +246,85 @@ final class RequestRouterTest extends TestCase {
 		$this->assertSame( 'complete', $result['resultType'] );
 	}
 
-	public function test_modern_tools_call_requires_request_metadata(): void {
+	public function test_2026_07_28_tools_call_requires_request_metadata(): void {
 		$result = $this->router->route_request(
 			'tools/call',
 			array( 'name' => 'test-always-allowed' ),
 			1,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
 
 		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 		$this->assertStringContainsString( 'requires params._meta', $result['error']['message'] );
 	}
 
-	public function test_modern_context_rejects_methods_outside_tools_call(): void {
+	public function test_2026_07_28_tools_call_rejects_non_object_client_capabilities(): void {
+		foreach ( array( array(), array( 'capability' ), null, 'invalid' ) as $index => $value ) {
+			$params = $this->tool_call_params_2026_07_28();
+			$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = $value;
+			$result = $this->router->route_request(
+				'tools/call',
+				$params,
+				100 + $index,
+				'test-transport',
+				null,
+				new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+			);
+
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+			$this->assertStringContainsString( 'clientCapabilities metadata must be a JSON object', $result['error']['message'] );
+		}
+	}
+
+	public function test_2026_07_28_tools_call_rejects_non_object_arguments(): void {
+		foreach ( array( array(), array( 'argument' ), null, 42 ) as $index => $value ) {
+			$params              = $this->tool_call_params_2026_07_28();
+			$params['arguments'] = $value;
+			$result              = $this->router->route_request(
+				'tools/call',
+				$params,
+				200 + $index,
+				'test-transport',
+				null,
+				new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+			);
+
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+			$this->assertStringContainsString( 'arguments must be a JSON object', $result['error']['message'] );
+		}
+	}
+
+	public function test_unknown_protocol_context_fails_before_handler_or_codec_selection(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->tool_call_params_2026_07_28(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( '2099-01-01' )
+		);
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
+		$this->assertStringContainsString( '2099-01-01', $result['error']['message'] );
+	}
+
+	public function test_2026_07_28_context_rejects_methods_outside_tools_call(): void {
 		$result = $this->router->route_request(
 			'tools/list',
 			array(),
 			1,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
 
 		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
 		$this->assertStringContainsString( 'only for tools/call', $result['error']['message'] );
 	}
 
-	public function test_modern_continuation_fields_are_rejected_before_tool_execution(): void {
+	public function test_2026_07_28_continuation_fields_are_rejected_before_tool_execution(): void {
 		$executed = false;
 		$filter   = static function ( array $arguments ) use ( &$executed ): array {
 			$executed = true;
@@ -283,7 +333,7 @@ final class RequestRouterTest extends TestCase {
 		};
 		add_filter( 'mcp_adapter_pre_tool_call', $filter );
 
-		$params                   = $this->modern_tool_call_params();
+		$params                   = $this->tool_call_params_2026_07_28();
 		$params['inputResponses'] = array( 'answer' => array( 'value' => 'yes' ) );
 		$result                   = $this->router->route_request(
 			'tools/call',
@@ -291,9 +341,9 @@ final class RequestRouterTest extends TestCase {
 			1,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
-		$params                   = $this->modern_tool_call_params();
+		$params                   = $this->tool_call_params_2026_07_28();
 		$params['requestState']   = 'opaque-state';
 		$state_result             = $this->router->route_request(
 			'tools/call',
@@ -301,7 +351,7 @@ final class RequestRouterTest extends TestCase {
 			2,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
 
 		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
@@ -313,7 +363,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertStringContainsString( 'Multi round-trip', $state_result['error']['message'] );
 	}
 
-	public function test_legacy_codec_fails_explicitly_for_list_structured_content(): void {
+	public function test_2025_11_25_codec_fails_explicitly_for_list_structured_content(): void {
 		$filter = static function (): array {
 			return array( 'one', 'two' );
 		};
@@ -331,7 +381,7 @@ final class RequestRouterTest extends TestCase {
 		$this->assertStringContainsString( 'requires structuredContent to be a JSON object', $result['error']['message'] );
 	}
 
-	public function test_modern_codec_preserves_list_structured_content(): void {
+	public function test_2026_07_28_codec_preserves_list_structured_content(): void {
 		$filter = static function (): array {
 			return array( 'one', 'two' );
 		};
@@ -339,11 +389,11 @@ final class RequestRouterTest extends TestCase {
 
 		$result = $this->router->route_request(
 			'tools/call',
-			$this->modern_tool_call_params(),
+			$this->tool_call_params_2026_07_28(),
 			1,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
 
 		remove_filter( 'mcp_adapter_tool_call_result', $filter );
@@ -363,11 +413,11 @@ final class RequestRouterTest extends TestCase {
 
 		$result = $this->router->route_request(
 			'tools/call',
-			$this->modern_tool_call_params(),
+			$this->tool_call_params_2026_07_28(),
 			1,
 			'test-transport',
 			null,
-			new McpProtocolContext( McpProtocolContext::MODERN_SCHEMA_REVISION )
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
 		);
 
 		remove_filter( 'mcp_adapter_tool_call_result', $filter );
@@ -1106,18 +1156,18 @@ final class RequestRouterTest extends TestCase {
 	}
 
 	/**
-	 * Build a valid request for the supported modern tools/call subset.
+	 * Build a valid request for the supported 2026-07-28 tools/call subset.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function modern_tool_call_params(): array {
+	private function tool_call_params_2026_07_28(): array {
 		return array(
 			'_meta'     => array(
-				'io.modelcontextprotocol/protocolVersion' => McpProtocolContext::MODERN_SCHEMA_REVISION,
-				'io.modelcontextprotocol/clientCapabilities' => array(),
+				'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+				'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
 			),
 			'name'      => 'test-always-allowed',
-			'arguments' => array(),
+			'arguments' => new \stdClass(),
 		);
 	}
 }

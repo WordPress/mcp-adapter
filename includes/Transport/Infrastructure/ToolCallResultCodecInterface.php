@@ -22,6 +22,8 @@ interface ToolCallResultCodecInterface {
 	/**
 	 * Encode an outcome for the selected wire revision.
 	 *
+	 * @since n.e.x.t
+	 *
 	 * @param \WP\MCP\Domain\Tools\ToolCallOutcome $outcome Stable tool-call outcome.
 	 *
 	 * @return array<string, mixed>

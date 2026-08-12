@@ -70,6 +70,13 @@ class HttpRequestContext {
 		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
-		$this->body             = 'POST' === $this->method ? $request->get_json_params() : null;
+		if ( 'POST' !== $this->method ) {
+			$this->body = null;
+			return;
+		}
+
+		$raw_body   = $request->get_body();
+		$body       = is_string( $raw_body ) ? JsonRpcRequestDecoder::decode( $raw_body ) : null;
+		$this->body = is_array( $body ) ? $body : null;
 	}
 }

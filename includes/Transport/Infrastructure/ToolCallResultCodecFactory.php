@@ -22,13 +22,23 @@ final class ToolCallResultCodecFactory {
 	/**
 	 * Select a codec for a request.
 	 *
+	 * @since n.e.x.t
+	 *
 	 * @param \WP\MCP\Core\McpProtocolContext $context Request protocol context.
+	 *
+	 * @throws \InvalidArgumentException If the context has no supported schema revision.
 	 */
 	public static function for_context( McpProtocolContext $context ): ToolCallResultCodecInterface {
-		if ( McpProtocolContext::MODERN_SCHEMA_REVISION === $context->get_schema_revision() ) {
-			return new V20260728ToolCallResultCodec();
+		switch ( $context->get_schema_revision() ) {
+			case McpProtocolContext::SCHEMA_REVISION_2025_11_25:
+				return new V20251125ToolCallResultCodec();
+
+			case McpProtocolContext::SCHEMA_REVISION_2026_07_28:
+				return new V20260728ToolCallResultCodec();
 		}
 
-		return new V20251125ToolCallResultCodec();
+		throw new \InvalidArgumentException(
+			sprintf( 'Unsupported MCP schema revision: %s', $context->get_schema_revision() )
+		);
 	}
 }

@@ -187,7 +187,7 @@ Negotiates the MCP protocol version between client and server. If the client req
 
 ### RequestRouter
 - **Purpose**: Routes MCP method calls to handlers and selects the request-scoped `tools/call` result codec
-- **DTO serialization boundary**: Converts legacy `AbstractDataTransferObject` results to arrays via `toArray()`, converts `JSONRPCErrorResponse` results to error arrays, and encodes `ToolCallOutcome` through the exact selected schema revision
+- **DTO serialization boundary**: Converts `V20251125` `AbstractDataTransferObject` results to arrays via `toArray()`, converts `JSONRPCErrorResponse` results to error arrays, and encodes `ToolCallOutcome` through the exact selected schema revision
 - **Observability**: Extracts per-component context from `McpComponentInterface::get_observability_context()` for request tagging
 
 ## Request flow
@@ -202,12 +202,12 @@ AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface -
 3. **Handler** finds the `McpComponentInterface` component, validates input, and invokes execution
 4. **Component** delegates to a WordPress ability or direct callable, returning a result
 5. **Handler** returns a schema DTO, except `tools/call`, whose internal router path returns `ToolCallOutcome`
-6. **RequestRouter** calls `toArray()` on legacy DTOs or selects an exact-revision `tools/call` codec at the serialization boundary
+6. **RequestRouter** calls `toArray()` on `V20251125` DTOs or selects an exact-revision `tools/call` codec at the serialization boundary
 7. **Transport** wraps the array in a JSON-RPC envelope and returns it
 
 ### Method routing
 
-The `RequestRouter` maps MCP methods to handlers. Most handlers return legacy schema DTOs; `tools/call` uses the internal outcome seam:
+The `RequestRouter` maps MCP methods to handlers. Most handlers return `V20251125` schema DTOs; `tools/call` uses the internal outcome seam:
 
 | Method | Handler | Return Type |
 |--------|---------|-------------|
@@ -222,7 +222,7 @@ The `RequestRouter` maps MCP methods to handlers. Most handlers return legacy sc
 
 Protocol-level errors (tool not found, missing parameters) return `JSONRPCErrorResponse`. Execution-level errors (permission denied, runtime failure) return the appropriate result DTO with `isError: true`.
 
-`ToolsHandler::call_tool()` remains the documented direct-call compatibility surface and returns the legacy `V20251125\CallToolResult` or `JSONRPCErrorResponse`. Modern `2026-07-28` support is request-scoped and limited to completed `tools/call` responses; the Adapter does not advertise that revision through the legacy initialize negotiator and rejects MRTR continuation fields before tool execution.
+`ToolsHandler::call_tool()` remains the documented direct-call compatibility surface and returns `V20251125\CallToolResult` or `JSONRPCErrorResponse`. Protocol revision `2026-07-28` support is request-scoped and limited to completed `tools/call` responses; the Adapter does not advertise that revision through the initialize negotiator and rejects MRTR continuation fields before tool execution.
 
 ## Component creation
 
