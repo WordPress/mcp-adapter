@@ -74,7 +74,7 @@ final class Plugin {
 		if ( ! function_exists( 'wp_register_ability' ) ) {
 			$display_notice = static function () {
 				wp_admin_notice(
-					__( 'MCP Adapter: Abilities API is not available (wp_register_ability function not found). Please ensure the Abilities API plugin is installed and activated.', 'mcp-adapter' ),
+					__( 'Abilities API not available (wp_register_ability function not found)', 'mcp-adapter' ),
 					array(
 						'type'    => 'error',
 						'dismiss' => false,
@@ -83,7 +83,6 @@ final class Plugin {
 			};
 
 			add_action( 'admin_notices', $display_notice );
-			add_action( 'network_admin_notices', $display_notice );
 
 			return false;
 		}
