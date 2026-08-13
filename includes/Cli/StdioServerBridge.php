@@ -13,6 +13,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
@@ -46,6 +47,9 @@ class StdioServerBridge {
 	 * @var bool
 	 */
 	private bool $is_running = false;
+
+	/** Negotiated protocol for the legacy STDIO lifecycle. */
+	private ?string $legacy_protocol_version = null;
 
 	/**
 	 * Initialize the STDIO server bridge.
@@ -230,18 +234,43 @@ class StdioServerBridge {
 			if ( ! is_array( $params ) ) {
 				$params = array();
 			}
+			if ( null === $id ) {
+				return '';
+			}
 
-			// Route the request to the appropriate handler
+			$metadata_version = $params['_meta']['io.modelcontextprotocol/protocolVersion'] ?? null;
+			$protocol_version = is_string( $metadata_version ) ? $metadata_version : null;
+			if ( 'server/discover' === $method && null === $protocol_version ) {
+				$protocol_version = McpVersionNegotiator::MODERN_PROTOCOL_VERSION;
+			}
+			$negotiated_after_success = null;
+			if ( 'initialize' === $method ) {
+				$requested_protocol_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] )
+					? $params['protocolVersion']
+					: '';
+				$negotiated_after_success   = McpVersionNegotiator::negotiate( $requested_protocol_version );
+			} elseif ( null === $protocol_version ) {
+				if ( null === $this->legacy_protocol_version ) {
+					return $this->create_error_response(
+						$id,
+						McpErrorFactory::INVALID_REQUEST,
+						'Invalid Request: Legacy STDIO clients must initialize before sending requests.'
+					);
+				}
+				$protocol_version = $this->legacy_protocol_version;
+			}
+
+			// Route the request to the appropriate handler.
 			$result = $this->request_router->route_request(
 				$method,
 				$params,
 				$id,
-				'stdio'
+				'stdio',
+				null,
+				$protocol_version
 			);
-
-			// If this is a notification (no id), don't send a response
-			if ( null === $id ) {
-				return '';
+			if ( null !== $negotiated_after_success && ! isset( $result['error'] ) ) {
+				$this->legacy_protocol_version = $negotiated_after_success;
 			}
 
 			// Format the response

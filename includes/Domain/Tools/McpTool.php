@@ -10,12 +10,12 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
+use WP\MCP\Domain\Continuation\McpContinuationContext;
+use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
-use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
 use WP_Error;
 
 /**
@@ -41,9 +41,9 @@ use WP_Error;
  * $tool = McpTool::fromAbility($ability);
  * ```
  *
- * McpTool wraps a protocol-only ToolDto for MCP serialization. Internal
+ * McpTool stores protocol-only, revision-neutral data for MCP serialization. Internal
  * adapter metadata and execution wiring live on this class and are never
- * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ * exposed to MCP clients. Use get_protocol_data() for protocol responses.
  *
  * @since 0.5.0
  */
@@ -55,11 +55,11 @@ final class McpTool implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Clean Tool DTO (protocol-only).
+	 * Clean tool data (protocol-only).
 	 *
-	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @var array<string, mixed>
 	 */
-	private ToolDto $tool;
+	private array $tool;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed tools).
@@ -103,9 +103,9 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
+	 * @param array<string, mixed> $tool The protocol-only tool data.
 	 */
-	private function __construct( ToolDto $tool ) {
+	private function __construct( array $tool ) {
 		$this->tool = $tool;
 	}
 
@@ -168,36 +168,20 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
-			}
-
-			$tool = ToolDto::fromArray( $tool_data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_tool_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
+		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$tool_data['annotations'] = $config['annotations'];
 		}
 
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpToolValidator::validate_tool_dto( $tool );
+			$validation_result = McpToolValidator::validate_tool_data( $tool_data );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
 		}
 
-		$instance          = new self( $tool );
+		$instance          = new self( $tool_data );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
@@ -232,7 +216,7 @@ final class McpTool implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'tool',
-			'tool_name'      => $tool_data['tool']->getName(),
+			'tool_name'      => $tool_data['tool']['name'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -245,11 +229,11 @@ final class McpTool implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get clean protocol data for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @return array<string, mixed>
 	 */
-	public function get_protocol_dto(): ToolDto {
+	public function get_protocol_data(): array {
 		return $this->tool;
 	}
 
@@ -257,10 +241,11 @@ final class McpTool implements McpComponentInterface {
 	 * Execute the tool.
 	 *
 	 * @param mixed $arguments Tool arguments.
+	 * @param \WP\MCP\Domain\Continuation\McpContinuationContext|null $continuation Optional stateless continuation data.
 	 *
 	 * @return mixed
 	 */
-	public function execute( $arguments ) {
+	public function execute( $arguments, ?McpContinuationContext $continuation = null ) {
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
@@ -277,7 +262,7 @@ final class McpTool implements McpComponentInterface {
 			}
 		} elseif ( null !== $this->handler ) {
 			try {
-				$result = call_user_func( $this->handler, $args );
+				$result = $this->invoke_handler( $args, $continuation );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_execution_failed',
@@ -290,6 +275,10 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+
+		if ( $result instanceof McpExecutionResult ) {
 			return $result;
 		}
 
@@ -343,6 +332,29 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	/**
+	 * Invoke a direct handler, passing continuation data only to handlers that opt in.
+	 *
+	 * @param mixed $arguments Tool arguments.
+	 * @param \WP\MCP\Domain\Continuation\McpContinuationContext|null $continuation Optional continuation data.
+	 *
+	 * @return mixed
+	 */
+	private function invoke_handler( $arguments, ?McpContinuationContext $continuation ) {
+		$handler = $this->handler;
+		if ( ! is_callable( $handler ) ) {
+			throw new \LogicException( 'Tool handler is not callable.' );
+		}
+
+		$reflection = new \ReflectionFunction( \Closure::fromCallable( $handler ) );
+
+		if ( $reflection->isVariadic() || $reflection->getNumberOfParameters() >= 2 ) {
+			return call_user_func( $handler, $arguments, $continuation );
+		}
+
+		return call_user_func( $handler, $arguments );
+	}
+
+	/**
 	 * Check whether the current request has permission to execute this tool.
 	 *
 	 * @param mixed $arguments Tool arguments.
@@ -388,7 +400,7 @@ final class McpTool implements McpComponentInterface {
 			'Access denied.',
 			array(
 				'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY,
-				'tool_name'      => $this->tool->getName(),
+				'tool_name'      => $this->tool['name'],
 			)
 		);
 	}

@@ -84,6 +84,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -127,6 +128,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -166,6 +168,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -281,6 +284,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -347,6 +351,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -411,6 +416,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -444,6 +450,7 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -962,6 +969,11 @@ final class HttpTransportTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
 				),
 			)
 		);

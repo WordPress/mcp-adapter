@@ -99,6 +99,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -128,6 +129,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -180,6 +182,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -230,6 +233,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -315,6 +319,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -355,7 +360,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertStringContainsString( 'Method not allowed', $data['error']['message'] );
 	}
 
-	public function test_handle_request_post_withNoProtocolVersionHeader_acceptsRequest(): void {
+	public function test_handle_request_post_with_no_protocol_version_header_rejects_legacy_request(): void {
 		// Create session first.
 		$session_id = $this->initializeAndGetSessionId();
 
@@ -374,11 +379,11 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		$this->assertEquals( 200, $response->get_status() );
+		$this->assertEquals( 400, $response->get_status() );
 
 		$data = $response->get_data();
-		$this->assertArrayHasKey( 'result', $data );
-		$this->assertArrayNotHasKey( 'error', $data );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+		$this->assertStringContainsString( 'Missing MCP-Protocol-Version header', $data['error']['message'] );
 	}
 
 	public function test_handle_request_post_withSupportedProtocolVersionHeader_acceptsRequest(): void {
@@ -407,34 +412,146 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
-	public function test_handle_request_post_withUnsupportedProtocolVersionHeader_returnsError(): void {
-		// Create session first.
-		$session_id = $this->initializeAndGetSessionId();
-
+	public function test_handle_request_post_with_unsupported_protocol_version_returns_exact_error(): void {
+		$params = $this->modern_params();
+		$params['_meta']['io.modelcontextprotocol/protocolVersion'] = '9999-99-99';
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
 				'id'      => 2,
 				'method'  => 'tools/list',
-				'params'  => array(),
+				'params'  => $params,
 			)
 		);
-		$request->set_header( 'Mcp-Session-Id', $session_id );
 		$request->set_header( 'Mcp-Protocol-Version', '9999-99-99' );
 
 		$context  = new HttpRequestContext( $request );
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		// INVALID_REQUEST (-32600) maps to HTTP 400 via McpErrorFactory::mcp_error_to_http_status().
 		$this->assertEquals( 400, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertArrayHasKey( 'error', $data );
 		$this->assertEquals( 2, $data['id'] );
-		$this->assertEquals( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+		$this->assertEquals( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $data['error']['code'] );
 		$this->assertStringContainsString( 'Unsupported protocol version', $data['error']['message'] );
-		$this->assertStringContainsString( '9999-99-99', $data['error']['message'] );
+		$this->assertSame( '9999-99-99', $data['error']['data']['requested'] );
+	}
+
+	public function test_modern_discovery_is_stateless_when_header_and_body_match(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 70,
+				'method'  => 'server/discover',
+				'params'  => $this->modern_params( true ),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+		$data     = $response->get_data();
+		$result   = (array) $data['result'];
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 70, $data['id'] );
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertSame( array( '2026-07-28', '2025-11-25' ), $result['supportedVersions'] );
+		$this->assertSame( 0, $result['ttlMs'] );
+		$this->assertSame( 'private', $result['cacheScope'] );
+	}
+
+	public function test_modern_request_rejects_missing_protocol_header(): void {
+		$request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 71,
+				'method'  => 'tools/list',
+				'params'  => $this->modern_params(),
+			)
+		);
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $data['error']['code'] );
+		$this->assertSame( 71, $data['id'] );
+	}
+
+	public function test_modern_request_rejects_header_body_version_mismatch(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 72,
+				'method'  => 'tools/list',
+				'params'  => $this->modern_params(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2025-11-25' );
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $data['error']['code'] );
+		$this->assertSame( '2026-07-28', $data['error']['data']['expected'] );
+		$this->assertSame( '2025-11-25', $data['error']['data']['actual'] );
+	}
+
+	public function test_modern_request_rejects_missing_body_metadata_even_with_header(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 75,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+		$this->assertSame( 75, $data['id'] );
+	}
+
+	public function test_modern_request_does_not_require_legacy_session(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 73,
+				'method'  => 'tools/list',
+				'params'  => $this->modern_params(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayNotHasKey( 'error', $data );
+	}
+
+	public function test_legacy_request_rejects_header_that_differs_from_session_revision(): void {
+		$session_id = $this->initializeAndGetSessionId();
+		$request    = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 74,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+		$this->assertStringContainsString( 'does not match', $data['error']['message'] );
 	}
 
 	public function test_handle_request_post_initialize_skipsProtocolVersionHeaderValidation(): void {
@@ -445,6 +562,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -481,6 +599,7 @@ final class HttpRequestHandlerTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -504,11 +623,27 @@ final class HttpRequestHandlerTest extends TestCase {
 		return (string) array_key_last( $sessions );
 	}
 
+	/** @return array<string, mixed> */
+	private function modern_params( bool $include_client_info = false ): array {
+		$metadata = array(
+			'io.modelcontextprotocol/protocolVersion'    => '2026-07-28',
+			'io.modelcontextprotocol/clientCapabilities' => array(),
+		);
+		if ( $include_client_info ) {
+			$metadata['io.modelcontextprotocol/clientInfo'] = array(
+				'name'    => 'modern-http-client',
+				'version' => '1.0.0',
+			);
+		}
+
+		return array( '_meta' => $metadata );
+	}
+
 	private function createPostRequest( array $body ): WP_REST_Request {
 		$request = new WP_REST_Request( 'POST', '/test-mcp' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_header( 'Accept', 'application/json, text/event-stream' );
-		$request->set_body( json_encode( $body ) );
+		$request->set_body( wp_json_encode( $body ) );
 
 		return $request;
 	}

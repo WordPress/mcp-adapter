@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Prompts;
 
+use WP\MCP\Domain\Continuation\McpContinuationContext;
+use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP_Error;
 
 /**
@@ -45,19 +46,18 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_protocol_dto();
+		$data = $prompt->get_protocol_data();
 
-		$this->assertInstanceOf( PromptDto::class, $dto );
-		$this->assertSame( 'test-array', $dto->getName() );
-		$this->assertSame( 'Test Array Prompt', $dto->getTitle() );
-		$this->assertSame( 'A prompt created from array config', $dto->getDescription() );
+		$this->assertSame( 'test-array', $data['name'] );
+		$this->assertSame( 'Test Array Prompt', $data['title'] );
+		$this->assertSame( 'A prompt created from array config', $data['description'] );
 
-		$arguments = $dto->getArguments();
+		$arguments = $data['arguments'];
 		$this->assertCount( 2, $arguments );
-		$this->assertSame( 'code', $arguments[0]->getName() );
-		$this->assertTrue( $arguments[0]->getRequired() );
-		$this->assertSame( 'language', $arguments[1]->getName() );
-		$this->assertNull( $arguments[1]->getRequired() );
+		$this->assertSame( 'code', $arguments[0]['name'] );
+		$this->assertTrue( $arguments[0]['required'] );
+		$this->assertSame( 'language', $arguments[1]['name'] );
+		$this->assertArrayNotHasKey( 'required', $arguments[1] );
 	}
 
 	public function test_fromArray_handler_is_executed(): void {
@@ -77,6 +77,23 @@ final class McpPromptTest extends TestCase {
 
 		$this->assertSame( 21, $result['received']['value'] );
 		$this->assertSame( 42, $result['computed'] );
+	}
+
+	public function test_execute_passes_continuation_to_opt_in_handler_and_preserves_result(): void {
+		$context = new McpContinuationContext( array(), 'prompt-state' );
+		$prompt  = McpPrompt::fromArray(
+			array(
+				'name'    => 'continuation-prompt',
+				'handler' => static function ( array $arguments, ?McpContinuationContext $continuation ): McpExecutionResult {
+					return McpExecutionResult::input_required( array(), $continuation ? $continuation->get_request_state() : null );
+				},
+			)
+		);
+
+		$result = $prompt->execute( array(), $context );
+
+		$this->assertInstanceOf( McpExecutionResult::class, $result );
+		$this->assertSame( 'prompt-state', $result->get_request_state() );
 	}
 
 	public function test_fromArray_permission_callback(): void {
@@ -136,8 +153,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_protocol_dto();
-		$arr = $dto->toArray();
+		$arr = $prompt->get_protocol_data();
 
 		$this->assertArrayHasKey( 'icons', $arr );
 		$this->assertCount( 1, $arr['icons'] );
@@ -157,8 +173,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_protocol_dto();
-		$arr = $dto->toArray();
+		$arr = $prompt->get_protocol_data();
 
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertSame( 'custom_value', $arr['_meta']['custom_key'] );
@@ -205,8 +220,7 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_protocol_dto();
-		$arr = $dto->toArray();
+		$arr = $prompt->get_protocol_data();
 
 		$this->assertArrayHasKey( 'icons', $arr );
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -266,14 +280,12 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_protocol_dto();
-		$this->assertSame( 'getter-test', $dto->getName() );
-		$this->assertSame( 'Getter Title', $dto->getTitle() );
-		$this->assertSame( 'Getter Description', $dto->getDescription() );
-		$this->assertCount( 1, $dto->getArguments() );
-		$this->assertSame( 'arg1', $dto->getArguments()[0]->getName() );
-
-		$arr = $dto->toArray();
+		$arr = $prompt->get_protocol_data();
+		$this->assertSame( 'getter-test', $arr['name'] );
+		$this->assertSame( 'Getter Title', $arr['title'] );
+		$this->assertSame( 'Getter Description', $arr['description'] );
+		$this->assertCount( 1, $arr['arguments'] );
+		$this->assertSame( 'arg1', $arr['arguments'][0]['name'] );
 		$this->assertArrayHasKey( 'icons', $arr );
 		$this->assertCount( 1, $arr['icons'] );
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -288,13 +300,13 @@ final class McpPromptTest extends TestCase {
 			)
 		);
 
-		$dto = $prompt->get_protocol_dto();
-		$this->assertSame( 'minimal-test', $dto->getName() );
-		$this->assertNull( $dto->getTitle() );
-		$this->assertNull( $dto->getDescription() );
-		$this->assertNull( $dto->getArguments() );
-		$this->assertNull( $dto->getIcons() );
-		$this->assertNull( $dto->get_meta() );
+		$data = $prompt->get_protocol_data();
+		$this->assertSame( 'minimal-test', $data['name'] );
+		$this->assertArrayNotHasKey( 'title', $data );
+		$this->assertArrayNotHasKey( 'description', $data );
+		$this->assertArrayNotHasKey( 'arguments', $data );
+		$this->assertArrayNotHasKey( 'icons', $data );
+		$this->assertArrayNotHasKey( '_meta', $data );
 	}
 
 	// =========================================================================

@@ -13,8 +13,6 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 use WP_Error;
 
 /**
@@ -106,7 +104,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
+	 * @return array<string, mixed>|\WP_Error Returns prompt data or WP_Error if validation fails.
 	 */
 	public static function make( \WP_Ability $ability ) {
 		$prompt = new self( $ability );
@@ -115,9 +113,9 @@ class RegisterAbilityAsMcpPrompt {
 	}
 
 	/**
-	 * Get the MCP prompt instance.
+	 * Get the MCP prompt data.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
+	 * @return array<string, mixed>|\WP_Error Prompt data or WP_Error if validation fails.
 	 * @since 0.5.0
 	 *
 	 */
@@ -129,15 +127,11 @@ class RegisterAbilityAsMcpPrompt {
 			return $built;
 		}
 
-		try {
-			return PromptDto::fromArray( $built['prompt_data'] );
-		} catch ( \Throwable $e ) {
-			return new WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
-		}
+		return $built['prompt_data'];
 	}
 
 	/**
-	 * Build Prompt DTO data and adapter metadata.
+	 * Build prompt protocol data and adapter metadata.
 	 *
 	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
@@ -299,7 +293,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param list<array<string,mixed>> $explicit_arguments User-defined arguments array.
 	 *
-	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
+	 * @return list<array{name: string, title?: string, description?: string, required?: true}>|\WP_Error Prompt argument data or WP_Error.
 	 * @since 0.5.0
 	 *
 	 */
@@ -351,7 +345,7 @@ class RegisterAbilityAsMcpPrompt {
 				$argument_data['required'] = true;
 			}
 
-			$arguments[] = PromptArgument::fromArray( $argument_data );
+			$arguments[] = $argument_data;
 		}
 
 		return $arguments;
@@ -380,7 +374,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
 	 *
-	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument> Argument DTO list.
+	 * @return list<array{name: string, title?: string, description?: string, required?: true}> Argument data list.
 	 * @since 0.5.0
 	 *
 	 */
@@ -425,7 +419,7 @@ class RegisterAbilityAsMcpPrompt {
 				$argument_data['required'] = true;
 			}
 
-			$arguments[] = PromptArgument::fromArray( $argument_data );
+			$arguments[] = $argument_data;
 		}
 
 		return $arguments;
@@ -474,15 +468,15 @@ class RegisterAbilityAsMcpPrompt {
 	}
 
 	/**
-	 * Build a clean Prompt DTO and adapter metadata for internal wiring.
+	 * Build clean prompt data and adapter metadata for internal wiring.
 	 *
-	 * This method returns a protocol-only Prompt DTO and provides the adapter metadata
-	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
+	 * This method returns protocol-only prompt data and provides the adapter metadata
+	 * separately. This keeps component storage stable across MCP spec changes and avoids coupling internal execution
 	 * wiring to protocol surfaces.
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{prompt: \WP\McpSchema\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{prompt: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
 	 *
 	 */
@@ -494,32 +488,17 @@ class RegisterAbilityAsMcpPrompt {
 			return $data;
 		}
 
-		try {
-			$prompt_dto = PromptDto::fromArray( $data['prompt_data'] );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_prompt_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Prompt DTO for ability %1$s: %2$s', 'mcp-adapter' ),
-					$ability->get_name(),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
-
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpPromptValidator::validate_prompt_dto( $prompt_dto );
+			$validation_result = McpPromptValidator::validate_prompt_data( $data['prompt_data'] );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
 		}
 
 		return array(
-			'prompt'       => $prompt_dto,
+			'prompt'       => $data['prompt_data'],
 			'adapter_meta' => $data['adapter_meta'],
 		);
 	}

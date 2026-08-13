@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
+use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
@@ -23,7 +25,6 @@ use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\SessionManager;
-use WP\McpSchema\Common\McpConstants;
 use WP_REST_Request;
 
 /**
@@ -78,6 +79,7 @@ final class RequestRouterTest extends TestCase {
 			'initialize',
 			array(
 				'protocolVersion' => '2025-11-25',
+				'capabilities'    => array(),
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -89,7 +91,7 @@ final class RequestRouterTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'protocolVersion', $result );
-		$this->assertEquals( McpConstants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
+		$this->assertSame( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION, $result['protocolVersion'] );
 		$this->assertArrayHasKey( 'serverInfo', $result );
 
 		// Verify observability events (unified event name with status tag)
@@ -118,6 +120,7 @@ final class RequestRouterTest extends TestCase {
 			'initialize',
 			array(
 				'protocolVersion' => '2025-11-25',
+				'capabilities'    => array(),
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -160,7 +163,14 @@ final class RequestRouterTest extends TestCase {
 		$http_context = new HttpRequestContext( $request );
 		$result       = $this->router->route_request(
 			'initialize',
-			array( 'protocolVersion' => '2025-11-25' ),
+			array(
+				'protocolVersion' => '2025-11-25',
+				'capabilities'    => array(),
+				'clientInfo'      => array(
+					'name'    => 'test-client',
+					'version' => '1.0.0',
+				),
+			),
 			1,
 			'test-transport',
 			$http_context
@@ -359,6 +369,7 @@ final class RequestRouterTest extends TestCase {
 			'initialize',
 			array(
 				'protocolVersion' => '2025-11-25',
+				'capabilities'    => array(),
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -402,6 +413,7 @@ final class RequestRouterTest extends TestCase {
 			'initialize',
 			array(
 				'protocolVersion' => '2025-11-25',
+				'capabilities'    => array(),
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -638,6 +650,7 @@ final class RequestRouterTest extends TestCase {
 			'initialize',
 			array(
 				'protocolVersion' => '2025-11-25',
+				'capabilities'    => array(),
 				'clientInfo'      => array(
 					'name'    => 'test-client',
 					'version' => '1.0.0',
@@ -851,8 +864,7 @@ final class RequestRouterTest extends TestCase {
 		);
 
 		$this->assertIsArray( $result );
-		// Ping with null ID should still work
-		$this->assertEmpty( $result );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 	}
 
 	public function test_route_request_with_string_request_id(): void {
@@ -916,6 +928,194 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		// Whitespace-only URI should be treated as empty
 		$this->assertArrayHasKey( 'error', $result );
+	}
+
+	public function test_initialize_falls_back_to_the_exact_legacy_revision(): void {
+		$result = $this->router->route_request(
+			'initialize',
+			array(
+				'protocolVersion' => '2024-11-05',
+				'capabilities'    => array(),
+				'clientInfo'      => array(
+					'name'    => 'fallback-client',
+					'version' => '1.0.0',
+				),
+			),
+			41,
+			'test-transport'
+		);
+
+		$this->assertSame( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION, $result['protocolVersion'] );
+		$this->assertArrayNotHasKey( 'resultType', $result );
+		$this->assertArrayNotHasKey( 'ttlMs', $result );
+		$this->assertArrayNotHasKey( 'cacheScope', $result );
+	}
+
+	public function test_modern_discovery_is_explicit_and_schema_encoded(): void {
+		$result = $this->router->route_request(
+			'server/discover',
+			$this->modern_params( true ),
+			42,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertSame( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, $result['supportedVersions'] );
+		$this->assertSame( array( 'prompts', 'resources', 'tools' ), array_keys( $result['capabilities'] ) );
+		$this->assertSame( 0, $result['ttlMs'] );
+		$this->assertSame( 'private', $result['cacheScope'] );
+		$this->assertSame(
+			array(
+				'name'    => 'Test MCP Server',
+				'version' => '1.0.0',
+			),
+			$result['_meta']['io.modelcontextprotocol/serverInfo']
+		);
+	}
+
+	public function test_modern_request_requires_protocol_metadata(): void {
+		$result = $this->router->route_request(
+			'tools/list',
+			array(),
+			43,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+		$this->assertStringContainsString( 'Invalid params', $result['error']['message'] );
+	}
+
+	public function test_unsupported_revision_is_rejected_before_handler_dispatch(): void {
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->expects( $this->never() )->method( 'list_tools' );
+		$this->context->tools_handler = $tools_handler;
+
+		$params = $this->modern_params();
+		$params['_meta']['io.modelcontextprotocol/protocolVersion'] = '2099-01-01';
+		$result = $this->router->route_request( 'tools/list', $params, 44, 'test-transport' );
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
+		$this->assertSame( '2099-01-01', $result['error']['data']['requested'] );
+		$this->assertSame( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, $result['error']['data']['supported'] );
+	}
+
+	public function test_modern_ping_is_method_not_found(): void {
+		$result = $this->router->route_request(
+			'ping',
+			$this->modern_params(),
+			45,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $result['error']['code'] );
+	}
+
+	public function test_modern_list_result_has_only_the_applicable_cache_fields(): void {
+		$result = $this->router->route_request(
+			'tools/list',
+			$this->modern_params(),
+			46,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertSame( 0, $result['ttlMs'] );
+		$this->assertSame( 'private', $result['cacheScope'] );
+		$this->assertArrayHasKey( 'tools', $result );
+		$this->assertSame(
+			array(
+				'name'    => 'Test MCP Server',
+				'version' => '1.0.0',
+			),
+			$result['_meta']['io.modelcontextprotocol/serverInfo']
+		);
+	}
+
+	public function test_modern_call_result_omits_inapplicable_cache_fields(): void {
+		$params              = $this->modern_params();
+		$params['name']      = 'test-always-allowed';
+		$params['arguments'] = array( 'test' => 'value' );
+
+		$result = $this->router->route_request(
+			'tools/call',
+			$params,
+			47,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertArrayNotHasKey( 'ttlMs', $result );
+		$this->assertArrayNotHasKey( 'cacheScope', $result );
+	}
+
+	public function test_request_schema_rejects_missing_required_tool_name(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->modern_params(),
+			48,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+		$this->assertStringContainsString( 'name', $result['error']['message'] );
+	}
+
+	public function test_modern_input_required_result_is_encoded_without_callback_execution(): void {
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->expects( $this->once() )
+			->method( 'call_tool' )
+			->willReturn( McpExecutionResult::input_required( array(), 'opaque-state' ) );
+		$this->context->tools_handler = $tools_handler;
+
+		$params              = $this->modern_params();
+		$params['name']      = 'test-always-allowed';
+		$params['arguments'] = array();
+		$result              = $this->router->route_request(
+			'tools/call',
+			$params,
+			49,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( 'input_required', $result['resultType'] );
+		$this->assertSame( 'opaque-state', $result['requestState'] );
+		$this->assertArrayNotHasKey( 'ttlMs', $result );
+		$this->assertArrayNotHasKey( 'cacheScope', $result );
+	}
+
+	/**
+	 * Build the mandatory request metadata for the stateless protocol.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function modern_params( bool $include_client_info = false ): array {
+		$metadata = array(
+			'io.modelcontextprotocol/protocolVersion'    => McpVersionNegotiator::MODERN_PROTOCOL_VERSION,
+			'io.modelcontextprotocol/clientCapabilities' => array(),
+		);
+		if ( $include_client_info ) {
+			$metadata['io.modelcontextprotocol/clientInfo'] = array(
+				'name'    => 'modern-test-client',
+				'version' => '1.0.0',
+			);
+		}
+
+		return array( '_meta' => $metadata );
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {

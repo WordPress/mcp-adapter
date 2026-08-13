@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
@@ -64,6 +65,52 @@ final class HttpSessionValidatorTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertEquals( McpErrorFactory::INVALID_REQUEST, $result['error']['code'] );
 		$this->assertStringContainsString( 'Missing Mcp-Session-Id header', $result['error']['message'] );
+	}
+
+	public function test_get_protocol_version_from_valid_session(): void {
+		wp_set_current_user( $this->test_user_id );
+		$session_id = SessionManager::create_session(
+			$this->test_user_id,
+			array( 'protocolVersion' => McpVersionNegotiator::LEGACY_PROTOCOL_VERSION )
+		);
+		$this->assertIsString( $session_id );
+
+		$request = new WP_REST_Request( 'POST', '/test' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		$this->assertSame(
+			McpVersionNegotiator::LEGACY_PROTOCOL_VERSION,
+			HttpSessionValidator::get_protocol_version( new HttpRequestContext( $request ) )
+		);
+	}
+
+	public function test_get_protocol_version_returns_session_validation_error(): void {
+		wp_set_current_user( $this->test_user_id );
+
+		$result = HttpSessionValidator::get_protocol_version(
+			new HttpRequestContext( new WP_REST_Request( 'POST', '/test' ) )
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result['error']['code'] );
+		$this->assertNull( $result['id'] );
+	}
+
+	public function test_get_protocol_version_rejects_unsupported_session_version(): void {
+		wp_set_current_user( $this->test_user_id );
+		$session_id = SessionManager::create_session(
+			$this->test_user_id,
+			array( 'protocolVersion' => '1900-01-01' )
+		);
+		$this->assertIsString( $session_id );
+
+		$request = new WP_REST_Request( 'POST', '/test' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$result = HttpSessionValidator::get_protocol_version( new HttpRequestContext( $request ) );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $result['error']['code'] );
+		$this->assertStringContainsString( 'supported protocol version', $result['error']['message'] );
 	}
 
 	public function test_create_session_with_valid_user(): void {
@@ -195,7 +242,8 @@ final class HttpSessionValidatorTest extends TestCase {
 		$result = HttpSessionValidator::validate_session_header( $context );
 
 		$this->assertIsArray( $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -215,7 +263,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -235,7 +284,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -250,7 +300,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -268,7 +319,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -287,6 +339,7 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 }

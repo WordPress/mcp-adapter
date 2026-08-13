@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\RegisterAbilityAsMcpPrompt;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 final class RegisterAbilityAsMcpPromptTest extends TestCase {
 
@@ -14,11 +13,11 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$ability = wp_get_ability( 'test/prompt' );
 		$this->assertNotNull( $ability, 'Ability test/prompt should be registered' );
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
-		$this->assertInstanceOf( PromptDto::class, $prompt );
-		$arr = $prompt->toArray();
+		$this->assertIsArray( $prompt );
+		$arr = $prompt;
 		$this->assertSame( 'test-prompt', $arr['name'] );
 		$this->assertArrayHasKey( 'arguments', $arr );
-		$this->assertNull( $prompt->get_meta() );
+		$this->assertArrayNotHasKey( '_meta', $prompt );
 	}
 
 	public function test_annotations_are_mapped_to_mcp_format(): void {
@@ -28,9 +27,9 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
-		// Note: Schema Prompt DTO does not support annotations; these are intentionally not exposed.
+		// Note: Prompt protocol data does not support annotations; these are intentionally not exposed.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
 	}
 
@@ -41,9 +40,9 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
-		// Note: Schema Prompt DTO does not support annotations; these are intentionally not exposed.
+		// Note: Prompt protocol data does not support annotations; these are intentionally not exposed.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
 	}
 
@@ -54,7 +53,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify annotations field is not present when empty.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
@@ -71,10 +70,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have exactly one argument named 'input'.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -95,10 +94,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have exactly one argument named 'input'.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -121,7 +120,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		$this->assertArrayHasKey( 'arguments', $arr );
 		$this->assertCount( 2, $arr['arguments'] );
@@ -164,7 +163,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		$this->assertArrayHasKey( 'arguments', $arr );
 		$this->assertCount( 3, $arr['arguments'] );
@@ -211,10 +210,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Empty object schema should result in no arguments key.
 		$this->assertArrayNotHasKey( 'arguments', $arr );
@@ -230,7 +229,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// No schema should result in no arguments key.
 		$this->assertArrayNotHasKey( 'arguments', $arr );
@@ -243,10 +242,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Object schema should have arguments.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -295,10 +294,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have 2 arguments from explicit definition.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -329,10 +328,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have exactly 1 argument from explicit override, NOT from input_schema.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -364,10 +363,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should fall back to input_schema since mcp.arguments is empty.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -412,10 +411,10 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
+		$this->assertIsArray( $built['prompt'] );
 		$prompt = $built['prompt'];
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have 2 arguments.
 		$this->assertArrayHasKey( 'arguments', $arr );
@@ -446,11 +445,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$built = RegisterAbilityAsMcpPrompt::build( $ability );
 		$this->assertNotWPError( $built );
 		$this->assertIsArray( $built );
-		$this->assertInstanceOf( PromptDto::class, $built['prompt'] );
-		$prompt = $built['prompt'];
-
-		$arr = $prompt->toArray();
-
+		$this->assertIsArray( $built['prompt'] );
 		// Verify arguments_source is 'schema' for auto-converted arguments.
 		$this->assertSame( 'schema', $built['adapter_meta']['arguments_source'] );
 	}
@@ -477,7 +472,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify icons array is present.
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -503,7 +498,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have only 2 valid icons (the one missing src was filtered out).
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -521,7 +516,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify icons key is not present when ability has no icons.
 		$this->assertArrayNotHasKey( 'icons', $arr );
@@ -538,7 +533,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify _meta is present with user-defined keys.
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -561,7 +556,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		$this->assertArrayNotHasKey( '_meta', $arr );
 	}
@@ -577,7 +572,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify icons are present.
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -608,7 +603,7 @@ final class RegisterAbilityAsMcpPromptTest extends TestCase {
 		$prompt = RegisterAbilityAsMcpPrompt::make( $ability );
 		$this->assertNotWPError( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 		$this->assertSame( 'custom-prompt-name', $arr['name'] );
 
 		remove_filter( 'mcp_adapter_prompt_name', $filter_callback );

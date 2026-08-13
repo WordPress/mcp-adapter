@@ -76,8 +76,8 @@ final class DefaultServerFactoryTest extends TestCase {
 		// The test/resource ability has mcp.public=true and mcp.type='resource'
 		$resources      = $server->get_resources();
 		$resource_names = array_map(
-			static function ( $resource ) {
-				return $resource->getName();
+			static function ( array $resource_data ): string {
+				return (string) $resource_data['name'];
 			},
 			$resources
 		);
@@ -104,8 +104,8 @@ final class DefaultServerFactoryTest extends TestCase {
 		// The test/prompt ability has mcp.public=true and mcp.type='prompt'
 		$prompts      = $server->get_prompts();
 		$prompt_names = array_map(
-			static function ( $prompt ) {
-				return $prompt->getName();
+			static function ( array $prompt ): string {
+				return (string) $prompt['name'];
 			},
 			$prompts
 		);
@@ -158,8 +158,8 @@ final class DefaultServerFactoryTest extends TestCase {
 
 		$tools      = $server->get_tools();
 		$tool_names = array_map(
-			static function ( $tool ) {
-				return $tool->getName();
+			static function ( array $tool ): string {
+				return (string) $tool['name'];
 			},
 			$tools
 		);

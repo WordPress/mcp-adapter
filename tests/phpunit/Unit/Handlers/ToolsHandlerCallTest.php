@@ -4,31 +4,52 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Handlers;
 
+use WP\MCP\Domain\Continuation\McpContinuationContext;
+use WP\MCP\Domain\Continuation\McpExecutionResult;
+use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\DTO\ImageContent;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 
 final class ToolsHandlerCallTest extends TestCase {
+
+	public function test_continuation_context_and_result_pass_through_unchanged(): void {
+		$received_context = null;
+		$expected         = McpExecutionResult::input_required(
+			array( 'confirm' => array( 'method' => 'elicitation/create' ) ),
+			'opaque-state'
+		);
+		$tool             = McpTool::fromArray(
+			array(
+				'name'       => 'continuing-tool',
+				'handler'    => static function ( array $arguments, McpContinuationContext $context ) use ( &$received_context, $expected ): McpExecutionResult {
+					$received_context = $context;
+
+					return $expected;
+				},
+				'permission' => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+
+		$context = new McpContinuationContext( array( 'confirm' => true ), 'previous-state' );
+		$result  = ( new ToolsHandler( $this->makeServer( array( $tool ) ) ) )->call_tool(
+			array( 'name' => 'continuing-tool' ),
+			1,
+			$context
+		);
+
+		$this->assertSame( $context, $received_context );
+		$this->assertSame( $expected, $result );
+	}
 
 	public function test_missing_name_returns_missing_parameter_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool( array( 'params' => array( 'arguments' => array() ) ) );
 
-		// Missing name is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getCode() );
-		$this->assertNotEmpty( $error->getMessage() );
+		$this->assertSame( -32602, $result['error']['code'] );
+		$this->assertNotEmpty( $result['error']['message'] );
 	}
 
 	public function test_unknown_tool_logs_and_returns_error(): void {
@@ -36,12 +57,8 @@ final class ToolsHandlerCallTest extends TestCase {
 		$handler = new ToolsHandler( $server );
 		$result  = $handler->call_tool( array( 'params' => array( 'name' => 'nope' ) ) );
 
-		// Tool not found is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		$this->assertSame( -32003, $result['error']['code'] );
+		$this->assertNotEmpty( $result['error']['message'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
@@ -54,14 +71,11 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		// Permission denied is a tool execution error - returns CallToolResult with isError
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$this->assertTrue( $result->getIsError() );
-		$content = $result->getContent();
+		$this->assertTrue( $result['isError'] );
+		$content = $result['content'];
 		$this->assertNotEmpty( $content );
-		$this->assertInstanceOf( TextContent::class, $content[0] );
-		$this->assertStringContainsString( 'Permission denied', $content[0]->getText() );
+		$this->assertSame( 'text', $content[0]['type'] );
+		$this->assertStringContainsString( 'Permission denied', $content[0]['text'] );
 	}
 
 	public function test_permission_exception_logs_and_returns_error(): void {
@@ -73,13 +87,10 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		// Permission check exception is a tool execution error - returns CallToolResult with isError
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$this->assertTrue( $result->getIsError() );
-		$content = $result->getContent();
+		$this->assertTrue( $result['isError'] );
+		$content = $result['content'];
 		$this->assertNotEmpty( $content );
-		$this->assertInstanceOf( TextContent::class, $content[0] );
+		$this->assertSame( 'text', $content[0]['type'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
@@ -92,14 +103,10 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		// Execute exceptions are tool execution errors - returns CallToolResult with isError
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$this->assertTrue( $result->getIsError() );
-		$content = $result->getContent();
+		$this->assertTrue( $result['isError'] );
+		$content = $result['content'];
 		$this->assertNotEmpty( $content );
-		$this->assertInstanceOf( TextContent::class, $content[0] );
-		$this->assertEquals( 'text', $content[0]->getType() );
+		$this->assertSame( 'text', $content[0]['type'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
@@ -112,15 +119,11 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		// Successful image result returns CallToolResult
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		// Use DTO getter methods instead of toArray()
-		$content = $result->getContent();
+		$content = $result['content'];
 		$this->assertNotEmpty( $content, 'Content array should not be empty' );
-		$this->assertInstanceOf( ImageContent::class, $content[0] );
-		$this->assertSame( 'image', $content[0]->getType() );
-		$this->assertNotEmpty( $content[0]->getData() );
-		$this->assertNotEmpty( $content[0]->getMimeType() );
+		$this->assertSame( 'image', $content[0]['type'] );
+		$this->assertNotEmpty( $content[0]['data'] );
+		$this->assertNotEmpty( $content[0]['mimeType'] );
 	}
 
 	public function test_embedded_text_resource_result_is_converted_to_embedded_resource_content_block(): void {
@@ -132,18 +135,15 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$content = $result->getContent();
+		$content = $result['content'];
 		$this->assertNotEmpty( $content, 'Content array should not be empty' );
 
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
-		$this->assertSame( 'resource', $content[0]->getType() );
+		$this->assertSame( 'resource', $content[0]['type'] );
 
-		$resource = $content[0]->getResource();
-		$this->assertInstanceOf( TextResourceContents::class, $resource );
-		$this->assertSame( 'WordPress://local/tool-embedded-text', $resource->getUri() );
-		$this->assertSame( 'text/plain', $resource->getMimeType() );
-		$this->assertSame( 'hello from embedded resource', $resource->getText() );
+		$resource = $content[0]['resource'];
+		$this->assertSame( 'WordPress://local/tool-embedded-text', $resource['uri'] );
+		$this->assertSame( 'text/plain', $resource['mimeType'] );
+		$this->assertSame( 'hello from embedded resource', $resource['text'] );
 	}
 
 	public function test_embedded_blob_resource_result_is_converted_to_embedded_resource_content_block(): void {
@@ -155,27 +155,26 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$content = $result->getContent();
+		$content = $result['content'];
 		$this->assertNotEmpty( $content, 'Content array should not be empty' );
 
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
-		$this->assertSame( 'resource', $content[0]->getType() );
+		$this->assertSame( 'resource', $content[0]['type'] );
 
-		$resource = $content[0]->getResource();
-		$this->assertInstanceOf( BlobResourceContents::class, $resource );
-		$this->assertSame( 'WordPress://local/tool-embedded-blob', $resource->getUri() );
-		$this->assertSame( 'application/octet-stream', $resource->getMimeType() );
-		$this->assertSame( base64_encode( 'blob-bytes' ), $resource->getBlob() ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+		$resource = $content[0]['resource'];
+		$this->assertSame( 'WordPress://local/tool-embedded-blob', $resource['uri'] );
+		$this->assertSame( 'application/octet-stream', $resource['mimeType'] );
+		$this->assertSame( base64_encode( 'blob-bytes' ), $resource['blob'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 	}
 
 	public function test_pre_tool_call_filter_can_modify_arguments(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 
-		$received_args = null;
-		$filter        = static function ( array $args, string $tool_name ) use ( &$received_args ): array {
+		$received_args      = null;
+		$received_tool_name = null;
+		$filter             = static function ( array $args, string $tool_name ) use ( &$received_args, &$received_tool_name ): array {
 			$received_args              = $args;
+			$received_tool_name         = $tool_name;
 			$args['injected_by_filter'] = true;
 
 			return $args;
@@ -193,6 +192,7 @@ final class ToolsHandlerCallTest extends TestCase {
 
 		$this->assertIsArray( $received_args );
 		$this->assertSame( 'value', $received_args['key'] );
+		$this->assertSame( 'test-always-allowed', $received_tool_name );
 
 		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
 	}
@@ -215,12 +215,10 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		// Short-circuit returns CallToolResult with isError=true.
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$this->assertTrue( $result->getIsError() );
-		$content = $result->getContent();
+		$this->assertTrue( $result['isError'] );
+		$content = $result['content'];
 		$this->assertNotEmpty( $content );
-		$this->assertStringContainsString( 'Rate limit exceeded', $content[0]->getText() );
+		$this->assertStringContainsString( 'Rate limit exceeded', $content[0]['text'] );
 
 		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
 	}
@@ -247,9 +245,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		// The result filter modifies the raw result before DTO assembly.
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$structured = $result->getStructuredContent();
+		$structured = $result['structuredContent'];
 		$this->assertNotNull( $structured );
 		$this->assertTrue( $structured['filtered'] );
 
@@ -269,14 +265,12 @@ final class ToolsHandlerCallTest extends TestCase {
 			1
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$this->assertFalse( (bool) $result->getIsError() );
+		$this->assertFalse( $result['isError'] );
 
-		$content = $result->getContent();
+		$content = $result['content'];
 		$this->assertNotEmpty( $content );
-		$this->assertInstanceOf( TextContent::class, $content[0] );
 
-			$text = $content[0]->getText();
+			$text = $content[0]['text'];
 			$this->assertStringContainsString( 'mcp_adapter', $text );
 
 			$decoded = json_decode( $text, true );
@@ -287,7 +281,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			$this->assertSame( 'nested', $decoded['nested']['_meta']['keep'] );
 			$this->assertArrayHasKey( 'mcp_adapter', $decoded['nested']['_meta'] );
 
-			$structured = $result->getStructuredContent();
+			$structured = $result['structuredContent'];
 			$this->assertIsArray( $structured );
 			$this->assertArrayHasKey( '_meta', $structured );
 			$this->assertArrayHasKey( 'mcp_adapter', $structured['_meta'] );
@@ -307,11 +301,8 @@ final class ToolsHandlerCallTest extends TestCase {
 			1
 		);
 
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertSame( -32602, $error->getCode() );
-		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
+		$this->assertSame( -32602, $result['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $result['error']['message'] );
 	}
 
 	public function test_call_tool_with_integer_arguments_returns_invalid_params_error(): void {
@@ -327,11 +318,8 @@ final class ToolsHandlerCallTest extends TestCase {
 			1
 		);
 
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertSame( -32602, $error->getCode() );
-		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
+		$this->assertSame( -32602, $result['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $result['error']['message'] );
 	}
 
 	public function test_call_tool_with_null_arguments_succeeds(): void {
@@ -347,9 +335,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			1
 		);
 
-		// null arguments should default to empty array and succeed.
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$this->assertFalse( (bool) $result->getIsError() );
+		$this->assertFalse( $result['isError'] );
 	}
 
 	public function test_call_tool_with_missing_arguments_succeeds(): void {
@@ -364,9 +350,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			1
 		);
 
-		// Missing arguments should default to empty array and succeed.
-		$this->assertInstanceOf( CallToolResult::class, $result );
-		$this->assertFalse( (bool) $result->getIsError() );
+		$this->assertFalse( $result['isError'] );
 	}
 
 	/**
@@ -374,7 +358,7 @@ final class ToolsHandlerCallTest extends TestCase {
 	 *
 	 * @param array $shape The embedded resource result to substitute.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array
 	 */
 	private function call_tool_returning( array $shape ) {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
@@ -403,9 +387,9 @@ final class ToolsHandlerCallTest extends TestCase {
 	public function test_embedded_resource_nested_shape_preserves_meta_on_both_levels(): void {
 		$result = $this->call_tool_returning(
 			array(
-				'type'        => 'resource',
-				'_meta'       => array( 'block' => 'level' ),
-				'resource'    => array(
+				'type'     => 'resource',
+				'_meta'    => array( 'block' => 'level' ),
+				'resource' => array(
 					'uri'      => 'ui://example/app',
 					'mimeType' => 'text/html;profile=mcp-app',
 					'text'     => '<!doctype html>',
@@ -414,18 +398,14 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$content = $result->getContent();
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$content = $result['content'];
 
 		// The outer `_meta` belongs to the content block.
-		$this->assertSame( array( 'block' => 'level' ), $content[0]->get_meta() );
+		$this->assertSame( array( 'block' => 'level' ), $content[0]['_meta'] );
 
 		// The nested _meta belongs to the resource contents.
-		$resource = $content[0]->getResource();
-		$this->assertInstanceOf( TextResourceContents::class, $resource );
-		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $resource->get_meta() );
+		$resource = $content[0]['resource'];
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $resource['_meta'] );
 	}
 
 	public function test_embedded_resource_flat_shape_assigns_meta_to_the_resource_contents(): void {
@@ -439,16 +419,13 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$content = $result->getContent();
-		$this->assertInstanceOf( EmbeddedResource::class, $content[0] );
+		$content = $result['content'];
 
 		// Strip `type` and the flat shape is a ResourceContents literal, so its `_meta`
 		// describes the resource. The block carries none; the nested form is how a caller
 		// addresses the block level.
-		$this->assertNull( $content[0]->get_meta() );
-		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]->getResource()->get_meta() );
+		$this->assertArrayNotHasKey( '_meta', $content[0] );
+		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $content[0]['resource']['_meta'] );
 	}
 
 	public function test_image_result_carries_meta(): void {
@@ -461,9 +438,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$block = $result->getContent()[0]->toArray();
+		$block = $result['content'][0];
 		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $block['_meta'] );
 	}
 
@@ -480,9 +455,7 @@ final class ToolsHandlerCallTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( CallToolResult::class, $result );
-
-		$block = $result->getContent()[0]->toArray();
+		$block = $result['content'][0];
 		$this->assertArrayNotHasKey( '_meta', $block );
 		$this->assertNotEmpty( $block['data'] );
 	}

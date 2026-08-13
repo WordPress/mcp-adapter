@@ -29,6 +29,16 @@ class JsonRpcResponseBuilderTest extends TestCase {
 	}
 
 	/**
+	 * Test that an object-shaped result retains its identity.
+	 */
+	public function test_create_success_response_preserves_object_identity(): void {
+		$result   = (object) array( 'status' => 'ok' );
+		$response = JsonRpcResponseBuilder::create_success_response( 123, $result );
+
+		$this->assertSame( $result, $response['result'] );
+	}
+
+	/**
 	 * Test creating an error response.
 	 */
 	public function test_create_error_response(): void {
@@ -41,7 +51,7 @@ class JsonRpcResponseBuilderTest extends TestCase {
 
 		$this->assertEquals( '2.0', $response['jsonrpc'] );
 		$this->assertEquals( 456, $response['id'] );
-		$this->assertEquals( $error, $response['error'] );
+		$this->assertSame( $error, $response['error'] );
 	}
 
 	/**

@@ -77,7 +77,7 @@ class HttpRequestHandler {
 
 		// Method not allowed
 		return new \WP_REST_Response(
-			McpErrorFactory::invalid_request( null, 'Method not allowed' )->toArray(),
+			McpErrorFactory::invalid_request( null, 'Method not allowed' ),
 			405
 		);
 	}
@@ -95,7 +95,7 @@ class HttpRequestHandler {
 			// Validate request body
 			if ( null === $context->body ) {
 				return new \WP_REST_Response(
-					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' )->toArray(),
+					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' ),
 					400
 				);
 			}
@@ -112,7 +112,7 @@ class HttpRequestHandler {
 			);
 
 			return new \WP_REST_Response(
-				McpErrorFactory::internal_error( null, 'Handler error occurred' )->toArray(),
+				McpErrorFactory::internal_error( null, 'Handler error occurred' ),
 				500
 			);
 		}
@@ -165,7 +165,7 @@ class HttpRequestHandler {
 		// Validate JSON-RPC message format
 		$validation = McpErrorFactory::validate_jsonrpc_message( $message );
 		if ( true !== $validation ) {
-			return $validation->toArray();
+			return $validation;
 		}
 
 		// Handle notifications (no response required)
@@ -196,17 +196,39 @@ class HttpRequestHandler {
 		$method     = $message['method'];
 		$params     = $message['params'] ?? array();
 
-		// Validate session for all requests except initialize (router will handle initialize session creation)
+		$protocol_version = null;
 		if ( 'initialize' !== $method ) {
-			$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
-			if ( true !== $session_validation ) {
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
-			}
+			$body_protocol_version = $this->get_body_protocol_version( $params );
+			$is_modern_request     = 'server/discover' === $method
+				|| McpVersionNegotiator::MODERN_PROTOCOL_VERSION === $body_protocol_version
+				|| ( null !== $body_protocol_version && ! McpVersionNegotiator::is_supported( $body_protocol_version ) )
+				|| (
+					null === $context->session_id
+					&& null !== $context->protocol_version
+					&& McpVersionNegotiator::LEGACY_PROTOCOL_VERSION !== $context->protocol_version
+				);
 
-			// Validate MCP-Protocol-Version header for non-initialize requests.
-			$protocol_version_error = $this->validate_protocol_version_header( $context );
-			if ( null !== $protocol_version_error ) {
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
+			if ( $is_modern_request ) {
+				$header_error = $this->validate_modern_protocol_headers( $context, $body_protocol_version, $request_id );
+				if ( null !== $header_error ) {
+					return $header_error;
+				}
+				$protocol_version = $body_protocol_version ?? $context->protocol_version ?? McpVersionNegotiator::MODERN_PROTOCOL_VERSION;
+			} else {
+				$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
+				if ( true !== $session_validation ) {
+					return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
+				}
+
+				$session_version = HttpSessionValidator::get_protocol_version( $context, $this->transport_context->error_handler );
+				if ( ! is_string( $session_version ) ) {
+					return JsonRpcResponseBuilder::create_error_response( $request_id, $session_version['error'] ?? $session_version );
+				}
+				$protocol_version_error = $this->validate_legacy_protocol_header( $context, $session_version, $request_id );
+				if ( null !== $protocol_version_error ) {
+					return $protocol_version_error;
+				}
+				$protocol_version = $session_version;
 			}
 		}
 
@@ -216,7 +238,8 @@ class HttpRequestHandler {
 			$params,
 			$request_id,
 			$this->get_transport_name(),
-			$context
+			$context,
+			$protocol_version
 		);
 
 		// Handle session header if provided by router
@@ -243,35 +266,58 @@ class HttpRequestHandler {
 	}
 
 	/**
-	 * Validate the MCP-Protocol-Version header on non-initialize requests.
+	 * Read the modern body-level protocol selector.
 	 *
-	 * A missing header is accepted (returns null). A header containing a supported
-	 * version is also accepted. An unsupported version returns a JSON-RPC
-	 * invalid-request error payload.
-	 *
-	 * @since 0.5.0
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return array|null Null when the header is absent or valid, error payload otherwise.
+	 * @param array<string,mixed> $params Request params.
 	 */
-	private function validate_protocol_version_header( HttpRequestContext $context ): ?array {
+	private function get_body_protocol_version( array $params ): ?string {
+		$value = $params['_meta']['io.modelcontextprotocol/protocolVersion'] ?? null;
+
+		return is_string( $value ) ? $value : null;
+	}
+
+	/**
+	 * Enforce the 2026 body/header agreement.
+	 *
+	 * @param string|null    $body_version Protocol version declared in params metadata.
+	 * @param string|int|null $request_id Request ID.
+	 * @return array<string,mixed>|null
+	 */
+	private function validate_modern_protocol_headers( HttpRequestContext $context, ?string $body_version, $request_id ): ?array {
 		if ( null === $context->protocol_version ) {
+			return McpErrorFactory::header_mismatch( $request_id, 'MCP-Protocol-Version', $body_version, null );
+		}
+
+		if ( null !== $body_version && $context->protocol_version !== $body_version ) {
+			return McpErrorFactory::header_mismatch(
+				$request_id,
+				'MCP-Protocol-Version',
+				$body_version,
+				$context->protocol_version
+			);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Enforce the negotiated legacy session/header agreement.
+	 *
+	 * @param string          $session_version Negotiated session version.
+	 * @param string|int|null $request_id Request ID.
+	 * @return array<string,mixed>|null
+	 */
+	private function validate_legacy_protocol_header( HttpRequestContext $context, string $session_version, $request_id ): ?array {
+		if ( $context->protocol_version === $session_version ) {
 			return null;
 		}
 
-		if ( McpVersionNegotiator::is_supported( $context->protocol_version ) ) {
-			return null;
-		}
-
-		return McpErrorFactory::create_error(
-			McpErrorFactory::INVALID_REQUEST,
-			sprintf(
-				'Bad Request: Unsupported protocol version: %s (supported versions: %s)',
-				$context->protocol_version,
-				implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
-			)
-		)->toArray();
+		return McpErrorFactory::invalid_request(
+			$request_id,
+			null === $context->protocol_version
+				? 'Missing MCP-Protocol-Version header.'
+				: 'MCP-Protocol-Version header does not match the negotiated session version.'
+		);
 	}
 
 	/**

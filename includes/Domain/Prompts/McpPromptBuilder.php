@@ -11,8 +11,6 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -123,32 +121,15 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	abstract protected function configure(): void;
 
 	/**
-	 * Build and return the Prompt DTO instance.
+	 * Build and return revision-neutral prompt protocol data.
 	 *
-	 * This method converts the configured state into an MCP Prompt DTO.
-	 * Safe to call multiple times - always returns a fresh DTO based on
+	 * This method converts the configured state into MCP prompt data.
+	 * Safe to call multiple times - always returns a fresh array based on
 	 * the current (immutable after construction) state.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
+	 * @return array<string, mixed> The built prompt data.
 	 */
-	public function build(): PromptDto {
-		$argument_dtos = null;
-		if ( ! empty( $this->arguments ) ) {
-			$argument_dtos = array_map(
-				static function ( array $arg ): PromptArgument {
-					return PromptArgument::fromArray(
-						array(
-							'name'        => $arg['name'],
-							'title'       => $arg['title'] ?? null,
-							'description' => $arg['description'] ?? null,
-							'required'    => $arg['required'] ?? null,
-						)
-					);
-				},
-				$this->arguments
-			);
-		}
-
+	public function build(): array {
 		// Validate and prepare icons if set.
 		$valid_icons = null;
 		if ( ! empty( $this->icons ) ) {
@@ -158,12 +139,19 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			}
 		}
 
-		$prompt_data = array(
-			'name'        => $this->name,
-			'title'       => $this->title,
-			'description' => $this->description,
-			'arguments'   => $argument_dtos,
-		);
+		$prompt_data = array( 'name' => $this->name );
+
+		if ( null !== $this->title ) {
+			$prompt_data['title'] = $this->title;
+		}
+
+		if ( null !== $this->description ) {
+			$prompt_data['description'] = $this->description;
+		}
+
+		if ( ! empty( $this->arguments ) ) {
+			$prompt_data['arguments'] = $this->arguments;
+		}
 
 		$prompt_meta = McpValidator::normalize_meta( $this->meta );
 		if ( null !== $prompt_meta ) {
@@ -175,7 +163,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		return PromptDto::fromArray( $prompt_data );
+		return $prompt_data;
 	}
 
 	/**

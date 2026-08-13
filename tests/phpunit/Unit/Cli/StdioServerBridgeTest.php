@@ -11,6 +11,8 @@ namespace WP\MCP\Tests\Unit\Cli;
 
 use WP\MCP\Cli\StdioServerBridge;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -77,6 +79,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -318,6 +321,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_tools_list(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -341,12 +346,14 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_object_params(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		// Test with object params (should be converted to array)
+		// Object params are decoded to an array, then validated against the exact request schema.
 		$json_input = wp_json_encode(
 			array(
 				'jsonrpc' => '2.0',
@@ -360,10 +367,12 @@ final class StdioServerBridgeTest extends TestCase {
 
 		$this->assertIsString( $result );
 		$response = json_decode( $result, true );
-		$this->assertArrayHasKey( 'result', $response );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['error']['code'] );
 	}
 
 	public function test_handle_request_with_non_array_params(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -388,6 +397,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_exception_in_routing(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -425,6 +436,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_bridge_handles_request_ids(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -559,6 +572,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_string_id(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -605,6 +620,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_resources_list(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -628,6 +645,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_prompts_list(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -651,6 +670,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_unknown_method(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -674,6 +695,8 @@ final class StdioServerBridgeTest extends TestCase {
 	}
 
 	public function test_handle_request_with_missing_params(): void {
+		$this->initialize_legacy();
+
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
@@ -694,6 +717,156 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertIsString( $result );
 		$response = json_decode( $result, true );
 		// Should succeed since ping doesn't need params
+		$this->assertArrayHasKey( 'result', $response );
+	}
+
+	public function test_legacy_stdio_requires_initialize_before_requests(): void {
+		$response = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 80,
+				'method'  => 'tools/list',
+				'params'  => array(),
+			)
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $response['error']['code'] );
+		$this->assertStringContainsString( 'must initialize', $response['error']['message'] );
+	}
+
+	public function test_legacy_stdio_initialize_falls_back_then_enables_session_flow(): void {
+		$initialize = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 81,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2024-11-05',
+					'capabilities'    => array(),
+					'clientInfo'      => array(
+						'name'    => 'legacy-stdio-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+
+		$this->assertSame( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION, $initialize['result']['protocolVersion'] );
+
+		$ping = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 82,
+				'method'  => 'ping',
+			)
+		);
+		$this->assertSame( array(), $ping['result'] );
+	}
+
+	public function test_modern_stdio_discovery_is_stateless(): void {
+		$params = $this->modern_params();
+		$params['_meta']['io.modelcontextprotocol/clientInfo'] = array(
+			'name'    => 'modern-stdio-client',
+			'version' => '1.0.0',
+		);
+		$response = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 83,
+				'method'  => 'server/discover',
+				'params'  => $params,
+			)
+		);
+
+		$this->assertSame( 'complete', $response['result']['resultType'] );
+		$this->assertSame( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, $response['result']['supportedVersions'] );
+		$this->assertSame( 0, $response['result']['ttlMs'] );
+		$this->assertSame( 'private', $response['result']['cacheScope'] );
+	}
+
+	public function test_modern_stdio_request_does_not_require_initialize(): void {
+		$response = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 84,
+				'method'  => 'tools/list',
+				'params'  => $this->modern_params(),
+			)
+		);
+
+		$this->assertSame( 'complete', $response['result']['resultType'] );
+		$this->assertArrayHasKey( 'tools', $response['result'] );
+	}
+
+	public function test_modern_stdio_rejects_unadvertised_revision(): void {
+		$params = $this->modern_params();
+		$params['_meta']['io.modelcontextprotocol/protocolVersion'] = '2099-01-01';
+		$response = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 85,
+				'method'  => 'tools/list',
+				'params'  => $params,
+			)
+		);
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $response['error']['code'] );
+		$this->assertSame( '2099-01-01', $response['error']['data']['requested'] );
+	}
+
+	public function test_modern_stdio_does_not_expose_legacy_ping(): void {
+		$response = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 86,
+				'method'  => 'ping',
+				'params'  => $this->modern_params(),
+			)
+		);
+
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $response['error']['code'] );
+	}
+
+	/** @param array<string, mixed> $request */
+	private function handle( array $request ): array {
+		$reflection = new \ReflectionClass( $this->bridge );
+		$method     = $reflection->getMethod( 'handle_request' );
+		$method->setAccessible( true );
+		$response = $method->invoke( $this->bridge, wp_json_encode( $request ) );
+		$decoded  = json_decode( $response, true );
+
+		$this->assertIsArray( $decoded );
+
+		return $decoded;
+	}
+
+	/** @return array<string, mixed> */
+	private function modern_params(): array {
+		return array(
+			'_meta' => array(
+				'io.modelcontextprotocol/protocolVersion' => McpVersionNegotiator::MODERN_PROTOCOL_VERSION,
+				'io.modelcontextprotocol/clientCapabilities' => array(),
+			),
+		);
+	}
+
+	private function initialize_legacy(): void {
+		$response = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 'test-initialize',
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => McpVersionNegotiator::LEGACY_PROTOCOL_VERSION,
+					'capabilities'    => array(),
+					'clientInfo'      => array(
+						'name'    => 'legacy-test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+
 		$this->assertArrayHasKey( 'result', $response );
 	}
 }

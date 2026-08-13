@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Resources;
 
+use WP\MCP\Domain\Continuation\McpContinuationContext;
+use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 final class McpResourceTest extends TestCase {
 
 
-	public function test_from_ability_builds_clean_resource_dto_and_adapter_meta(): void {
+	public function test_from_ability_builds_clean_resource_data_and_adapter_meta(): void {
 		$ability = wp_get_ability( 'test/resource-new-meta' );
 		$this->assertNotNull( $ability, 'Ability test/resource-new-meta should be registered' );
 
@@ -20,10 +21,8 @@ final class McpResourceTest extends TestCase {
 		$this->assertNotWPError( $mcp_resource );
 		$this->assertInstanceOf( McpResource::class, $mcp_resource );
 
-		$dto = $mcp_resource->get_protocol_dto();
-		$this->assertInstanceOf( ResourceDto::class, $dto );
-
-		$arr = $dto->toArray();
+		$arr = $mcp_resource->get_protocol_data();
+		$this->assertIsArray( $arr );
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayHasKey( 'custom_field', $arr['_meta'] );
 		$this->assertSame( 'custom_value', $arr['_meta']['custom_field'] );
@@ -78,8 +77,7 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$dto = $mcp_resource->get_protocol_dto();
-		$arr = $dto->toArray();
+		$arr = $mcp_resource->get_protocol_data();
 
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayHasKey( 'foo', $arr['_meta'] );
@@ -99,12 +97,11 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$dto = $resource->get_protocol_dto();
+		$data = $resource->get_protocol_data();
 
-		$this->assertInstanceOf( ResourceDto::class, $dto );
-		$this->assertSame( 'WordPress://local/minimal', $dto->getUri() );
+		$this->assertSame( 'WordPress://local/minimal', $data['uri'] );
 		// Name defaults to URI when not provided
-		$this->assertSame( 'WordPress://local/minimal', $dto->getName() );
+		$this->assertSame( 'WordPress://local/minimal', $data['name'] );
 	}
 
 	public function test_fromArray_with_all_options(): void {
@@ -126,15 +123,14 @@ final class McpResourceTest extends TestCase {
 			)
 		);
 
-		$dto  = $resource->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $resource->get_protocol_data();
 
-		$this->assertSame( 'WordPress://local/full', $dto->getUri() );
-		$this->assertSame( 'full-resource', $dto->getName() );
-		$this->assertSame( 'Full Resource', $dto->getTitle() );
-		$this->assertSame( 'A comprehensive test resource', $dto->getDescription() );
-		$this->assertSame( 'text/plain', $dto->getMimeType() );
-		$this->assertSame( 1024, $dto->getSize() );
+		$this->assertSame( 'WordPress://local/full', $data['uri'] );
+		$this->assertSame( 'full-resource', $data['name'] );
+		$this->assertSame( 'Full Resource', $data['title'] );
+		$this->assertSame( 'A comprehensive test resource', $data['description'] );
+		$this->assertSame( 'text/plain', $data['mimeType'] );
+		$this->assertSame( 1024, $data['size'] );
 		$this->assertArrayHasKey( 'annotations', $data );
 		$this->assertArrayHasKey( '_meta', $data );
 		$this->assertSame( '1.0', $data['_meta']['version'] );
@@ -185,6 +181,23 @@ final class McpResourceTest extends TestCase {
 		$result = $resource->execute( array( 'name' => 'Claude' ) );
 
 		$this->assertSame( 'Hello, Claude', $result );
+	}
+
+	public function test_execute_passes_continuation_to_opt_in_handler_and_preserves_result(): void {
+		$context  = new McpContinuationContext( array(), 'resource-state' );
+		$resource = McpResource::fromArray(
+			array(
+				'uri'     => 'WordPress://local/continuation',
+				'handler' => static function ( array $arguments, ?McpContinuationContext $continuation ): McpExecutionResult {
+					return McpExecutionResult::input_required( array(), $continuation ? $continuation->get_request_state() : null );
+				},
+			)
+		);
+
+		$result = $resource->execute( array(), $context );
+
+		$this->assertInstanceOf( McpExecutionResult::class, $result );
+		$this->assertSame( 'resource-state', $result->get_request_state() );
 	}
 
 	public function test_fromArray_checks_permission(): void {
@@ -255,22 +268,24 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes Annotations::fromArray() to throw.
-		// The 'priority' field expects a float, not a string.
+	public function test_fromArray_deep_validation_rejects_invalid_annotations(): void {
+		add_filter( 'mcp_adapter_validation_enabled', '__return_true' );
+
 		$result = McpResource::fromArray(
 			array(
 				'uri'         => 'WordPress://local/invalid-annotations',
 				'handler'     => static fn() => 'content',
 				'annotations' => array(
-					'priority' => 'not-a-float', // This will cause Annotations::fromArray() to throw.
+					'priority' => 'not-a-float',
 				),
 			)
 		);
 
 		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'mcp_resource_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected float', $result->get_error_message() );
+		$this->assertSame( 'mcp_resource_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'priority must be a number', $result->get_error_message() );
+
+		remove_filter( 'mcp_adapter_validation_enabled', '__return_true' );
 	}
 
 	// =========================================================================

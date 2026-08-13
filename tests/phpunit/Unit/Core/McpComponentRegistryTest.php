@@ -15,9 +15,6 @@ use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 // Test prompt builder for registry testing
 // phpcs:ignore Generic.Files.OneObjectStructurePerFile.MultipleFound
@@ -109,8 +106,8 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-always-allowed', $tools );
 
 		$tool = $tools['test-always-allowed'];
-		$this->assertInstanceOf( ToolDto::class, $tool );
-		$this->assertEquals( 'test-always-allowed', $tool->getName() );
+		$this->assertIsArray( $tool );
+		$this->assertSame( 'test-always-allowed', $tool['name'] );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -195,7 +192,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Get the first resource
 		$resource = array_values( $resources )[0];
-		$this->assertInstanceOf( ResourceDto::class, $resource );
+		$this->assertIsArray( $resource );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -250,7 +247,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		// Get the first prompt
 		$prompt = array_values( $prompts )[0];
-		$this->assertInstanceOf( PromptDto::class, $prompt );
+		$this->assertIsArray( $prompt );
 
 		// Verify observability event was recorded
 		$events = DummyObservabilityHandler::$events;
@@ -279,7 +276,7 @@ final class McpComponentRegistryTest extends TestCase {
 		$this->assertArrayHasKey( 'test-registry-prompt', $prompts );
 
 		$prompt = $prompts['test-registry-prompt'];
-		$this->assertInstanceOf( PromptDto::class, $prompt );
+		$this->assertIsArray( $prompt );
 		$this->assertNotNull( $this->registry->get_prompt_builder( 'test-registry-prompt' ) );
 
 		// Verify observability event was recorded
@@ -332,7 +329,7 @@ final class McpComponentRegistryTest extends TestCase {
 
 		$mcp_tool = $this->registry->get_mcp_tool( 'test-always-allowed' );
 		$this->assertInstanceOf( \WP\MCP\Domain\Tools\McpTool::class, $mcp_tool );
-		$this->assertEquals( 'test-always-allowed', $mcp_tool->get_protocol_dto()->getName() );
+		$this->assertSame( 'test-always-allowed', $mcp_tool->get_protocol_data()['name'] );
 
 		$nonexistent = $this->registry->get_mcp_tool( 'nonexistent' );
 		$this->assertNull( $nonexistent );
@@ -545,8 +542,6 @@ final class McpComponentRegistryTest extends TestCase {
 		);
 		$this->assertNotEmpty( $failure_event );
 	}
-
-	// Note: DTO schema validation is handled by the php-mcp-schema DTO constructors.
 
 	public function test_register_resources_skips_non_strings(): void {
 		$this->registry->register_resources( array( 123, null, array(), 'test/resource' ) );

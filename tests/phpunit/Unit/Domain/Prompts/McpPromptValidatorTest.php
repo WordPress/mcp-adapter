@@ -7,7 +7,6 @@ namespace WP\MCP\Tests\Unit\Domain\Prompts;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Prompts\McpPromptValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * Tests for McpPromptValidator class.
@@ -17,48 +16,42 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 final class McpPromptValidatorTest extends TestCase {
 
 	// =========================================================================
-	// validate_prompt_dto Tests
+	// validate_prompt_data Tests
 	// =========================================================================
 
-	public function test_validate_prompt_dto_with_valid_prompt(): void {
-		$prompt = PromptDto::fromArray(
-			array(
-				'name' => 'test-prompt',
-			)
+	public function test_validate_prompt_data_with_valid_prompt(): void {
+		$prompt = array(
+			'name' => 'test-prompt',
 		);
 
-		$result = McpPromptValidator::validate_prompt_dto( $prompt );
+		$result = McpPromptValidator::validate_prompt_data( $prompt );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_prompt_dto_rejects_invalid_name(): void {
-		$prompt = PromptDto::fromArray(
-			array(
-				'name' => 'invalid/name',
-			)
+	public function test_validate_prompt_data_rejects_invalid_name(): void {
+		$prompt = array(
+			'name' => 'invalid/name',
 		);
 
-		$result = McpPromptValidator::validate_prompt_dto( $prompt );
+		$result = McpPromptValidator::validate_prompt_data( $prompt );
 		$this->assertWPError( $result );
 		$this->assertSame( 'mcp_prompt_validation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'Prompt name', $result->get_error_message() );
 	}
 
-	public function test_validate_prompt_dto_rejects_invalid_icons(): void {
-		$prompt = PromptDto::fromArray(
-			array(
-				'name'  => 'test-prompt',
-				'icons' => array(
-					array(
-						'src'      => 'https://example.com/icon.png',
-						'mimeType' => 'image/png',
-					),
-					array( 'src' => 'invalid-url' ), // Invalid src
+	public function test_validate_prompt_data_rejects_invalid_icons(): void {
+		$prompt = array(
+			'name'  => 'test-prompt',
+			'icons' => array(
+				array(
+					'src'      => 'https://example.com/icon.png',
+					'mimeType' => 'image/png',
 				),
-			)
+				array( 'src' => 'invalid-url' ), // Invalid src
+			),
 		);
 
-		$result = McpPromptValidator::validate_prompt_dto( $prompt );
+		$result = McpPromptValidator::validate_prompt_data( $prompt );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'Icon at index 1', $result->get_error_message() );
 	}
@@ -714,11 +707,11 @@ final class McpPromptValidatorTest extends TestCase {
 
 	public function test_validate_prompt_instance_with_invalid_prompt(): void {
 		// We cannot create an McpPrompt with invalid name via fromArray
-		// because the Prompt DTO allows any name. Instead, let's test
-		// validate_prompt_dto directly with an invalid name
-		$prompt_dto = PromptDto::fromArray( array( 'name' => 'invalid/name' ) );
+		// because the protocol data may contain any name. Instead, let's test
+		// validate_prompt_data directly with an invalid name
+		$prompt_data = array( 'name' => 'invalid/name' );
 
-		$result = McpPromptValidator::validate_prompt_dto( $prompt_dto );
+		$result = McpPromptValidator::validate_prompt_data( $prompt_data );
 		$this->assertWPError( $result );
 		$this->assertSame( 'mcp_prompt_validation_failed', $result->get_error_code() );
 	}

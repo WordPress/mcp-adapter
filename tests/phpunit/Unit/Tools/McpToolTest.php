@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Unit\Tools;
 
+use WP\MCP\Domain\Continuation\McpContinuationContext;
+use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 final class McpToolTest extends TestCase {
@@ -46,10 +47,8 @@ final class McpToolTest extends TestCase {
 		$mcp_tool = McpTool::fromAbility( $ability );
 		$this->assertNotWPError( $mcp_tool );
 
-		$dto = $mcp_tool->get_protocol_dto();
-		$this->assertInstanceOf( ToolDto::class, $dto );
-
-		$data = $dto->toArray();
+		$data = $mcp_tool->get_protocol_data();
+		$this->assertIsArray( $data );
 
 		// User-provided _meta is preserved.
 		$this->assertArrayHasKey( '_meta', $data );
@@ -178,15 +177,14 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto = $tool->get_protocol_dto();
+		$data = $tool->get_protocol_data();
 
-		$this->assertInstanceOf( ToolDto::class, $dto );
-		$this->assertSame( 'minimal-tool', $dto->getName() );
-		$this->assertNull( $dto->getTitle() );
-		$this->assertNull( $dto->getDescription() );
+		$this->assertSame( 'minimal-tool', $data['name'] );
+		$this->assertArrayNotHasKey( 'title', $data );
+		$this->assertArrayNotHasKey( 'description', $data );
 
 		// Input schema defaults to object type
-		$input_schema = $dto->getInputSchema()->toArray();
+		$input_schema = $data['inputSchema'];
 		$this->assertSame( 'object', $input_schema['type'] );
 	}
 
@@ -221,12 +219,11 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $tool->get_protocol_data();
 
-		$this->assertSame( 'full-featured-tool', $dto->getName() );
-		$this->assertSame( 'Full Featured Tool', $dto->getTitle() );
-		$this->assertSame( 'A comprehensive test tool', $dto->getDescription() );
+		$this->assertSame( 'full-featured-tool', $data['name'] );
+		$this->assertSame( 'Full Featured Tool', $data['title'] );
+		$this->assertSame( 'A comprehensive test tool', $data['description'] );
 
 		// Check input schema
 		$this->assertArrayHasKey( 'inputSchema', $data );
@@ -259,8 +256,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $tool->get_protocol_data();
 
 		$this->assertArrayHasKey( 'annotations', $data );
 		$this->assertTrue( $data['annotations']['readOnlyHint'] );
@@ -280,8 +276,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $tool->get_protocol_data();
 
 		$this->assertArrayHasKey( 'annotations', $data );
 		$this->assertTrue( $data['annotations']['destructiveHint'] );
@@ -303,8 +298,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $tool->get_protocol_data();
 
 		$this->assertSame( 'Custom Annotation Title', $data['annotations']['title'] );
 		$this->assertFalse( $data['annotations']['readOnlyHint'] );
@@ -408,12 +402,11 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $tool->get_protocol_data();
 
-		$this->assertSame( 'array-tool', $dto->getName() );
-		$this->assertSame( 'Array Tool', $dto->getTitle() );
-		$this->assertSame( 'Created from array', $dto->getDescription() );
+		$this->assertSame( 'array-tool', $data['name'] );
+		$this->assertSame( 'Array Tool', $data['title'] );
+		$this->assertSame( 'Created from array', $data['description'] );
 		$this->assertTrue( $data['annotations']['readOnlyHint'] );
 
 		// Execute
@@ -452,8 +445,7 @@ final class McpToolTest extends TestCase {
 			)
 		);
 
-		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $tool->get_protocol_data();
 
 		$this->assertArrayHasKey( '_meta', $data );
 		$this->assertSame( '1.0.0', $data['_meta']['version'] );
@@ -498,22 +490,24 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes ToolAnnotations::fromArray() to throw.
-		// The 'readOnlyHint' field expects a bool, not a string.
+	public function test_fromArray_deep_validation_rejects_invalid_annotations(): void {
+		add_filter( 'mcp_adapter_validation_enabled', '__return_true' );
+
 		$result = McpTool::fromArray(
 			array(
 				'name'        => 'invalid-annotations-tool',
 				'handler'     => static fn( $args ) => array( 'ok' => true ),
 				'annotations' => array(
-					'readOnlyHint' => 'not-a-boolean', // This will cause ToolAnnotations::fromArray() to throw.
+					'readOnlyHint' => 'not-a-boolean',
 				),
 			)
 		);
 
 		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'mcp_tool_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected bool', $result->get_error_message() );
+		$this->assertSame( 'mcp_tool_validation_failed', $result->get_error_code() );
+		$this->assertStringContainsString( 'must be a boolean', $result->get_error_message() );
+
+		remove_filter( 'mcp_adapter_validation_enabled', '__return_true' );
 	}
 
 	// =========================================================================
@@ -553,6 +547,40 @@ final class McpToolTest extends TestCase {
 				'items'  => array( 1, 2, 3 ),
 			),
 			$result
+		);
+	}
+
+	public function test_execute_passes_continuation_only_to_opt_in_handler_and_preserves_result(): void {
+		$context = new McpContinuationContext( array( 'answer' => 'yes' ), 'state-1' );
+		$tool    = McpTool::fromArray(
+			array(
+				'name'    => 'continuation-tool',
+				'handler' => static function ( array $arguments, ?McpContinuationContext $continuation ): McpExecutionResult {
+					return McpExecutionResult::input_required(
+						array( 'next' => array( 'method' => 'elicitation/create' ) ),
+						$continuation ? $continuation->get_request_state() : null
+					);
+				},
+			)
+		);
+
+		$result = $tool->execute( array(), $context );
+
+		$this->assertInstanceOf( McpExecutionResult::class, $result );
+		$this->assertSame( 'state-1', $result->get_request_state() );
+	}
+
+	public function test_execute_keeps_one_argument_handler_compatible_when_continuation_is_present(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'    => 'one-argument-tool',
+				'handler' => static fn( array $arguments ): array => $arguments,
+			)
+		);
+
+		$this->assertSame(
+			array( 'value' => 'ok' ),
+			$tool->execute( array( 'value' => 'ok' ), new McpContinuationContext() )
 		);
 	}
 

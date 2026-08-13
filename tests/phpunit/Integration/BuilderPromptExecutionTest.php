@@ -7,9 +7,6 @@ namespace WP\MCP\Tests\Integration;
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
-use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 
 // Test prompt that requires admin permissions
 class AdminOnlyPrompt extends McpPromptBuilder {
@@ -76,16 +73,15 @@ final class BuilderPromptExecutionTest extends TestCase {
 			)
 		);
 
-		// Builder prompts return GetPromptResult DTO.
 		// The arbitrary result is wrapped as JSON in a text message.
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$messages = $result['messages'];
 		$this->assertNotEmpty( $messages );
-		$this->assertContainsOnlyInstancesOf( PromptMessage::class, $messages );
+		$this->assertContainsOnly( 'array', $messages );
 
 		// The wrapped content contains the original data as JSON.
-		$content = $messages[0]->getContent();
-		$text    = $content->toArray()['text'] ?? '';
+		$content = $messages[0]['content'];
+		$text    = $content['text'] ?? '';
 		$this->assertStringContainsString( 'Hello from open prompt!', $text );
 	}
 
@@ -102,11 +98,9 @@ final class BuilderPromptExecutionTest extends TestCase {
 			)
 		);
 
-		// Should return permission denied error as JSONRPCErrorResponse.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertStringContainsString( 'Access denied', $error->getMessage() );
+		$this->assertIsArray( $result );
+		$this->assertSame( -32008, $result['error']['code'] );
+		$this->assertStringContainsString( 'Access denied', $result['error']['message'] );
 	}
 
 	public function test_mixed_ability_and_builder_prompts(): void {

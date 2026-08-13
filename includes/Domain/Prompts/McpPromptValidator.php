@@ -11,7 +11,6 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP_Error;
 
 /**
@@ -49,47 +48,6 @@ class McpPromptValidator {
 	}
 
 	/**
-	 * Validate a Prompt DTO against the MCP schema.
-	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO to validate.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_prompt_dto( PromptDto $prompt ) {
-		$errors = array();
-
-		// Validate name.
-		if ( ! McpValidator::validate_name( $prompt->getName() ) ) {
-			$errors[] = __( 'Prompt name must be 1-128 characters and contain only [A-Za-z0-9_.-]', 'mcp-adapter' );
-		}
-
-		// Validate icons if present.
-		$icons = $prompt->getIcons();
-		if ( ! empty( $icons ) ) {
-			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
-			$icons_result = McpValidator::validate_icons_array( $icons_array );
-			$icons_errors = self::format_icon_validation_errors( $icons_result );
-			$errors       = array_merge( $errors, $icons_errors );
-		}
-
-		// Validate annotations if present (shared annotations).
-		// Currently Prompt DTO doesn't have annotations field in spec, but if it did, we'd validate here.
-		// BaseMetadata has title and name, handled separately.
-
-		if ( ! empty( $errors ) ) {
-			return new WP_Error(
-				'mcp_prompt_validation_failed',
-				sprintf(
-				/* translators: %s: list of validation errors */
-					__( 'Prompt validation failed: %s', 'mcp-adapter' ),
-					implode( '; ', $errors )
-				)
-			);
-		}
-
-		return true;
-	}
-
 	/**
 	 * Validate an McpPrompt instance against the MCP schema.
 	 *
@@ -98,7 +56,7 @@ class McpPromptValidator {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	public static function validate_prompt_instance( McpPrompt $prompt ) {
-		return self::validate_prompt_dto( $prompt->get_protocol_dto() );
+		return self::validate_prompt_data( $prompt->get_protocol_data() );
 	}
 
 
@@ -132,6 +90,15 @@ class McpPromptValidator {
 			$arguments_errors = self::get_arguments_validation_errors( $prompt_data['arguments'] );
 			if ( ! empty( $arguments_errors ) ) {
 				$errors = array_merge( $errors, $arguments_errors );
+			}
+		}
+
+		if ( isset( $prompt_data['icons'] ) ) {
+			if ( ! is_array( $prompt_data['icons'] ) ) {
+				$errors[] = __( 'Prompt icons must be an array if provided', 'mcp-adapter' );
+			} else {
+				$icons_result = McpValidator::validate_icons_array( $prompt_data['icons'], false );
+				$errors       = array_merge( $errors, self::format_icon_validation_errors( $icons_result ) );
 			}
 		}
 

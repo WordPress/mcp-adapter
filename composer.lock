@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bfa32ba59be79ad50b3c83430daa6a4d",
+    "content-hash": "d0b20959c7c9d3e9e1393ec1a1370917",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -72,16 +72,16 @@
         },
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "v0.1.3",
+            "version": "dev-try/descriptor-backed-generic-record-model",
             "source": {
                 "type": "git",
                 "url": "https://github.com/WordPress/php-mcp-schema",
-                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2"
+                "reference": "78514f25a769903fea6858f5db1a1bb01a23e1cf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
-                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/78514f25a769903fea6858f5db1a1bb01a23e1cf",
+                "reference": "78514f25a769903fea6858f5db1a1bb01a23e1cf",
                 "shasum": ""
             },
             "require": {
@@ -106,16 +106,16 @@
                     "homepage": "https://wordpress.org"
                 }
             ],
-            "description": "PHP DTOs for the Model Context Protocol (MCP) specification",
+            "description": "Descriptor-backed PHP records for explicit Model Context Protocol revisions",
             "homepage": "https://github.com/WordPress/php-mcp-schema",
             "keywords": [
-                "dto",
                 "mcp",
                 "model-context-protocol",
                 "php",
+                "record",
                 "schema"
             ],
-            "time": "2026-08-10T09:12:14+00:00"
+            "time": "2026-08-13T07:53:16+00:00"
         }
     ],
     "packages-dev": [
@@ -3250,7 +3250,9 @@
     ],
     "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {},
+    "stability-flags": {
+        "wordpress/php-mcp-schema": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
