@@ -4,6 +4,7 @@
 # Directories to exclude from `composer require`.
 /.github        export-ignore
 /.wordpress-org export-ignore
+/scripts        export-ignore
 /tests          export-ignore
 
 # Don't include the dotfiles for distribution.

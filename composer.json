@@ -44,7 +44,7 @@
 			"WP\\MCP\\": "includes/"
 		},
 		"exclude-from-classmap": [
-			"/tests/"
+			"tests/phpunit/"
 		]
 	},
 	"autoload-dev": {
