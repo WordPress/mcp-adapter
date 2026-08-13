@@ -60,8 +60,10 @@ jobs:
           CI: true
 
       - name: Create Artifact
-        run: |
-          npm run plugin-zip
+        run: npm run plugin-zip
+
+      - name: Verify artifact
+        run: npm run verify:plugin-zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

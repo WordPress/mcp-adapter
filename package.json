@@ -25,6 +25,7 @@
 		"lint:php:fix": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script format",
 		"lint:php:stan": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script phpstan",
 		"plugin-zip": "wp-scripts plugin-zip",
+		"verify:plugin-zip": "scripts/verify-plugin-zip.sh mcp-adapter.zip",
 		"test:php": "npm run wp-env:test -- run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
 		"wp-env": "wp-env",
 		"wp-env:cli": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/",
