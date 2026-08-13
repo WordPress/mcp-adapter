@@ -11,6 +11,8 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -121,15 +123,19 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	abstract protected function configure(): void;
 
 	/**
-	 * Build and return revision-neutral prompt protocol data.
+	 * Build and return the descriptor-backed Prompt compatibility facade.
 	 *
 	 * This method converts the configured state into MCP prompt data.
 	 * Safe to call multiple times - always returns a fresh array based on
 	 * the current (immutable after construction) state.
 	 *
-	 * @return array<string, mixed> The built prompt data.
+	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt facade.
 	 */
-	public function build(): array {
+	public function build(): Prompt {
+		$arguments = array_map(
+			static fn( array $argument ): PromptArgument => PromptArgument::fromArray( $argument ),
+			$this->arguments
+		);
 		// Validate and prepare icons if set.
 		$valid_icons = null;
 		if ( ! empty( $this->icons ) ) {
@@ -150,7 +156,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 		}
 
 		if ( ! empty( $this->arguments ) ) {
-			$prompt_data['arguments'] = $this->arguments;
+			$prompt_data['arguments'] = $arguments;
 		}
 
 		$prompt_meta = McpValidator::normalize_meta( $this->meta );
@@ -163,7 +169,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		return $prompt_data;
+		return Prompt::fromArray( $prompt_data );
 	}
 
 	/**

@@ -10,6 +10,7 @@ use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 use WP_Error;
 
 final class PromptsHandlerTest extends TestCase {
@@ -41,6 +42,24 @@ final class PromptsHandlerTest extends TestCase {
 		$this->assertSame( $expected, $result );
 	}
 
+	public function test_completed_execution_result_uses_existing_prompt_normalization(): void {
+		$prompt = McpPrompt::fromArray(
+			array(
+				'name'       => 'completed-prompt',
+				'handler'    => static fn(): McpExecutionResult => McpExecutionResult::complete( array( 'text' => 'done' ) ),
+				'permission' => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpPrompt::class, $prompt );
+
+		$result = ( new PromptsHandler( $this->makeServer( array(), array(), array( $prompt ) ) ) )->get_prompt(
+			array( 'name' => 'completed-prompt' ),
+			1
+		);
+
+		$this->assertSame( 'done', $result['messages'][0]['content']['text'] );
+	}
+
 	public function test_list_prompts_returns_registered_prompts(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
@@ -56,7 +75,10 @@ final class PromptsHandlerTest extends TestCase {
 		$server  = $this->makeServer( array(), array(), array( 'test/always-allowed' ) );
 		$handler = new PromptsHandler( $server );
 
-		$filter = static function (): array {
+		$filter = function ( array $prompts ): array {
+			$this->assertInstanceOf( Prompt::class, $prompts[0] );
+			$this->assertSame( 'test-always-allowed', $prompts[0]->getName() );
+
 			return array();
 		};
 		add_filter( 'mcp_adapter_prompts_list', $filter );

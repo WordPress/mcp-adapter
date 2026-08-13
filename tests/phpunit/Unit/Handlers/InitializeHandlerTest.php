@@ -10,6 +10,7 @@ use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
 
 final class InitializeHandlerTest extends TestCase {
 
@@ -233,10 +234,12 @@ final class InitializeHandlerTest extends TestCase {
 			DummyObservabilityHandler::class,
 		);
 
-		$filter = static function ( array $result ): array {
-			$result['instructions'] = 'Custom instructions';
+		$filter = function ( InitializeResult $result ): InitializeResult {
+			$this->assertSame( 'Original instructions', $result->getInstructions() );
+			$data                 = $result->toArray();
+			$data['instructions'] = 'Custom instructions';
 
-			return $result;
+			return InitializeResult::fromArray( $data );
 		};
 		add_filter( 'mcp_adapter_initialize_response', $filter );
 

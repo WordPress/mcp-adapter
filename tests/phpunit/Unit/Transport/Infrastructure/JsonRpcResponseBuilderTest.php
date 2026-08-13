@@ -70,6 +70,7 @@ class JsonRpcResponseBuilderTest extends TestCase {
 			),
 		);
 		$this->assertTrue( JsonRpcResponseBuilder::is_batch_request( $batch_body ) );
+		$this->assertFalse( JsonRpcResponseBuilder::is_batch_request( array() ) );
 
 		// Test single request
 		$single_body = array(

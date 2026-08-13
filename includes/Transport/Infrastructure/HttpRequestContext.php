@@ -39,9 +39,12 @@ class HttpRequestContext {
 	/**
 	 * The JSON-decoded body of the request.
 	 *
-	 * @var array|null
+	 * @var mixed
 	 */
-	public ?array $body;
+	public $body;
+
+	/** Whether the POST body was valid JSON. */
+	public bool $body_is_valid_json = true;
 
 	/**
 	 * The MCP-Protocol-Version header from the request.
@@ -70,6 +73,11 @@ class HttpRequestContext {
 		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
-		$this->body             = 'POST' === $this->method ? $request->get_json_params() : null;
+		$this->body             = null;
+		if ( 'POST' !== $this->method ) {
+			return;
+		}
+
+		$this->body = JsonRpcRequestDecoder::decode( (string) $request->get_body(), $this->body_is_valid_json );
 	}
 }

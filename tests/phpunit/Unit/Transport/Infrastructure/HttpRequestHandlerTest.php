@@ -91,6 +91,15 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertEquals( McpErrorFactory::PARSE_ERROR, $data['error']['code'] );
 	}
 
+	public function test_handle_request_post_empty_batch_is_invalid_request(): void {
+		$request  = $this->createPostRequest( array() );
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $response->get_data()['error']['code'] );
+	}
+
 	public function test_handle_request_post_initialize(): void {
 		$request = $this->createPostRequest(
 			array(
@@ -511,7 +520,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
 		$data     = $response->get_data();
 
-		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 400, $response->get_status() );
 		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
 		$this->assertSame( 75, $data['id'] );
 	}
@@ -584,6 +593,89 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
+	public function test_raw_legacy_initialize_rejects_capabilities_list(): void {
+		$response = $this->handleRawRequest(
+			'{"jsonrpc":"2.0","id":80,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":[],"clientInfo":{"name":"raw-client","version":"1.0.0"}}}'
+		);
+		$data     = $response->get_data();
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+	}
+
+	public function test_raw_modern_request_accepts_client_capabilities_object(): void {
+		$response = $this->handleRawRequest(
+			'{"jsonrpc":"2.0","id":81,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}',
+			'2026-07-28'
+		);
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertArrayHasKey( 'result', $data );
+	}
+
+	public function test_raw_modern_request_rejects_client_capabilities_list(): void {
+		$response = $this->handleRawRequest(
+			'{"jsonrpc":"2.0","id":82,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":[]}}}',
+			'2026-07-28'
+		);
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+	}
+
+	public function test_raw_modern_tool_arguments_list_is_not_coerced_to_object(): void {
+		$response = $this->handleRawRequest(
+			'{"jsonrpc":"2.0","id":83,"method":"tools/call","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test-always-allowed","arguments":[]}}',
+			'2026-07-28'
+		);
+		$data     = $response->get_data();
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+	}
+
+	public function test_raw_modern_prompt_arguments_list_is_not_coerced_to_object(): void {
+		$response = $this->handleRawRequest(
+			'{"jsonrpc":"2.0","id":84,"method":"prompts/get","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test/prompt","arguments":[]}}',
+			'2026-07-28'
+		);
+		$data     = $response->get_data();
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+	}
+
+	public function test_raw_modern_continuation_response_list_is_not_coerced_to_map(): void {
+		$response = $this->handleRawRequest(
+			'{"jsonrpc":"2.0","id":85,"method":"tools/call","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test-always-allowed","arguments":{},"inputResponses":[],"requestState":"opaque"}}',
+			'2026-07-28'
+		);
+		$data     = $response->get_data();
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+	}
+
+	public function test_modern_http_response_preserves_numeric_key_objects(): void {
+		$filter = static fn() => array(
+			'numeric' => (object) array( 0 => 'zero' ),
+		);
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$response = $this->handleRawRequest(
+				'{"jsonrpc":"2.0","id":86,"method":"tools/call","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test-always-allowed","arguments":{}}}',
+				'2026-07-28'
+			);
+			$data     = $response->get_data();
+			$result   = (array) $data['result'];
+
+			$this->assertSame( 200, $response->get_status() );
+			$this->assertInstanceOf( \stdClass::class, $result['structuredContent']['numeric'] );
+			$this->assertStringContainsString( '"numeric":{"0":"zero"}', wp_json_encode( $data ) );
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+	}
+
 	// Helper methods
 
 	/**
@@ -643,9 +735,53 @@ final class HttpRequestHandlerTest extends TestCase {
 		$request = new WP_REST_Request( 'POST', '/test-mcp' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_header( 'Accept', 'application/json, text/event-stream' );
-		$request->set_body( wp_json_encode( $body ) );
+		$request->set_body( wp_json_encode( $this->normalizeTestWireObjects( $body ) ) );
 
 		return $request;
+	}
+
+	private function handleRawRequest( string $json, ?string $protocol_version = null ): WP_REST_Response {
+		$request = new WP_REST_Request( 'POST', '/test-mcp' );
+		$request->set_header( 'Content-Type', 'application/json' );
+		$request->set_header( 'Accept', 'application/json, text/event-stream' );
+		if ( null !== $protocol_version ) {
+			$request->set_header( 'Mcp-Protocol-Version', $protocol_version );
+		}
+		$request->set_body( $json );
+
+		return $this->handler->handle_request( new HttpRequestContext( $request ) );
+	}
+
+	/**
+	 * Express empty object fields accurately in fixtures assembled as PHP arrays.
+	 *
+	 * Raw identity regressions set the JSON body directly and bypass this helper.
+	 *
+	 * @param mixed       $value Fixture value.
+	 * @param string|null $key Parent key.
+	 * @return mixed
+	 */
+	private function normalizeTestWireObjects( $value, ?string $key = null ) {
+		$object_keys = array(
+			'_meta',
+			'arguments',
+			'capabilities',
+			'io.modelcontextprotocol/clientCapabilities',
+			'params',
+		);
+		if ( array() === $value && null !== $key && in_array( $key, $object_keys, true ) ) {
+			return new \stdClass();
+		}
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		$result = array();
+		foreach ( $value as $item_key => $item ) {
+			$result[ $item_key ] = $this->normalizeTestWireObjects( $item, (string) $item_key );
+		}
+
+		return $result;
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {

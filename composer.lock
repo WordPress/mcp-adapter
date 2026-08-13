@@ -76,12 +76,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/WordPress/php-mcp-schema",
-                "reference": "78514f25a769903fea6858f5db1a1bb01a23e1cf"
+                "reference": "9c5ca956f9d87c49b80daddaf7cd064fcf62b641"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/78514f25a769903fea6858f5db1a1bb01a23e1cf",
-                "reference": "78514f25a769903fea6858f5db1a1bb01a23e1cf",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/9c5ca956f9d87c49b80daddaf7cd064fcf62b641",
+                "reference": "9c5ca956f9d87c49b80daddaf7cd064fcf62b641",
                 "shasum": ""
             },
             "require": {

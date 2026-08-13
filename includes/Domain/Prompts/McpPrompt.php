@@ -260,7 +260,7 @@ final class McpPrompt implements McpComponentInterface {
 	 */
 	public static function fromBuilder( McpPromptBuilderInterface $builder ) {
 		try {
-			$prompt = $builder->build();
+			$prompt = $builder->build()->toArray();
 		} catch ( \Throwable $throwable ) {
 			return new WP_Error(
 				'mcp_prompt_builder_failed',

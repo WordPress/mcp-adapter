@@ -9,6 +9,7 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 final class ResourcesHandlerListTest extends TestCase {
 
@@ -61,7 +62,10 @@ final class ResourcesHandlerListTest extends TestCase {
 		$before = $handler->list_resources();
 		$this->assertNotEmpty( $before['resources'] );
 
-		$filter = static function (): array {
+		$filter = function ( array $resources ): array {
+			$this->assertInstanceOf( Resource::class, $resources[0] );
+			$this->assertSame( 'WordPress://local/resource-1', $resources[0]->getUri() );
+
 			return array();
 		};
 		add_filter( 'mcp_adapter_resources_list', $filter );

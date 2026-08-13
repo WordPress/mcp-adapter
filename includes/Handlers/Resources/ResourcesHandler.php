@@ -15,6 +15,7 @@ use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Server\Resources\DTO\Resource;
 
 /**
  * Handles resources-related MCP methods.
@@ -48,7 +49,10 @@ class ResourcesHandler {
 	 * @return array Response with resources list.
 	 */
 	public function list_resources(): array {
-		$resources = array_values( $this->mcp->get_resources() );
+		$resources = array_map(
+			static fn( array $resource_data ): Resource => Resource::fromArray( $resource_data ),
+			array_values( $this->mcp->get_resources() )
+		);
 
 		/**
 		 * Filters the list of resources before returning to the client.
@@ -58,8 +62,8 @@ class ResourcesHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array                  $resources Array of resource protocol data.
-		 * @param \WP\MCP\Core\McpServer $server    The MCP server instance.
+		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource facades.
+		 * @param \WP\MCP\Core\McpServer                                 $server The MCP server instance.
 		 */
 		$resources = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp ),
@@ -69,7 +73,10 @@ class ResourcesHandler {
 		);
 
 		return array(
-			'resources' => $resources,
+			'resources' => array_map(
+				static fn( $resource_item ): array => $resource_item instanceof Resource ? $resource_item->toArray() : (array) $resource_item,
+				$resources
+			),
 		);
 	}
 
@@ -188,7 +195,10 @@ class ResourcesHandler {
 			}
 
 			if ( $contents instanceof McpExecutionResult ) {
-				return $contents;
+				if ( $contents->is_input_required() ) {
+					return $contents;
+				}
+				$contents = $contents->get_value();
 			}
 
 			// Successful execution - convert contents to validated protocol arrays.

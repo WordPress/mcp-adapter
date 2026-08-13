@@ -17,6 +17,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 /**
  * Handles tools-related MCP methods.
@@ -72,7 +73,10 @@ class ToolsHandler {
 	 * @return array Response with tools list.
 	 */
 	public function list_tools(): array {
-		$tools = array_values( $this->mcp->get_tools() );
+		$tools = array_map(
+			static fn( array $tool ): Tool => Tool::fromArray( $tool ),
+			array_values( $this->mcp->get_tools() )
+		);
 
 		/**
 		 * Filters the list of tools before returning to the client.
@@ -82,8 +86,8 @@ class ToolsHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array                  $tools  Array of tool protocol data.
-		 * @param \WP\MCP\Core\McpServer $server The MCP server instance.
+		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools Array of Tool facades.
+		 * @param \WP\MCP\Core\McpServer                         $server The MCP server instance.
 		 */
 		$tools = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),
@@ -93,7 +97,10 @@ class ToolsHandler {
 		);
 
 		return array(
-			'tools' => $tools,
+			'tools' => array_map(
+				static fn( $tool ): array => $tool instanceof Tool ? $tool->toArray() : (array) $tool,
+				$tools
+			),
 		);
 	}
 
@@ -219,7 +226,10 @@ class ToolsHandler {
 			}
 
 			if ( $result instanceof McpExecutionResult ) {
-				return $result;
+				if ( $result->is_input_required() ) {
+					return $result;
+				}
+				$result = $result->get_value();
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.

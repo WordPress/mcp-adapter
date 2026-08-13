@@ -11,7 +11,9 @@ namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Core\McpVersionNegotiator;
+use WP\MCP\Domain\Continuation\McpContinuationContext;
 use WP\MCP\Domain\Continuation\McpExecutionResult;
+use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
@@ -25,6 +27,9 @@ use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\SessionManager;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
+use WP\McpSchema\Server\Resources\DTO\Resource;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 use WP_REST_Request;
 
 /**
@@ -1059,6 +1064,160 @@ final class RequestRouterTest extends TestCase {
 		$this->assertArrayNotHasKey( 'cacheScope', $result );
 	}
 
+	/**
+	 * @dataProvider modernStructuredContentProvider
+	 * @param mixed $structured_content Arbitrary modern JSON value.
+	 */
+	public function test_modern_structured_content_round_trips_without_key_based_coercion( $structured_content ): void {
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->method( 'call_tool' )->willReturn(
+			array(
+				'content'           => array(),
+				'structuredContent' => $structured_content,
+			)
+		);
+		$this->context->tools_handler = $tools_handler;
+		$params                       = $this->modern_params();
+		$params['name']               = 'test-always-allowed';
+		$params['arguments']          = array();
+
+		$result = $this->router->route_request(
+			'tools/call',
+			$params,
+			48,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertArrayHasKey( 'structuredContent', $result );
+		$this->assertSame( $structured_content, $result['structuredContent'] );
+	}
+
+	public function test_modern_structured_content_preserves_numeric_key_objects(): void {
+		$numeric_object = json_decode( '{"0":"zero"}' );
+		$this->assertInstanceOf( \stdClass::class, $numeric_object );
+
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->method( 'call_tool' )->willReturn(
+			array(
+				'content'           => array(),
+				'structuredContent' => $numeric_object,
+			)
+		);
+		$this->context->tools_handler = $tools_handler;
+		$params                       = $this->modern_params();
+		$params['name']               = 'test-always-allowed';
+		$params['arguments']          = array();
+
+		$result = $this->router->route_request(
+			'tools/call',
+			$params,
+			48,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertInstanceOf( \stdClass::class, $result['structuredContent'] );
+		$this->assertSame( '{"0":"zero"}', wp_json_encode( $result['structuredContent'] ) );
+	}
+
+	public function test_facade_list_hooks_preserve_known_empty_objects(): void {
+		$tool_filter     = static fn(): array => array(
+			Tool::fromArray(
+				array(
+					'name'        => 'filtered-tool',
+					'inputSchema' => array(
+						'type'       => 'object',
+						'properties' => array(),
+					),
+				)
+			),
+		);
+		$resource_filter = static fn(): array => array(
+			Resource::fromArray(
+				array(
+					'uri'         => 'file:///filtered',
+					'name'        => 'filtered-resource',
+					'annotations' => array(),
+				)
+			),
+		);
+		$prompt_filter   = static fn(): array => array(
+			Prompt::fromArray(
+				array(
+					'name'  => 'filtered-prompt',
+					'_meta' => array(),
+				)
+			),
+		);
+		add_filter( 'mcp_adapter_tools_list', $tool_filter );
+		add_filter( 'mcp_adapter_resources_list', $resource_filter );
+		add_filter( 'mcp_adapter_prompts_list', $prompt_filter );
+
+		try {
+			$tools     = $this->router->route_request( 'tools/list', $this->modern_params(), 60, 'test', null, McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+			$resources = $this->router->route_request( 'resources/list', $this->modern_params(), 61, 'test', null, McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+			$prompts   = $this->router->route_request( 'prompts/list', $this->modern_params(), 62, 'test', null, McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+
+			$this->assertArrayNotHasKey( 'error', $tools, (string) wp_json_encode( $tools ) );
+			$this->assertInstanceOf( \stdClass::class, $tools['tools'][0]['inputSchema']['properties'] );
+			$this->assertArrayNotHasKey( 'error', $resources, (string) wp_json_encode( $resources ) );
+			$this->assertInstanceOf( \stdClass::class, $resources['resources'][0]['annotations'] );
+			$this->assertArrayNotHasKey( 'error', $prompts, (string) wp_json_encode( $prompts ) );
+			$this->assertInstanceOf( \stdClass::class, $prompts['prompts'][0]['_meta'] );
+		} finally {
+			remove_filter( 'mcp_adapter_tools_list', $tool_filter );
+			remove_filter( 'mcp_adapter_resources_list', $resource_filter );
+			remove_filter( 'mcp_adapter_prompts_list', $prompt_filter );
+		}
+	}
+
+	/** @return array<string,array{0:mixed}> */
+	public static function modernStructuredContentProvider(): array {
+		return array(
+			'reserved-looking nested keys' => array(
+				array(
+					'arguments'      => array(),
+					'_meta'          => array(),
+					'inputResponses' => array(),
+				),
+			),
+			'list'                         => array( array( 'one', 'two' ) ),
+			'scalar'                       => array( 'value' ),
+			'boolean'                      => array( true ),
+			'explicit null'                => array( null ),
+			'business discriminator key'   => array( array( 'resultType' => 'input_required' ) ),
+		);
+	}
+
+	public function test_legacy_structured_content_rejects_non_object_values(): void {
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->method( 'call_tool' )->willReturn(
+			array(
+				'content'           => array(),
+				'structuredContent' => 'not-an-object',
+			)
+		);
+		$this->context->tools_handler = $tools_handler;
+
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-always-allowed',
+				'arguments' => array(),
+			),
+			49,
+			'test-transport',
+			null,
+			McpVersionNegotiator::LEGACY_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $result['error']['code'] );
+	}
+
 	public function test_request_schema_rejects_missing_required_tool_name(): void {
 		$result = $this->router->route_request(
 			'tools/call',
@@ -1096,6 +1255,156 @@ final class RequestRouterTest extends TestCase {
 		$this->assertSame( 'opaque-state', $result['requestState'] );
 		$this->assertArrayNotHasKey( 'ttlMs', $result );
 		$this->assertArrayNotHasKey( 'cacheScope', $result );
+	}
+
+	public function test_modern_input_required_accepts_zero_property_elicitation_schema(): void {
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->method( 'call_tool' )->willReturn(
+			McpExecutionResult::input_required(
+				array(
+					'empty-form' => array(
+						'method' => 'elicitation/create',
+						'params' => array(
+							'message'         => 'Continue',
+							'requestedSchema' => array(
+								'type'       => 'object',
+								'properties' => array(),
+							),
+						),
+					),
+				)
+			)
+		);
+		$this->context->tools_handler = $tools_handler;
+
+		$params = $this->modern_params();
+		$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = array(
+			'elicitation' => array( 'form' => array() ),
+		);
+		$params['name']      = 'test-always-allowed';
+		$params['arguments'] = array();
+		$result              = $this->router->route_request( 'tools/call', $params, 63, 'test', null, McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+
+		$this->assertArrayNotHasKey( 'error', $result, (string) wp_json_encode( $result ) );
+		$this->assertSame( 'input_required', $result['resultType'] );
+		$this->assertInstanceOf( \stdClass::class, $result['inputRequests']['empty-form']['params']['requestedSchema']['properties'] );
+	}
+
+	public function test_modern_input_request_requires_declared_client_capability(): void {
+		$tools_handler = $this->createMock( ToolsHandler::class );
+		$tools_handler->method( 'call_tool' )->willReturn(
+			McpExecutionResult::input_required(
+				array(
+					'confirm' => array(
+						'method' => 'elicitation/create',
+						'params' => array(
+							'mode'            => 'form',
+							'message'         => 'Confirm',
+							'requestedSchema' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'confirmed' => array( 'type' => 'boolean' ),
+								),
+							),
+						),
+					),
+				)
+			)
+		);
+		$this->context->tools_handler = $tools_handler;
+
+		$params              = $this->modern_params();
+		$params['name']      = 'test-always-allowed';
+		$params['arguments'] = array();
+		$result              = $this->router->route_request(
+			'tools/call',
+			$params,
+			50,
+			'test-transport',
+			null,
+			McpVersionNegotiator::MODERN_PROTOCOL_VERSION
+		);
+
+		$this->assertSame( McpErrorFactory::MISSING_REQUIRED_CLIENT_CAPABILITY, $result['error']['code'] );
+		$this->assertArrayHasKey( 'elicitation', $result['error']['data']['requiredCapabilities'] );
+	}
+
+	public function test_modern_tool_continuation_round_trip_is_stateless(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'round-trip-tool',
+				'permission' => '__return_true',
+				'handler'    => static function ( array $arguments, McpContinuationContext $continuation ): McpExecutionResult {
+					if ( ! $continuation->is_resumed() ) {
+						return McpExecutionResult::input_required(
+							array(
+								'confirm' => array(
+									'method' => 'elicitation/create',
+									'params' => array(
+										'mode'            => 'form',
+										'message'         => 'Confirm',
+										'requestedSchema' => array(
+											'type'       => 'object',
+											'properties' => array(
+												'confirmed' => array( 'type' => 'boolean' ),
+											),
+										),
+									),
+								),
+							),
+							'round-trip-state'
+						);
+					}
+
+					return McpExecutionResult::complete(
+						array(
+							'state'     => $continuation->get_request_state(),
+							'responses' => $continuation->get_input_responses(),
+						)
+					);
+				},
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server = new McpServer(
+			'continuation-server',
+			'mcp/v1',
+			'/continuation',
+			'Continuation Server',
+			'Stateless continuation test',
+			'1.0.0',
+			array(),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class,
+			array( $tool )
+		);
+		$router = new RequestRouter( $this->createTransportContext( $server ) );
+		$params = $this->modern_params();
+		$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = array(
+			'elicitation' => array( 'form' => array() ),
+		);
+		$params['name']      = 'round-trip-tool';
+		$params['arguments'] = array();
+
+		$first = $router->route_request( 'tools/call', $params, 51, 'test', null, McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+		$this->assertArrayNotHasKey( 'error', $first, (string) wp_json_encode( $first ) );
+		$this->assertSame( 'input_required', $first['resultType'] );
+		$this->assertSame( 'round-trip-state', $first['requestState'] );
+		$this->assertArrayHasKey( 'confirm', $first['inputRequests'] );
+
+		$params['requestState']   = $first['requestState'];
+		$params['inputResponses'] = array(
+			'confirm' => array(
+				'action'  => 'accept',
+				'content' => array( 'confirmed' => true ),
+			),
+		);
+		$second                   = $router->route_request( 'tools/call', $params, 52, 'test', null, McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+
+		$this->assertArrayNotHasKey( 'error', $second, (string) wp_json_encode( $second ) );
+		$this->assertSame( 'complete', $second['resultType'] );
+		$this->assertSame( 'round-trip-state', $second['structuredContent']['state'] );
+		$this->assertTrue( $second['structuredContent']['responses']['confirm']['content']['confirmed'] );
 	}
 
 	/**

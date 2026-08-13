@@ -7,6 +7,7 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
+use WP\McpSchema\Server\Tools\DTO\Tool;
 
 final class ToolsHandlerListTest extends TestCase {
 
@@ -25,8 +26,11 @@ final class ToolsHandlerListTest extends TestCase {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );
 
-		// Register a filter that removes all tools.
-		$filter = static function (): array {
+		// The documented hook still receives Tool objects.
+		$filter = function ( array $tools ): array {
+			$this->assertInstanceOf( Tool::class, $tools[0] );
+			$this->assertSame( 'test-always-allowed', $tools[0]->getName() );
+
 			return array();
 		};
 		add_filter( 'mcp_adapter_tools_list', $filter );

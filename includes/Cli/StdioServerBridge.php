@@ -15,6 +15,8 @@ namespace WP\MCP\Cli;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestParams;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 
@@ -181,9 +183,10 @@ class StdioServerBridge {
 	private function handle_request( string $json_input ): string {
 		try {
 			// Parse JSON-RPC request
-			$request = json_decode( $json_input, true );
+			$valid_json = false;
+			$request    = JsonRpcRequestDecoder::decode( $json_input, $valid_json );
 
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
+			if ( ! $valid_json ) {
 				return $this->create_error_response(
 					null,
 					McpErrorFactory::PARSE_ERROR,
@@ -214,7 +217,10 @@ class StdioServerBridge {
 
 			// Extract request components
 			$method = $request['method'] ?? null;
-			$params = $request['params'] ?? array();
+			$params = new JsonRpcRequestParams(
+				array_key_exists( 'params', $request ),
+				$request['params'] ?? null
+			);
 			$id     = $request['id'] ?? null;
 
 			if ( ! is_string( $method ) ) {
@@ -226,27 +232,23 @@ class StdioServerBridge {
 				);
 			}
 
-			// Convert params to array if it's an object
-			if ( is_object( $params ) ) {
-				$params = (array) $params;
-			}
-
-			if ( ! is_array( $params ) ) {
-				$params = array();
-			}
 			if ( null === $id ) {
 				return '';
 			}
 
-			$metadata_version = $params['_meta']['io.modelcontextprotocol/protocolVersion'] ?? null;
+			$params_value     = $params->get_value();
+			$params_array     = $params_value instanceof \stdClass ? get_object_vars( $params_value ) : $params_value;
+			$meta             = is_array( $params_array ) ? ( $params_array['_meta'] ?? null ) : null;
+			$meta_array       = $meta instanceof \stdClass ? get_object_vars( $meta ) : $meta;
+			$metadata_version = is_array( $meta_array ) ? ( $meta_array['io.modelcontextprotocol/protocolVersion'] ?? null ) : null;
 			$protocol_version = is_string( $metadata_version ) ? $metadata_version : null;
 			if ( 'server/discover' === $method && null === $protocol_version ) {
 				$protocol_version = McpVersionNegotiator::MODERN_PROTOCOL_VERSION;
 			}
 			$negotiated_after_success = null;
 			if ( 'initialize' === $method ) {
-				$requested_protocol_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] )
-					? $params['protocolVersion']
+				$requested_protocol_version = is_array( $params_array ) && isset( $params_array['protocolVersion'] ) && is_string( $params_array['protocolVersion'] )
+					? $params_array['protocolVersion']
 					: '';
 				$negotiated_after_success   = McpVersionNegotiator::negotiate( $requested_protocol_version );
 			} elseif ( null === $protocol_version ) {

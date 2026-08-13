@@ -521,7 +521,14 @@ final class HttpTransportTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 1,
 				'method'  => 'initialize',
-				'params'  => array(),
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array(),
+					'clientInfo'      => array(
+						'name'    => 'origin-test-client',
+						'version' => '1.0.0',
+					),
+				),
 			)
 		);
 		$request->set_header( 'Origin', 'https://malicious-site.com' );
@@ -1008,9 +1015,33 @@ final class HttpTransportTest extends TestCase {
 		$request = new WP_REST_Request( 'POST', '/test-mcp' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_header( 'Accept', 'application/json, text/event-stream' );
-		$request->set_body( wp_json_encode( $body ) );
+		$request->set_body( wp_json_encode( $this->normalizeTestWireObjects( $body ) ) );
 
 		return $request;
+	}
+
+	/** @param mixed $value @return mixed */
+	private function normalizeTestWireObjects( $value, ?string $key = null ) {
+		$object_keys = array(
+			'_meta',
+			'arguments',
+			'capabilities',
+			'io.modelcontextprotocol/clientCapabilities',
+			'params',
+		);
+		if ( array() === $value && null !== $key && in_array( $key, $object_keys, true ) ) {
+			return new \stdClass();
+		}
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		$result = array();
+		foreach ( $value as $item_key => $item ) {
+			$result[ $item_key ] = $this->normalizeTestWireObjects( $item, (string) $item_key );
+		}
+
+		return $result;
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {

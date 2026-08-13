@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
@@ -93,7 +94,7 @@ class HttpRequestHandler {
 	private function handle_mcp_request( HttpRequestContext $context ): \WP_REST_Response {
 		try {
 			// Validate request body
-			if ( null === $context->body ) {
+			if ( ! $context->body_is_valid_json ) {
 				return new \WP_REST_Response(
 					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' ),
 					400
@@ -132,7 +133,7 @@ class HttpRequestHandler {
 		$response_body = JsonRpcResponseBuilder::process_messages(
 			$messages,
 			$is_batch_request,
-			function ( array $message ) use ( $context ) {
+			function ( $message ) use ( $context ) {
 				return $this->process_single_message( $message, $context );
 			}
 		);
@@ -146,6 +147,13 @@ class HttpRequestHandler {
 		// Determine HTTP status code based on error type
 		if ( ! $is_batch_request && isset( $response_body['error'] ) ) {
 			$http_status = McpErrorFactory::get_http_status_for_error( $response_body );
+			if (
+				McpErrorFactory::INVALID_PARAMS === ( $response_body['error']['code'] ?? null )
+				&& null === $context->session_id
+				&& McpVersionNegotiator::LEGACY_PROTOCOL_VERSION !== $context->protocol_version
+			) {
+				$http_status = 400;
+			}
 
 			return new \WP_REST_Response( $response_body, $http_status );
 		}
@@ -156,12 +164,12 @@ class HttpRequestHandler {
 	/**
 	 * Process a single MCP message.
 	 *
-	 * @param array $message The MCP JSON-RPC message.
+	 * @param mixed $message The decoded MCP JSON-RPC message.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
 	 * @return array|null JSON-RPC response or null for notifications.
 	 */
-	private function process_single_message( array $message, HttpRequestContext $context ): ?array {
+	private function process_single_message( $message, HttpRequestContext $context ): ?array {
 		// Validate JSON-RPC message format
 		$validation = McpErrorFactory::validate_jsonrpc_message( $message );
 		if ( true !== $validation ) {
@@ -169,12 +177,16 @@ class HttpRequestHandler {
 		}
 
 		// Handle notifications (no response required)
-		if ( isset( $message['method'] ) && ! isset( $message['id'] ) ) {
+		if ( ! is_array( $message ) ) {
+			return McpErrorFactory::invalid_request( null );
+		}
+
+		if ( isset( $message['method'] ) && ! array_key_exists( 'id', $message ) ) {
 			return null; // Notifications don't get a response
 		}
 
 		// Process requests with IDs
-		if ( isset( $message['method'] ) && isset( $message['id'] ) ) {
+		if ( isset( $message['method'] ) && array_key_exists( 'id', $message ) ) {
 			return $this->process_jsonrpc_request( $message, $context );
 		}
 
@@ -194,11 +206,14 @@ class HttpRequestHandler {
 	private function process_jsonrpc_request( array $message, HttpRequestContext $context ): array {
 		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
 		$method     = $message['method'];
-		$params     = $message['params'] ?? array();
+		$params     = new JsonRpcRequestParams(
+			array_key_exists( 'params', $message ),
+			$message['params'] ?? null
+		);
 
 		$protocol_version = null;
 		if ( 'initialize' !== $method ) {
-			$body_protocol_version = $this->get_body_protocol_version( $params );
+			$body_protocol_version = $this->get_body_protocol_version( $params->get_value() );
 			$is_modern_request     = 'server/discover' === $method
 				|| McpVersionNegotiator::MODERN_PROTOCOL_VERSION === $body_protocol_version
 				|| ( null !== $body_protocol_version && ! McpVersionNegotiator::is_supported( $body_protocol_version ) )
@@ -270,8 +285,18 @@ class HttpRequestHandler {
 	 *
 	 * @param array<string,mixed> $params Request params.
 	 */
-	private function get_body_protocol_version( array $params ): ?string {
-		$value = $params['_meta']['io.modelcontextprotocol/protocolVersion'] ?? null;
+	private function get_body_protocol_version( $params ): ?string {
+		if ( $params instanceof \stdClass ) {
+			$params = get_object_vars( $params );
+		}
+		if ( ! is_array( $params ) ) {
+			return null;
+		}
+		$meta = $params['_meta'] ?? null;
+		if ( $meta instanceof \stdClass ) {
+			$meta = get_object_vars( $meta );
+		}
+		$value = is_array( $meta ) ? ( $meta['io.modelcontextprotocol/protocolVersion'] ?? null ) : null;
 
 		return is_string( $value ) ? $value : null;
 	}
@@ -285,19 +310,32 @@ class HttpRequestHandler {
 	 */
 	private function validate_modern_protocol_headers( HttpRequestContext $context, ?string $body_version, $request_id ): ?array {
 		if ( null === $context->protocol_version ) {
-			return McpErrorFactory::header_mismatch( $request_id, 'MCP-Protocol-Version', $body_version, null );
+			return $this->modern_header_mismatch( $request_id, $body_version, null );
 		}
 
 		if ( null !== $body_version && $context->protocol_version !== $body_version ) {
-			return McpErrorFactory::header_mismatch(
-				$request_id,
-				'MCP-Protocol-Version',
-				$body_version,
-				$context->protocol_version
-			);
+			return $this->modern_header_mismatch( $request_id, $body_version, $context->protocol_version );
 		}
 
 		return null;
+	}
+
+	/**
+	 * Create and validate the transport-owned modern header error envelope.
+	 *
+	 * @param string|int|null $request_id Request ID.
+	 * @param string|null     $expected Body-declared version.
+	 * @param string|null     $actual Header version.
+	 * @return array<string,mixed>
+	 */
+	private function modern_header_mismatch( $request_id, ?string $expected, ?string $actual ): array {
+		$response = McpErrorFactory::header_mismatch( $request_id, 'MCP-Protocol-Version', $expected, $actual );
+		$record   = McpProtocolContext::for_version( McpVersionNegotiator::MODERN_PROTOCOL_VERSION )
+			->get_schema()
+			->type( 'HeaderMismatchError' )
+			->fromValue( $response );
+
+		return $record->toArray();
 	}
 
 	/**

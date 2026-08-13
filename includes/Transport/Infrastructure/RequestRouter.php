@@ -46,7 +46,7 @@ class RequestRouter {
 	 * Route a request to the appropriate handler.
 	 *
 	 * @param string $method The MCP method name.
-	 * @param array $params The request parameters.
+	 * @param mixed $params Request parameters or a lossless transport carrier.
 	 * @param mixed $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
@@ -55,7 +55,7 @@ class RequestRouter {
 	 */
 	public function route_request(
 		string $method,
-		array $params,
+		$params,
 		$request_id = 0,
 		string $transport_name = 'unknown',
 		?HttpRequestContext $http_context = null,
@@ -63,6 +63,14 @@ class RequestRouter {
 	): array {
 		// Track request start time.
 		$start_time = microtime( true );
+
+		$is_wire_params = $params instanceof JsonRpcRequestParams;
+		$params_present = $is_wire_params ? $params->is_present() : true;
+		$wire_params    = $is_wire_params ? $params->get_value() : $params;
+		$params         = $this->callback_params( $wire_params );
+		if ( ! is_array( $params ) ) {
+			$params = array();
+		}
 
 		$new_session_id = null;
 		$component_tags = $this->resolve_component_observability_context( $method, $params );
@@ -93,7 +101,14 @@ class RequestRouter {
 				);
 			}
 
-			$request_error = $this->validate_request( $protocol, $method, $params, $request_id );
+			$request_error = $this->validate_request(
+				$protocol,
+				$method,
+				$wire_params,
+				$request_id,
+				$is_wire_params,
+				$params_present
+			);
 			if ( null !== $request_error ) {
 				return $this->record_error_result(
 					$this->normalize_protocol_error( $protocol, $method, $request_id, $request_error ),
@@ -287,10 +302,18 @@ class RequestRouter {
 	/**
 	 * Validate an exact request envelope before handler execution.
 	 *
+	 * @param mixed           $params Raw or programmatic request params.
 	 * @param string|int|null $request_id JSON-RPC request ID.
 	 * @return array<string, mixed>|null
 	 */
-	private function validate_request( McpProtocolContext $protocol, string $method, array $params, $request_id ): ?array {
+	private function validate_request(
+		McpProtocolContext $protocol,
+		string $method,
+		$params,
+		$request_id,
+		bool $preserve_wire_identity = false,
+		bool $params_present = true
+	): ?array {
 		$type_names = $protocol->is_modern()
 			? array(
 				'server/discover'          => 'DiscoverRequest',
@@ -320,13 +343,16 @@ class RequestRouter {
 			return $this->error_object( McpErrorFactory::method_not_found( $request_id, $method ) );
 		}
 
-		$wire = array(
+		$wire            = array(
 			'jsonrpc' => '2.0',
 			'id'      => $request_id,
 			'method'  => 'tools/list/all' === $method ? 'tools/list' : $method,
 		);
-		if ( $protocol->is_modern() || ! empty( $params ) || in_array( $method, array( 'initialize', 'tools/call', 'resources/read', 'prompts/get' ), true ) ) {
-			$wire['params'] = $this->normalize_known_objects( $params );
+		$requires_params = $protocol->is_modern() || in_array( $method, array( 'initialize', 'tools/call', 'resources/read', 'prompts/get' ), true );
+		if ( ( $preserve_wire_identity && $params_present ) || ( ! $preserve_wire_identity && ( $requires_params || ! empty( $params ) ) ) ) {
+			$wire['params'] = $preserve_wire_identity
+				? $params
+				: $this->normalize_public_request_params( $method, is_array( $params ) ? $params : array() );
 		}
 
 		try {
@@ -359,15 +385,25 @@ class RequestRouter {
 				$error['data'] ?? null
 			);
 		}
+		$code = isset( $error['code'] ) && is_numeric( $error['code'] ) ? (int) $error['code'] : McpErrorFactory::INTERNAL_ERROR;
 
 		$envelope = array(
 			'jsonrpc' => '2.0',
-			'error'   => $this->normalize_known_objects( $error ),
+			'error'   => $error,
 		);
 		if ( null !== $request_id ) {
 			$envelope['id'] = $request_id;
 		}
-		$record = $protocol->get_schema()->type( 'JSONRPCErrorResponse' )->fromValue( $envelope );
+		$type_name = 'JSONRPCErrorResponse';
+		if ( $protocol->is_modern() ) {
+			$type_name = array(
+				McpErrorFactory::HEADER_MISMATCH => 'HeaderMismatchError',
+				McpErrorFactory::MISSING_REQUIRED_CLIENT_CAPABILITY => 'MissingRequiredClientCapabilityError',
+				McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION => 'UnsupportedProtocolVersionError',
+			)[ $code ] ?? 'JSONRPCErrorResponse';
+		}
+
+		$record = $protocol->get_schema()->type( $type_name )->fromValue( $envelope );
 		$wire   = $record->toWireArray();
 
 		return isset( $wire['error'] ) && is_array( $wire['error'] ) ? $wire['error'] : $error;
@@ -482,7 +518,7 @@ class RequestRouter {
 			}
 		}
 
-		$wire   = $this->normalize_known_objects( $wire, ! $protocol->is_modern() );
+		$wire   = $this->normalize_public_result( $method, $wire, $protocol->is_modern() );
 		$record = $protocol->get_schema()->type( $type_name )->fromValue( empty( $wire ) ? new \stdClass() : $wire );
 
 		return $this->public_result_array( $record->toWireArray() );
@@ -514,7 +550,7 @@ class RequestRouter {
 			array(
 				'jsonrpc' => '2.0',
 				'id'      => $request_id,
-				'result'  => empty( $result ) ? new \stdClass() : $this->normalize_known_objects( $result ),
+				'result'  => empty( $result ) ? new \stdClass() : $result,
 			)
 		);
 	}
@@ -539,7 +575,7 @@ class RequestRouter {
 			),
 		);
 
-		$record = $protocol->get_schema()->type( 'InputRequiredResult' )->fromValue( $this->normalize_known_objects( $wire ) );
+		$record = $protocol->get_schema()->type( 'InputRequiredResult' )->fromValue( $this->normalize_input_required_result( $wire ) );
 
 		return $this->public_result_array( $record->toWireArray() );
 	}
@@ -567,46 +603,263 @@ class RequestRouter {
 	}
 
 	/**
-	 * Convert legacy empty arrays only at known object/map-shaped public boundaries.
+	 * Convert callback-facing objects to arrays after lossless schema validation.
 	 *
 	 * @param mixed $value Value to normalize.
 	 * @return mixed
 	 */
-	private function normalize_known_objects( $value, bool $legacy_structured_content = false, ?string $key = null ) {
+	private function callback_params( $value ) {
+		if ( $value instanceof \stdClass ) {
+			$value = get_object_vars( $value );
+		}
 		if ( ! is_array( $value ) ) {
 			return $value;
 		}
-		$object_keys = array(
-			'_meta',
-			'capabilities',
-			'clientCapabilities',
-			'arguments',
-			'inputSchema',
-			'outputSchema',
-			'properties',
-			'patternProperties',
-			'annotations',
-			'requestedSchema',
-			'inputRequests',
-			'inputResponses',
-			'experimental',
-			'form',
-			'url',
-			'io.modelcontextprotocol/clientCapabilities',
-			'io.modelcontextprotocol/serverInfo',
-		);
-		if ( $legacy_structured_content ) {
-			$object_keys[] = 'structuredContent';
-		}
-		if ( array() === $value && null !== $key && in_array( $key, $object_keys, true ) ) {
-			return new \stdClass();
-		}
 
 		$result = array();
-		foreach ( $value as $item_key => $item ) {
-			$result[ $item_key ] = $this->normalize_known_objects( $item, $legacy_structured_content, (string) $item_key );
+		foreach ( $value as $key => $item ) {
+			$result[ $key ] = $this->callback_params( $item );
 		}
 		return $result;
+	}
+
+	/**
+	 * Normalize only documented object-shaped request fields for PHP callers.
+	 *
+	 * Raw transport requests bypass this compatibility boundary and retain their
+	 * exact JSON object/list identity for schema validation.
+	 *
+	 * @param array<string,mixed> $params Programmatic request params.
+	 * @return array<string,mixed>
+	 */
+	private function normalize_public_request_params( string $method, array $params ): array {
+		if ( 'initialize' === $method ) {
+			$this->normalize_empty_object_field( $params, 'capabilities' );
+			$this->normalize_capabilities( $params, 'capabilities' );
+			$this->normalize_empty_object_field( $params, 'clientInfo' );
+		}
+
+		$this->normalize_request_meta( $params );
+		if ( in_array( $method, array( 'tools/call', 'prompts/get' ), true ) ) {
+			$this->normalize_empty_object_field( $params, 'arguments' );
+		}
+		if ( in_array( $method, array( 'tools/call', 'resources/read', 'prompts/get' ), true ) ) {
+			$this->normalize_empty_object_field( $params, 'inputResponses' );
+		}
+
+		return $params;
+	}
+
+	/** @param array<string,mixed> $params */
+	private function normalize_request_meta( array &$params ): void {
+		$this->normalize_empty_object_field( $params, '_meta' );
+		if ( ! isset( $params['_meta'] ) || ! is_array( $params['_meta'] ) ) {
+			return;
+		}
+		$meta =& $params['_meta'];
+		$this->normalize_empty_object_field( $meta, 'io.modelcontextprotocol/clientCapabilities' );
+		$this->normalize_empty_object_field( $meta, 'io.modelcontextprotocol/clientInfo' );
+		$this->normalize_capabilities( $meta, 'io.modelcontextprotocol/clientCapabilities' );
+	}
+
+	/** @param array<string,mixed> $container */
+	private function normalize_capabilities( array &$container, string $key ): void {
+		if ( ! isset( $container[ $key ] ) || ! is_array( $container[ $key ] ) ) {
+			return;
+		}
+		$capabilities =& $container[ $key ];
+		foreach ( array( 'elicitation', 'experimental', 'roots', 'sampling', 'tasks' ) as $capability ) {
+			$this->normalize_empty_object_field( $capabilities, $capability );
+		}
+		if ( ! isset( $capabilities['elicitation'] ) || ! is_array( $capabilities['elicitation'] ) ) {
+			return;
+		}
+
+		$this->normalize_empty_object_field( $capabilities['elicitation'], 'form' );
+		$this->normalize_empty_object_field( $capabilities['elicitation'], 'url' );
+	}
+
+	/**
+	 * Normalize only exact result fields whose public PHP shape predates the
+	 * descriptor model. Opaque payloads such as structuredContent stay untouched.
+	 *
+	 * @param array<string,mixed> $wire Result data.
+	 * @return array<string,mixed>
+	 */
+	private function normalize_public_result( string $method, array $wire, bool $modern ): array {
+		$this->normalize_empty_object_field( $wire, '_meta' );
+		if ( 'initialize' === $method || 'server/discover' === $method ) {
+			$this->normalize_empty_object_field( $wire, 'capabilities' );
+			$this->normalize_capabilities( $wire, 'capabilities' );
+			$this->normalize_empty_object_field( $wire, 'serverInfo' );
+		}
+		if ( ! $modern && 'tools/call' === $method ) {
+			$this->normalize_empty_object_field( $wire, 'structuredContent' );
+		}
+		if ( isset( $wire['_meta'] ) && is_array( $wire['_meta'] ) ) {
+			$this->normalize_empty_object_field( $wire['_meta'], 'io.modelcontextprotocol/serverInfo' );
+		}
+		if ( 'tools/list' === $method && isset( $wire['tools'] ) && is_array( $wire['tools'] ) ) {
+			foreach ( $wire['tools'] as &$tool ) {
+				if ( ! is_array( $tool ) ) {
+					continue;
+				}
+
+				$this->normalize_tool_definition( $tool );
+			}
+			unset( $tool );
+		}
+		if ( 'resources/list' === $method && isset( $wire['resources'] ) && is_array( $wire['resources'] ) ) {
+			foreach ( $wire['resources'] as &$resource ) {
+				if ( ! is_array( $resource ) ) {
+					continue;
+				}
+
+				$this->normalize_empty_object_field( $resource, '_meta' );
+				$this->normalize_empty_object_field( $resource, 'annotations' );
+			}
+			unset( $resource );
+		}
+		if ( 'prompts/list' === $method && isset( $wire['prompts'] ) && is_array( $wire['prompts'] ) ) {
+			foreach ( $wire['prompts'] as &$prompt ) {
+				if ( ! is_array( $prompt ) ) {
+					continue;
+				}
+
+				$this->normalize_empty_object_field( $prompt, '_meta' );
+			}
+			unset( $prompt );
+		}
+
+		return $wire;
+	}
+
+	/** @param array<string,mixed> $tool */
+	private function normalize_tool_definition( array &$tool ): void {
+		foreach ( array( '_meta', 'annotations', 'execution', 'inputSchema', 'outputSchema' ) as $field ) {
+			$this->normalize_empty_object_field( $tool, $field );
+		}
+		foreach ( array( 'inputSchema', 'outputSchema' ) as $schema_field ) {
+			if ( ! isset( $tool[ $schema_field ] ) || ! is_array( $tool[ $schema_field ] ) ) {
+				continue;
+			}
+			foreach ( array( '$defs', 'definitions', 'patternProperties', 'properties' ) as $object_field ) {
+				$this->normalize_empty_object_field( $tool[ $schema_field ], $object_field );
+			}
+		}
+	}
+
+	/** @param array<string,mixed> $wire @return array<string,mixed> */
+	private function normalize_input_required_result( array $wire ): array {
+		$this->normalize_empty_object_field( $wire, '_meta' );
+		if ( isset( $wire['_meta'] ) && is_array( $wire['_meta'] ) ) {
+			$this->normalize_empty_object_field( $wire['_meta'], 'io.modelcontextprotocol/serverInfo' );
+		}
+		$this->normalize_empty_object_field( $wire, 'inputRequests' );
+		if ( isset( $wire['inputRequests'] ) && is_array( $wire['inputRequests'] ) ) {
+			foreach ( $wire['inputRequests'] as &$request ) {
+				if ( ! is_array( $request ) ) {
+					continue;
+				}
+				$this->normalize_empty_object_field( $request, 'params' );
+				if ( ! isset( $request['params'] ) || ! is_array( $request['params'] ) ) {
+					continue;
+				}
+
+				$params =& $request['params'];
+				$this->normalize_empty_object_field( $params, 'requestedSchema' );
+				if ( isset( $params['requestedSchema'] ) && is_array( $params['requestedSchema'] ) ) {
+					$this->normalize_empty_object_field( $params['requestedSchema'], 'properties' );
+				}
+				if ( 'sampling/createMessage' === ( $request['method'] ?? null ) ) {
+					foreach ( array( 'metadata', 'modelPreferences', 'toolChoice' ) as $object_field ) {
+						$this->normalize_empty_object_field( $params, $object_field );
+					}
+					if ( isset( $params['modelPreferences']['hints'] ) && is_array( $params['modelPreferences']['hints'] ) ) {
+						foreach ( $params['modelPreferences']['hints'] as &$hint ) {
+							if ( array() !== $hint ) {
+								continue;
+							}
+
+							$hint = new \stdClass();
+						}
+						unset( $hint );
+					}
+					if ( isset( $params['tools'] ) && is_array( $params['tools'] ) ) {
+						foreach ( $params['tools'] as &$tool ) {
+							if ( ! is_array( $tool ) ) {
+								continue;
+							}
+
+							$this->normalize_tool_definition( $tool );
+						}
+						unset( $tool );
+					}
+					if ( isset( $params['messages'] ) && is_array( $params['messages'] ) ) {
+						foreach ( $params['messages'] as &$message ) {
+							if ( ! is_array( $message ) ) {
+								continue;
+							}
+							$this->normalize_empty_object_field( $message, '_meta' );
+							if ( ! array_key_exists( 'content', $message ) ) {
+								continue;
+							}
+
+							$this->normalize_sampling_content( $message['content'] );
+						}
+						unset( $message );
+					}
+				}
+				if ( ! ( 'roots/list' === ( $request['method'] ?? null ) ) ) {
+					continue;
+				}
+
+				$this->normalize_empty_object_field( $params, '_meta' );
+			}
+			unset( $request );
+		}
+
+		return $wire;
+	}
+
+	/** @param mixed $content */
+	private function normalize_sampling_content( &$content ): void {
+		if ( ! is_array( $content ) ) {
+			return;
+		}
+		if ( $this->is_list_array( $content ) ) {
+			foreach ( $content as &$block ) {
+				$this->normalize_sampling_content( $block );
+			}
+			unset( $block );
+			return;
+		}
+
+		$this->normalize_empty_object_field( $content, '_meta' );
+		$this->normalize_empty_object_field( $content, 'annotations' );
+		if ( 'tool_use' === ( $content['type'] ?? null ) ) {
+			$this->normalize_empty_object_field( $content, 'input' );
+		}
+		if ( 'resource' === ( $content['type'] ?? null ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
+			$this->normalize_empty_object_field( $content['resource'], '_meta' );
+		}
+		if ( ! ( 'tool_result' === ( $content['type'] ?? null ) ) || ! isset( $content['content'] ) || ! is_array( $content['content'] ) ) {
+			return;
+		}
+
+		foreach ( $content['content'] as &$result_block ) {
+			$this->normalize_sampling_content( $result_block );
+		}
+		unset( $result_block );
+	}
+
+	/** @param array<string,mixed> $container */
+	private function normalize_empty_object_field( array &$container, string $key ): void {
+		if ( ! isset( $container[ $key ] ) || array() !== $container[ $key ] ) {
+			return;
+		}
+
+		$container[ $key ] = new \stdClass();
 	}
 
 	/**
@@ -622,6 +875,9 @@ class RequestRouter {
 			if ( empty( $properties ) ) {
 				return $value;
 			}
+			if ( $this->is_list_array( $properties ) ) {
+				return $value;
+			}
 			$value = $properties;
 		}
 		if ( ! is_array( $value ) ) {
@@ -634,6 +890,11 @@ class RequestRouter {
 		}
 
 		return $result;
+	}
+
+	/** @param array<mixed> $value */
+	private function is_list_array( array $value ): bool {
+		return array() === $value || array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
 
 	/** @param array<string,mixed> $wire @return array<string,mixed> */

@@ -15,6 +15,7 @@ use WP\MCP\Domain\Continuation\McpExecutionResult;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Server\Prompts\DTO\Prompt;
 
 /**
  * Handles prompts-related MCP methods.
@@ -67,7 +68,10 @@ class PromptsHandler {
 	 * @return array Response with prompts list.
 	 */
 	public function list_prompts(): array {
-		$prompts = array_values( $this->mcp->get_prompts() );
+		$prompts = array_map(
+			static fn( array $prompt ): Prompt => Prompt::fromArray( $prompt ),
+			array_values( $this->mcp->get_prompts() )
+		);
 
 		/**
 		 * Filters the list of prompts before returning to the client.
@@ -77,8 +81,8 @@ class PromptsHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array                  $prompts Array of prompt protocol data.
-		 * @param \WP\MCP\Core\McpServer $server  The MCP server instance.
+		 * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts Array of Prompt facades.
+		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
 		 */
 		$prompts = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp ),
@@ -88,7 +92,10 @@ class PromptsHandler {
 		);
 
 		return array(
-			'prompts' => $prompts,
+			'prompts' => array_map(
+				static fn( $prompt ): array => $prompt instanceof Prompt ? $prompt->toArray() : (array) $prompt,
+				$prompts
+			),
 		);
 	}
 
@@ -190,7 +197,10 @@ class PromptsHandler {
 			}
 
 			if ( $result instanceof McpExecutionResult ) {
-				return $result;
+				if ( $result->is_input_required() ) {
+					return $result;
+				}
+				$result = $result->get_value();
 			}
 
 			return $this->normalize_result( $result, $prompt, $prompt_name );

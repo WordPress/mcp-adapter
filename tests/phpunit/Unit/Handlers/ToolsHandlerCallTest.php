@@ -43,6 +43,29 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertSame( $expected, $result );
 	}
 
+	public function test_completed_execution_result_uses_existing_tool_normalization(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'completed-tool',
+				'handler'    => static fn(): McpExecutionResult => McpExecutionResult::complete( array( 'value' => 'done' ) ),
+				'permission' => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$handler = new ToolsHandler( $this->makeServer( array( $tool ) ) );
+
+		$result = $handler->call_tool(
+			array(
+				'name'      => 'completed-tool',
+				'arguments' => array(),
+			),
+			1
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertSame( array( 'value' => 'done' ), $result['structuredContent'] );
+	}
+
 	public function test_missing_name_returns_missing_parameter_error(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );

@@ -42,6 +42,25 @@ final class ResourcesHandlerReadTest extends TestCase {
 		$this->assertSame( $expected, $result );
 	}
 
+	public function test_completed_execution_result_uses_existing_resource_normalization(): void {
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'test://completed-resource',
+				'name'       => 'Completed resource',
+				'handler'    => static fn(): McpExecutionResult => McpExecutionResult::complete( 'done' ),
+				'permission' => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpResource::class, $resource );
+
+		$result = ( new ResourcesHandler( $this->makeServer( array(), array( $resource ) ) ) )->read_resource(
+			array( 'uri' => 'test://completed-resource' ),
+			1
+		);
+
+		$this->assertSame( 'done', $result['contents'][0]['text'] );
+	}
+
 	public function test_missing_uri_returns_error(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array( 'test/resource' ) );

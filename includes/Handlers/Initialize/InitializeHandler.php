@@ -11,6 +11,7 @@ namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Core\McpVersionNegotiator;
+use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
 
 /**
  * Handles the initialize MCP method.
@@ -66,24 +67,32 @@ class InitializeHandler {
 			'tools'     => array( 'listChanged' => false ),
 		);
 
-		$result = array(
-			'protocolVersion' => $negotiated_version,
-			'capabilities'    => $capabilities,
-			'serverInfo'      => $server_info,
-			'instructions'    => $this->mcp->get_server_description(),
+		$result = InitializeResult::fromArray(
+			array(
+				'protocolVersion' => $negotiated_version,
+				'capabilities'    => $capabilities,
+				'serverInfo'      => $server_info,
+				'instructions'    => $this->mcp->get_server_description(),
+			)
 		);
 
 		/**
 		 * Filters the initialize response before returning to the client.
 		 *
 		 * Use this filter to modify server capabilities, instructions, or
-		 * other initialization data dynamically.
+		 * other initialization data dynamically. Call `$result->toArray()`,
+		 * change the data, and return `InitializeResult::fromArray( $data )`.
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array                  $result The initialize result data.
-		 * @param \WP\MCP\Core\McpServer $server The MCP server instance.
+		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result facade.
+		 * @param \WP\MCP\Core\McpServer                              $server The MCP server instance.
 		 */
-		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );
+		$filtered = apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );
+		if ( $filtered instanceof InitializeResult ) {
+			return $filtered->toArray();
+		}
+
+		return is_array( $filtered ) ? $filtered : $result->toArray();
 	}
 }

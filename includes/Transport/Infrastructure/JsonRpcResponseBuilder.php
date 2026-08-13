@@ -61,7 +61,7 @@ class JsonRpcResponseBuilder {
 	 * @param array $messages Array of JSON-RPC messages to process.
 	 * @param bool $is_batch_request Whether the original request was a batch.
 	 * @param callable $processor Callback function to process each individual message.
-	 *                                Should accept (array $message) and return array $response.
+	 *                                Should accept the decoded message and return an array response.
 	 *
 	 * @return array|null The formatted response (array for batch, single response for non-batch).
 	 */
@@ -105,6 +105,6 @@ class JsonRpcResponseBuilder {
 	 * @return bool True if this is a batch request.
 	 */
 	public static function is_batch_request( $body ): bool {
-		return is_array( $body ) && isset( $body[0] );
+		return is_array( $body ) && array() !== $body && array_keys( $body ) === range( 0, count( $body ) - 1 );
 	}
 }

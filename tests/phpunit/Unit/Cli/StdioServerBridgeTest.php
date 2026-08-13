@@ -79,7 +79,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'method'  => 'initialize',
 				'params'  => array(
 					'protocolVersion' => '2025-11-25',
-					'capabilities'    => array(),
+					'capabilities'    => new \stdClass(),
 					'clientInfo'      => array(
 						'name'    => 'test-client',
 						'version' => '1.0.0',
@@ -151,7 +151,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'jsonrpc' => '1.0', // Invalid version
 				'id'      => 1,
 				'method'  => 'initialize',
-				'params'  => array(),
+				'params'  => new \stdClass(),
 			)
 		);
 
@@ -333,7 +333,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 2,
 				'method'  => 'tools/list',
-				'params'  => array(),
+				'params'  => new \stdClass(),
 			)
 		);
 
@@ -378,7 +378,7 @@ final class StdioServerBridgeTest extends TestCase {
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
 		$handle_request_method->setAccessible( true );
 
-		// Test with string params (should be converted to empty array)
+		// Scalar params violate the exact request schema.
 		$json_input = wp_json_encode(
 			array(
 				'jsonrpc' => '2.0',
@@ -392,8 +392,7 @@ final class StdioServerBridgeTest extends TestCase {
 
 		$this->assertIsString( $result );
 		$response = json_decode( $result, true );
-		// Should still work since ping doesn't require specific params
-		$this->assertArrayHasKey( 'result', $response );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['error']['code'] );
 	}
 
 	public function test_handle_request_with_exception_in_routing(): void {
@@ -449,7 +448,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 42,
 				'method'  => 'ping',
-				'params'  => array(),
+				'params'  => new \stdClass(),
 			)
 		);
 
@@ -536,7 +535,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 1,
 				'method'  => 12345, // Non-string method
-				'params'  => array(),
+				'params'  => new \stdClass(),
 			)
 		);
 
@@ -632,7 +631,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 3,
 				'method'  => 'resources/list',
-				'params'  => array(),
+				'params'  => new \stdClass(),
 			)
 		);
 
@@ -657,7 +656,7 @@ final class StdioServerBridgeTest extends TestCase {
 				'jsonrpc' => '2.0',
 				'id'      => 4,
 				'method'  => 'prompts/list',
-				'params'  => array(),
+				'params'  => new \stdClass(),
 			)
 		);
 
@@ -827,17 +826,127 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $response['error']['code'] );
 	}
 
+	public function test_raw_stdio_rejects_legacy_capabilities_list(): void {
+		$response = $this->handleRaw(
+			'{"jsonrpc":"2.0","id":87,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":[],"clientInfo":{"name":"raw-client","version":"1.0.0"}}}'
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['error']['code'] );
+	}
+
+	public function test_raw_stdio_accepts_modern_client_capabilities_object(): void {
+		$response = $this->handleRaw(
+			'{"jsonrpc":"2.0","id":88,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+		);
+
+		$this->assertArrayHasKey( 'result', $response );
+		$this->assertSame( 'complete', $response['result']['resultType'] );
+	}
+
+	public function test_raw_stdio_rejects_modern_object_fields_encoded_as_lists(): void {
+		$client_capabilities = $this->handleRaw(
+			'{"jsonrpc":"2.0","id":89,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":[]}}}'
+		);
+		$arguments           = $this->handleRaw(
+			'{"jsonrpc":"2.0","id":90,"method":"tools/call","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test-always-allowed","arguments":[]}}'
+		);
+		$input_responses     = $this->handleRaw(
+			'{"jsonrpc":"2.0","id":91,"method":"tools/call","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test-always-allowed","arguments":{},"inputResponses":[],"requestState":"opaque"}}'
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $client_capabilities['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $arguments['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $input_responses['error']['code'] );
+	}
+
+	public function test_modern_request_does_not_replace_initialized_legacy_revision(): void {
+		$this->initialize_legacy();
+		$modern = $this->handleRaw(
+			'{"jsonrpc":"2.0","id":92,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}'
+		);
+		$legacy = $this->handle(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 93,
+				'method'  => 'ping',
+			)
+		);
+
+		$this->assertSame( 'complete', $modern['result']['resultType'] );
+		$this->assertSame( array(), $legacy['result'] );
+	}
+
+	public function test_modern_stdio_response_preserves_numeric_key_objects(): void {
+		$filter = static fn() => array(
+			'numeric' => (object) array( 0 => 'zero' ),
+		);
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$reflection = new \ReflectionClass( $this->bridge );
+			$method     = $reflection->getMethod( 'handle_request' );
+			$method->setAccessible( true );
+			$response = $method->invoke(
+				$this->bridge,
+				'{"jsonrpc":"2.0","id":94,"method":"tools/call","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}},"name":"test-always-allowed","arguments":{}}}'
+			);
+
+			$this->assertIsString( $response );
+			$this->assertStringContainsString( '"numeric":{"0":"zero"}', $response );
+			$this->assertStringNotContainsString( '"numeric":["zero"]', $response );
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+	}
+
 	/** @param array<string, mixed> $request */
 	private function handle( array $request ): array {
 		$reflection = new \ReflectionClass( $this->bridge );
 		$method     = $reflection->getMethod( 'handle_request' );
 		$method->setAccessible( true );
-		$response = $method->invoke( $this->bridge, wp_json_encode( $request ) );
+		$response = $method->invoke( $this->bridge, wp_json_encode( $this->normalizeTestWireObjects( $request ) ) );
 		$decoded  = json_decode( $response, true );
 
 		$this->assertIsArray( $decoded );
 
 		return $decoded;
+	}
+
+	/** @return array<string,mixed> */
+	private function handleRaw( string $json ): array {
+		$reflection = new \ReflectionClass( $this->bridge );
+		$method     = $reflection->getMethod( 'handle_request' );
+		$method->setAccessible( true );
+		$response = $method->invoke( $this->bridge, $json );
+		$decoded  = json_decode( $response, true );
+
+		$this->assertIsArray( $decoded );
+
+		return $decoded;
+	}
+
+	/** @param mixed $value @return mixed */
+	private function normalizeTestWireObjects( $value, ?string $key = null ) {
+		$object_keys = array(
+			'_meta',
+			'arguments',
+			'capabilities',
+			'io.modelcontextprotocol/clientCapabilities',
+			'params',
+		);
+		if ( array() === $value && null !== $key && in_array( $key, $object_keys, true ) ) {
+			return new \stdClass();
+		}
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		$result = array();
+		foreach ( $value as $item_key => $item ) {
+			$result[ $item_key ] = $this->normalizeTestWireObjects( $item, (string) $item_key );
+		}
+
+		return $result;
 	}
 
 	/** @return array<string, mixed> */
