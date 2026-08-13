@@ -1,29 +1,18 @@
-# Custom Transport Layers
+# Custom transports
 
-This guide covers how to implement custom transport layers for the MCP Adapter when the built-in `HttpTransport` doesn't meet your specific needs.
+Use a custom transport when the built-in `HttpTransport` and STDIO bridge do not fit the delivery mechanism. The injected `RequestRouter` still owns MCP request validation, method dispatch, and response serialization.
 
-## Built-in Transports
+The built-in transports support both exact revisions described in [Protocol versions](protocol-versions.md):
 
-- ✅ **`HttpTransport`** - Recommended (implements MCP 2025-11-25 specification)
-- ✅ **`STDIO Transport`** - Available via WP-CLI commands
+- MCP 2025-11-25 uses `initialize` and a negotiated session.
+- MCP 2026-07-28 is stateless and selects the revision in every request.
 
-## When to Create Custom Transports
+For authentication or authorization changes on the existing HTTP route, use [transport permissions](transport-permissions.md) instead of a custom transport.
 
-> **💡 Consider [Transport Permissions](transport-permissions.md) first**: For authentication needs, use transport permission callbacks instead of custom transports.
+## Transport interfaces
 
-Create custom transports for:
+All transports implement `McpTransportInterface`:
 
-- **Custom routing patterns** or URL structures
-- **Message queue integration** (Redis, RabbitMQ, AWS SQS)
-- **Request signing** and verification
-- **Custom encryption** or data masking
-- **Specialized protocols** beyond HTTP/STDIO
-
-## Transport Interfaces
-
-Custom transports implement one of two interfaces:
-
-### McpTransportInterface (Base)
 ```php
 interface McpTransportInterface {
     public function __construct( McpTransportContext $context );
@@ -31,7 +20,8 @@ interface McpTransportInterface {
 }
 ```
 
-### McpRestTransportInterface (REST-specific)
+REST transports also implement `McpRestTransportInterface`:
+
 ```php
 interface McpRestTransportInterface extends McpTransportInterface {
     public function check_permission( WP_REST_Request $request );
@@ -39,148 +29,109 @@ interface McpRestTransportInterface extends McpTransportInterface {
 }
 ```
 
-### Helper Trait
-Use `McpTransportHelperTrait` for common functionality:
+`McpTransportHelperTrait` provides the normalized transport name used for observability:
+
 ```php
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 
 class MyTransport implements McpRestTransportInterface {
     use McpTransportHelperTrait;
-    
-    // Provides get_transport_name() method
 }
 ```
 
-## Creating Custom Transports
+## Route a request
 
-### Basic Example: API Key Transport
+Call `RequestRouter::route_request()` with the MCP method, params, request ID, and transport name. Existing four- and five-argument calls remain compatible and default to the legacy revision when no other selector exists.
 
-```php
-<?php
-use WP\MCP\Transport\Contracts\McpRestTransportInterface;
-use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
+When the transport knows the revision, pass it as the optional sixth argument:
 
-class ApiKeyTransport implements McpRestTransportInterface {
-    use McpTransportHelperTrait;
-    
-    private McpTransportContext $context;
-    
-    public function __construct( McpTransportContext $context ) {
-        $this->context = $context;
-        $this->register_routes();
-    }
-    
-    public function register_routes(): void {
-        $server = $this->context->mcp_server;
-        
-        register_rest_route(
-            $server->get_server_route_namespace(),
-            $server->get_server_route(),
-            [
-                'methods' => ['POST', 'GET', 'DELETE'],
-                'callback' => [$this, 'handle_request'],
-                'permission_callback' => [$this, 'check_permission'],
-            ]
-        );
-    }
-    
-    public function check_permission( \WP_REST_Request $request ) {
-        $api_key = sanitize_text_field( $request->get_header( 'X-API-Key' ) );
-
-        if ( empty( $api_key ) ) {
-            return false;
-        }
-
-        // Validate against stored keys
-        $valid_keys = get_option( 'mcp_api_keys', array() );
-        return in_array( $api_key, $valid_keys, true );
-    }
-    
-    public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
-        $body = $request->get_json_params();
-        
-        if ( empty( $body['method'] ) ) {
-            return new \WP_REST_Response( 
-                ['error' => 'MCP method required'], 
-                400 
-            );
-        }
-        
-        // Route through the request router
-        $result = $this->context->request_router->route_request(
-            $body['method'],
-            $body['params'] ?? [],
-            $body['id'] ?? 0,
-            $this->get_transport_name()
-        );
-        
-        return rest_ensure_response( $result );
-    }
-}
-```
-
-### Using the Custom Transport
-
-```php
-add_action( 'mcp_adapter_init', function( $adapter ) {
-    $adapter->create_server(
-        'api-key-server',
-        'my-plugin',
-        'secure-mcp',
-        'Secure MCP Server',
-        'MCP server with API key authentication',
-        '1.0.0',
-        array( ApiKeyTransport::class ), // Use custom transport
-        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
-        null,                            // Observability handler (null = default)
-        array( 'my-plugin/secure-tool' ) // Tools
-    );
-});
-```
-
-## Transport Permissions vs Custom Transports
-
-### Use Transport Permissions For:
-- ✅ **Authentication logic** (role checks, API keys)
-- ✅ **User-based permissions** (capability validation)
-- ✅ **Time-based access** (business hours)
-- ✅ **Most authorization needs**
-
-See [Transport Permissions](transport-permissions.md) for simpler authentication solutions.
-
-### Use Custom Transports For:
-- ✅ **Custom routing patterns**
-- ✅ **Message queue integration**
-- ✅ **Request signing/encryption**
-- ✅ **Specialized protocols**
-
-## Implementation Notes
-
-### Required Methods
-- `__construct()`: Accept `McpTransportContext` and call `register_routes()`
-- `register_routes()`: Register WordPress REST API endpoints
-- `check_permission()`: Validate request access (REST transports only)
-- `handle_request()`: Process MCP requests (REST transports only)
-
-### Helper Trait Benefits
-- `get_transport_name()`: Normalized transport name for metrics
-- Consistent naming conventions
-- Shared utility methods
-
-### Request Routing
-All transports use the injected `request_router` to process MCP methods:
 ```php
 $result = $this->context->request_router->route_request(
     $method,
     $params,
     $request_id,
-    $this->get_transport_name()
+    $this->get_transport_name(),
+    null,              // HttpRequestContext, when available.
+    $protocol_version  // "2025-11-25", "2026-07-28", or null.
 );
 ```
 
-## Next Steps
+The router also reads `params._meta["io.modelcontextprotocol/protocolVersion"]` for modern requests and `params.protocolVersion` for `initialize`. An explicit version does not replace transport-level lifecycle enforcement. A custom transport is responsible for:
 
-- **[Transport Permissions](transport-permissions.md)** - Simpler authentication approach
-- **[Error Handling](error-handling.md)** - Custom error management
-- **[Architecture Overview](../architecture/overview.md)** - System design
+- validating the top-level JSON-RPC envelope before routing;
+- suppressing responses to notifications and client responses;
+- retaining the negotiated `2025-11-25` version and any session identity between legacy requests;
+- requiring and comparing the relevant protocol headers when its delivery mechanism uses them;
+- keeping MCP 2026-07-28 requests independent and passing their exact declared version;
+- authenticating the caller before routing; and
+- wrapping the router's bare result or `error` array in the transport's JSON-RPC envelope.
+
+## REST example
+
+For a custom REST route, extend the built-in `HttpTransport` so JSON-RPC envelopes, notifications, batches, lossless JSON decoding, protocol headers, and legacy sessions keep the same behavior as the default route. Customize authentication with the server's transport permission callback.
+
+```php
+<?php
+use WP\MCP\Transport\HttpTransport;
+
+class CustomRouteTransport extends HttpTransport {
+
+    public function register_routes(): void {
+        $server = $this->request_handler->get_transport_context()->mcp_server;
+
+        register_rest_route(
+            $server->get_server_route_namespace(),
+            '/custom/' . ltrim( $server->get_server_route(), '/' ),
+            array(
+                'methods'             => array( 'POST', 'GET', 'DELETE' ),
+                'callback'            => array( $this, 'handle_request' ),
+                'permission_callback' => array( $this, 'check_permission' ),
+            )
+        );
+    }
+}
+```
+
+The inherited request path keeps nested JSON objects as `stdClass` and JSON lists as PHP arrays until exact schema validation. A transport that implements another delivery mechanism should use `JsonRpcRequestDecoder` and `JsonRpcRequestParams` for the same lossless boundary. Do not replace this boundary with `WP_REST_Request::get_json_params()` when accepting raw JSON.
+
+Register the transport when creating a server:
+
+```php
+add_action( 'mcp_adapter_init', function( $adapter ) {
+    $adapter->create_server(
+        'custom-route-server',
+        'my-plugin',
+        'secure-mcp',
+        'Custom Route MCP Server',
+        'MCP server exposed on a custom REST route',
+        '1.0.0',
+        array( CustomRouteTransport::class ),
+        \WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler::class,
+        null,
+        array( 'my-plugin/secure-tool' ),
+        array(),
+        array(),
+        static function(): bool {
+            return current_user_can( 'manage_options' );
+        }
+    );
+} );
+```
+
+## When a custom transport is appropriate
+
+Use transport permissions for role checks, API keys on the built-in route, user capabilities, and other authorization rules.
+
+Use a custom transport for:
+
+- custom routing or URL structures;
+- message queues such as Redis, RabbitMQ, or Amazon SQS;
+- request signing, encryption, or data masking; or
+- delivery mechanisms other than HTTP and STDIO.
+
+## Next steps
+
+- [Protocol versions](protocol-versions.md) — implement the exact lifecycle for each supported revision
+- [Transport permissions](transport-permissions.md) — customize access to built-in transports
+- [Error handling](error-handling.md) — integrate custom error management
+- [Architecture overview](../architecture/overview.md) — understand request routing and schema serialization

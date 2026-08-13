@@ -8,7 +8,7 @@ The official WordPress package for MCP integration that exposes WordPress abilit
 
 ## Overview
 
-This adapter bridges WordPress's Abilities API with the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/), providing a standardized way for AI agents to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
+This adapter bridges WordPress's Abilities API with the Model Context Protocol, providing a standardized way for AI agents to interact with WordPress functionality. It supports the exact [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/) and [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/) protocol revisions over HTTP and STDIO, with comprehensive error handling and an extensible architecture for custom integrations.
 
 ## Features
 
@@ -17,7 +17,7 @@ This adapter bridges WordPress's Abilities API with the [MCP specification](http
 - **Ability-to-MCP Conversion**: Automatically converts WordPress abilities into MCP tools, resources, and prompts
 - **Multi-Server Management**: Create and manage multiple MCP servers with unique configurations
 - **Extensible Transport Layer**:
-    - **HTTP Transport**: Unified transport implementing [MCP 2025-11-25 specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) for HTTP-based communication
+    - **HTTP Transport**: Unified transport for session-based MCP 2025-11-25 and stateless MCP 2026-07-28 requests
     - **STDIO Transport**: Process-based communication via standard input/output for local development and CLI integration
     - **Custom Transport Support**: Implement `McpTransportInterface` to create specialized communication protocols
     - **Multi-Transport Configuration**: Configure servers with multiple transport methods simultaneously
@@ -35,10 +35,10 @@ This adapter bridges WordPress's Abilities API with the [MCP specification](http
 
 ### MCP Component Support
 
-- **[Tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools.md)**: Convert WordPress abilities into executable MCP tools for AI agent interactions
-- **[Resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources.md)**: Expose WordPress data as MCP resources for contextual information access
-- **[Prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts.md)**: Transform abilities into structured MCP prompts for AI guidance and templates
-- **Server Discovery**: Automatic registration and discovery of MCP servers following MCP protocol standards
+- **[Tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)**: Convert WordPress abilities into executable MCP tools for AI agent interactions
+- **[Resources](https://modelcontextprotocol.io/specification/2025-11-25/server/resources)**: Expose WordPress data as MCP resources for contextual information access
+- **[Prompts](https://modelcontextprotocol.io/specification/2025-11-25/server/prompts)**: Transform abilities into structured MCP prompts for AI guidance and templates
+- **Server Discovery**: Advertise supported revisions and capabilities through stateless MCP 2026-07-28 `server/discover`
 - **Built-in Abilities**: Core WordPress abilities for system introspection and ability management
 - **CLI Integration**: WP-CLI commands supporting STDIO transport as defined in MCP specification
 
@@ -50,7 +50,7 @@ For a full breakdown of the component structure, see the [Architecture Overview]
 
 - **PHP**: >= 7.4
 - **WordPress**: >= 6.9 (includes the [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) in core — no separate plugin)
-- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types — installed automatically via Composer
+- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)**: Descriptor-backed records for exact MCP request validation and wire serialization, plus narrow legacy namespace facades for public compatibility — installed automatically via Composer
 
 ## Installation
 
@@ -119,6 +119,7 @@ add_action( 'plugins_loaded', function() {
 The MCP Adapter automatically creates a default server that exposes registered WordPress abilities through a layered architecture. This provides immediate MCP functionality without requiring manual server configuration.
 
 **How it works:**
+
 - WordPress abilities registered via `wp_register_ability()` with `meta.public` set to `true` are discoverable and executable on the default server via its built-in adapter tools
 - Set `meta.mcp.public` explicitly to override the high-level setting for MCP only; `false` opts a public ability out, while `true` exposes an otherwise private ability to MCP
 - On the default server, public abilities are accessed through `mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, and `mcp-adapter/execute-ability` rather than being auto-registered individually in `tools/list`
@@ -127,6 +128,8 @@ The MCP Adapter automatically creates a default server that exposes registered W
 - Built-in error handling and observability are included
 - Access via HTTP: `/wp-json/mcp/mcp-adapter-default-server`
 - Access via STDIO: `wp mcp-adapter serve --server=mcp-adapter-default-server`
+
+See [Protocol versions](docs/guides/protocol-versions.md) for the different lifecycle, metadata, and method requirements of MCP 2025-11-25 and MCP 2026-07-28.
 
 <details>
 <summary><strong>Create a new ability (click to expand)</strong></summary>
@@ -216,11 +219,12 @@ For local development and testing, you can interact directly with MCP servers us
 # List all available MCP servers
 wp mcp-adapter list
 
-# Test the discover abilities tool to see all available WordPress abilities
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mcp-adapter-discover-abilities","arguments":{}}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
-
-# Test listing available tools
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+# Initialize a legacy connection, then list tools in the same process
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"shell-client","version":"1.0.0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+  | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
 ```
 
 #### MCP Client Configuration
@@ -332,7 +336,6 @@ The MCP Adapter includes production-ready HTTP transports. For specialized requi
 
 See the [Custom Transports Guide](docs/guides/custom-transports.md) for detailed implementation instructions.
 
-
 ### Custom Transport Permissions
 
 The MCP Adapter supports custom authentication logic through transport permission callbacks. Instead of the default `is_user_logged_in()` check, you can implement custom authentication for your MCP servers.
@@ -357,4 +360,5 @@ See the [Observability Guide](docs/guides/observability.md) for detailed metrics
 - [Migration Guide: v0.3.0](docs/migration/v0.3.0.md) — Transport, observability, and hook name changes
 
 ## License
+
 [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html)
