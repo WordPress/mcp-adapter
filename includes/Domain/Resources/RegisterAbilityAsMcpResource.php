@@ -13,7 +13,7 @@ namespace WP\MCP\Domain\Resources;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\V20251125\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -74,7 +74,7 @@ class RegisterAbilityAsMcpResource {
 	 * @param \WP_Ability $ability The ability.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource|\WP_Error Returns Resource DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\V20251125\Server\Resources\DTO\Resource|\WP_Error Returns Resource DTO or WP_Error if validation fails.
 	 */
 	public static function make( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
 		$resource = new self( $ability, $error_handler );
@@ -87,7 +87,7 @@ class RegisterAbilityAsMcpResource {
 	 *
 	 * Resource schema validity is enforced by the php-mcp-schema DTO constructor.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource|\WP_Error Returns the Resource DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\V20251125\Server\Resources\DTO\Resource|\WP_Error Returns the Resource DTO or WP_Error if validation fails.
 	 */
 	private function get_resource() {
 		$data = $this->get_data();
@@ -434,7 +434,7 @@ class RegisterAbilityAsMcpResource {
 	 * @param \WP_Ability $ability The ability.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
 	 *
-	 * @return array{resource: \WP\McpSchema\Server\Resources\DTO\Resource, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{resource: \WP\McpSchema\V20251125\Server\Resources\DTO\Resource, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
 	 *
 	 */

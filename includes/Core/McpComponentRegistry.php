@@ -18,9 +18,9 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\V20251125\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\V20251125\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 /**
@@ -139,7 +139,7 @@ class McpComponentRegistry {
 		if ( $tool_item instanceof McpTool ) {
 			$this->add_mcp_tool( $tool_item );
 
-			/** @var \WP\McpSchema\Server\Tools\DTO\Tool $tool_dto */
+			/** @var \WP\McpSchema\V20251125\Server\Tools\DTO\Tool $tool_dto */
 			$tool_dto = $tool_item->get_protocol_dto();
 			$this->track_registration( 'tool', $tool_dto->getName(), 'success' );
 
@@ -173,7 +173,7 @@ class McpComponentRegistry {
 	 *
 	 */
 	private function add_mcp_tool( McpTool $mcp_tool ): void {
-		/** @var \WP\McpSchema\Server\Tools\DTO\Tool $tool_dto */
+		/** @var \WP\McpSchema\V20251125\Server\Tools\DTO\Tool $tool_dto */
 		$tool_dto  = $mcp_tool->get_protocol_dto();
 		$tool_name = $tool_dto->getName();
 
@@ -278,7 +278,7 @@ class McpComponentRegistry {
 		if ( $resource_item instanceof McpResource ) {
 			$this->add_mcp_resource( $resource_item );
 
-			/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
+			/** @var \WP\McpSchema\V20251125\Server\Resources\DTO\Resource $resource_dto */
 			$resource_dto = $resource_item->get_protocol_dto();
 			$this->track_registration( 'resource', $resource_dto->getUri(), 'success' );
 
@@ -313,7 +313,7 @@ class McpComponentRegistry {
 	 *
 	 */
 	private function add_mcp_resource( McpResource $mcp_resource ): bool {
-		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
+		/** @var \WP\McpSchema\V20251125\Server\Resources\DTO\Resource $resource_dto */
 		$resource_dto = $mcp_resource->get_protocol_dto();
 		$uri          = $resource_dto->getUri();
 
@@ -371,7 +371,7 @@ class McpComponentRegistry {
 		if ( $added ) {
 			$this->track_registration( 'resource', $ability_name, 'success' );
 		} else {
-			/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
+			/** @var \WP\McpSchema\V20251125\Server\Resources\DTO\Resource $resource_dto */
 			$resource_dto = $mcp_resource->get_protocol_dto();
 			$this->track_registration(
 				'resource',
@@ -417,7 +417,7 @@ class McpComponentRegistry {
 		if ( $prompt_item instanceof McpPrompt ) {
 			$this->add_mcp_prompt( $prompt_item );
 
-			/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt_dto */
+			/** @var \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt $prompt_dto */
 			$prompt_dto = $prompt_item->get_protocol_dto();
 			$this->track_registration( 'prompt', $prompt_dto->getName(), 'success' );
 
@@ -467,7 +467,7 @@ class McpComponentRegistry {
 	 *
 	 */
 	private function add_mcp_prompt( McpPrompt $mcp_prompt ): void {
-		/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt */
+		/** @var \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt $prompt */
 		$prompt      = $mcp_prompt->get_protocol_dto();
 		$prompt_name = $prompt->getName();
 
@@ -573,7 +573,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all tools registered to the server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Tools\DTO\Tool>
+	 * @return array<string, \WP\McpSchema\V20251125\Server\Tools\DTO\Tool>
 	 */
 	public function get_tools(): array {
 		return array_map(
@@ -585,7 +585,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all resources registered to the server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Resources\DTO\Resource>
+	 * @return array<string, \WP\McpSchema\V20251125\Server\Resources\DTO\Resource>
 	 */
 	public function get_resources(): array {
 		return array_map(
@@ -597,7 +597,7 @@ class McpComponentRegistry {
 	/**
 	 * Get all prompts registered to the server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Prompts\DTO\Prompt>
+	 * @return array<string, \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt>
 	 */
 	public function get_prompts(): array {
 		return array_map(

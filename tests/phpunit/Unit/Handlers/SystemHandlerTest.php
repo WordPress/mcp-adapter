@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\System\SystemHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Protocol\DTO\Result;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\Result;
 
 final class SystemHandlerTest extends TestCase {
 

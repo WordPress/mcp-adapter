@@ -9,8 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\System;
 
-use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\Protocol\DTO\Result;
+use WP\McpSchema\V20251125\Common\AbstractDataTransferObject;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\Result;
 
 /**
  * Handles system-related MCP methods.
@@ -19,7 +19,7 @@ class SystemHandler {
 	/**
 	 * Handles the ping request.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Empty result DTO per MCP specification.
+	 * @return \WP\McpSchema\V20251125\Common\AbstractDataTransferObject Empty result DTO per MCP specification.
 	 */
 	public function ping(): AbstractDataTransferObject {
 		return Result::fromArray( array() );

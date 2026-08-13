@@ -12,8 +12,11 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Cli;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 
@@ -41,6 +44,13 @@ class StdioServerBridge {
 	private RequestRouter $request_router;
 
 	/**
+	 * Protocol context negotiated by this bridge instance.
+	 *
+	 * @var \WP\MCP\Core\McpProtocolContext
+	 */
+	private McpProtocolContext $protocol_context;
+
+	/**
 	 * Whether the bridge is currently running.
 	 *
 	 * @var bool
@@ -56,7 +66,8 @@ class StdioServerBridge {
 		$this->server = $server;
 
 		// Create request router using server's infrastructure
-		$this->request_router = $this->create_request_router();
+		$this->request_router   = $this->create_request_router();
+		$this->protocol_context = McpProtocolContext::for_2025_11_25();
 	}
 
 	/**
@@ -177,7 +188,7 @@ class StdioServerBridge {
 	private function handle_request( string $json_input ): string {
 		try {
 			// Parse JSON-RPC request
-			$request = json_decode( $json_input, true );
+			$request = JsonRpcRequestDecoder::decode( $json_input );
 
 			if ( json_last_error() !== JSON_ERROR_NONE ) {
 				return $this->create_error_response(
@@ -231,12 +242,28 @@ class StdioServerBridge {
 				$params = array();
 			}
 
+			if ( 'initialize' === $method ) {
+				$client_version         = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] ) ? $params['protocolVersion'] : '';
+				$this->protocol_context = new McpProtocolContext( McpVersionNegotiator::negotiate( $client_version ) );
+			}
+
+			$request_protocol_context = $this->protocol_context;
+			$request_meta             = $params['_meta'] ?? null;
+			if (
+				is_array( $request_meta )
+				&& McpProtocolContext::PROTOCOL_VERSION_2026_07_28 === ( $request_meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null )
+			) {
+				$request_protocol_context = new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 );
+			}
+
 			// Route the request to the appropriate handler
 			$result = $this->request_router->route_request(
 				$method,
 				$params,
 				$id,
-				'stdio'
+				'stdio',
+				null,
+				$request_protocol_context
 			);
 
 			// If this is a notification (no id), don't send a response

@@ -10,7 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\V20251125\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -50,7 +50,7 @@ class McpResourceValidator {
 	/**
 	 * Validate a Resource DTO against the MCP schema.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The resource DTO to validate.
+	 * @param \WP\McpSchema\V20251125\Server\Resources\DTO\Resource $resource_dto The resource DTO to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
 	 */

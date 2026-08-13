@@ -107,7 +107,7 @@ The MCP Adapter uses a two-layer architecture that separates protocol concerns f
 
 ### Schema layer (protocol DTOs)
 
-The Schema Layer is provided by the `php-mcp-schema` package (`WP\McpSchema\` namespace). It contains protocol-only data transfer objects that are safe to expose to MCP clients.
+The Schema Layer is provided by the `php-mcp-schema` package. It contains sibling, exact-revision DTO trees under `WP\McpSchema\V20251125\` and `WP\McpSchema\V20260728\`; every protocol type belongs to one revision explicitly.
 
 **Key DTOs:**
 
@@ -117,7 +117,7 @@ The Schema Layer is provided by the `php-mcp-schema` package (`WP\McpSchema\` na
 | Result types | `ListToolsResult`, `CallToolResult`, `ListResourcesResult`, `ReadResourceResult`, `ListPromptsResult`, `GetPromptResult` |
 | Content blocks | `TextContent`, `ImageContent`, `AudioContent`, `EmbeddedResource` |
 
-All DTOs extend `AbstractDataTransferObject`, which provides `toArray()` and `fromArray()` methods for serialization. These types carry no execution logic and no adapter-internal metadata.
+DTOs extend the `AbstractDataTransferObject` in their own revision tree, which provides `toArray()` and `fromArray()` methods for serialization. The two base classes are intentionally unrelated. These types carry no execution logic and no adapter-internal metadata.
 
 ### Adapter layer (WordPress integration)
 
@@ -140,6 +140,8 @@ This separation ensures that:
 - **Observability context** provides structured tags for logging and metrics without polluting DTO `_meta`.
 
 `McpComponentInterface` is an internal contract (`@internal`). It is not intended for third-party implementation.
+
+Existing component, list, initialize, and public handler DTO contracts use `V20251125`. The bounded dual-revision experiment is limited to `tools/call`: `ToolsHandler` classifies the raw provider result into an Adapter-owned `ToolCallOutcome`, and `RequestRouter` passes it to one result encoder with the request's `McpProtocolContext`. Content blocks remain arrays until the encoder hydrates the selected revision tree.
 
 ### Supporting layers
 
@@ -184,14 +186,14 @@ Negotiates the MCP protocol version between client and server. If the client req
 - **Validation**: Ensures transport classes implement `McpTransportInterface`
 
 ### RequestRouter
-- **Purpose**: Routes MCP method calls to handlers that return schema DTOs
-- **DTO serialization boundary**: Converts `AbstractDataTransferObject` results to arrays via `toArray()` and `JSONRPCErrorResponse` results to error arrays
+- **Purpose**: Routes MCP method calls, owns shared protocol validation, and selects the request-scoped `tools/call` result shape
+- **DTO serialization boundary**: Converts `V20251125` `AbstractDataTransferObject` results to arrays via `toArray()`, converts `JSONRPCErrorResponse` results to error arrays, and encodes `ToolCallOutcome` through the exact selected schema revision
 - **Observability**: Extracts per-component context from `McpComponentInterface::get_observability_context()` for request tagging
 
 ## Request flow
 
 ```
-AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Schema DTO --> Response
+AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Outcome/Schema DTO --> Response
 ```
 
 ### Detailed flow
@@ -199,19 +201,19 @@ AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface -
 2. **RequestRouter** maps method to appropriate handler
 3. **Handler** finds the `McpComponentInterface` component, validates input, and invokes execution
 4. **Component** delegates to a WordPress ability or direct callable, returning a result
-5. **Handler** wraps the result in a schema DTO (e.g., `CallToolResult`)
-6. **RequestRouter** calls `toArray()` on the DTO at the serialization boundary
+5. **Handler** returns a schema DTO, except `tools/call`, whose internal router path returns `ToolCallOutcome`
+6. **RequestRouter** calls `toArray()` on `V20251125` DTOs or encodes `tools/call` through the exact selected schema revision
 7. **Transport** wraps the array in a JSON-RPC envelope and returns it
 
 ### Method routing
 
-The `RequestRouter` maps MCP methods to handlers. All handlers return schema DTOs:
+The `RequestRouter` maps MCP methods to handlers. Most handlers return `V20251125` schema DTOs; `tools/call` returns an internal completed outcome before revision-specific encoding:
 
 | Method | Handler | Return Type |
 |--------|---------|-------------|
 | `initialize` | `InitializeHandler::handle()` | `InitializeResult` |
 | `tools/list` | `ToolsHandler::list_tools()` | `ListToolsResult` |
-| `tools/call` | `ToolsHandler::call_tool()` | `CallToolResult` or `JSONRPCErrorResponse` |
+| `tools/call` | `ToolsHandler::call_tool_outcome()` | `ToolCallOutcome` or `JSONRPCErrorResponse`; the result encoder emits the selected revision DTO array |
 | `resources/list` | `ResourcesHandler::list_resources()` | `ListResourcesResult` |
 | `resources/read` | `ResourcesHandler::read_resource()` | `ReadResourceResult` or `JSONRPCErrorResponse` |
 | `prompts/list` | `PromptsHandler::list_prompts()` | `ListPromptsResult` |
@@ -219,6 +221,8 @@ The `RequestRouter` maps MCP methods to handlers. All handlers return schema DTO
 | `ping` | `SystemHandler::ping()` | `Result` |
 
 Protocol-level errors (tool not found, missing parameters) return `JSONRPCErrorResponse`. Execution-level errors (permission denied, runtime failure) return the appropriate result DTO with `isError: true`.
+
+`ToolsHandler::call_tool()` remains the documented direct-call compatibility surface and returns `V20251125\CallToolResult` or `JSONRPCErrorResponse`. Protocol revision `2026-07-28` support is request-scoped and limited to completed `tools/call` responses; the Adapter does not advertise that revision through the initialize negotiator and rejects MRTR continuation fields before tool execution.
 
 ## Component creation
 
@@ -258,7 +262,7 @@ $tool = McpTool::fromArray( [
 Each component exposes its clean protocol DTO for serialization:
 
 ```php
-$dto = $tool->get_protocol_dto();  // Returns WP\McpSchema\Server\Tools\DTO\Tool
+$dto = $tool->get_protocol_dto();  // Returns WP\McpSchema\V20251125\Server\Tools\DTO\Tool
 $array = $dto->toArray();          // Protocol-safe array for JSON responses
 ```
 

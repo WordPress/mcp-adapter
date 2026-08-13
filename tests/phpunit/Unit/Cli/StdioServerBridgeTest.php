@@ -10,7 +10,9 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Cli;
 
 use WP\MCP\Cli\StdioServerBridge;
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -338,6 +340,116 @@ final class StdioServerBridgeTest extends TestCase {
 		$response = json_decode( $result, true );
 		$this->assertArrayHasKey( 'result', $response );
 		$this->assertArrayHasKey( 'tools', $response['result'] );
+	}
+
+	public function test_2026_07_28_tools_call_does_not_change_the_next_request_result_shape(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 20,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'_meta'     => array(
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+					),
+					'name'      => 'test-always-allowed',
+					'arguments' => new \stdClass(),
+				),
+			)
+		);
+
+		$result   = $handle_request_method->invoke( $this->bridge, $json_input );
+		$response = json_decode( $result, true );
+
+		$this->assertSame( 'complete', $response['result']['resultType'] );
+
+		$legacy_result = $handle_request_method->invoke(
+			$this->bridge,
+			wp_json_encode(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 21,
+					'method'  => 'tools/call',
+					'params'  => array( 'name' => 'test-always-allowed' ),
+				)
+			)
+		);
+		$legacy_response = json_decode( $legacy_result, true );
+
+		$this->assertArrayNotHasKey( 'resultType', $legacy_response['result'] );
+	}
+
+	public function test_2026_07_28_stdio_tools_call_rejects_non_objects_for_object_fields(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$wrong_shapes = array( array(), array( 'list-item' ), null, 'invalid' );
+		$request_id   = 22;
+		foreach ( array( 'clientCapabilities', 'arguments' ) as $field ) {
+			foreach ( $wrong_shapes as $wrong_shape ) {
+				$params = array(
+					'_meta'     => array(
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+					),
+					'name'      => 'test-always-allowed',
+					'arguments' => new \stdClass(),
+				);
+				if ( 'clientCapabilities' === $field ) {
+					$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = $wrong_shape;
+				} else {
+					$params['arguments'] = $wrong_shape;
+				}
+
+				$result = $handle_request_method->invoke(
+					$this->bridge,
+					wp_json_encode(
+						array(
+							'jsonrpc' => '2.0',
+							'id'      => $request_id++,
+							'method'  => 'tools/call',
+							'params'  => $params,
+						)
+					)
+				);
+				$response = json_decode( $result, true );
+
+				$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['error']['code'] );
+				$this->assertStringContainsString( 'must be a JSON object', $response['error']['message'] );
+			}
+		}
+	}
+
+	public function test_2026_07_28_request_rejects_methods_outside_tools_call(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$json_input = wp_json_encode(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 21,
+				'method'  => 'tools/list',
+				'params'  => array(
+					'_meta' => array(
+						'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+					),
+				),
+			)
+		);
+
+		$result   = $handle_request_method->invoke( $this->bridge, $json_input );
+		$response = json_decode( $result, true );
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $response['error']['code'] );
+		$this->assertStringContainsString( 'only for tools/call', $response['error']['message'] );
 	}
 
 	public function test_handle_request_with_object_params(): void {

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
@@ -192,21 +193,29 @@ class HttpRequestHandler {
 	 * @return array JSON-RPC response.
 	 */
 	private function process_jsonrpc_request( array $message, HttpRequestContext $context ): array {
-		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
-		$method     = $message['method'];
-		$params     = $message['params'] ?? array();
+		$request_id       = $message['id']; // Preserve original scalar ID (string, number, or null)
+		$method           = $message['method'];
+		$params           = $message['params'] ?? array();
+		$protocol_context = $this->resolve_protocol_context( $method, $params, $context );
 
 		// Validate session for all requests except initialize (router will handle initialize session creation)
 		if ( 'initialize' !== $method ) {
-			$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
-			if ( true !== $session_validation ) {
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
-			}
+			if ( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 === $protocol_context->get_protocol_version() || $this->has_protocol_version_metadata( $params ) ) {
+				$revision_validation_error = $this->validate_protocol_version_agreement( $params, $context );
+				if ( null !== $revision_validation_error ) {
+					return JsonRpcResponseBuilder::create_error_response( $request_id, $revision_validation_error );
+				}
+			} else {
+				$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
+				if ( true !== $session_validation ) {
+					return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
+				}
 
-			// Validate MCP-Protocol-Version header for non-initialize requests.
-			$protocol_version_error = $this->validate_protocol_version_header( $context );
-			if ( null !== $protocol_version_error ) {
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
+				// Validate MCP-Protocol-Version header for session-based non-initialize requests.
+				$protocol_version_error = $this->validate_protocol_version_header( $context );
+				if ( null !== $protocol_version_error ) {
+					return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
+				}
 			}
 		}
 
@@ -216,7 +225,8 @@ class HttpRequestHandler {
 			$params,
 			$request_id,
 			$this->get_transport_name(),
-			$context
+			$context,
+			$protocol_context
 		);
 
 		// Handle session header if provided by router
@@ -240,6 +250,102 @@ class HttpRequestHandler {
 	 */
 	private function get_transport_name(): string {
 		return 'HTTP';
+	}
+
+	/**
+	 * Resolve the protocol revision selected for one HTTP request.
+	 *
+	 * Explicit request headers take precedence. When a session-based client omits the
+	 * header, recover the revision negotiated during initialize from the session.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string                                                        $method  MCP method name.
+	 * @param array<string, mixed>                                          $params  MCP request parameters.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context HTTP request context.
+	 */
+	private function resolve_protocol_context( string $method, array $params, HttpRequestContext $context ): McpProtocolContext {
+		if ( 'initialize' === $method ) {
+			$client_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] )
+				? $params['protocolVersion']
+				: '';
+
+			return new McpProtocolContext( McpVersionNegotiator::negotiate( $client_version ) );
+		}
+
+		$request_params = $params['params'] ?? $params;
+		if ( is_array( $request_params ) && isset( $request_params['_meta'] ) && is_array( $request_params['_meta'] ) ) {
+			$request_version = $request_params['_meta'][ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ] ?? null;
+			if ( is_string( $request_version ) && '' !== $request_version ) {
+				return new McpProtocolContext( $request_version );
+			}
+		}
+
+		if ( null !== $context->protocol_version ) {
+			return new McpProtocolContext( $context->protocol_version );
+		}
+
+		if ( null !== $context->session_id ) {
+			$session = SessionManager::get_session( get_current_user_id(), $context->session_id );
+			if ( is_array( $session ) ) {
+				$client_params = $session['client_params'] ?? null;
+				if ( is_array( $client_params ) && isset( $client_params['protocolVersion'] ) && is_string( $client_params['protocolVersion'] ) ) {
+					return new McpProtocolContext( McpVersionNegotiator::negotiate( $client_params['protocolVersion'] ) );
+				}
+			}
+		}
+
+		return McpProtocolContext::for_2025_11_25();
+	}
+
+	/**
+	 * Whether request metadata opts into the revisioned 2026 protocol shape.
+	 *
+	 * Presence, rather than validity, is checked here so malformed or unknown
+	 * revisions receive a protocol error instead of falling into session
+	 * handling.
+	 *
+	 * @param array<string, mixed> $params MCP request parameters.
+	 */
+	private function has_protocol_version_metadata( array $params ): bool {
+		$request_params = $params['params'] ?? $params;
+		if ( ! is_array( $request_params ) || ! isset( $request_params['_meta'] ) || ! is_array( $request_params['_meta'] ) ) {
+			return false;
+		}
+
+		return array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $request_params['_meta'] );
+	}
+
+	/**
+	 * Require HTTP headers and per-request metadata to select the same revision.
+	 *
+	 * Method support and request-field validation belong to RequestRouter. HTTP
+	 * validates only the agreement between its header and the request payload.
+	 *
+	 * @param array<string, mixed>                                          $params MCP request parameters.
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context HTTP request context.
+	 *
+	 * @return array<string, mixed>|null Error payload, or null when valid.
+	 */
+	private function validate_protocol_version_agreement( array $params, HttpRequestContext $context ): ?array {
+		$request_params = $params['params'] ?? $params;
+		$meta           = is_array( $request_params ) ? ( $request_params['_meta'] ?? null ) : null;
+		if ( ! is_array( $meta ) || ! array_key_exists( McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY, $meta ) ) {
+			return McpErrorFactory::create_error(
+				McpErrorFactory::HEADER_MISMATCH,
+				'The MCP-Protocol-Version header requires matching protocol-version request metadata.'
+			)->toArray();
+		}
+
+		$request_version = $meta[ McpProtocolContext::REQUEST_PROTOCOL_VERSION_META_KEY ];
+		if ( $context->protocol_version !== $request_version ) {
+			return McpErrorFactory::create_error(
+				McpErrorFactory::HEADER_MISMATCH,
+				'The MCP-Protocol-Version header must match the protocol version in request metadata.'
+			)->toArray();
+		}
+
+		return null;
 	}
 
 	/**

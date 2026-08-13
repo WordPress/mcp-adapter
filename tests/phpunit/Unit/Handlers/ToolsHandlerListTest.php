@@ -7,8 +7,8 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\V20251125\Server\Tools\DTO\ListToolsResult;
+use WP\McpSchema\V20251125\Server\Tools\DTO\Tool as ToolDto;
 
 final class ToolsHandlerListTest extends TestCase {
 

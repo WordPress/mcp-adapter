@@ -13,8 +13,8 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\PromptArgument;
 use WP_Error;
 
 /**
@@ -106,7 +106,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt|\WP_Error Returns Prompt DTO or WP_Error if validation fails.
 	 */
 	public static function make( \WP_Ability $ability ) {
 		$prompt = new self( $ability );
@@ -117,7 +117,7 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get the MCP prompt instance.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
+	 * @return \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt|\WP_Error Prompt DTO or WP_Error if validation fails.
 	 * @since 0.5.0
 	 *
 	 */
@@ -299,7 +299,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param list<array<string,mixed>> $explicit_arguments User-defined arguments array.
 	 *
-	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
+	 * @return list<\WP\McpSchema\V20251125\Server\Prompts\DTO\PromptArgument>|\WP_Error PromptArgument DTOs or WP_Error.
 	 * @since 0.5.0
 	 *
 	 */
@@ -380,7 +380,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
 	 *
-	 * @return list<\WP\McpSchema\Server\Prompts\DTO\PromptArgument> Argument DTO list.
+	 * @return list<\WP\McpSchema\V20251125\Server\Prompts\DTO\PromptArgument> Argument DTO list.
 	 * @since 0.5.0
 	 *
 	 */
@@ -482,7 +482,7 @@ class RegisterAbilityAsMcpPrompt {
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{prompt: \WP\McpSchema\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{prompt: \WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
 	 *
 	 */

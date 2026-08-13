@@ -15,10 +15,10 @@ namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\V20251125\Server\Resources\DTO\ReadResourceResult;
+use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
 
 final class DtoSerializationRegressionTest extends TestCase {
 

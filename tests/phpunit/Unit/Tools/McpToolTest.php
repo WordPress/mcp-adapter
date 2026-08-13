@@ -6,7 +6,7 @@ namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\V20251125\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 final class McpToolTest extends TestCase {

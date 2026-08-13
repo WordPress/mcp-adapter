@@ -3,6 +3,18 @@
 	"description": "Adapter for Abilities API, letting WordPress abilities to be used as MCP tools, resources or prompts",
 	"license": "GPL-2.0-or-later",
 	"type": "wordpress-plugin",
+	"repositories": [
+		{
+			"type": "path",
+			"url": "../php-mcp-schema",
+			"options": {
+				"symlink": false,
+				"versions": {
+					"wordpress/php-mcp-schema": "0.2.0"
+				}
+			}
+		}
+	],
 	"keywords": [
 		"wordpress",
 		"mcp",
@@ -57,7 +69,7 @@
 	"require": {
 		"php": "^7.4 || ^8.0",
 		"automattic/jetpack-autoloader": "^5.0",
-		"wordpress/php-mcp-schema": "^0.1.0",
+		"wordpress/php-mcp-schema": "^0.2.0",
 		"ext-json": "*"
 	},
 	"require-dev": {

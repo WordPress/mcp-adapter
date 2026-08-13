@@ -9,7 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\V20251125\Common\McpConstants;
 
 /**
  * Builds standardized JSON-RPC 2.0 responses for MCP transport.

@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Tools\ToolsHandler;
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\DTO\ImageContent;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\McpSchema\V20251125\Common\Content\DTO\ImageContent;
+use WP\McpSchema\V20251125\Common\Content\DTO\TextContent;
+use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\EmbeddedResource;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult;
 
 final class ToolsHandlerCallTest extends TestCase {
 
@@ -256,6 +257,28 @@ final class ToolsHandlerCallTest extends TestCase {
 		remove_filter( 'mcp_adapter_tool_call_result', $filter );
 	}
 
+	public function test_public_call_tool_keeps_2025_11_25_error_for_scalar_filter_result(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$filter  = static function (): string {
+			return 'scalar-after-normalization';
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-always-allowed' ),
+			),
+			7
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $result->getError()->getCode() );
+		$this->assertStringContainsString( 'Failed to execute tool', $result->getError()->getMessage() );
+	}
+
 	public function test_tool_call_preserves_meta_in_text_and_structured_content(): void {
 		$server  = $this->makeServer( array( 'test/meta-leak' ) );
 		$handler = new ToolsHandler( $server );
@@ -369,12 +392,33 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertFalse( (bool) $result->getIsError() );
 	}
 
+	public function test_call_tool_rejects_structured_content_that_the_legacy_contract_cannot_represent(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$filter  = static function (): array {
+			return array( 'one', 'two' );
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $handler->call_tool(
+			array(
+				'params' => array( 'name' => 'test-always-allowed' ),
+			),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $result->getError()->getCode() );
+	}
+
 	/**
 	 * Runs a tool whose raw result is replaced by the given embedded-resource shape.
 	 *
 	 * @param array $shape The embedded resource result to substitute.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\V20251125\Server\Tools\DTO\CallToolResult|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	private function call_tool_returning( array $shape ) {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
@@ -403,9 +447,9 @@ final class ToolsHandlerCallTest extends TestCase {
 	public function test_embedded_resource_nested_shape_preserves_meta_on_both_levels(): void {
 		$result = $this->call_tool_returning(
 			array(
-				'type'        => 'resource',
-				'_meta'       => array( 'block' => 'level' ),
-				'resource'    => array(
+				'type'     => 'resource',
+				'_meta'    => array( 'block' => 'level' ),
+				'resource' => array(
 					'uri'      => 'ui://example/app',
 					'mimeType' => 'text/html;profile=mcp-app',
 					'text'     => '<!doctype html>',

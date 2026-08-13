@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bfa32ba59be79ad50b3c83430daa6a4d",
+    "content-hash": "8f9d85c4bc222833d05a0f36355abf22",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -72,17 +72,11 @@
         },
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "v0.1.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/WordPress/php-mcp-schema",
-                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2"
-            },
+            "version": "0.2.0",
             "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
-                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
-                "shasum": ""
+                "type": "path",
+                "url": "../php-mcp-schema",
+                "reference": "9a63860804347ea2383f3e29d98ec616532d948a"
             },
             "require": {
                 "php": ">=7.4"
@@ -96,7 +90,17 @@
                     "WP\\McpSchema\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "scripts": {
+                "analyse": [
+                    "phpstan analyse"
+                ],
+                "phpstan": [
+                    "@analyse"
+                ],
+                "test": [
+                    "php tests/dual-revisions.php"
+                ]
+            },
             "license": [
                 "GPL-2.0-or-later"
             ],
@@ -115,7 +119,10 @@
                 "php",
                 "schema"
             ],
-            "time": "2026-08-10T09:12:14+00:00"
+            "transport-options": {
+                "symlink": false,
+                "relative": true
+            }
         }
     ],
     "packages-dev": [

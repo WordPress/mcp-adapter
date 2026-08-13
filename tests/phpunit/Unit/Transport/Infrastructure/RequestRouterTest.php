@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
@@ -23,7 +24,7 @@ use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\SessionManager;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\V20251125\Common\McpConstants;
 use WP_REST_Request;
 
 /**
@@ -210,6 +211,219 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result );
 		// Should either have content or error
 		$this->assertTrue( isset( $result['content'] ) || isset( $result['error'] ) );
+	}
+
+	public function test_2025_11_25_tools_call_uses_2025_11_25_result_shape(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array(
+				'name'      => 'test-always-allowed',
+				'arguments' => array(),
+			),
+			1,
+			'test-transport',
+			null,
+			McpProtocolContext::for_2025_11_25()
+		);
+
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertArrayHasKey( 'structuredContent', $result );
+		$this->assertArrayNotHasKey( 'resultType', $result );
+	}
+
+	public function test_2026_07_28_tools_call_uses_2026_07_28_result_shape(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->tool_call_params_2026_07_28(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+
+		$this->assertArrayHasKey( 'content', $result );
+		$this->assertArrayHasKey( 'structuredContent', $result );
+		$this->assertSame( 'complete', $result['resultType'] );
+	}
+
+	public function test_2026_07_28_tools_call_requires_request_metadata(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			array( 'name' => 'test-always-allowed' ),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+		$this->assertStringContainsString( 'requires params._meta', $result['error']['message'] );
+	}
+
+	public function test_2026_07_28_tools_call_rejects_non_object_client_capabilities(): void {
+		foreach ( array( array(), array( 'capability' ), null, 'invalid' ) as $index => $value ) {
+			$params = $this->tool_call_params_2026_07_28();
+			$params['_meta']['io.modelcontextprotocol/clientCapabilities'] = $value;
+			$result = $this->router->route_request(
+				'tools/call',
+				$params,
+				100 + $index,
+				'test-transport',
+				null,
+				new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+			);
+
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+			$this->assertStringContainsString( 'clientCapabilities metadata must be a JSON object', $result['error']['message'] );
+		}
+	}
+
+	public function test_2026_07_28_tools_call_rejects_non_object_arguments(): void {
+		foreach ( array( array(), array( 'argument' ), null, 42 ) as $index => $value ) {
+			$params              = $this->tool_call_params_2026_07_28();
+			$params['arguments'] = $value;
+			$result              = $this->router->route_request(
+				'tools/call',
+				$params,
+				200 + $index,
+				'test-transport',
+				null,
+				new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+			);
+
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+			$this->assertStringContainsString( 'arguments must be a JSON object', $result['error']['message'] );
+		}
+	}
+
+	public function test_unknown_protocol_context_is_rejected(): void {
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->tool_call_params_2026_07_28(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( '2099-01-01' )
+		);
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
+		$this->assertStringContainsString( '2099-01-01', $result['error']['message'] );
+	}
+
+	public function test_2026_07_28_context_rejects_methods_outside_tools_call(): void {
+		$result = $this->router->route_request(
+			'tools/list',
+			array(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $result['error']['code'] );
+		$this->assertStringContainsString( 'only for tools/call', $result['error']['message'] );
+	}
+
+	public function test_2026_07_28_continuation_fields_are_rejected_before_tool_execution(): void {
+		$executed = false;
+		$filter   = static function ( array $arguments ) use ( &$executed ): array {
+			$executed = true;
+
+			return $arguments;
+		};
+		add_filter( 'mcp_adapter_pre_tool_call', $filter );
+
+		$params                   = $this->tool_call_params_2026_07_28();
+		$params['inputResponses'] = array( 'answer' => array( 'value' => 'yes' ) );
+		$result                   = $this->router->route_request(
+			'tools/call',
+			$params,
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+		$params                   = $this->tool_call_params_2026_07_28();
+		$params['requestState']   = 'opaque-state';
+		$state_result             = $this->router->route_request(
+			'tools/call',
+			$params,
+			2,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+
+		remove_filter( 'mcp_adapter_pre_tool_call', $filter );
+
+		$this->assertFalse( $executed );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+		$this->assertStringContainsString( 'Multi round-trip', $result['error']['message'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $state_result['error']['code'] );
+		$this->assertStringContainsString( 'Multi round-trip', $state_result['error']['message'] );
+	}
+
+	public function test_2025_11_25_result_rejects_list_structured_content(): void {
+		$filter = static function (): array {
+			return array( 'one', 'two' );
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $this->router->route_request(
+			'tools/call',
+			array( 'name' => 'test-always-allowed' ),
+			1
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $result['error']['code'] );
+		$this->assertStringContainsString( 'requires structuredContent to be a JSON object', $result['error']['message'] );
+	}
+
+	public function test_2026_07_28_result_preserves_list_structured_content(): void {
+		$filter = static function (): array {
+			return array( 'one', 'two' );
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->tool_call_params_2026_07_28(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertSame( array( 'one', 'two' ), $result['structuredContent'] );
+	}
+
+	public function test_domain_result_type_is_not_interpreted_as_protocol_state(): void {
+		$filter = static function (): array {
+			return array(
+				'resultType' => 'input_required',
+				'value'      => 'domain-data',
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$result = $this->router->route_request(
+			'tools/call',
+			$this->tool_call_params_2026_07_28(),
+			1,
+			'test-transport',
+			null,
+			new McpProtocolContext( McpProtocolContext::PROTOCOL_VERSION_2026_07_28 )
+		);
+
+		remove_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertSame( 'input_required', $result['structuredContent']['resultType'] );
 	}
 
 	public function test_route_request_tools_call_preserves_meta_in_text_content(): void {
@@ -938,6 +1152,22 @@ final class RequestRouterTest extends TestCase {
 				'observability_handler' => new DummyObservabilityHandler(),
 				'error_handler'         => new DummyErrorHandler(),
 			)
+		);
+	}
+
+	/**
+	 * Build a valid request for the supported 2026-07-28 tools/call subset.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function tool_call_params_2026_07_28(): array {
+		return array(
+			'_meta'     => array(
+				'io.modelcontextprotocol/protocolVersion'    => McpProtocolContext::PROTOCOL_VERSION_2026_07_28,
+				'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+			),
+			'name'      => 'test-always-allowed',
+			'arguments' => new \stdClass(),
 		);
 	}
 }

@@ -13,11 +13,11 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult;
-use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
-use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents;
+use WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents;
+use WP\McpSchema\V20251125\Server\Resources\DTO\ListResourceTemplatesResult;
+use WP\McpSchema\V20251125\Server\Resources\DTO\ListResourcesResult;
+use WP\McpSchema\V20251125\Server\Resources\DTO\ReadResourceResult;
 
 /**
  * Handles resources-related MCP methods.
@@ -48,7 +48,7 @@ class ResourcesHandler {
 	 * Returns a ListResourcesResult DTO containing all registered resources.
 	 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourcesResult Response with resources list.
+	 * @return \WP\McpSchema\V20251125\Server\Resources\DTO\ListResourcesResult Response with resources list.
 	 */
 	public function list_resources(): ListResourcesResult {
 		$resources = array_values( $this->mcp->get_resources() );
@@ -61,7 +61,7 @@ class ResourcesHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
+		 * @param array<\WP\McpSchema\V20251125\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
 		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
 		 */
 		$resources = $this->validate_filtered_list(
@@ -86,7 +86,7 @@ class ResourcesHandler {
 	 * the base `resources` capability (no sub-flag gates it), which the server always
 	 * advertises, so spec-compliant clients call it during resource discovery.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult Empty resource-templates list.
+	 * @return \WP\McpSchema\V20251125\Server\Resources\DTO\ListResourceTemplatesResult Empty resource-templates list.
 	 */
 	public function list_resource_templates(): ListResourceTemplatesResult {
 		return ListResourceTemplatesResult::fromArray(
@@ -108,7 +108,7 @@ class ResourcesHandler {
 	 * @param array $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ReadResourceResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\V20251125\Server\Resources\DTO\ReadResourceResult|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	public function read_resource( array $params, $request_id = 0 ) {
 		// Extract parameters using helper method.
@@ -126,7 +126,7 @@ class ResourcesHandler {
 			return McpErrorFactory::resource_not_found( $request_id, $uri );
 		}
 
-		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource */
+		/** @var \WP\McpSchema\V20251125\Server\Resources\DTO\Resource $resource */
 		$resource = $mcp_resource->get_protocol_dto();
 
 		try {
@@ -231,7 +231,7 @@ class ResourcesHandler {
 	 * @param mixed $contents The contents returned by the ability.
 	 * @param string $uri The resource URI.
 	 *
-	 * @return array<\WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents>
+	 * @return array<\WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents>
 	 */
 	private function convert_contents_to_dtos( $contents, string $uri ): array {
 		// If contents is already an array of properly structured items, convert each.
@@ -284,7 +284,7 @@ class ResourcesHandler {
 	 * @param array{uri?: mixed, mimeType?: mixed, text?: mixed, blob?: mixed, _meta?: mixed} $item The content item array.
 	 * @param string $default_uri The URI to use when the item names none.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents
+	 * @return \WP\McpSchema\V20251125\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\V20251125\Common\Protocol\DTO\BlobResourceContents
 	 */
 	private function create_content_dto( array $item, string $default_uri ) {
 		$item_uri  = $item['uri'] ?? $default_uri;

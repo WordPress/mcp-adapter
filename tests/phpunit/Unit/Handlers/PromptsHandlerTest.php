@@ -7,11 +7,11 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
-use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
+use WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\GetPromptResult;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\ListPromptsResult;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\V20251125\Server\Prompts\DTO\PromptMessage;
 use WP_Error;
 
 final class PromptsHandlerTest extends TestCase {
@@ -1102,7 +1102,7 @@ final class PromptsHandlerTest extends TestCase {
 	 *
 	 * @param array $shape The prompt result to normalize.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return \WP\McpSchema\V20251125\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\V20251125\Common\JsonRpc\DTO\JSONRPCErrorResponse
 	 */
 	private function get_prompt_returning( array $shape ) {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
@@ -1131,7 +1131,7 @@ final class PromptsHandlerTest extends TestCase {
 	/**
 	 * The emitted array of the first message's content block.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
+	 * @param \WP\McpSchema\V20251125\Server\Prompts\DTO\GetPromptResult $result The prompt result.
 	 *
 	 * @return array
 	 */
