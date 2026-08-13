@@ -10,7 +10,6 @@
 /.* export-ignore
 
 # Root files that are not needed for distribution.
-/CHANGELOG.md      export-ignore
 /composer.lock     export-ignore
 /package-lock.json export-ignore
 /package.json      export-ignore
