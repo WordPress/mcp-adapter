@@ -184,6 +184,52 @@ final class WireBaselineTest extends TestCase {
 		);
 	}
 
+	public function test_http_a5_input_identity_and_list_result(): void {
+		$this->assert_wire_fixture(
+			'http-scalar-request',
+			$this->dispatch_http_raw( '"hello"' )
+		);
+
+		$this->assert_wire_fixture(
+			'http-numeric-key-request-object',
+			$this->dispatch_http_raw( '{"0":{"jsonrpc":"2.0","id":42,"method":"ping"}}' )
+		);
+
+		$this->assert_wire_fixture(
+			'http-empty-batch',
+			$this->dispatch_http_raw( '[]' )
+		);
+
+		$session = $this->start_session();
+		$this->assert_wire_fixture(
+			'http-tools-call-list-arguments',
+			$this->dispatch_http_raw(
+				'{"jsonrpc":"2.0","id":42,"method":"tools/call","params":{"name":"test-always-allowed","arguments":[1,2]}}',
+				array( 'Mcp-Session-Id' => $session )
+			)
+		);
+
+		$filter = static function (): array {
+			return array(
+				array( 'id' => 1 ),
+				array( 'id' => 2 ),
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$this->assert_wire_fixture(
+				'http-tools-call-list-result',
+				$this->dispatch_http(
+					$this->jsonrpc( 43, 'tools/call', array( 'name' => 'test-always-allowed' ) ),
+					array( 'Mcp-Session-Id' => $session )
+				)
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+	}
+
 	public function test_http_resources(): void {
 		$session = $this->start_session();
 
@@ -348,6 +394,7 @@ final class WireBaselineTest extends TestCase {
 				)
 			),
 			'stdio-parse-error'     => '{"jsonrpc": "2.0", "id": 4,',
+			'stdio-list-arguments'  => '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"test-always-allowed","arguments":[1,2]}}',
 		);
 
 		foreach ( $lines as $fixture => $line ) {

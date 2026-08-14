@@ -471,6 +471,23 @@ final class StdioServerBridgeTest extends TestCase {
 		$this->assertStringContainsString( 'not a valid Request object', $response['error']['data'] );
 	}
 
+	public function test_handle_request_rejects_non_empty_list_arguments(): void {
+		$reflection            = new \ReflectionClass( $this->bridge );
+		$handle_request_method = $reflection->getMethod( 'handle_request' );
+		$handle_request_method->setAccessible( true );
+
+		$result = $handle_request_method->invoke(
+			$this->bridge,
+			'{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"test-always-allowed","arguments":[1,2]}}'
+		);
+
+		$this->assertIsString( $result );
+		$response = json_decode( $result, true );
+		$this->assertIsArray( $response );
+		$this->assertSame( -32602, $response['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $response['error']['message'] );
+	}
+
 	public function test_handle_request_with_null_json(): void {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );

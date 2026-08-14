@@ -91,6 +91,43 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertEquals( McpErrorFactory::PARSE_ERROR, $data['error']['code'] );
 	}
 
+	public function test_handle_request_post_scalar_json_returns_invalid_request(): void {
+		$request  = $this->createRawPostRequest( '"hello"' );
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertSame( 400, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+	}
+
+	public function test_handle_request_post_numeric_key_object_is_not_a_batch(): void {
+		$request  = $this->createRawPostRequest( '{"0":{"jsonrpc":"2.0","id":1,"method":"ping"}}' );
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertSame( 400, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertArrayNotHasKey( 0, $data );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+	}
+
+	public function test_handle_request_post_empty_batch_returns_one_invalid_request(): void {
+		$request  = $this->createRawPostRequest( '[]' );
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertSame( 400, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertArrayNotHasKey( 0, $data );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $data['error']['code'] );
+	}
+
 	public function test_handle_request_post_initialize(): void {
 		$request = $this->createPostRequest(
 			array(
@@ -271,6 +308,33 @@ final class HttpRequestHandlerTest extends TestCase {
 		$data = $response->get_data();
 		$this->assertIsArray( $data );
 		$this->assertCount( 2, $data );
+	}
+
+	public function test_handle_request_post_tools_call_rejects_list_arguments(): void {
+		$session_id = $this->initializeAndGetSessionId();
+		$request    = $this->createRawPostRequest( '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"test-always-allowed","arguments":[1,2]}}' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+
+		$this->assertSame( 200, $response->get_status() );
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $data['error']['message'] );
+	}
+
+	public function test_handle_request_post_tools_call_accepts_numeric_key_object_arguments(): void {
+		$session_id = $this->initializeAndGetSessionId();
+		$request    = $this->createRawPostRequest( '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"test-always-allowed","arguments":{"0":"value"}}}' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
 	public function test_handle_request_post_notification(): void {
@@ -505,10 +569,14 @@ final class HttpRequestHandlerTest extends TestCase {
 	}
 
 	private function createPostRequest( array $body ): WP_REST_Request {
+		return $this->createRawPostRequest( (string) json_encode( $body ) );
+	}
+
+	private function createRawPostRequest( string $body ): WP_REST_Request {
 		$request = new WP_REST_Request( 'POST', '/test-mcp' );
 		$request->set_header( 'Content-Type', 'application/json' );
 		$request->set_header( 'Accept', 'application/json, text/event-stream' );
-		$request->set_body( json_encode( $body ) );
+		$request->set_body( $body );
 
 		return $request;
 	}

@@ -14,6 +14,7 @@ namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 
@@ -176,10 +177,10 @@ class StdioServerBridge {
 	 */
 	private function handle_request( string $json_input ): string {
 		try {
-			// Parse JSON-RPC request
-			$request = json_decode( $json_input, true );
-
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
+			// Parse JSON-RPC request without collapsing objects into arrays.
+			try {
+				$request_identity = JsonRpcRequestDecoder::decode( $json_input );
+			} catch ( \JsonException $exception ) {
 				return $this->create_error_response(
 					null,
 					McpErrorFactory::PARSE_ERROR,
@@ -189,13 +190,18 @@ class StdioServerBridge {
 			}
 
 			// Validate JSON-RPC structure
-			if ( ! is_array( $request ) ) {
+			if ( ! $request_identity instanceof \stdClass ) {
 				return $this->create_error_response(
 					null,
 					McpErrorFactory::INVALID_REQUEST,
 					'Invalid Request',
 					'The JSON sent is not a valid Request object.'
 				);
+			}
+
+			$request = JsonRpcRequestDecoder::to_associative( $request_identity );
+			if ( ! is_array( $request ) ) {
+				throw new \LogicException( 'A decoded JSON object must have an associative representation.' );
 			}
 
 			// Check for JSON-RPC version
@@ -236,7 +242,9 @@ class StdioServerBridge {
 				$method,
 				$params,
 				$id,
-				'stdio'
+				'stdio',
+				null,
+				$request_identity
 			);
 
 			// If this is a notification (no id), don't send a response

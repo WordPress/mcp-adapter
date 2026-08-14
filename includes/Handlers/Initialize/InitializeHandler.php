@@ -54,10 +54,9 @@ class InitializeHandler {
 			'version' => $this->mcp->get_server_version(),
 		);
 
-		// Capabilities should only be advertised if they are implemented end-to-end.
-		// IMPORTANT: We set explicit boolean values (not empty arrays) to ensure proper JSON serialization.
-		// Empty arrays `[]` serialize as JSON arrays `[]`, but MCP spec requires JSON objects `{}`.
-		// Setting explicit values like `listChanged: false` produces associative arrays that serialize correctly.
+		// Capabilities are advertised only when implemented end-to-end. The
+		// explicit false values deliberately tell clients that list-change
+		// notifications and resource subscriptions are not emitted.
 		$capabilities = array(
 			'prompts'   => array( 'listChanged' => false ),
 			'resources' => array(

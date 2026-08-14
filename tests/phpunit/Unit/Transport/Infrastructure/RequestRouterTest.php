@@ -74,7 +74,8 @@ final class RequestRouterTest extends TestCase {
 	}
 
 	public function test_route_request_initialize(): void {
-		$result = $this->router->route_request(
+		$new_session_id = null;
+		$result         = $this->router->route_request(
 			'initialize',
 			array(
 				'protocolVersion' => '2025-11-25',
@@ -125,15 +126,17 @@ final class RequestRouterTest extends TestCase {
 			),
 			1,
 			'test-transport',
-			$http_context
+			$http_context,
+			null,
+			$new_session_id
 		);
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'protocolVersion', $result );
 
-		// Should have session ID for HTTP context
-		$this->assertArrayHasKey( '_session_id', $result );
-		$this->assertIsString( $result['_session_id'] );
+		// Session transport metadata must never be inserted into the MCP result.
+		$this->assertArrayNotHasKey( '_session_id', $result );
+		$this->assertIsString( $new_session_id );
 	}
 
 	/**

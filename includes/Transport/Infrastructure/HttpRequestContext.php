@@ -37,11 +37,42 @@ class HttpRequestContext {
 	public ?string $session_id;
 
 	/**
-	 * The JSON-decoded body of the request.
+	 * The associative request representation derived from the identity-preserving body.
+	 *
+	 * Non-array JSON roots leave this property null.
 	 *
 	 * @var array|null
 	 */
 	public ?array $body;
+
+	/**
+	 * The exact raw request body bytes.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var string|null
+	 */
+	public ?string $raw_body;
+
+	/**
+	 * The decoded body with JSON object/list identity preserved.
+	 *
+	 * JSON objects are stdClass instances and JSON arrays are PHP lists.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var mixed
+	 */
+	public $identity_body;
+
+	/**
+	 * Whether the POST body failed JSON parsing.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var bool
+	 */
+	public bool $body_has_parse_error;
 
 	/**
 	 * The MCP-Protocol-Version header from the request.
@@ -65,11 +96,31 @@ class HttpRequestContext {
 	 * @param \WP_REST_Request<array<string, mixed>> $request The original request object.
 	 */
 	public function __construct( \WP_REST_Request $request ) {
-		$this->request          = $request;
-		$this->method           = $request->get_method();
-		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
-		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
-		$this->accept_header    = $request->get_header( 'accept' );
-		$this->body             = 'POST' === $this->method ? $request->get_json_params() : null;
+		$this->request              = $request;
+		$this->method               = $request->get_method();
+		$this->session_id           = $request->get_header( 'Mcp-Session-Id' );
+		$this->protocol_version     = $request->get_header( 'Mcp-Protocol-Version' );
+		$this->accept_header        = $request->get_header( 'accept' );
+		$this->raw_body             = null;
+		$this->identity_body        = null;
+		$this->body                 = null;
+		$this->body_has_parse_error = false;
+
+		if ( 'POST' !== $this->method ) {
+			return;
+		}
+
+		$this->raw_body = (string) $request->get_body();
+
+		try {
+			$this->identity_body = JsonRpcRequestDecoder::decode( $this->raw_body );
+		} catch ( \JsonException $exception ) {
+			$this->body_has_parse_error = true;
+
+			return;
+		}
+
+		$associative = JsonRpcRequestDecoder::to_associative( $this->identity_body );
+		$this->body  = is_array( $associative ) ? $associative : null;
 	}
 }

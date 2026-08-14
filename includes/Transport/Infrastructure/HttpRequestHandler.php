@@ -93,9 +93,16 @@ class HttpRequestHandler {
 	private function handle_mcp_request( HttpRequestContext $context ): \WP_REST_Response {
 		try {
 			// Validate request body
-			if ( null === $context->body ) {
+			if ( $context->body_has_parse_error ) {
 				return new \WP_REST_Response(
 					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' ),
+					400
+				);
+			}
+
+			if ( ! $context->identity_body instanceof \stdClass && ! is_array( $context->identity_body ) ) {
+				return new \WP_REST_Response(
+					McpErrorFactory::invalid_request( null, 'The JSON sent is not a valid Request object' ),
 					400
 				);
 			}
@@ -126,14 +133,23 @@ class HttpRequestHandler {
 	 * @return \WP_REST_Response MCP response.
 	 */
 	private function process_mcp_messages( HttpRequestContext $context ): \WP_REST_Response {
-		$is_batch_request = JsonRpcResponseBuilder::is_batch_request( $context->body );
-		$messages         = JsonRpcResponseBuilder::normalize_messages( $context->body );
+		$is_batch_request = JsonRpcResponseBuilder::is_batch_request( $context->identity_body );
+		$messages         = JsonRpcResponseBuilder::normalize_messages( $context->identity_body );
+		$identities       = $is_batch_request ? $context->identity_body : array( $context->identity_body );
+		$identity_index   = 0;
 
 		$response_body = JsonRpcResponseBuilder::process_messages(
 			$messages,
 			$is_batch_request,
-			function ( array $message ) use ( $context ) {
-				return $this->process_single_message( $message, $context );
+			function ( array $message ) use ( $context, $identities, &$identity_index ) {
+				$identity = $identities[ $identity_index ] ?? null;
+				++$identity_index;
+
+				return $this->process_single_message(
+					$message,
+					$context,
+					$identity instanceof \stdClass ? $identity : null
+				);
 			}
 		);
 
@@ -159,9 +175,11 @@ class HttpRequestHandler {
 	 * @param array $message The MCP JSON-RPC message.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
+	 * @param \stdClass|null $request_identity Identity-preserving request object.
+	 *
 	 * @return array|null JSON-RPC response or null for notifications.
 	 */
-	private function process_single_message( array $message, HttpRequestContext $context ): ?array {
+	private function process_single_message( array $message, HttpRequestContext $context, ?\stdClass $request_identity = null ): ?array {
 		// Validate JSON-RPC message format
 		$validation = McpErrorFactory::validate_jsonrpc_message( $message );
 		if ( true !== $validation ) {
@@ -175,7 +193,7 @@ class HttpRequestHandler {
 
 		// Process requests with IDs
 		if ( isset( $message['method'] ) && isset( $message['id'] ) ) {
-			return $this->process_jsonrpc_request( $message, $context );
+			return $this->process_jsonrpc_request( $message, $context, $request_identity );
 		}
 
 		// JSON-RPC responses from client (has result/error, no method) also return null.
@@ -189,9 +207,11 @@ class HttpRequestHandler {
 	 * @param array $message The JSON-RPC message.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
+	 * @param \stdClass|null $request_identity Identity-preserving request object.
+	 *
 	 * @return array JSON-RPC response.
 	 */
-	private function process_jsonrpc_request( array $message, HttpRequestContext $context ): array {
+	private function process_jsonrpc_request( array $message, HttpRequestContext $context, ?\stdClass $request_identity = null ): array {
 		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
 		$method     = $message['method'];
 		$params     = $message['params'] ?? array();
@@ -211,18 +231,20 @@ class HttpRequestHandler {
 		}
 
 		// Route the request through the transport context
-		$result = $this->transport_context->request_router->route_request(
+		$new_session_id = null;
+		$result         = $this->transport_context->request_router->route_request(
 			$method,
 			$params,
 			$request_id,
 			$this->get_transport_name(),
-			$context
+			$context,
+			$request_identity,
+			$new_session_id
 		);
 
-		// Handle session header if provided by router
-		if ( isset( $result['_session_id'] ) ) {
-			$this->add_session_header_to_response( $result['_session_id'] );
-			unset( $result['_session_id'] ); // Remove from actual response data
+		// Carry transport session metadata outside the validated MCP result.
+		if ( null !== $new_session_id ) {
+			$this->add_session_header_to_response( $new_session_id );
 		}
 
 		// Format response based on result

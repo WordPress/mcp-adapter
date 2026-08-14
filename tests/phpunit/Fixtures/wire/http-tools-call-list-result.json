@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":43,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"[{\\\"id\\\":1},{\\\"id\\\":2}]\"}],\"isError\":false}}"
+}

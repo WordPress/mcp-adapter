@@ -41,15 +41,19 @@ class RequestRouter {
 	/**
 	 * Route a request to the appropriate handler.
 	 *
+	 * @since n.e.x.t Adds identity-preserving request input and out-of-band session output.
+	 *
 	 * @param string $method The MCP method name.
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @param \stdClass|null $request_identity Identity-preserving JSON-RPC request object.
+	 * @param string|null $new_session_id Newly created session id, if any.
 	 *
 	 * @return array
 	 */
-	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null ): array {
+	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null, ?\stdClass $request_identity = null, ?string &$new_session_id = null ): array {
 		// Track request start time.
 		$start_time = microtime( true );
 
@@ -73,7 +77,7 @@ class RequestRouter {
 			'ping'                     => fn() => $this->context->system_handler->ping(),
 			'tools/list'               => fn() => $this->context->tools_handler->list_tools(),
 			'tools/list/all'           => fn() => $this->context->tools_handler->list_all_tools(),
-			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
+			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id, $request_identity ),
 			'resources/list'           => fn() => $this->context->resources_handler->list_resources(),
 			'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates(),
 			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
@@ -111,7 +115,6 @@ class RequestRouter {
 
 			if ( null !== $new_session_id ) {
 				$component_tags['new_session_id'] = $new_session_id;
-				$result['_session_id']            = $new_session_id;
 			}
 
 			$status = 'success';

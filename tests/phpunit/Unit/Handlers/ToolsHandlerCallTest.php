@@ -325,6 +325,56 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertStringContainsString( 'arguments must be an object', $error['message'] );
 	}
 
+	public function test_call_tool_with_non_empty_list_arguments_returns_invalid_params_error(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$result  = $handler->call_tool(
+			array(
+				'params' => array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array( 1, 2 ),
+				),
+			),
+			1
+		);
+
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertSame( -32602, $result['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $result['error']['message'] );
+	}
+
+	public function test_call_tool_list_result_uses_text_without_structured_content(): void {
+		$server  = $this->makeServer( array( 'test/always-allowed' ) );
+		$handler = new ToolsHandler( $server );
+		$filter  = static function (): array {
+			return array(
+				array( 'id' => 1 ),
+				array( 'id' => 2 ),
+			);
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+
+		try {
+			$result = $handler->call_tool(
+				array(
+					'params' => array(
+						'name'      => 'test-always-allowed',
+						'arguments' => array(),
+					),
+				),
+				1
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+
+		$this->assertArrayNotHasKey( 'error', $result );
+		$this->assertArrayNotHasKey( 'structuredContent', $result );
+		$this->assertSame( 'text', $result['content'][0]['type'] );
+		$this->assertSame( '[{"id":1},{"id":2}]', $result['content'][0]['text'] );
+		$this->assertFalse( $result['isError'] );
+	}
+
 	public function test_call_tool_with_null_arguments_succeeds(): void {
 		$server  = $this->makeServer( array( 'test/always-allowed' ) );
 		$handler = new ToolsHandler( $server );

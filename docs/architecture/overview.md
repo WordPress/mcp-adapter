@@ -91,6 +91,7 @@ includes/
 │       ├── HttpRequestContext.php         # Encapsulates HTTP request data
 │       ├── HttpRequestHandler.php         # Processes raw HTTP requests
 │       ├── HttpSessionValidator.php       # Validates Mcp-Session-Id header
+│       ├── JsonRpcRequestDecoder.php       # Preserves JSON object/list identity
 │       ├── JsonRpcResponseBuilder.php     # Builds JSON-RPC responses
 │       ├── McpTransportContext.php        # Bundles server + handlers for transport use
 │       ├── McpTransportHelperTrait.php    # Shared transport utilities
@@ -421,12 +422,24 @@ class MyTransport implements McpRestTransportInterface {
     }
 
     public function handle_request( WP_REST_Request $request ): WP_REST_Response {
-        $body   = $request->get_json_params();
+        try {
+            $request_identity = JsonRpcRequestDecoder::decode( (string) $request->get_body() );
+        } catch ( JsonException $exception ) {
+            return new WP_REST_Response( ['error' => 'Invalid JSON'], 400 );
+        }
+
+        if ( ! $request_identity instanceof stdClass ) {
+            return new WP_REST_Response( ['error' => 'MCP request object required'], 400 );
+        }
+
+        $body   = JsonRpcRequestDecoder::to_associative( $request_identity );
         $result = $this->context->request_router->route_request(
             $body['method'],
             $body['params'] ?? [],
             $body['id'] ?? 0,
-            'my-transport'
+            'my-transport',
+            null,
+            $request_identity
         );
 
         return new WP_REST_Response( $result );

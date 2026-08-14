@@ -125,10 +125,11 @@ class ToolsHandler {
 	 *
 	 * @param array $params Request params.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \stdClass|null $request_identity Optional identity-preserving JSON-RPC request object.
 	 *
 	 * @return array<string, mixed> Tool-call result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function call_tool( array $params, $request_id = 0 ): array {
+	public function call_tool( array $params, $request_id = 0, ?\stdClass $request_identity = null ): array {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -136,7 +137,7 @@ class ToolsHandler {
 			return McpErrorFactory::missing_parameter( $request_id, 'tool name' );
 		}
 
-		if ( isset( $request_params['arguments'] ) && ! is_array( $request_params['arguments'] ) ) {
+		if ( isset( $request_params['arguments'] ) && ( ! is_array( $request_params['arguments'] ) || $this->arguments_are_non_object( $request_params['arguments'], $request_identity ) ) ) {
 			return McpErrorFactory::invalid_params( $request_id, 'arguments must be an object' );
 		}
 
@@ -352,13 +353,16 @@ class ToolsHandler {
 				$json_text = '{}';
 			}
 
-			return $this->mcp->get_wire_encoder()->call_tool_result(
-				array(
-					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $result,
-					'isError'           => false,
-				)
+			$payload = array(
+				'content' => array( ContentBlockHelper::text( $json_text ) ),
 			);
+
+			if ( ! is_array( $result ) || ! self::is_non_empty_list( $result ) ) {
+				$payload['structuredContent'] = $result;
+			}
+			$payload['isError'] = false;
+
+			return $this->mcp->get_wire_encoder()->call_tool_result( $payload );
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -370,6 +374,40 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
+	}
+
+	/**
+	 * Determine whether tool arguments came from a non-object JSON value.
+	 *
+	 * The primary params remain associative arrays for callback compatibility.
+	 * When available, the identity-preserving request object distinguishes a
+	 * numeric-key JSON object from a JSON list. Direct PHP callers have no such
+	 * identity, so a non-empty sequential array is treated as a list.
+	 *
+	 * @param array<mixed> $arguments Associative callback-facing arguments.
+	 * @param \stdClass|null $request_identity Identity-preserving request object.
+	 *
+	 * @return bool True when the arguments are a non-empty JSON/PHP list.
+	 */
+	private function arguments_are_non_object( array $arguments, ?\stdClass $request_identity ): bool {
+		if ( null !== $request_identity && isset( $request_identity->params ) && $request_identity->params instanceof \stdClass && property_exists( $request_identity->params, 'arguments' ) ) {
+			$identity_arguments = $request_identity->params->arguments;
+
+			return is_array( $identity_arguments ) && array() !== $identity_arguments;
+		}
+
+		return self::is_non_empty_list( $arguments );
+	}
+
+	/**
+	 * Determine whether an array is a non-empty list.
+	 *
+	 * @param array<mixed> $value Value to inspect.
+	 *
+	 * @return bool True for sequential integer keys starting at zero.
+	 */
+	private static function is_non_empty_list( array $value ): bool {
+		return array() !== $value && array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
 
 	/**
