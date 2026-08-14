@@ -1,0 +1,5 @@
+{
+    "status": 400,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":8,\"error\":{\"code\":-32600,\"message\":\"Invalid Request: Missing Mcp-Session-Id header\"}}"
+}

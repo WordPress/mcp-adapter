@@ -1,0 +1,5 @@
+{
+    "status": 400,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"code\":\"rest_invalid_json\",\"message\":\"Invalid JSON body passed.\",\"data\":{\"status\":400,\"json_error_code\":4,\"json_error_message\":\"Syntax error\"}}"
+}

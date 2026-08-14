@@ -1,0 +1,5 @@
+{
+    "status": 404,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":70,\"error\":{\"code\":-32002,\"message\":\"Resource not found: WordPress:\\/\\/local\\/does-not-exist\"}}"
+}

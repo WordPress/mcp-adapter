@@ -1,0 +1,5 @@
+{
+    "status": 500,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":82,\"error\":{\"code\":-32603,\"message\":\"Internal error: Ability \\\"test\\/prompt\\\" has invalid input. Reason: code is a required property of input.\"}}"
+}

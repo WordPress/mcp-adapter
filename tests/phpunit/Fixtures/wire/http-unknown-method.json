@@ -1,0 +1,5 @@
+{
+    "status": 404,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":92,\"error\":{\"code\":-32601,\"message\":\"Method not found: no\\/such-method\"}}"
+}
