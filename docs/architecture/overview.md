@@ -35,7 +35,7 @@ includes/
 │   │   ├── McpValidator.php                # Validates names, URIs, and schemas
 │   │   ├── McpAnnotationMapper.php         # Maps ability meta.annotations to MCP DTOs
 │   │   ├── SchemaTransformer.php           # Transforms JSON Schema formats
-│   │   ├── ContentBlockHelper.php          # Factory for MCP content block DTOs
+│   │   ├── ContentBlockHelper.php          # Factory for MCP content block arrays
 │   │   └── AbilityArgumentNormalizer.php   # Normalizes empty {} input to null
 │   ├── Tools/
 │   │   ├── McpTool.php                     # Wraps Tool DTO with execution logic
@@ -283,18 +283,18 @@ $name = McpNameSanitizer::sanitize_name( 'my-plugin/action-name' );
 
 ### ContentBlockHelper
 
-Factory for creating typed content block DTOs used in tool call results, prompt messages, and resource contents.
+Factory for creating content block arrays used in tool call results, prompt messages, and resource contents. Each method builds the matching schema DTO internally, so DTO validation still runs, and returns its array form.
 
 | Method | Returns | Purpose |
 |--------|---------|---------|
-| `text( $text )` | `TextContent` | Plain text content |
-| `json_text( $data, $flags )` | `TextContent` | JSON-encoded data as text (flags: `JSON_*` constants) |
-| `image( $data, $mime_type )` | `ImageContent` | Base64-encoded image |
-| `audio( $data, $mime_type )` | `AudioContent` | Base64-encoded audio |
-| `embedded_text_resource( $uri, $text )` | `EmbeddedResource` | Text resource embedded in content |
-| `embedded_blob_resource( $uri, $blob )` | `EmbeddedResource` | Binary resource embedded in content |
-| `error_text( $message )` | `TextContent` | Semantic alias for error messages |
-| `to_array_list( $blocks )` | `array[]` | Converts content block DTOs to arrays |
+| `text( $text )` | `array` | Plain text content |
+| `json_text( $data, $flags )` | `array` | JSON-encoded data as text (flags: `JSON_*` constants) |
+| `image( $data, $mime_type )` | `array` | Base64-encoded image |
+| `audio( $data, $mime_type )` | `array` | Base64-encoded audio |
+| `embedded_text_resource( $uri, $text )` | `array` | Text resource embedded in content |
+| `embedded_blob_resource( $uri, $blob )` | `array` | Binary resource embedded in content |
+| `error_text( $message )` | `array` | Semantic alias for error messages |
+| `to_array_list( $blocks )` | `array[]` | Returns content blocks in array form |
 
 ### AbilityArgumentNormalizer
 

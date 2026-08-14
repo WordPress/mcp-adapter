@@ -1,10 +1,10 @@
 <?php
 /**
- * ContentBlockHelper - Factory for creating MCP content block DTOs.
+ * ContentBlockHelper - Factory for creating MCP content block arrays.
  *
- * This helper provides convenience methods for constructing typed content block DTOs
- * from the php-mcp-schema library. It simplifies the creation of TextContent,
- * ImageContent, AudioContent, and EmbeddedResource instances.
+ * This helper provides convenience methods for constructing content block arrays
+ * in the shape the php-mcp-schema library emits. It simplifies the creation of
+ * text, image, audio, and embedded-resource blocks.
  *
  * @package WP\MCP\Domain\Utils
  */
@@ -16,18 +16,18 @@ namespace WP\MCP\Domain\Utils;
 use WP\McpSchema\Common\Content\DTO\AudioContent;
 use WP\McpSchema\Common\Content\DTO\ImageContent;
 use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
 use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
 use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
 
 /**
- * Helper class for creating MCP content block DTOs.
+ * Helper class for creating MCP content block arrays.
  *
- * Provides static factory methods to create typed content blocks that implement
- * ContentBlockInterface. These DTOs are used in tool call results, prompt messages,
- * and resource contents throughout the MCP protocol.
+ * Provides static factory methods that return content blocks as plain arrays.
+ * These blocks are used in tool call results, prompt messages, and resource
+ * contents throughout the MCP protocol. Each factory builds the matching schema
+ * DTO internally, so the DTO's own validation still runs, and returns its array
+ * form. Result DTOs rehydrate these arrays when they assemble a response.
  *
  * Every `_meta` argument passes through {@see McpValidator::normalize_meta()}, so a
  * PHP list is omitted instead of being serialized where MCP declares a JSON object.
@@ -37,16 +37,16 @@ use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
 final class ContentBlockHelper {
 
 	/**
-	 * Creates an ImageContent DTO.
+	 * Creates an image content block.
 	 *
 	 * @param string $data Base64-encoded image data.
 	 * @param string $mime_type The MIME type of the image (e.g., 'image/png').
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\ImageContent The created ImageContent DTO.
+	 * @return array<string, mixed> The created image content block.
 	 */
-	public static function image( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): ImageContent {
+	public static function image( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
 		return ImageContent::fromArray(
 			array(
 				'type'        => ImageContent::TYPE,
@@ -55,20 +55,20 @@ final class ContentBlockHelper {
 				'annotations' => $annotations,
 				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
-		);
+		)->toArray();
 	}
 
 	/**
-	 * Creates an AudioContent DTO.
+	 * Creates an audio content block.
 	 *
 	 * @param string $data Base64-encoded audio data.
 	 * @param string $mime_type The MIME type of the audio (e.g., 'audio/mp3').
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\AudioContent The created AudioContent DTO.
+	 * @return array<string, mixed> The created audio content block.
 	 */
-	public static function audio( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): AudioContent {
+	public static function audio( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
 		return AudioContent::fromArray(
 			array(
 				'type'        => AudioContent::TYPE,
@@ -77,15 +77,15 @@ final class ContentBlockHelper {
 				'annotations' => $annotations,
 				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
-		);
+		)->toArray();
 	}
 
 	/**
-	 * Creates an EmbeddedResource DTO with TextResourceContents.
+	 * Creates an embedded resource content block with text resource contents.
 	 *
 	 * Use this for embedding text-based resources (files, documents, etc.) in content.
 	 *
-	 * The DTO tree has two levels that each carry their own `_meta`: the content
+	 * The block has two levels that each carry their own `_meta`: the content
 	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
 	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
 	 * the spec and are not interchangeable.
@@ -95,20 +95,20 @@ final class ContentBlockHelper {
 	 * @param string $uri The URI of the resource.
 	 * @param string $text The text content of the resource.
 	 * @param string|null $mime_type Optional MIME type of the resource.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
+	 * @return array<string, mixed> The created embedded resource content block.
 	 */
 	public static function embedded_text_resource(
 		string $uri,
 		string $text,
 		?string $mime_type = null,
-		?Annotations $annotations = null,
+		?array $annotations = null,
 		?array $_meta = null,
 		?array $resource_meta = null
-	): EmbeddedResource {
+	): array {
 		$resource = TextResourceContents::fromArray(
 			array(
 				'uri'      => $uri,
@@ -125,15 +125,15 @@ final class ContentBlockHelper {
 				'annotations' => $annotations,
 				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
-		);
+		)->toArray();
 	}
 
 	/**
-	 * Creates an EmbeddedResource DTO with BlobResourceContents.
+	 * Creates an embedded resource content block with blob resource contents.
 	 *
 	 * Use this for embedding binary resources (images, PDFs, etc.) in content.
 	 *
-	 * The DTO tree has two levels that each carry their own `_meta`: the content
+	 * The block has two levels that each carry their own `_meta`: the content
 	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
 	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
 	 * the spec and are not interchangeable.
@@ -143,20 +143,20 @@ final class ContentBlockHelper {
 	 * @param string $uri The URI of the resource.
 	 * @param string $blob Base64-encoded binary data.
 	 * @param string|null $mime_type Optional MIME type of the resource.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
+	 * @return array<string, mixed> The created embedded resource content block.
 	 */
 	public static function embedded_blob_resource(
 		string $uri,
 		string $blob,
 		?string $mime_type = null,
-		?Annotations $annotations = null,
+		?array $annotations = null,
 		?array $_meta = null,
 		?array $resource_meta = null
-	): EmbeddedResource {
+	): array {
 		$resource = BlobResourceContents::fromArray(
 			array(
 				'uri'      => $uri,
@@ -173,35 +173,35 @@ final class ContentBlockHelper {
 				'annotations' => $annotations,
 				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
-		);
+		)->toArray();
 	}
 
 	/**
-	 * Creates a TextContent DTO for error messages.
+	 * Creates a text content block for error messages.
 	 *
 	 * Convenience method for creating text content specifically for error responses.
 	 * This is semantically equivalent to text() but makes the intent clearer in code.
 	 *
 	 * @param string $message The error message.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
+	 * @return array<string, mixed> The created text content block.
 	 */
-	public static function error_text( string $message, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
+	public static function error_text( string $message, ?array $annotations = null, ?array $_meta = null ): array {
 		return self::text( $message, $annotations, $_meta );
 	}
 
 	/**
-	 * Creates a TextContent DTO.
+	 * Creates a text content block.
 	 *
 	 * @param string $text The text content.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
+	 * @return array<string, mixed> The created text content block.
 	 */
-	public static function text( string $text, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
+	public static function text( string $text, ?array $annotations = null, ?array $_meta = null ): array {
 		return TextContent::fromArray(
 			array(
 				'type'        => TextContent::TYPE,
@@ -209,23 +209,23 @@ final class ContentBlockHelper {
 				'annotations' => $annotations,
 				'_meta'       => McpValidator::normalize_meta( $_meta ),
 			)
-		);
+		)->toArray();
 	}
 
 	/**
-	 * Creates a TextContent DTO with JSON-encoded data.
+	 * Creates a text content block with JSON-encoded data.
 	 *
 	 * Convenience method for creating text content from structured data.
-	 * The data is encoded as JSON and wrapped in a TextContent DTO.
+	 * The data is encoded as JSON and wrapped in a text content block.
 	 *
 	 * @param mixed $data The data to JSON-encode.
 	 * @param int $flags JSON encoding flags (default: 0).
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
 	 * @param array|null $_meta Optional metadata for the content block.
 	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
+	 * @return array<string, mixed> The created text content block.
 	 */
-	public static function json_text( $data, int $flags = 0, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
+	public static function json_text( $data, int $flags = 0, ?array $annotations = null, ?array $_meta = null ): array {
 		$json = wp_json_encode( $data, $flags );
 		if ( false === $json ) {
 			$json = '{}';
@@ -235,20 +235,17 @@ final class ContentBlockHelper {
 	}
 
 	/**
-	 * Converts an array of ContentBlockInterface DTOs to their array representations.
+	 * Returns a list of content blocks in their array representations.
 	 *
-	 * Use this at the serialization boundary when preparing content blocks for JSON output.
+	 * The factories above already return arrays, so this is a pass-through. It is
+	 * kept because call sites and third-party code use it at the serialization
+	 * boundary when preparing content blocks for JSON output.
 	 *
-	 * @param \WP\McpSchema\Common\Protocol\Union\ContentBlockInterface[] $blocks Array of content block DTOs.
+	 * @param array<int, array<string, mixed>> $blocks Array of content blocks.
 	 *
-	 * @return array[] Array of content block arrays.
+	 * @return array<int, array<string, mixed>> Array of content block arrays.
 	 */
 	public static function to_array_list( array $blocks ): array {
-		return array_map(
-			static function ( ContentBlockInterface $block ): array {
-				return $block->toArray();
-			},
-			$blocks
-		);
+		return $blocks;
 	}
 }
