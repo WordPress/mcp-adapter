@@ -11,6 +11,9 @@ namespace WP\MCP\Tests\Integration\Wire;
 
 use WP\MCP\Cli\StdioServerBridge;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Domain\Prompts\McpPrompt;
+use WP\MCP\Domain\Resources\McpResource;
+use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
@@ -447,6 +450,126 @@ final class WireBaselineTest extends TestCase {
 		);
 	}
 
+	public function test_http_2026_stateless_continuation_round_trips(): void {
+		$permission_checks = 0;
+		$this->register_continuation_components( $permission_checks );
+		$capabilities = array( 'elicitation' => array() );
+
+		$tool_params = array(
+			'name'      => 'a7-confirm-tool',
+			'arguments' => array( 'city' => 'Bucharest' ),
+		);
+		$tool_initial = $this->dispatch_modern_http( 150, 'tools/call', $tool_params, '2026-07-28', '2026-07-28', $capabilities );
+		$tool_state   = $this->request_state_from_http( $tool_initial );
+		$this->assert_wire_fixture( 'http-2026-tools-call-input-required', $tool_initial );
+
+		$tool_retry                   = $tool_params;
+		$tool_retry['requestState']   = $tool_state;
+		$tool_retry['inputResponses'] = $this->accepted_input_responses();
+		$tool_complete                = $this->dispatch_modern_http( 151, 'tools/call', $tool_retry, '2026-07-28', '2026-07-28', $capabilities );
+		$this->assert_wire_fixture( 'http-2026-tools-call-resumed', $tool_complete );
+		$this->assertSame( 2, $permission_checks, 'Tool permission must run on the initial request and the retry.' );
+
+		$tampered_state                   = $tool_state;
+		$tampered_state                   = substr( $tampered_state, 0, -1 ) . ( 'A' === substr( $tampered_state, -1 ) ? 'B' : 'A' );
+		$tampered_retry                   = $tool_retry;
+		$tampered_retry['requestState']   = $tampered_state;
+		$this->assert_wire_fixture(
+			'http-2026-tools-call-tampered-state',
+			$this->dispatch_modern_http( 152, 'tools/call', $tampered_retry, '2026-07-28', '2026-07-28', $capabilities )
+		);
+
+		$cross_request                         = $tool_retry;
+		$cross_request['arguments']['city']    = 'Cluj';
+		$this->assert_wire_fixture(
+			'http-2026-tools-call-cross-request-state',
+			$this->dispatch_modern_http( 153, 'tools/call', $cross_request, '2026-07-28', '2026-07-28', $capabilities )
+		);
+		$this->assertSame( 2, $permission_checks, 'Rejected state must not reach the permission callback.' );
+
+		$this->assert_wire_fixture(
+			'http-2026-tools-call-missing-input-capability',
+			$this->dispatch_modern_http( 154, 'tools/call', $tool_params )
+		);
+		$this->assertSame( 3, $permission_checks, 'The initial callback runs before its requested capabilities can be derived.' );
+
+		$missing_state                   = $tool_params;
+		$missing_state['inputResponses'] = $this->accepted_input_responses();
+		$this->assert_wire_fixture(
+			'http-2026-tools-call-input-responses-without-state',
+			$this->dispatch_modern_http( 155, 'tools/call', $missing_state, '2026-07-28', '2026-07-28', $capabilities )
+		);
+		$this->assertSame( 3, $permission_checks, 'Continuation validation must precede permission checks.' );
+
+		$resource_params = array( 'uri' => 'WordPress://local/a7-continuation-resource' );
+		$resource_initial = $this->dispatch_modern_http( 160, 'resources/read', $resource_params, '2026-07-28', '2026-07-28', $capabilities );
+		$resource_state   = $this->request_state_from_http( $resource_initial );
+		$this->assert_wire_fixture( 'http-2026-resources-read-input-required', $resource_initial );
+
+		$resource_retry                   = $resource_params;
+		$resource_retry['requestState']   = $resource_state;
+		$resource_retry['inputResponses'] = $this->accepted_input_responses();
+		$this->assert_wire_fixture(
+			'http-2026-resources-read-resumed',
+			$this->dispatch_modern_http( 161, 'resources/read', $resource_retry, '2026-07-28', '2026-07-28', $capabilities )
+		);
+
+		$prompt_params = array(
+			'name'      => 'a7-confirm-prompt',
+			'arguments' => array( 'topic' => 'MRTR' ),
+		);
+		$prompt_initial = $this->dispatch_modern_http( 170, 'prompts/get', $prompt_params, '2026-07-28', '2026-07-28', $capabilities );
+		$prompt_state   = $this->request_state_from_http( $prompt_initial );
+		$this->assert_wire_fixture( 'http-2026-prompts-get-input-required', $prompt_initial );
+
+		$prompt_retry                   = $prompt_params;
+		$prompt_retry['requestState']   = $prompt_state;
+		$prompt_retry['inputResponses'] = $this->accepted_input_responses();
+		$this->assert_wire_fixture(
+			'http-2026-prompts-get-resumed',
+			$this->dispatch_modern_http( 171, 'prompts/get', $prompt_retry, '2026-07-28', '2026-07-28', $capabilities )
+		);
+
+		$session = $this->start_session();
+		$this->assert_wire_fixture(
+			'http-legacy-tools-call-input-required-looking-data',
+			$this->dispatch_http(
+				$this->jsonrpc( 180, 'tools/call', $tool_params ),
+				array( 'Mcp-Session-Id' => $session )
+			)
+		);
+		$legacy_continuation                 = $tool_params;
+		$legacy_continuation['requestState'] = $tool_state;
+		$this->assert_wire_fixture(
+			'http-legacy-tools-call-continuation-rejected',
+			$this->dispatch_http(
+				$this->jsonrpc( 181, 'tools/call', $legacy_continuation ),
+				array( 'Mcp-Session-Id' => $session )
+			)
+		);
+
+		$input_required_filter = static fn(): array => array(
+			'resultType'   => 'input_required',
+			'requestState' => 'ordinary business data',
+		);
+		add_filter( 'mcp_adapter_tool_call_result', $input_required_filter );
+		try {
+			$this->assert_wire_fixture(
+				'http-2026-tools-call-non-opt-in-input-required-looking-data',
+				$this->dispatch_modern_http(
+					182,
+					'tools/call',
+					array( 'name' => 'test-always-allowed' ),
+					'2026-07-28',
+					'2026-07-28',
+					$capabilities
+				)
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $input_required_filter );
+		}
+	}
+
 	// -------------------------------------------------------------------------
 	// STDIO exchanges
 	// -------------------------------------------------------------------------
@@ -499,6 +622,36 @@ final class WireBaselineTest extends TestCase {
 		}
 	}
 
+	public function test_stdio_2026_stateless_continuation(): void {
+		$permission_checks = 0;
+		$this->register_continuation_components( $permission_checks );
+
+		$bridge = new StdioServerBridge( $this->server );
+		$handle = new \ReflectionMethod( StdioServerBridge::class, 'handle_request' );
+		$handle->setAccessible( true );
+
+		$params = $this->modern_params(
+			array(
+				'name'      => 'a7-confirm-tool',
+				'arguments' => array( 'city' => 'Bucharest' ),
+			),
+			'2026-07-28',
+			array( 'elicitation' => array() )
+		);
+		$initial = (string) $handle->invoke( $bridge, wp_json_encode( $this->jsonrpc( 190, 'tools/call', $params ) ) );
+		$this->assert_stdio_fixture( 'stdio-2026-tools-call-input-required', $initial );
+
+		$initial_data = json_decode( $initial, true );
+		$this->assertIsArray( $initial_data );
+		$this->assertIsString( $initial_data['result']['requestState'] ?? null );
+		$params['requestState']   = $initial_data['result']['requestState'];
+		$params['inputResponses'] = $this->accepted_input_responses();
+
+		$complete = (string) $handle->invoke( $bridge, wp_json_encode( $this->jsonrpc( 191, 'tools/call', $params ) ) );
+		$this->assert_stdio_fixture( 'stdio-2026-tools-call-resumed', $complete );
+		$this->assertSame( 2, $permission_checks );
+	}
+
 	// -------------------------------------------------------------------------
 	// Harness
 	// -------------------------------------------------------------------------
@@ -526,13 +679,14 @@ final class WireBaselineTest extends TestCase {
 	 *
 	 * @param array<string, mixed> $params Operation params.
 	 * @param string               $version Declared request revision.
+	 * @param array<string, mixed> $client_capabilities Per-request optional capabilities.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function modern_params( array $params = array(), string $version = '2026-07-28' ): array {
+	private function modern_params( array $params = array(), string $version = '2026-07-28', array $client_capabilities = array() ): array {
 		$params['_meta'] = array(
 			'io.modelcontextprotocol/protocolVersion'    => $version,
-			'io.modelcontextprotocol/clientCapabilities' => array(),
+			'io.modelcontextprotocol/clientCapabilities' => $client_capabilities,
 		);
 
 		return $params;
@@ -546,10 +700,11 @@ final class WireBaselineTest extends TestCase {
 	 * @param array<string, mixed> $params Operation params.
 	 * @param string               $header_version HTTP revision header.
 	 * @param string               $body_version Body metadata revision.
+	 * @param array<string, mixed> $client_capabilities Per-request optional capabilities.
 	 */
-	private function dispatch_modern_http( $id, string $method, array $params = array(), string $header_version = '2026-07-28', string $body_version = '2026-07-28' ): \WP_REST_Response {
+	private function dispatch_modern_http( $id, string $method, array $params = array(), string $header_version = '2026-07-28', string $body_version = '2026-07-28', array $client_capabilities = array() ): \WP_REST_Response {
 		return $this->dispatch_http(
-			$this->jsonrpc( $id, $method, $this->modern_params( $params, $body_version ) ),
+			$this->jsonrpc( $id, $method, $this->modern_params( $params, $body_version, $client_capabilities ) ),
 			array( 'Mcp-Protocol-Version' => $header_version )
 		);
 	}
@@ -620,7 +775,7 @@ final class WireBaselineTest extends TestCase {
 			? $headers['Mcp-Session-Id']
 			: null;
 
-		$data = $response->get_data();
+		$data = $this->normalize_dynamic_request_state( $response->get_data() );
 		$body = null === $data ? '' : (string) wp_json_encode( $data );
 
 		$captured = array(
@@ -638,10 +793,190 @@ final class WireBaselineTest extends TestCase {
 	 * Assert one STDIO exchange against its fixture (or update it).
 	 */
 	private function assert_stdio_fixture( string $name, string $output_line ): void {
+		if ( false !== strpos( $output_line, '"requestState":"mcp1.' ) ) {
+			$decoded = json_decode( $output_line, true );
+			if ( is_array( $decoded ) ) {
+				$output_line = (string) wp_json_encode( $this->normalize_dynamic_request_state( $decoded ) );
+			}
+		}
+
 		$this->handle_fixture(
 			'wire/' . $name . '.json',
 			array( 'line' => $output_line )
 		);
+	}
+
+	/**
+	 * Register direct components used only by A7 wire exchanges.
+	 */
+	private function register_continuation_components( int &$permission_checks ): void {
+		$permission = static function () use ( &$permission_checks ): bool {
+			++$permission_checks;
+
+			return true;
+		};
+		$input_required = fn( string $state ): array => array(
+			'resultType'    => 'input_required',
+			'inputRequests' => array( 'confirm' => $this->elicitation_input_request() ),
+			'requestState'  => $state,
+		);
+
+		$tool = McpTool::fromArray(
+			array(
+				'name'                    => 'a7-confirm-tool',
+				'description'             => 'A direct tool that requires confirmation.',
+				'inputSchema'             => array(
+					'type'       => 'object',
+					'properties' => array( 'city' => array( 'type' => 'string' ) ),
+					'required'   => array( 'city' ),
+				),
+				'handler'                 => static function ( array $arguments, ?array $continuation = null ) use ( $input_required ): array {
+					if ( null === $continuation ) {
+						return $input_required( 'tool:' . $arguments['city'] );
+					}
+
+					return array(
+						'completed' => true,
+						'city'      => $arguments['city'],
+						'state'     => $continuation['requestState'] ?? null,
+						'action'    => $continuation['inputResponses']['confirm']['action'] ?? null,
+					);
+				},
+				'permission'              => $permission,
+				'supports_input_required' => true,
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+
+		$resource = McpResource::fromArray(
+			array(
+				'uri'                     => 'WordPress://local/a7-continuation-resource',
+				'name'                    => 'A7 continuation resource',
+				'handler'                 => static function ( array $params, ?array $continuation = null ) use ( $input_required ) {
+					if ( null === $continuation ) {
+						return $input_required( 'resource:' . $params['uri'] );
+					}
+
+					return 'resource resumed with ' . ( $continuation['inputResponses']['confirm']['action'] ?? 'missing' );
+				},
+				'permission'              => static fn(): bool => true,
+				'supports_input_required' => true,
+			)
+		);
+		$this->assertInstanceOf( McpResource::class, $resource );
+
+		$prompt = McpPrompt::fromArray(
+			array(
+				'name'                    => 'a7-confirm-prompt',
+				'description'             => 'A direct prompt that requires confirmation.',
+				'arguments'               => array(
+					array(
+						'name'     => 'topic',
+						'required' => true,
+					),
+				),
+				'handler'                 => static function ( array $arguments, ?array $continuation = null ) use ( $input_required ): array {
+					if ( null === $continuation ) {
+						return $input_required( 'prompt:' . $arguments['topic'] );
+					}
+
+					return array(
+						'messages' => array(
+							array(
+								'role'    => 'assistant',
+								'content' => array(
+									'type' => 'text',
+									'text' => 'Prompt resumed with ' . ( $continuation['inputResponses']['confirm']['action'] ?? 'missing' ),
+								),
+							),
+						),
+					);
+				},
+				'permission'              => static fn(): bool => true,
+				'supports_input_required' => true,
+			)
+		);
+		$this->assertInstanceOf( McpPrompt::class, $prompt );
+
+		$registry_property = new \ReflectionProperty( McpServer::class, 'component_registry' );
+		$registry_property->setAccessible( true );
+		$registry = $registry_property->getValue( $this->server );
+		$this->assertInstanceOf( \WP\MCP\Core\McpComponentRegistry::class, $registry );
+		$registry->register_tools( array( $tool ) );
+		$registry->register_resources( array( $resource ) );
+		$registry->register_prompts( array( $prompt ) );
+	}
+
+	/** @return array<string, mixed> */
+	private function elicitation_input_request(): array {
+		return array(
+			'method' => 'elicitation/create',
+			'params' => array(
+				'mode'            => 'form',
+				'message'         => 'Confirm this operation',
+				'requestedSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'confirmed' => array( 'type' => 'boolean' ),
+					),
+					'required'   => array( 'confirmed' ),
+				),
+			),
+		);
+	}
+
+	/** @return array<string, mixed> */
+	private function accepted_input_responses(): array {
+		return array(
+			'confirm' => array(
+				'action'  => 'accept',
+				'content' => array( 'confirmed' => true ),
+			),
+		);
+	}
+
+	private function request_state_from_http( \WP_REST_Response $response ): string {
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+		$result = $data['result'] ?? null;
+		if ( $result instanceof \stdClass ) {
+			$result = get_object_vars( $result );
+		}
+		$this->assertIsArray( $result );
+		$this->assertIsString( $result['requestState'] ?? null );
+
+		return $result['requestState'];
+	}
+
+	/**
+	 * Replace only Adapter-signed state, preserving all other exact wire data.
+	 *
+	 * @param mixed $value Wire value.
+	 * @return mixed
+	 */
+	private function normalize_dynamic_request_state( $value ) {
+		if ( is_string( $value ) && 0 === strpos( $value, 'mcp1.' ) ) {
+			return '{{REQUEST_STATE}}';
+		}
+
+		if ( $value instanceof \stdClass ) {
+			$result = new \stdClass();
+			foreach ( get_object_vars( $value ) as $key => $item ) {
+				$result->{$key} = $this->normalize_dynamic_request_state( $item );
+			}
+
+			return $result;
+		}
+
+		if ( ! is_array( $value ) ) {
+			return $value;
+		}
+
+		foreach ( $value as $key => $item ) {
+			$value[ $key ] = $this->normalize_dynamic_request_state( $item );
+		}
+
+		return $value;
 	}
 
 	/**

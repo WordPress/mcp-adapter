@@ -73,6 +73,17 @@ final class V20260728WireEncoder extends AbstractWireEncoder {
 		return $this->encode( $this->catalog->callToolResult(), $this->enrich_result( $data, false ) );
 	}
 
+	/**
+	 * Encode the modern input-required union arm used by tools, resources, and prompts.
+	 *
+	 * @param array<string, mixed> $data Adapter continuation result.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function input_required_result( array $data ): array {
+		return $this->encode( $this->catalog->inputRequiredResult(), $this->enrich_result( $data, false ) );
+	}
+
 	/** @inheritDoc */
 	public function list_resources_result( array $data ): array {
 		return $this->encode( $this->catalog->listResourcesResult(), $this->enrich_result( $data, true ) );
@@ -122,6 +133,35 @@ final class V20260728WireEncoder extends AbstractWireEncoder {
 	 */
 	public function validate_request_metadata( array $params ): void {
 		$this->catalog->requestMetaObject()->fromValue( $params['_meta'] ?? null );
+	}
+
+	/**
+	 * Validate and normalize continuation-capable operation params.
+	 *
+	 * Callback-facing values remain associative arrays after validation; the
+	 * final result encoder remains responsible for exact JSON object identity.
+	 *
+	 * @param string               $method Continuation-capable MCP method.
+	 * @param array<string, mixed> $params Request params.
+	 *
+	 * @return array<string, mixed>
+	 *
+	 * @throws \InvalidArgumentException When the method cannot continue.
+	 * @throws \WP\McpSchema\Runtime\ValidationException When params are malformed.
+	 */
+	public function continuation_request_params( string $method, array $params ): array {
+		switch ( $method ) {
+			case 'tools/call':
+				return $this->catalog->callToolRequestParams()->fromValue( $params )->toArray();
+
+			case 'resources/read':
+				return $this->catalog->readResourceRequestParams()->fromValue( $params )->toArray();
+
+			case 'prompts/get':
+				return $this->catalog->getPromptRequestParams()->fromValue( $params )->toArray();
+		}
+
+		throw new \InvalidArgumentException( 'This MCP method cannot carry continuation params.' );
 	}
 
 	/**

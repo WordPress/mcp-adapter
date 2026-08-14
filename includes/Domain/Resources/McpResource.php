@@ -80,6 +80,13 @@ final class McpResource implements McpComponentInterface {
 	private $permission_callback = null;
 
 	/**
+	 * Whether this direct component opted into modern input-required results.
+	 *
+	 * @var bool
+	 */
+	private bool $supports_input_required = false;
+
+	/**
 	 * Internal adapter metadata (never exposed to clients).
 	 *
 	 * @var array<string, mixed>
@@ -195,8 +202,9 @@ final class McpResource implements McpComponentInterface {
 			}
 		}
 
-		$instance          = new self( $resource );
-		$instance->handler = $config['handler'];
+		$instance                          = new self( $resource );
+		$instance->handler                 = $config['handler'];
+		$instance->supports_input_required = true === ( $config['supports_input_required'] ?? false );
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
 			$instance->permission_callback = $config['permission'];
@@ -258,11 +266,12 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Execute the resource read.
 	 *
-	 * @param mixed $arguments Read arguments (may be empty).
+	 * @param mixed             $arguments    Read arguments (may be empty).
+	 * @param array<string, mixed>|null $continuation Validated continuation data for opted-in direct callbacks.
 	 *
 	 * @return mixed
 	 */
-	public function execute( $arguments ) {
+	public function execute( $arguments, ?array $continuation = null ) {
 		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
 			try {
@@ -278,7 +287,9 @@ final class McpResource implements McpComponentInterface {
 
 		if ( null !== $this->handler ) {
 			try {
-				return call_user_func( $this->handler, $arguments );
+				return $this->supports_input_required
+					? call_user_func( $this->handler, $arguments, $continuation )
+					: call_user_func( $this->handler, $arguments );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_execution_failed',
@@ -340,6 +351,13 @@ final class McpResource implements McpComponentInterface {
 	 */
 	public function get_adapter_meta(): array {
 		return $this->adapter_meta;
+	}
+
+	/**
+	 * Whether this direct resource opted into modern continuation callbacks.
+	 */
+	public function supports_input_required(): bool {
+		return $this->supports_input_required;
 	}
 
 	/**

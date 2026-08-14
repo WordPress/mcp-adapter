@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
@@ -110,10 +111,11 @@ class PromptsHandler {
 	 * @param array           $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
+	 * @param array<string, mixed>|null $continuation Validated modern continuation data.
 	 *
 	 * @return array<string, mixed> Prompt result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function get_prompt( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null ): array {
+	public function get_prompt( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null, ?array $continuation = null ): array {
 		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
 
 		// Extract parameters using helper method.
@@ -134,6 +136,10 @@ class PromptsHandler {
 
 		if ( ! $mcp_prompt ) {
 			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name, $encoder->revision() );
+		}
+
+		if ( null !== $continuation && ! $mcp_prompt->supports_input_required() ) {
+			return McpErrorFactory::invalid_params( $request_id, 'This prompt does not accept continuation data' );
 		}
 
 		$prompt = $mcp_prompt->get_protocol_dto();
@@ -172,7 +178,7 @@ class PromptsHandler {
 				return McpErrorFactory::internal_error( $request_id, $arguments->get_error_message() );
 			}
 
-			$result = $mcp_prompt->execute( $arguments );
+			$result = $mcp_prompt->execute( $arguments, $continuation );
 
 			/**
 			 * Filters the prompt execution result before normalization.
@@ -201,6 +207,15 @@ class PromptsHandler {
 				);
 
 				return McpErrorFactory::internal_error( $request_id, $result->get_error_message() );
+			}
+
+			if (
+				$mcp_prompt->supports_input_required()
+				&& McpVersionNegotiator::is_modern( $encoder->revision() )
+				&& is_array( $result )
+				&& 'input_required' === ( $result['resultType'] ?? null )
+			) {
+				return $result;
 			}
 
 			return $encoder->get_prompt_result(

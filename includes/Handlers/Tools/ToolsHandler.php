@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
@@ -128,10 +129,11 @@ class ToolsHandler {
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 * @param \stdClass|null $request_identity Optional identity-preserving JSON-RPC request object.
 	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
+	 * @param array<string, mixed>|null $continuation Validated modern continuation data.
 	 *
 	 * @return array<string, mixed> Tool-call result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function call_tool( array $params, $request_id = 0, ?\stdClass $request_identity = null, ?WireEncoderInterface $encoder = null ): array {
+	public function call_tool( array $params, $request_id = 0, ?\stdClass $request_identity = null, ?WireEncoderInterface $encoder = null, ?array $continuation = null ): array {
 		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
 
 		// Extract parameters using helper method.
@@ -160,6 +162,10 @@ class ToolsHandler {
 				);
 
 				return McpErrorFactory::tool_not_found( $request_id, $tool_name, $encoder->revision() );
+			}
+
+			if ( null !== $continuation && ! $mcp_tool->supports_input_required() ) {
+				return McpErrorFactory::invalid_params( $request_id, 'This tool does not accept continuation data' );
 			}
 
 			$permission = $mcp_tool->check_permission( $args );
@@ -203,7 +209,7 @@ class ToolsHandler {
 				return $this->create_error_result( $args->get_error_message(), $encoder );
 			}
 
-			$result = $mcp_tool->execute( $args );
+			$result = $mcp_tool->execute( $args, $continuation );
 
 			/**
 			 * Filters the tool execution result before response assembly.
@@ -233,6 +239,15 @@ class ToolsHandler {
 				);
 
 				return $this->create_error_result( $result->get_error_message(), $encoder );
+			}
+
+			if (
+				$mcp_tool->supports_input_required()
+				&& McpVersionNegotiator::is_modern( $encoder->revision() )
+				&& is_array( $result )
+				&& 'input_required' === ( $result['resultType'] ?? null )
+			) {
+				return $result;
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.

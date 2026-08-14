@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":155,\"error\":{\"code\":-32602,\"message\":\"Invalid params: A continuation retry requires the Adapter-issued requestState.\"}}"
+}

@@ -1,0 +1,5 @@
+{
+    "status": 400,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":154,\"error\":{\"code\":-32021,\"message\":\"Missing required client capability\",\"data\":{\"requiredCapabilities\":{\"elicitation\":{\"form\":{}}}}}}"
+}

@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":182,\"result\":{\"resultType\":\"complete\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"resultType\\\":\\\"input_required\\\",\\\"requestState\\\":\\\"ordinary business data\\\"}\"}],\"structuredContent\":{\"resultType\":\"input_required\",\"requestState\":\"ordinary business data\"},\"isError\":false,\"_meta\":{\"io.modelcontextprotocol\\/serverInfo\":{\"name\":\"Wire Baseline Server\",\"version\":\"0.0.1\"}}}}"
+}

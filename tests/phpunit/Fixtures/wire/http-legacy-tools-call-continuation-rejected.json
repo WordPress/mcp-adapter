@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":181,\"error\":{\"code\":-32602,\"message\":\"Invalid params: Continuation data requires MCP 2026-07-28\"}}"
+}

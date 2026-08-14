@@ -13,6 +13,7 @@ use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Protocol\ContinuationManager;
 use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
 use WP\MCP\Infrastructure\Protocol\WireEncoder;
 
@@ -31,6 +32,9 @@ class RequestRouter {
 	 */
 	private McpTransportContext $context;
 
+	/** @var \WP\MCP\Infrastructure\Protocol\ContinuationManager */
+	private ContinuationManager $continuation_manager;
+
 	/**
 	 * Initialize the request router.
 	 *
@@ -39,7 +43,8 @@ class RequestRouter {
 	public function __construct(
 		McpTransportContext $context
 	) {
-		$this->context = $context;
+		$this->context              = $context;
+		$this->continuation_manager = new ContinuationManager( $context->mcp_server->get_server_id() );
 	}
 
 	/**
@@ -67,6 +72,7 @@ class RequestRouter {
 		$wire_encoder     = $this->context->mcp_server->get_wire_encoder_for_revision( $protocol_context->revision() );
 		$is_modern        = McpVersionNegotiator::is_modern( $protocol_context->revision() );
 		$component_tags   = $this->resolve_component_observability_context( $method, $params );
+		$continuation     = null;
 
 		// Common tags for all metrics.
 		$common_tags = array(
@@ -79,28 +85,6 @@ class RequestRouter {
 			'protocol_version' => $protocol_context->revision(),
 		);
 
-		$handlers = array(
-			'tools/list'               => fn() => $this->context->tools_handler->list_tools( $wire_encoder ),
-			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id, $request_identity, $wire_encoder ),
-			'resources/list'           => fn() => $this->context->resources_handler->list_resources( $wire_encoder ),
-			'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates( $wire_encoder ),
-			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id, $wire_encoder ),
-			'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts( $wire_encoder ),
-			'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id, $wire_encoder ),
-		);
-
-		if ( $wire_encoder instanceof WireEncoder ) {
-			$handlers['initialize']     = function () use ( $params, $request_id, $http_context, $wire_encoder, &$new_session_id ) {
-				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $wire_encoder, $new_session_id );
-			};
-			$handlers['ping']           = fn() => $this->context->system_handler->ping();
-			$handlers['tools/list/all'] = fn() => $this->context->tools_handler->list_all_tools( $wire_encoder );
-		} elseif ( $wire_encoder instanceof V20260728WireEncoder ) {
-			$handlers['server/discover'] = fn() => $this->context->initialize_handler->discover( $wire_encoder );
-		} else {
-			throw new \LogicException( 'Resolved MCP revision has no matching request encoder.' );
-		}
-
 		try {
 			$handler_result = null;
 			if ( $wire_encoder instanceof V20260728WireEncoder ) {
@@ -110,10 +94,90 @@ class RequestRouter {
 					$invalid_params = McpErrorFactory::invalid_params( $request_id, $exception->getMessage() );
 					$handler_result = array( 'error' => $invalid_params['error'] );
 				}
+
+				if ( null === $handler_result && $this->continuation_manager->has_continuation_fields( $params ) ) {
+					if ( ! $this->continuation_manager->supports_method( $method ) ) {
+						$invalid_params = McpErrorFactory::invalid_params( $request_id, 'This method does not accept continuation data' );
+						$handler_result = array( 'error' => $invalid_params['error'] );
+					} else {
+						try {
+							$validated_params = $wire_encoder->continuation_request_params( $method, $params );
+							$continuation     = $this->continuation_manager->resume( $method, $validated_params, $request_identity );
+						} catch ( \WP\McpSchema\Runtime\ValidationException | \InvalidArgumentException $exception ) {
+							$invalid_params = McpErrorFactory::invalid_params( $request_id, $exception->getMessage() );
+							$handler_result = array( 'error' => $invalid_params['error'] );
+						}
+					}
+				}
+			} elseif ( $this->continuation_manager->has_continuation_fields( $params ) ) {
+				$invalid_params = McpErrorFactory::invalid_params( $request_id, 'Continuation data requires MCP 2026-07-28' );
+				$handler_result = array( 'error' => $invalid_params['error'] );
+			}
+
+			$handlers = array(
+				'tools/list'               => fn() => $this->context->tools_handler->list_tools( $wire_encoder ),
+				'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id, $request_identity, $wire_encoder, $continuation ),
+				'resources/list'           => fn() => $this->context->resources_handler->list_resources( $wire_encoder ),
+				'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates( $wire_encoder ),
+				'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id, $wire_encoder, $continuation ),
+				'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts( $wire_encoder ),
+				'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id, $wire_encoder, $continuation ),
+			);
+
+			if ( $wire_encoder instanceof WireEncoder ) {
+				$handlers['initialize']     = function () use ( $params, $request_id, $http_context, $wire_encoder, &$new_session_id ) {
+					return $this->handle_initialize_with_session( $params, $request_id, $http_context, $wire_encoder, $new_session_id );
+				};
+				$handlers['ping']           = fn() => $this->context->system_handler->ping();
+				$handlers['tools/list/all'] = fn() => $this->context->tools_handler->list_all_tools( $wire_encoder );
+			} elseif ( $wire_encoder instanceof V20260728WireEncoder ) {
+				$handlers['server/discover'] = fn() => $this->context->initialize_handler->discover( $wire_encoder );
+			} else {
+				throw new \LogicException( 'Resolved MCP revision has no matching request encoder.' );
 			}
 
 			if ( null === $handler_result ) {
 				$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			}
+
+			if ( ! isset( $handler_result['error'] ) && 'input_required' === ( $handler_result['resultType'] ?? null ) ) {
+				if ( ! $wire_encoder instanceof V20260728WireEncoder ) {
+					$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Input-required results require MCP 2026-07-28' );
+					$handler_result   = array( 'error' => $unexpected_error['error'] );
+				} else {
+					try {
+						$input_requests = $handler_result['inputRequests'] ?? array();
+						if ( ! is_array( $input_requests ) ) {
+							throw new \InvalidArgumentException( 'inputRequests must be an object-shaped array.' );
+						}
+
+						$meta                 = isset( $params['_meta'] ) && is_array( $params['_meta'] ) ? $params['_meta'] : array();
+						$client_capabilities  = isset( $meta['io.modelcontextprotocol/clientCapabilities'] ) && is_array( $meta['io.modelcontextprotocol/clientCapabilities'] )
+							? $meta['io.modelcontextprotocol/clientCapabilities']
+							: array();
+						$missing_capabilities = $this->continuation_manager->missing_capabilities( $input_requests, $client_capabilities );
+
+						if ( ! empty( $missing_capabilities ) ) {
+							$capability_error = $wire_encoder->missing_required_client_capability_error( $request_id, $missing_capabilities );
+							$handler_result   = array( 'error' => $capability_error['error'] );
+						} else {
+							$prepared_result = $this->continuation_manager->prepare_result( $method, $params, $request_identity, $handler_result );
+							$handler_result  = $wire_encoder->input_required_result( $prepared_result );
+						}
+					} catch ( \WP\McpSchema\Runtime\ValidationException | \InvalidArgumentException $exception ) {
+						$this->context->error_handler->log(
+							'Invalid MCP input-required result returned by a component.',
+							array(
+								'method'   => $method,
+								'revision' => $protocol_context->revision(),
+								'error'    => $exception->getMessage(),
+							)
+						);
+
+						$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Invalid input-required result' );
+						$handler_result   = array( 'error' => $unexpected_error['error'] );
+					}
+				}
 			}
 
 			// Calculate request duration.

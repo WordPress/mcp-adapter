@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
@@ -119,10 +120,11 @@ class ResourcesHandler {
 	 * @param array $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
+	 * @param array<string, mixed>|null $continuation Validated modern continuation data.
 	 *
 	 * @return array<string, mixed> Read-resource result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function read_resource( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null ): array {
+	public function read_resource( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null, ?array $continuation = null ): array {
 		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
 
 		// Extract parameters using helper method.
@@ -139,6 +141,12 @@ class ResourcesHandler {
 		if ( ! $mcp_resource ) {
 			return McpErrorFactory::resource_not_found( $request_id, $uri, $encoder->revision() );
 		}
+
+		if ( null !== $continuation && ! $mcp_resource->supports_input_required() ) {
+			return McpErrorFactory::invalid_params( $request_id, 'This resource does not accept continuation data' );
+		}
+
+		unset( $request_params['inputResponses'], $request_params['requestState'] );
 
 		$resource = $mcp_resource->get_protocol_dto();
 
@@ -175,7 +183,7 @@ class ResourcesHandler {
 				return McpErrorFactory::internal_error( $request_id, $request_params->get_error_message() );
 			}
 
-			$contents = $mcp_resource->execute( $request_params );
+			$contents = $mcp_resource->execute( $request_params, $continuation );
 
 			/**
 			 * Filters the resource contents after execution.
@@ -205,6 +213,15 @@ class ResourcesHandler {
 				);
 
 				return McpErrorFactory::internal_error( $request_id, $contents->get_error_message() );
+			}
+
+			if (
+				$mcp_resource->supports_input_required()
+				&& McpVersionNegotiator::is_modern( $encoder->revision() )
+				&& is_array( $contents )
+				&& 'input_required' === ( $contents['resultType'] ?? null )
+			) {
+				return $contents;
 			}
 
 			// Successful execution - convert contents to DTOs.

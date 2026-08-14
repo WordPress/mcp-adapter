@@ -95,6 +95,13 @@ final class McpPrompt implements McpComponentInterface {
 	private $permission_callback = null;
 
 	/**
+	 * Whether this direct component opted into modern input-required results.
+	 *
+	 * @var bool
+	 */
+	private bool $supports_input_required = false;
+
+	/**
 	 * Internal adapter metadata (never exposed to clients).
 	 *
 	 * @var array<string, mixed>
@@ -208,8 +215,9 @@ final class McpPrompt implements McpComponentInterface {
 			}
 		}
 
-		$instance          = new self( $prompt );
-		$instance->handler = $config['handler'];
+		$instance                          = new self( $prompt );
+		$instance->handler                 = $config['handler'];
+		$instance->supports_input_required = true === ( $config['supports_input_required'] ?? false );
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
 			$instance->permission_callback = $config['permission'];
@@ -316,11 +324,12 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Execute the prompt.
 	 *
-	 * @param mixed $arguments Prompt arguments.
+	 * @param mixed             $arguments    Prompt arguments.
+	 * @param array<string, mixed>|null $continuation Validated continuation data for opted-in direct callbacks.
 	 *
 	 * @return mixed
 	 */
-	public function execute( $arguments ) {
+	public function execute( $arguments, ?array $continuation = null ) {
 		$args = $this->unwrap_input_if_needed( $arguments );
 		$args = is_array( $args ) ? $args : array();
 
@@ -348,7 +357,9 @@ final class McpPrompt implements McpComponentInterface {
 			}
 		} elseif ( null !== $this->handler ) {
 			try {
-				$result = call_user_func( $this->handler, $args );
+				$result = $this->supports_input_required
+					? call_user_func( $this->handler, $args, $continuation )
+					: call_user_func( $this->handler, $args );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_execution_failed',
@@ -456,6 +467,13 @@ final class McpPrompt implements McpComponentInterface {
 	 */
 	public function get_adapter_meta(): array {
 		return $this->adapter_meta;
+	}
+
+	/**
+	 * Whether this direct prompt opted into modern continuation callbacks.
+	 */
+	public function supports_input_required(): bool {
+		return $this->supports_input_required;
 	}
 
 	/**

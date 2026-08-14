@@ -60,6 +60,60 @@ final class V20260728WireEncoderTest extends TestCase {
 		$this->assertArrayNotHasKey( 'cacheScope', $result );
 	}
 
+	public function test_input_required_result_uses_exact_modern_union_arm(): void {
+		$result = $this->encoder()->input_required_result(
+			array(
+				'resultType'    => 'input_required',
+				'inputRequests' => array(
+					'confirm' => array(
+						'method' => 'elicitation/create',
+						'params' => array(
+							'mode'            => 'form',
+							'message'         => 'Confirm',
+							'requestedSchema' => array(
+								'type'       => 'object',
+								'properties' => array(),
+							),
+						),
+					),
+				),
+				'requestState'  => 'sealed',
+			)
+		);
+
+		$this->assertSame( 'input_required', $result['resultType'] );
+		$this->assertSame( 'sealed', $result['requestState'] );
+		$this->assertArrayHasKey( 'confirm', $result['inputRequests'] );
+		$this->assertArrayNotHasKey( 'ttlMs', $result );
+		$this->assertArrayNotHasKey( 'cacheScope', $result );
+	}
+
+	public function test_continuation_request_params_are_schema_validated_and_normalized(): void {
+		$params = $this->encoder()->continuation_request_params(
+			'tools/call',
+			array(
+				'name'           => 'weather',
+				'arguments'      => array( 'city' => 'Bucharest' ),
+				'inputResponses' => array(
+					'confirm' => array(
+						'action'  => 'accept',
+						'content' => array( 'confirmed' => true ),
+					),
+				),
+				'requestState'   => 'sealed',
+				'_meta'          => array(
+					'io.modelcontextprotocol/protocolVersion'    => '2026-07-28',
+					'io.modelcontextprotocol/clientCapabilities' => array(
+						'elicitation' => array(),
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 'sealed', $params['requestState'] );
+		$this->assertSame( 'accept', $params['inputResponses']['confirm']['action'] );
+	}
+
 	public function test_request_metadata_is_validated_by_the_modern_schema(): void {
 		$this->encoder()->validate_request_metadata(
 			array(
