@@ -13,6 +13,7 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 
 /**
  * Handles prompts-related MCP methods.
@@ -66,7 +67,7 @@ class PromptsHandler {
 	 *
 	 * @return array<string, mixed> Response with prompts list, in wire shape.
 	 */
-	public function list_prompts(): array {
+	public function list_prompts( ?WireEncoderInterface $encoder = null ): array {
 		$prompts = array_values( $this->mcp->get_prompts() );
 
 		/**
@@ -88,7 +89,7 @@ class PromptsHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		$encoder = $this->mcp->get_wire_encoder();
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
 
 		return $encoder->list_prompts_result(
 			array(
@@ -108,10 +109,13 @@ class PromptsHandler {
 	 *
 	 * @param array           $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
 	 *
 	 * @return array<string, mixed> Prompt result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function get_prompt( array $params, $request_id = 0 ): array {
+	public function get_prompt( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null ): array {
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -129,7 +133,7 @@ class PromptsHandler {
 		$mcp_prompt = $this->mcp->get_mcp_prompt( $prompt_name );
 
 		if ( ! $mcp_prompt ) {
-			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
+			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name, $encoder->revision() );
 		}
 
 		$prompt = $mcp_prompt->get_protocol_dto();
@@ -199,7 +203,7 @@ class PromptsHandler {
 				return McpErrorFactory::internal_error( $request_id, $result->get_error_message() );
 			}
 
-			return $this->mcp->get_wire_encoder()->get_prompt_result(
+			return $encoder->get_prompt_result(
 				$this->normalize_result_to_dto( $result, $prompt, $prompt_name )
 			);
 		} catch ( \Throwable $e ) {

@@ -149,7 +149,7 @@ final class InitializeHandlerTest extends TestCase {
 		$this->assertFalse( $decoded->capabilities->prompts->listChanged );
 	}
 
-	public function test_handle_withSupportedVersion_negotiatesToClientVersion(): void {
+	public function test_handle_withOlderLegacyVersion_counterProposesSupportedLegacyVersion(): void {
 		$server = new McpServer(
 			'test',
 			'mcp/v1',
@@ -166,7 +166,7 @@ final class InitializeHandlerTest extends TestCase {
 		$result  = $handler->handle( '2025-06-18' );
 
 		$this->assertIsArray( $result );
-		$this->assertSame( '2025-06-18', $result['protocolVersion'] );
+		$this->assertSame( V20251125Constants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
 
 		// Verify other fields are still correct.
 		$this->assertSame( 'Test Server', $result['serverInfo']['name'] );

@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":121,\"result\":{\"resultType\":\"complete\",\"resourceTemplates\":[],\"_meta\":{\"io.modelcontextprotocol\\/serverInfo\":{\"name\":\"Wire Baseline Server\",\"version\":\"0.0.1\"}},\"ttlMs\":0,\"cacheScope\":\"private\"}}"
+}

@@ -13,6 +13,7 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 
 /**
  * Handles resources-related MCP methods.
@@ -47,7 +48,7 @@ class ResourcesHandler {
 	 *
 	 * @return array<string, mixed> Response with resources list.
 	 */
-	public function list_resources(): array {
+	public function list_resources( ?WireEncoderInterface $encoder = null ): array {
 		$resources = array_values( $this->mcp->get_resources() );
 
 		/**
@@ -69,7 +70,7 @@ class ResourcesHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		$encoder = $this->mcp->get_wire_encoder();
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
 
 		return $encoder->list_resources_result(
 			array(
@@ -94,8 +95,10 @@ class ResourcesHandler {
 	 *
 	 * @return array<string, mixed> Empty resource-templates list, in wire shape.
 	 */
-	public function list_resource_templates(): array {
-		return $this->mcp->get_wire_encoder()->list_resource_templates_result(
+	public function list_resource_templates( ?WireEncoderInterface $encoder = null ): array {
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
+		return $encoder->list_resource_templates_result(
 			array(
 				'resourceTemplates' => array(),
 			)
@@ -115,10 +118,13 @@ class ResourcesHandler {
 	 *
 	 * @param array $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
 	 *
 	 * @return array<string, mixed> Read-resource result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function read_resource( array $params, $request_id = 0 ): array {
+	public function read_resource( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null ): array {
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -131,7 +137,7 @@ class ResourcesHandler {
 
 		$mcp_resource = $this->mcp->get_mcp_resource( $uri );
 		if ( ! $mcp_resource ) {
-			return McpErrorFactory::resource_not_found( $request_id, $uri );
+			return McpErrorFactory::resource_not_found( $request_id, $uri, $encoder->revision() );
 		}
 
 		$resource = $mcp_resource->get_protocol_dto();
@@ -211,7 +217,7 @@ class ResourcesHandler {
 			// lowercased the scheme (RFC 3986 3.1). For an exact-case read the two are equal.
 			$content_items = $this->convert_contents_to_arrays( $contents, $resource['uri'] );
 
-			return $this->mcp->get_wire_encoder()->read_resource_result(
+			return $encoder->read_resource_result(
 				array(
 					'contents' => $content_items,
 				)

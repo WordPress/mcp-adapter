@@ -10,6 +10,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP_Error;
@@ -110,10 +111,11 @@ final class SessionManager {
 	 * @param int                                                   $user_id      The user ID.
 	 * @param array                                                 $params       Client parameters from initialize request.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures. Defaults to the standard error-log handler.
+	 * @param string|null                                            $protocol_version Negotiated legacy revision.
 	 *
 	 * @return string|false The session ID on success, false on failure.
 	 */
-	public static function create_session( int $user_id, array $params = array(), ?McpErrorHandlerInterface $error_handler = null ) {
+	public static function create_session( int $user_id, array $params = array(), ?McpErrorHandlerInterface $error_handler = null, ?string $protocol_version = null ) {
 		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
 			return false;
 		}
@@ -124,7 +126,7 @@ final class SessionManager {
 
 		$created = self::mutate_sessions(
 			$user_id,
-			static function ( array $sessions ) use ( $config, $now, $params, $session_id ): array {
+			static function ( array $sessions ) use ( $config, $now, $params, $protocol_version, $session_id ): array {
 				foreach ( $sessions as $stored_session_id => $session ) {
 					if ( $session['last_activity'] + $config['inactivity_timeout'] >= $now ) {
 						continue;
@@ -144,11 +146,17 @@ final class SessionManager {
 					array_shift( $sessions );
 				}
 
-				$sessions[ $session_id ] = array(
+				$session = array(
 					'created_at'    => $now,
 					'last_activity' => $now,
 					'client_params' => $params,
 				);
+
+				if ( null !== $protocol_version ) {
+					$session['protocol_version'] = $protocol_version;
+				}
+
+				$sessions[ $session_id ] = $session;
 
 				return $sessions;
 			},
@@ -352,6 +360,38 @@ final class SessionManager {
 		}
 
 		return $session;
+	}
+
+	/**
+	 * Return the negotiated legacy revision retained by a session.
+	 *
+	 * Sessions created before A6 do not have a dedicated revision field. For
+	 * those, use the initialize proposal when it is still supported by the
+	 * legacy lifecycle, then fall back to the only supported legacy revision.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int    $user_id User ID.
+	 * @param string $session_id Session ID.
+	 */
+	public static function get_protocol_version( int $user_id, string $session_id ): ?string {
+		$session = self::get_session( $user_id, $session_id );
+		if ( ! is_array( $session ) ) {
+			return null;
+		}
+
+		$stored_version = $session['protocol_version'] ?? null;
+		if ( is_string( $stored_version ) && McpVersionNegotiator::is_legacy( $stored_version ) ) {
+			return $stored_version;
+		}
+
+		$client_params    = $session['client_params'] ?? array();
+		$proposed_version = is_array( $client_params ) ? ( $client_params['protocolVersion'] ?? null ) : null;
+		if ( is_string( $proposed_version ) && McpVersionNegotiator::is_legacy( $proposed_version ) ) {
+			return $proposed_version;
+		}
+
+		return McpVersionNegotiator::LEGACY_PROTOCOL_VERSION;
 	}
 
 	/**

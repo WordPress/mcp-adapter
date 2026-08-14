@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":112,\"error\":{\"code\":-32602,\"message\":\"Tool not found: test-not-registered\"}}"
+}

@@ -245,6 +245,12 @@ final class McpErrorFactoryTest extends TestCase {
 		$this->assertStringContainsString( 'test-prompt', $response['error']['message'] );
 	}
 
+	public function test_modern_component_not_found_errors_use_invalid_params(): void {
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, McpErrorFactory::tool_not_found( 1, 'tool', '2026-07-28' )['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, McpErrorFactory::resource_not_found( 1, 'resource', '2026-07-28' )['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, McpErrorFactory::prompt_not_found( 1, 'prompt', '2026-07-28' )['error']['code'] );
+	}
+
 	/**
 	 * Test permission_denied returns an error envelope with correct error code.
 	 */
@@ -349,6 +355,16 @@ final class McpErrorFactoryTest extends TestCase {
 	 */
 	public function test_mcp_error_to_http_status_method_not_found(): void {
 		$this->assertSame( 404, McpErrorFactory::mcp_error_to_http_status( McpErrorFactory::METHOD_NOT_FOUND ) );
+	}
+
+	public function test_modern_method_not_found_maps_to_http_200(): void {
+		$this->assertSame( 200, McpErrorFactory::mcp_error_to_http_status( McpErrorFactory::METHOD_NOT_FOUND, '2026-07-28' ) );
+	}
+
+	public function test_modern_typed_errors_map_to_http_400(): void {
+		$this->assertSame( 400, McpErrorFactory::mcp_error_to_http_status( McpErrorFactory::HEADER_MISMATCH, '2026-07-28' ) );
+		$this->assertSame( 400, McpErrorFactory::mcp_error_to_http_status( McpErrorFactory::MISSING_REQUIRED_CLIENT_CAPABILITY, '2026-07-28' ) );
+		$this->assertSame( 400, McpErrorFactory::mcp_error_to_http_status( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, '2026-07-28' ) );
 	}
 
 	/**

@@ -9,8 +9,12 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
+use WP\MCP\Infrastructure\Protocol\WireEncoder;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -50,43 +54,67 @@ class RequestRouter {
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
 	 * @param \stdClass|null $request_identity Identity-preserving JSON-RPC request object.
 	 * @param string|null $new_session_id Newly created session id, if any.
+	 * @param \WP\MCP\Core\McpProtocolContext|null $protocol_context Already-resolved request revision. Defaults to legacy for custom transports.
 	 *
 	 * @return array
 	 */
-	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null, ?\stdClass $request_identity = null, ?string &$new_session_id = null ): array {
+	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null, ?\stdClass $request_identity = null, ?string &$new_session_id = null, ?McpProtocolContext $protocol_context = null ): array {
 		// Track request start time.
 		$start_time = microtime( true );
 
-		$new_session_id = null;
-		$component_tags = $this->resolve_component_observability_context( $method, $params );
+		$new_session_id   = null;
+		$protocol_context = $protocol_context ?? McpProtocolContext::for_revision( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
+		$wire_encoder     = $this->context->mcp_server->get_wire_encoder_for_revision( $protocol_context->revision() );
+		$is_modern        = McpVersionNegotiator::is_modern( $protocol_context->revision() );
+		$component_tags   = $this->resolve_component_observability_context( $method, $params );
 
 		// Common tags for all metrics.
 		$common_tags = array(
-			'method'     => $method,
-			'transport'  => $transport_name,
-			'server_id'  => $this->context->mcp_server->get_server_id(),
-			'params'     => $this->sanitize_params_for_logging( $params ),
-			'request_id' => $request_id,
-			'session_id' => $http_context ? $http_context->session_id : null,
+			'method'           => $method,
+			'transport'        => $transport_name,
+			'server_id'        => $this->context->mcp_server->get_server_id(),
+			'params'           => $this->sanitize_params_for_logging( $params ),
+			'request_id'       => $request_id,
+			'session_id'       => ! $is_modern && $http_context ? $http_context->session_id : null,
+			'protocol_version' => $protocol_context->revision(),
 		);
 
 		$handlers = array(
-			'initialize'               => function () use ( $params, $request_id, $http_context, &$new_session_id ) {
-				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $new_session_id );
-			},
-			'ping'                     => fn() => $this->context->system_handler->ping(),
-			'tools/list'               => fn() => $this->context->tools_handler->list_tools(),
-			'tools/list/all'           => fn() => $this->context->tools_handler->list_all_tools(),
-			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id, $request_identity ),
-			'resources/list'           => fn() => $this->context->resources_handler->list_resources(),
-			'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates(),
-			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
-			'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts(),
-			'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
+			'tools/list'               => fn() => $this->context->tools_handler->list_tools( $wire_encoder ),
+			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id, $request_identity, $wire_encoder ),
+			'resources/list'           => fn() => $this->context->resources_handler->list_resources( $wire_encoder ),
+			'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates( $wire_encoder ),
+			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id, $wire_encoder ),
+			'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts( $wire_encoder ),
+			'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id, $wire_encoder ),
 		);
 
+		if ( $wire_encoder instanceof WireEncoder ) {
+			$handlers['initialize']     = function () use ( $params, $request_id, $http_context, $wire_encoder, &$new_session_id ) {
+				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $wire_encoder, $new_session_id );
+			};
+			$handlers['ping']           = fn() => $this->context->system_handler->ping();
+			$handlers['tools/list/all'] = fn() => $this->context->tools_handler->list_all_tools( $wire_encoder );
+		} elseif ( $wire_encoder instanceof V20260728WireEncoder ) {
+			$handlers['server/discover'] = fn() => $this->context->initialize_handler->discover( $wire_encoder );
+		} else {
+			throw new \LogicException( 'Resolved MCP revision has no matching request encoder.' );
+		}
+
 		try {
-			$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			$handler_result = null;
+			if ( $wire_encoder instanceof V20260728WireEncoder ) {
+				try {
+					$wire_encoder->validate_request_metadata( $params );
+				} catch ( \WP\McpSchema\Runtime\ValidationException $exception ) {
+					$invalid_params = McpErrorFactory::invalid_params( $request_id, $exception->getMessage() );
+					$handler_result = array( 'error' => $invalid_params['error'] );
+				}
+			}
+
+			if ( null === $handler_result ) {
+				$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			}
 
 			// Calculate request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
@@ -292,21 +320,25 @@ class RequestRouter {
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoder $encoder Legacy request encoder.
 	 * @param string|null $new_session_id Newly created session id, if any.
 	 *
 	 * @return array<string, mixed> Initialize result or JSON-RPC error envelope, in wire shape.
 	 */
-	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): array {
+	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, WireEncoder $encoder, ?string &$new_session_id = null ): array {
 		// Extract client protocol version from params, defaulting to empty string if missing.
 		$client_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] ) ? $params['protocolVersion'] : '';
 
 		// Get the initialize response from the handler (wire-shape array).
-		$init_result = $this->context->initialize_handler->handle( $client_version );
+		$init_result = $this->context->initialize_handler->handle( $client_version, $encoder );
 
 		// Handle session creation if HTTP context is provided.
 		// The initialize result never carries errors - errors would be thrown as exceptions.
 		if ( $http_context && ! $http_context->session_id ) {
-			$session_result = HttpSessionValidator::create_session_with_error_handler( $params, $this->context->error_handler );
+			$negotiated_version = isset( $init_result['protocolVersion'] ) && is_string( $init_result['protocolVersion'] )
+				? $init_result['protocolVersion']
+				: McpVersionNegotiator::LEGACY_PROTOCOL_VERSION;
+			$session_result     = HttpSessionValidator::create_session_with_error_handler( $params, $this->context->error_handler, $negotiated_version );
 
 			if ( is_array( $session_result ) ) {
 				$error = $session_result['error'] ?? array();

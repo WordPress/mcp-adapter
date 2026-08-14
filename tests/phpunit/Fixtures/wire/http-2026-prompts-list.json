@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":130,\"result\":{\"resultType\":\"complete\",\"prompts\":[{\"name\":\"test-prompt\",\"title\":\"Prompt\",\"description\":\"A sample prompt\",\"arguments\":[{\"name\":\"code\",\"description\":\"Code to review\",\"required\":true}]},{\"name\":\"test-prompt-with-annotations\",\"title\":\"Prompt With Annotations\",\"description\":\"A prompt with MCP annotations\",\"arguments\":[{\"name\":\"code\",\"description\":\"Code to review\"}]},{\"name\":\"test-prompt-explicit-args\",\"title\":\"Prompt Explicit Args\",\"description\":\"A prompt with explicit mcp.arguments and no input_schema\",\"arguments\":[{\"name\":\"code\",\"title\":\"Source Code\",\"description\":\"The code to review\",\"required\":true},{\"name\":\"language\",\"description\":\"Programming language (optional)\"}]}],\"_meta\":{\"io.modelcontextprotocol\\/serverInfo\":{\"name\":\"Wire Baseline Server\",\"version\":\"0.0.1\"}},\"ttlMs\":0,\"cacheScope\":\"private\"}}"
+}

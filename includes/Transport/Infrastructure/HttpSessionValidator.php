@@ -67,6 +67,33 @@ class HttpSessionValidator {
 	}
 
 	/**
+	 * Validate a legacy HTTP session and return its negotiated revision.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context HTTP request context.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Storage-failure reporter.
+	 *
+	 * @return string|array<string, mixed> Negotiated revision or error envelope.
+	 */
+	public static function validate_session_protocol_version( HttpRequestContext $context, ?McpErrorHandlerInterface $error_handler ) {
+		$validation = self::validate_session_with_error_handler( $context, $error_handler );
+		if ( true !== $validation ) {
+			return $validation;
+		}
+
+		$user_id          = get_current_user_id();
+		$session_id       = (string) $context->session_id;
+		$protocol_version = SessionManager::get_protocol_version( $user_id, $session_id );
+
+		if ( null === $protocol_version ) {
+			return McpErrorFactory::session_not_found( null, 'Invalid or expired session' );
+		}
+
+		return $protocol_version;
+	}
+
+	/**
 	 * Validate session header presence in HTTP request.
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
@@ -89,12 +116,13 @@ class HttpSessionValidator {
 	 * Validates user authentication and creates session, providing better error
 	 * context than direct SessionManager calls.
 	 *
-	 * @param array $params The client parameters from initialize request.
+	 * @param array       $params The client parameters from initialize request.
+	 * @param string|null $protocol_version Negotiated legacy revision.
 	 *
 	 * @return string|array Session ID on success, error array on failure.
 	 */
-	public static function create_session( array $params = array() ) {
-		return self::create_session_with_error_handler( $params, null );
+	public static function create_session( array $params = array(), ?string $protocol_version = null ) {
+		return self::create_session_with_error_handler( $params, null, $protocol_version );
 	}
 
 	/**
@@ -105,16 +133,17 @@ class HttpSessionValidator {
 	 *
 	 * @param array                                                 $params        The client parameters from initialize request.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting storage failures.
+	 * @param string|null                                           $protocol_version Negotiated legacy revision.
 	 *
 	 * @return string|array Session ID on success, error array on failure.
 	 */
-	public static function create_session_with_error_handler( array $params, ?McpErrorHandlerInterface $error_handler ) {
+	public static function create_session_with_error_handler( array $params, ?McpErrorHandlerInterface $error_handler, ?string $protocol_version = null ) {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			return McpErrorFactory::unauthorized( null, 'User authentication required for session creation' );
 		}
 
-		$session_id = SessionManager::create_session( $user_id, $params, $error_handler );
+		$session_id = SessionManager::create_session( $user_id, $params, $error_handler, $protocol_version );
 
 		if ( ! $session_id ) {
 			return McpErrorFactory::internal_error( null, 'Failed to create session' );

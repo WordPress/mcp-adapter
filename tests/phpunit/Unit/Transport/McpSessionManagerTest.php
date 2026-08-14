@@ -77,6 +77,28 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertSame( $client_info, $sessions[ $session_id ]['client_params'] );
 	}
 
+	public function test_session_retains_the_negotiated_protocol_version(): void {
+		$session_id = SessionManager::create_session(
+			$this->test_user_id,
+			array( 'protocolVersion' => '2026-07-28' ),
+			null,
+			'2025-11-25'
+		);
+
+		$this->assertIsString( $session_id );
+		$this->assertSame( '2025-11-25', SessionManager::get_protocol_version( $this->test_user_id, $session_id ) );
+	}
+
+	public function test_pre_a6_session_infers_the_supported_legacy_version(): void {
+		$session_id = SessionManager::create_session(
+			$this->test_user_id,
+			array( 'protocolVersion' => '2025-11-25' )
+		);
+
+		$this->assertIsString( $session_id );
+		$this->assertSame( '2025-11-25', SessionManager::get_protocol_version( $this->test_user_id, $session_id ) );
+	}
+
 	/**
 	 * Single-site keeps the unsuffixed legacy key (blog ID is still 1).
 	 */

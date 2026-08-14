@@ -12,6 +12,7 @@ namespace WP\MCP\Tests\Unit\Core;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Generated\V20251125Constants;
+use WP\McpSchema\Generated\V20260728Constants;
 
 /**
  * @since 0.5.0
@@ -19,13 +20,13 @@ use WP\McpSchema\Generated\V20251125Constants;
 final class McpVersionNegotiatorTest extends TestCase {
 
 	/**
-	 * Test that negotiating with each supported version echoes back the client version.
+	 * Test that initialize negotiation echoes each supported legacy version.
 	 *
 	 * @dataProvider data_supported_versions
 	 *
 	 * @param string $version A supported protocol version.
 	 */
-	public function test_negotiate_withSupportedVersion_returnsClientVersion( string $version ): void {
+	public function test_negotiate_withSupportedLegacyVersion_returnsClientVersion( string $version ): void {
 		$this->assertSame( $version, McpVersionNegotiator::negotiate( $version ) );
 	}
 
@@ -36,28 +37,31 @@ final class McpVersionNegotiatorTest extends TestCase {
 	 */
 	public function data_supported_versions(): array {
 		$data = array();
-		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+		foreach ( McpVersionNegotiator::SUPPORTED_LEGACY_PROTOCOL_VERSIONS as $version ) {
 			$data[ $version ] = array( $version );
 		}
 		return $data;
 	}
 
 	/**
-	 * Test that negotiating with an unsupported version returns the latest supported version.
+	 * Test that negotiating with an unsupported version returns the latest legacy version.
 	 */
 	public function test_negotiate_withUnsupportedVersion_returnsLatest(): void {
-		$latest = McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0];
-
-		$this->assertSame( $latest, McpVersionNegotiator::negotiate( '9999-99-99' ) );
+		$this->assertSame( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION, McpVersionNegotiator::negotiate( '9999-99-99' ) );
 	}
 
 	/**
 	 * Test that negotiating with an empty string returns the latest supported version.
 	 */
 	public function test_negotiate_withEmptyString_returnsLatest(): void {
-		$latest = McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0];
+		$this->assertSame( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION, McpVersionNegotiator::negotiate( '' ) );
+	}
 
-		$this->assertSame( $latest, McpVersionNegotiator::negotiate( '' ) );
+	public function test_negotiate_withModernVersion_returnsLegacyCounterProposal(): void {
+		$this->assertSame(
+			McpVersionNegotiator::LEGACY_PROTOCOL_VERSION,
+			McpVersionNegotiator::negotiate( McpVersionNegotiator::MODERN_PROTOCOL_VERSION )
+		);
 	}
 
 	/**
@@ -79,19 +83,19 @@ final class McpVersionNegotiatorTest extends TestCase {
 	}
 
 	/**
-	 * Test that the latest supported version matches the schema package constant.
+	 * Test that both era constants match the schema package.
 	 *
 	 * V20251125Constants::LATEST_PROTOCOL_VERSION comes from the php-mcp-schema vendor
 	 * package. If that package updates its constant but SUPPORTED_PROTOCOL_VERSIONS
 	 * is not updated, this test will catch the drift.
 	 */
-	public function test_latestSupportedVersion_matchesSchemaLatest(): void {
+	public function test_supportedEraVersions_matchSchemaConstants(): void {
 		$this->assertSame(
-			V20251125Constants::LATEST_PROTOCOL_VERSION,
+			V20260728Constants::LATEST_PROTOCOL_VERSION,
 			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0],
-			'SUPPORTED_PROTOCOL_VERSIONS[0] must match V20251125Constants::LATEST_PROTOCOL_VERSION. '
-			. 'If the php-mcp-schema package was updated, add the new version to SUPPORTED_PROTOCOL_VERSIONS.'
+			'SUPPORTED_PROTOCOL_VERSIONS[0] must be the modern schema revision.'
 		);
+		$this->assertSame( V20251125Constants::LATEST_PROTOCOL_VERSION, McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
 	}
 
 	/**
@@ -104,9 +108,8 @@ final class McpVersionNegotiatorTest extends TestCase {
 	 */
 	public function test_supported_versions_containsExactExpectedSet(): void {
 		$expected = array(
+			'2026-07-28',
 			'2025-11-25',
-			'2025-06-18',
-			'2024-11-05',
 		);
 
 		$this->assertSame(

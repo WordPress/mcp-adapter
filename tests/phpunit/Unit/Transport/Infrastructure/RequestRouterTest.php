@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
@@ -198,6 +199,68 @@ final class RequestRouterTest extends TestCase {
 		$this->assertIsArray( $result['tools'] );
 		$this->assertNotEmpty( $result['tools'] );
 		$this->assertContainsOnly( 'array', $result['tools'] );
+	}
+
+	public function test_route_request_modern_discovery_uses_the_modern_catalog(): void {
+		$result = $this->route_modern( 'server/discover' );
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertSame( array( '2026-07-28', '2025-11-25' ), $result['supportedVersions'] );
+		$this->assertSame( 0, $result['ttlMs'] );
+		$this->assertSame( 'private', $result['cacheScope'] );
+		$this->assertSame( 'Test MCP Server', $result['_meta']['io.modelcontextprotocol/serverInfo']['name'] );
+	}
+
+	public function test_route_request_modern_tools_list_has_no_legacy_fields(): void {
+		$result = $this->route_modern( 'tools/list' );
+
+		$this->assertSame( 'complete', $result['resultType'] );
+		$this->assertArrayHasKey( 'tools', $result );
+		$this->assertArrayNotHasKey( 'protocolVersion', $result );
+	}
+
+	public function test_route_request_modern_ping_is_method_not_found(): void {
+		$result = $this->route_modern( 'ping' );
+
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $result['error']['code'] );
+	}
+
+	public function test_route_request_legacy_discovery_is_method_not_found(): void {
+		$result = $this->router->route_request( 'server/discover', array(), 1 );
+
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $result['error']['code'] );
+	}
+
+	public function test_route_request_modern_unknown_tool_uses_invalid_params(): void {
+		$result = $this->route_modern(
+			'tools/call',
+			array(
+				'name'      => 'not-registered',
+				'arguments' => array(),
+			)
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
+	}
+
+	public function test_route_request_modern_metadata_is_validated_before_handlers(): void {
+		$new_session_id = null;
+		$result         = $this->router->route_request(
+			'tools/list',
+			array(
+				'_meta' => array(
+					'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+				),
+			),
+			1,
+			'test-transport',
+			null,
+			null,
+			$new_session_id,
+			McpProtocolContext::for_revision( '2026-07-28' )
+		);
+
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 	}
 
 	public function test_route_request_tools_call(): void {
@@ -941,6 +1004,34 @@ final class RequestRouterTest extends TestCase {
 				'observability_handler' => new DummyObservabilityHandler(),
 				'error_handler'         => new DummyErrorHandler(),
 			)
+		);
+	}
+
+	/**
+	 * Route one valid modern request directly through the request router.
+	 *
+	 * @param string               $method Method name.
+	 * @param array<string, mixed> $params Operation-specific params.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function route_modern( string $method, array $params = array() ): array {
+		$params['_meta'] = array(
+			'io.modelcontextprotocol/protocolVersion'    => '2026-07-28',
+			'io.modelcontextprotocol/clientCapabilities' => array(),
+		);
+
+		$new_session_id = null;
+
+		return $this->router->route_request(
+			$method,
+			$params,
+			1,
+			'test-transport',
+			null,
+			null,
+			$new_session_id,
+			McpProtocolContext::for_revision( '2026-07-28' )
 		);
 	}
 }

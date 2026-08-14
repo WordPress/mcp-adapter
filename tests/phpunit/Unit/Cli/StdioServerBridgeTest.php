@@ -713,4 +713,91 @@ final class StdioServerBridgeTest extends TestCase {
 		// Should succeed since ping doesn't need params
 		$this->assertArrayHasKey( 'result', $response );
 	}
+
+	public function test_one_stream_can_alternate_legacy_and_modern_requests(): void {
+		$handle = new \ReflectionMethod( StdioServerBridge::class, 'handle_request' );
+		$handle->setAccessible( true );
+
+		$initialize = json_decode(
+			(string) $handle->invoke(
+				$this->bridge,
+				(string) wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 30,
+						'method'  => 'initialize',
+						'params'  => array( 'protocolVersion' => '2026-07-28' ),
+					)
+				)
+			),
+			true
+		);
+		$this->assertSame( '2025-11-25', $initialize['result']['protocolVersion'] );
+
+		$modern_params = array(
+			'_meta' => array(
+				'io.modelcontextprotocol/protocolVersion'    => '2026-07-28',
+				'io.modelcontextprotocol/clientCapabilities' => array(),
+			),
+		);
+		$modern       = json_decode(
+			(string) $handle->invoke(
+				$this->bridge,
+				(string) wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 31,
+						'method'  => 'tools/list',
+						'params'  => $modern_params,
+					)
+				)
+			),
+			true
+		);
+		$this->assertSame( 'complete', $modern['result']['resultType'] );
+
+		$legacy = json_decode(
+			(string) $handle->invoke(
+				$this->bridge,
+				(string) wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 32,
+						'method'  => 'ping',
+						'params'  => array(),
+					)
+				)
+			),
+			true
+		);
+		$this->assertSame( array(), $legacy['result'] );
+	}
+
+	public function test_stdio_unsupported_modern_version_uses_typed_error(): void {
+		$handle = new \ReflectionMethod( StdioServerBridge::class, 'handle_request' );
+		$handle->setAccessible( true );
+
+		$response = json_decode(
+			(string) $handle->invoke(
+				$this->bridge,
+				(string) wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 33,
+						'method'  => 'tools/list',
+						'params'  => array(
+							'_meta' => array(
+								'io.modelcontextprotocol/protocolVersion'    => '1900-01-01',
+								'io.modelcontextprotocol/clientCapabilities' => array(),
+							),
+						),
+					)
+				)
+			),
+			true
+		);
+
+		$this->assertSame( -32022, $response['error']['code'] );
+		$this->assertSame( '1900-01-01', $response['error']['data']['requested'] );
+	}
 }

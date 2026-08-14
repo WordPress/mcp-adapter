@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Infrastructure\ErrorHandling;
 
 use WP\McpSchema\Generated\V20251125Constants;
+use WP\McpSchema\Generated\V20260728Constants;
 
 /**
  * Factory for creating standardized MCP error responses.
@@ -22,20 +23,23 @@ use WP\McpSchema\Generated\V20251125Constants;
  * JSON-RPC error is a transport-level structure: the specification requires a
  * null id when the request id could not be determined, which the protocol's own
  * JSONRPCErrorResponse type cannot express, and an error path that can itself
- * fail to encode is worse than no validation at all. The JSON-RPC codes and
- * version are identical in every revision the adapter supports, which a test
- * pins.
+ * fail to encode is worse than no validation at all. Revision-specific typed
+ * 2026 errors are the exception: their concrete encoder validates the whole
+ * envelope and required data payload before emission.
  */
 class McpErrorFactory {
 
 	/**
 	 * Standard JSON-RPC error codes as defined in the specification.
 	 */
-	public const PARSE_ERROR      = V20251125Constants::PARSE_ERROR;
-	public const INVALID_REQUEST  = V20251125Constants::INVALID_REQUEST;
-	public const METHOD_NOT_FOUND = V20251125Constants::METHOD_NOT_FOUND;
-	public const INVALID_PARAMS   = V20251125Constants::INVALID_PARAMS;
-	public const INTERNAL_ERROR   = V20251125Constants::INTERNAL_ERROR;
+	public const PARSE_ERROR                        = V20251125Constants::PARSE_ERROR;
+	public const INVALID_REQUEST                    = V20251125Constants::INVALID_REQUEST;
+	public const METHOD_NOT_FOUND                   = V20251125Constants::METHOD_NOT_FOUND;
+	public const INVALID_PARAMS                     = V20251125Constants::INVALID_PARAMS;
+	public const INTERNAL_ERROR                     = V20251125Constants::INTERNAL_ERROR;
+	public const HEADER_MISMATCH                    = V20260728Constants::HEADER_MISMATCH;
+	public const MISSING_REQUIRED_CLIENT_CAPABILITY = V20260728Constants::MISSING_REQUIRED_CLIENT_CAPABILITY;
+	public const UNSUPPORTED_PROTOCOL_VERSION       = V20260728Constants::UNSUPPORTED_PROTOCOL_VERSION;
 
 	/**
 	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
@@ -227,11 +231,24 @@ class McpErrorFactory {
 	 * Create a resource not found error response.
 	 *
 	 * @param string|int|null $id The request ID.
-	 * @param string $resource_uri The resource identifier.
+	 * @param string      $resource_uri The resource identifier.
+	 * @param string|null $revision Exact request revision, or null for legacy compatibility.
 	 *
 	 * @return array<string, mixed> JSON-RPC error envelope in wire shape (`id` omitted when null).
 	 */
-	public static function resource_not_found( $id, string $resource_uri ): array {
+	public static function resource_not_found( $id, string $resource_uri, ?string $revision = null ): array {
+		if ( self::is_modern_revision( $revision ) ) {
+			return self::create_error_response(
+				$id,
+				self::INVALID_PARAMS,
+				sprintf(
+					/* translators: %s: resource identifier. */
+					__( 'Resource not found: %s', 'mcp-adapter' ),
+					$resource_uri
+				)
+			);
+		}
+
 		return self::create_error_response(
 			$id,
 			self::RESOURCE_NOT_FOUND,
@@ -247,11 +264,24 @@ class McpErrorFactory {
 	 * Create a tool not found error response.
 	 *
 	 * @param string|int|null $id The request ID.
-	 * @param string $tool The tool name.
+	 * @param string      $tool The tool name.
+	 * @param string|null $revision Exact request revision, or null for legacy compatibility.
 	 *
 	 * @return array<string, mixed> JSON-RPC error envelope in wire shape (`id` omitted when null).
 	 */
-	public static function tool_not_found( $id, string $tool ): array {
+	public static function tool_not_found( $id, string $tool, ?string $revision = null ): array {
+		if ( self::is_modern_revision( $revision ) ) {
+			return self::create_error_response(
+				$id,
+				self::INVALID_PARAMS,
+				sprintf(
+					/* translators: %s: tool name. */
+					__( 'Tool not found: %s', 'mcp-adapter' ),
+					$tool
+				)
+			);
+		}
+
 		return self::create_error_response(
 			$id,
 			self::TOOL_NOT_FOUND,
@@ -287,11 +317,24 @@ class McpErrorFactory {
 	 * Create a prompt not found error response.
 	 *
 	 * @param string|int|null $id The request ID.
-	 * @param string $prompt The prompt name.
+	 * @param string      $prompt The prompt name.
+	 * @param string|null $revision Exact request revision, or null for legacy compatibility.
 	 *
 	 * @return array<string, mixed> JSON-RPC error envelope in wire shape (`id` omitted when null).
 	 */
-	public static function prompt_not_found( $id, string $prompt ): array {
+	public static function prompt_not_found( $id, string $prompt, ?string $revision = null ): array {
+		if ( self::is_modern_revision( $revision ) ) {
+			return self::create_error_response(
+				$id,
+				self::INVALID_PARAMS,
+				sprintf(
+					/* translators: %s: prompt name. */
+					__( 'Prompt not found: %s', 'mcp-adapter' ),
+					$prompt
+				)
+			);
+		}
+
 		return self::create_error_response(
 			$id,
 			self::PROMPT_NOT_FOUND,
@@ -365,15 +408,16 @@ class McpErrorFactory {
 	 * HTTP 200 with a JSON-RPC error response).
 	 *
 	 * @param array<string, mixed> $error_response The MCP error response array.
+	 * @param string|null          $revision Exact request revision when known.
 	 *
 	 * @return int The appropriate HTTP status code.
 	 */
-	public static function get_http_status_for_error( array $error_response ): int {
+	public static function get_http_status_for_error( array $error_response, ?string $revision = null ): int {
 		if ( ! isset( $error_response['error']['code'] ) ) {
 			return 500; // Invalid error response structure
 		}
 
-		return self::mcp_error_to_http_status( $error_response['error']['code'] );
+		return self::mcp_error_to_http_status( $error_response['error']['code'], $revision );
 	}
 
 	/**
@@ -384,12 +428,41 @@ class McpErrorFactory {
 	 * - Application-level errors (business logic) → HTTP 200 with JSON-RPC error
 	 *
 	 * @param int|string|float $mcp_error_code The MCP/JSON-RPC error code (integer, float, or string).
+	 * @param string|null      $revision Exact request revision when known.
 	 *
 	 * @return int The appropriate HTTP status code.
 	 */
-	public static function mcp_error_to_http_status( $mcp_error_code ): int {
+	public static function mcp_error_to_http_status( $mcp_error_code, ?string $revision = null ): int {
 		// Cast to integer for comparison (handles float from DTOs)
 		$code = is_numeric( $mcp_error_code ) ? (int) $mcp_error_code : 0;
+
+		if ( in_array( $code, array( self::HEADER_MISMATCH, self::MISSING_REQUIRED_CLIENT_CAPABILITY, self::UNSUPPORTED_PROTOCOL_VERSION ), true ) ) {
+			return 400;
+		}
+
+		if ( self::is_modern_revision( $revision ) ) {
+			switch ( $code ) {
+				case self::PARSE_ERROR:
+				case self::INVALID_REQUEST:
+					return 400;
+
+				case self::UNAUTHORIZED:
+					return 401;
+
+				case self::PERMISSION_DENIED:
+					return 403;
+
+				case self::INTERNAL_ERROR:
+				case self::SERVER_ERROR:
+					return 500;
+
+				case self::TIMEOUT_ERROR:
+					return 504;
+
+				default:
+					return 200;
+			}
+		}
 
 		switch ( $code ) {
 			// Transport-level errors - these indicate malformed requests
@@ -484,5 +557,12 @@ class McpErrorFactory {
 		}
 
 		return self::create_error_response( $id, self::INVALID_REQUEST, $message );
+	}
+
+	/**
+	 * Whether the error policy belongs to the modern stateless revision.
+	 */
+	private static function is_modern_revision( ?string $revision ): bool {
+		return V20260728Constants::LATEST_PROTOCOL_VERSION === $revision;
 	}
 }

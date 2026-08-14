@@ -371,6 +371,82 @@ final class WireBaselineTest extends TestCase {
 		);
 	}
 
+	public function test_http_2026_discovery_agreement_and_method_gates(): void {
+		$this->assert_wire_fixture(
+			'http-2026-discover',
+			$this->dispatch_modern_http( 100, 'server/discover' )
+		);
+
+		$this->assert_wire_fixture(
+			'http-2026-ping-method-not-found',
+			$this->dispatch_modern_http( 101, 'ping' )
+		);
+
+		$this->assert_wire_fixture(
+			'http-2026-missing-version-header',
+			$this->dispatch_http(
+				$this->jsonrpc( 102, 'tools/list', $this->modern_params() )
+			)
+		);
+
+		$this->assert_wire_fixture(
+			'http-2026-header-mismatch',
+			$this->dispatch_modern_http( 103, 'tools/list', array(), '2025-11-25' )
+		);
+
+		$this->assert_wire_fixture(
+			'http-2026-unsupported-version',
+			$this->dispatch_modern_http( 104, 'tools/list', array(), '1900-01-01', '1900-01-01' )
+		);
+	}
+
+	public function test_http_2026_advertised_operation_flows(): void {
+		$this->assert_wire_fixture( 'http-2026-tools-list', $this->dispatch_modern_http( 110, 'tools/list' ) );
+		$this->assert_wire_fixture(
+			'http-2026-tools-call',
+			$this->dispatch_modern_http(
+				111,
+				'tools/call',
+				array(
+					'name'      => 'test-always-allowed',
+					'arguments' => array(),
+				)
+			)
+		);
+		$this->assert_wire_fixture(
+			'http-2026-tools-call-unknown',
+			$this->dispatch_modern_http( 112, 'tools/call', array( 'name' => 'test-not-registered' ) )
+		);
+
+		$this->assert_wire_fixture( 'http-2026-resources-list', $this->dispatch_modern_http( 120, 'resources/list' ) );
+		$this->assert_wire_fixture( 'http-2026-resource-templates-list', $this->dispatch_modern_http( 121, 'resources/templates/list' ) );
+		$this->assert_wire_fixture(
+			'http-2026-resources-read',
+			$this->dispatch_modern_http( 122, 'resources/read', array( 'uri' => 'WordPress://local/resource-1' ) )
+		);
+		$this->assert_wire_fixture(
+			'http-2026-resources-read-unknown',
+			$this->dispatch_modern_http( 123, 'resources/read', array( 'uri' => 'WordPress://local/does-not-exist' ) )
+		);
+
+		$this->assert_wire_fixture( 'http-2026-prompts-list', $this->dispatch_modern_http( 130, 'prompts/list' ) );
+		$this->assert_wire_fixture(
+			'http-2026-prompts-get',
+			$this->dispatch_modern_http(
+				131,
+				'prompts/get',
+				array(
+					'name'      => 'test-prompt',
+					'arguments' => array( 'code' => 'echo 1;' ),
+				)
+			)
+		);
+		$this->assert_wire_fixture(
+			'http-2026-prompts-get-unknown',
+			$this->dispatch_modern_http( 132, 'prompts/get', array( 'name' => 'test-not-a-prompt' ) )
+		);
+	}
+
 	// -------------------------------------------------------------------------
 	// STDIO exchanges
 	// -------------------------------------------------------------------------
@@ -403,6 +479,26 @@ final class WireBaselineTest extends TestCase {
 		}
 	}
 
+	public function test_stdio_2026_exchanges_on_the_legacy_stream(): void {
+		$bridge = new StdioServerBridge( $this->server );
+		$handle = new \ReflectionMethod( StdioServerBridge::class, 'handle_request' );
+		$handle->setAccessible( true );
+
+		$legacy_initialize = (string) wp_json_encode( $this->jsonrpc( 140, 'initialize', array( 'protocolVersion' => '2025-11-25' ) ) );
+		$handle->invoke( $bridge, $legacy_initialize );
+
+		$lines = array(
+			'stdio-2026-discover'   => wp_json_encode( $this->jsonrpc( 141, 'server/discover', $this->modern_params() ) ),
+			'stdio-2026-tools-list' => wp_json_encode( $this->jsonrpc( 142, 'tools/list', $this->modern_params() ) ),
+			'stdio-legacy-ping-after-2026' => wp_json_encode( $this->jsonrpc( 143, 'ping', array() ) ),
+		);
+
+		foreach ( $lines as $fixture => $line ) {
+			$output = (string) $handle->invoke( $bridge, $line );
+			$this->assert_stdio_fixture( $fixture, $output );
+		}
+	}
+
 	// -------------------------------------------------------------------------
 	// Harness
 	// -------------------------------------------------------------------------
@@ -422,6 +518,39 @@ final class WireBaselineTest extends TestCase {
 			'id'      => $id,
 			'method'  => $method,
 			'params'  => $params,
+		);
+	}
+
+	/**
+	 * Build modern per-request metadata around operation-specific params.
+	 *
+	 * @param array<string, mixed> $params Operation params.
+	 * @param string               $version Declared request revision.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function modern_params( array $params = array(), string $version = '2026-07-28' ): array {
+		$params['_meta'] = array(
+			'io.modelcontextprotocol/protocolVersion'    => $version,
+			'io.modelcontextprotocol/clientCapabilities' => array(),
+		);
+
+		return $params;
+	}
+
+	/**
+	 * Dispatch one modern HTTP request with explicit body/header versions.
+	 *
+	 * @param int|string           $id Request id.
+	 * @param string               $method Method name.
+	 * @param array<string, mixed> $params Operation params.
+	 * @param string               $header_version HTTP revision header.
+	 * @param string               $body_version Body metadata revision.
+	 */
+	private function dispatch_modern_http( $id, string $method, array $params = array(), string $header_version = '2026-07-28', string $body_version = '2026-07-28' ): \WP_REST_Response {
+		return $this->dispatch_http(
+			$this->jsonrpc( $id, $method, $this->modern_params( $params, $body_version ) ),
+			array( 'Mcp-Protocol-Version' => $header_version )
 		);
 	}
 

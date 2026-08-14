@@ -14,6 +14,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Unit\Transport\Infrastructure;
 
 use WP\MCP\Core\McpProtocolContext;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Protocol\WireEncoder;
@@ -23,12 +24,12 @@ use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 final class WireSerializationRegressionTest extends TestCase {
 
 	/**
-	 * Build an encoder for the newest supported revision.
+	 * Build the concrete legacy encoder with its exact revision catalog.
 	 *
 	 * @return WireEncoder
 	 */
 	private function encoder(): WireEncoder {
-		return new WireEncoder( McpProtocolContext::default(), new NullMcpErrorHandler() );
+		return new WireEncoder( McpProtocolContext::for_revision( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION ), new NullMcpErrorHandler() );
 	}
 
 	public function test_embedded_resource_content_block_serializes_resource_fields_without_placeholder_objects(): void {

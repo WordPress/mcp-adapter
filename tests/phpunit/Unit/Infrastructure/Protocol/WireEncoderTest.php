@@ -23,7 +23,7 @@ final class WireEncoderTest extends TestCase {
 	}
 
 	private function encoder(): WireEncoder {
-		return new WireEncoder( McpProtocolContext::default(), new DummyErrorHandler() );
+		return new WireEncoder( McpProtocolContext::for_revision( '2025-11-25' ), new DummyErrorHandler() );
 	}
 
 	public function test_encode_returns_the_wire_shape(): void {

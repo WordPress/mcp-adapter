@@ -11,7 +11,6 @@ namespace WP\MCP\Infrastructure\Protocol;
 
 use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\McpSchema\Contract\Type;
 use WP\McpSchema\Generated\V20251125Schema;
 
 /**
@@ -23,10 +22,9 @@ use WP\McpSchema\Generated\V20251125Schema;
  * instead of a runtime one, and the generated field shapes stay available to
  * static analysis.
  *
- * The catalog is narrowed to a concrete revision once, here, which is why the
- * accessors are callable at all. Only one revision is negotiable today; when a
- * second joins the negotiator this class gains a sibling per era behind a
- * shared interface, and the narrowing below becomes the era selection.
+ * The catalog is narrowed to the legacy revision once, here, which is why the
+ * accessors are callable at all. The modern era has a sibling encoder behind
+ * the shared interface.
  *
  * The adapter never hand-assembles wire bytes. Hydration through the schema
  * package is what produces them, and hydration validates as it goes, so
@@ -35,14 +33,7 @@ use WP\McpSchema\Generated\V20251125Schema;
  *
  * @since n.e.x.t
  */
-final class WireEncoder {
-
-	/**
-	 * The protocol context supplying the catalog.
-	 *
-	 * @var \WP\MCP\Core\McpProtocolContext
-	 */
-	private McpProtocolContext $context;
+final class WireEncoder extends AbstractWireEncoder {
 
 	/**
 	 * The catalog, narrowed to a concrete revision.
@@ -50,13 +41,6 @@ final class WireEncoder {
 	 * @var \WP\McpSchema\Generated\V20251125Schema
 	 */
 	private V20251125Schema $catalog;
-
-	/**
-	 * Error handler used to report components that fail to encode.
-	 *
-	 * @var \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
-	 */
-	private McpErrorHandlerInterface $error_handler;
 
 	/**
 	 * Constructor.
@@ -75,18 +59,8 @@ final class WireEncoder {
 			);
 		}
 
-		$this->context       = $context;
-		$this->catalog       = $catalog;
-		$this->error_handler = $error_handler;
-	}
-
-	/**
-	 * The negotiated protocol revision this encoder emits for.
-	 *
-	 * @return string
-	 */
-	public function revision(): string {
-		return $this->context->revision();
+		parent::__construct( $context, $error_handler );
+		$this->catalog = $catalog;
 	}
 
 	// =========================================================================
@@ -219,95 +193,5 @@ final class WireEncoder {
 	 */
 	public function try_prompt( array $data, string $subject = '' ): ?array {
 		return $this->try_encode( $this->catalog->prompt(), $data, 'Prompt', $subject );
-	}
-
-	// =========================================================================
-	// Internals
-	// =========================================================================
-
-	/**
-	 * Hydrates an array as a protocol type and returns its wire form.
-	 *
-	 * Hydration goes through fromValue() rather than fromArray(). The adapter
-	 * builds revision-neutral arrays, which do not satisfy the exact array
-	 * shape each generated type declares, while fromValue() accepts an
-	 * already-decoded JSON value, which is what these arrays are. Both run the
-	 * same hydration, so the accepted input and the emitted bytes are the same.
-	 *
-	 * @template TWire of array<string, mixed>
-	 * @template TFields of array<string, mixed>
-	 *
-	 * @param \WP\McpSchema\Contract\Type<TWire, TFields> $type The protocol type.
-	 * @param array<string, mixed> $data The array to encode.
-	 *
-	 * @return array<string, mixed> The wire array, readable as nested arrays.
-	 *
-	 * @throws \WP\McpSchema\Runtime\ValidationException When the array does not match the type.
-	 */
-	private function encode( Type $type, array $data ): array {
-		return $type->fromValue( $data )->toJsonArray();
-	}
-
-	/**
-	 * Encodes a component, returning null instead of throwing.
-	 *
-	 * This is the skip-bad-component path. A single malformed component must
-	 * never take down a whole list response, so callers building a list use
-	 * this and drop what comes back null. The omission is logged and reported
-	 * through _doing_it_wrong; MCP has no partial-result signal, so those are
-	 * the only trace.
-	 *
-	 * @template TWire of array<string, mixed>
-	 * @template TFields of array<string, mixed>
-	 *
-	 * @param \WP\McpSchema\Contract\Type<TWire, TFields> $type      The protocol type.
-	 * @param array<string, mixed> $data      The array to encode.
-	 * @param string               $type_name The type name, for logs.
-	 * @param string               $subject   Component identity, for logs.
-	 *
-	 * @return array<string, mixed>|null The wire array, or null when it did not validate.
-	 */
-	private function try_encode( Type $type, array $data, string $type_name, string $subject ): ?array {
-		try {
-			return $this->encode( $type, $data );
-		} catch ( \WP\McpSchema\Runtime\ValidationException $exception ) {
-			$this->report_failure( $type_name, $subject, $exception );
-
-			return null;
-		}
-	}
-
-	/**
-	 * Reports a component that failed to encode.
-	 *
-	 * @param string              $type_name Protocol type name.
-	 * @param string              $subject   Human-readable identity for logs.
-	 * @param \WP\McpSchema\Runtime\ValidationException $exception The validation failure.
-	 *
-	 * @return void
-	 */
-	private function report_failure( string $type_name, string $subject, \WP\McpSchema\Runtime\ValidationException $exception ): void {
-		$label = '' === $subject ? $type_name : $type_name . ' "' . $subject . '"';
-
-		$this->error_handler->log(
-			'MCP component omitted from the response because it does not match the protocol schema.',
-			array(
-				'type'     => $type_name,
-				'subject'  => $subject,
-				'revision' => $this->context->revision(),
-				'error'    => $exception->getMessage(),
-			)
-		);
-
-		_doing_it_wrong(
-			__METHOD__,
-			sprintf(
-				/* translators: 1: protocol type and component name, 2: validation error message. */
-				esc_html__( '%1$s was left out of the MCP response because it does not match the protocol schema: %2$s', 'mcp-adapter' ),
-				esc_html( $label ),
-				esc_html( $exception->getMessage() )
-			),
-			'n.e.x.t'
-		);
 	}
 }

@@ -17,7 +17,9 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
 use WP\MCP\Infrastructure\Protocol\WireEncoder;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**
@@ -102,11 +104,11 @@ class McpServer {
 	private bool $mcp_validation_enabled;
 
 	/**
-	 * Encoder for protocol wire output, built on first use.
+	 * Revision-bound encoders for protocol wire output, built on first use.
 	 *
-	 * @var \WP\MCP\Infrastructure\Protocol\WireEncoder|null
+	 * @var array<string, \WP\MCP\Infrastructure\Protocol\WireEncoderInterface>
 	 */
-	private ?WireEncoder $wire_encoder = null;
+	private array $wire_encoders = array();
 
 	/**
 	 * Transport permission callback.
@@ -345,20 +347,57 @@ class McpServer {
 	/**
 	 * Get the encoder that turns adapter arrays into wire arrays.
 	 *
-	 * The encoder is bound to one protocol revision. Only one revision is
-	 * negotiable today, so it is built from the default context; when a second
-	 * revision joins the negotiator this becomes per-request.
+	 * Direct handler callers have no request-scoped revision, so this compatibility
+	 * seam remains explicitly legacy. Transports call
+	 * {@see self::get_wire_encoder_for_revision()} after resolving the request era.
 	 *
 	 * @since n.e.x.t
 	 *
 	 * @return \WP\MCP\Infrastructure\Protocol\WireEncoder
 	 */
 	public function get_wire_encoder(): WireEncoder {
-		if ( null === $this->wire_encoder ) {
-			$this->wire_encoder = new WireEncoder( McpProtocolContext::default(), $this->error_handler );
+		$encoder = $this->get_wire_encoder_for_revision( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
+		if ( ! $encoder instanceof WireEncoder ) {
+			throw new \LogicException( 'Legacy MCP encoder selection returned the wrong implementation.' );
 		}
 
-		return $this->wire_encoder;
+		return $encoder;
+	}
+
+	/**
+	 * Get the encoder for one already-resolved protocol revision.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $revision Exact supported protocol revision.
+	 *
+	 * @throws \LogicException When the revision has no Adapter encoder.
+	 */
+	public function get_wire_encoder_for_revision( string $revision ): WireEncoderInterface {
+		if ( isset( $this->wire_encoders[ $revision ] ) ) {
+			return $this->wire_encoders[ $revision ];
+		}
+
+		$context = McpProtocolContext::for_revision( $revision );
+
+		if ( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION === $revision ) {
+			$encoder = new WireEncoder( $context, $this->error_handler );
+		} elseif ( McpVersionNegotiator::MODERN_PROTOCOL_VERSION === $revision ) {
+			$encoder = new V20260728WireEncoder(
+				$context,
+				$this->error_handler,
+				array(
+					'name'    => $this->server_name,
+					'version' => $this->server_version,
+				)
+			);
+		} else {
+			throw new \LogicException( 'No MCP wire encoder for revision ' . $revision );
+		}
+
+		$this->wire_encoders[ $revision ] = $encoder;
+
+		return $encoder;
 	}
 
 	/**

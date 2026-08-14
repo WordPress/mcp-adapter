@@ -1,0 +1,5 @@
+{
+    "status": 400,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32022,\"message\":\"Unsupported protocol version\",\"data\":{\"supported\":[\"2026-07-28\",\"2025-11-25\"],\"requested\":\"1900-01-01\"}},\"id\":104}"
+}

@@ -530,6 +530,156 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
+	public function test_handle_request_modern_discovery_is_stateless(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 20,
+				'method'  => 'server/discover',
+				'params'  => $this->modernParams(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'complete', $data['result']->resultType );
+		$this->assertSame( array( '2026-07-28', '2025-11-25' ), $data['result']->supportedVersions );
+		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response->get_headers() );
+	}
+
+	public function test_handle_request_modern_missing_header_returns_typed_error(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 21,
+				'method'  => 'tools/list',
+				'params'  => $this->modernParams(),
+			)
+		);
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $data['error']['code'] );
+	}
+
+	public function test_handle_request_modern_header_body_mismatch_returns_typed_error(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 22,
+				'method'  => 'tools/list',
+				'params'  => $this->modernParams(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2025-11-25' );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $data['error']['code'] );
+	}
+
+	public function test_handle_request_modern_unsupported_version_returns_typed_data(): void {
+		$params = $this->modernParams();
+		$params['_meta']['io.modelcontextprotocol/protocolVersion'] = '1900-01-01';
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 23,
+				'method'  => 'tools/list',
+				'params'  => $params,
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '1900-01-01' );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( McpErrorFactory::UNSUPPORTED_PROTOCOL_VERSION, $data['error']['code'] );
+		$this->assertSame( '1900-01-01', $data['error']['data']['requested'] );
+		$this->assertSame( array( '2026-07-28', '2025-11-25' ), $data['error']['data']['supported'] );
+	}
+
+	public function test_handle_request_modern_missing_capabilities_is_invalid_params(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 24,
+				'method'  => 'tools/list',
+				'params'  => array(
+					'_meta' => array(
+						'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+					),
+				),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $data['error']['code'] );
+	}
+
+	public function test_handle_request_modern_ping_is_method_not_found_with_http_200(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 25,
+				'method'  => 'ping',
+				'params'  => $this->modernParams(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+
+		$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $data['error']['code'] );
+	}
+
+	public function test_handle_request_modern_request_never_reads_legacy_sessions(): void {
+		$session_reads = 0;
+		$session_key   = self::session_meta_key();
+		$track_reads   = static function ( $value, $object_id, $meta_key ) use ( &$session_reads, $session_key ) {
+			if ( $session_key === $meta_key ) {
+				++$session_reads;
+			}
+
+			return $value;
+		};
+		add_filter( 'get_user_metadata', $track_reads, 10, 3 );
+
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 26,
+				'method'  => 'tools/list',
+				'params'  => $this->modernParams(),
+			)
+		);
+		$request->set_header( 'Mcp-Protocol-Version', '2026-07-28' );
+		$request->set_header( 'Mcp-Session-Id', 'legacy-looking-but-ignored' );
+
+		try {
+			$response = $this->handler->handle_request( new HttpRequestContext( $request ) );
+		} finally {
+			remove_filter( 'get_user_metadata', $track_reads, 10 );
+		}
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 0, $session_reads );
+	}
+
 	// Helper methods
 
 	/**
@@ -579,6 +729,20 @@ final class HttpRequestHandlerTest extends TestCase {
 		$request->set_body( $body );
 
 		return $request;
+	}
+
+	/**
+	 * @param array<string, mixed> $params Operation-specific parameters.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function modernParams( array $params = array() ): array {
+		$params['_meta'] = array(
+			'io.modelcontextprotocol/protocolVersion'    => '2026-07-28',
+			'io.modelcontextprotocol/clientCapabilities' => array(),
+		);
+
+		return $params;
 	}
 
 	private function createTransportContext( McpServer $server ): McpTransportContext {

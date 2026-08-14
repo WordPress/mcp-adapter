@@ -1,0 +1,5 @@
+{
+    "status": 400,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32020,\"message\":\"Request headers do not match request metadata\"},\"id\":103}"
+}

@@ -15,6 +15,7 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 
 /**
  * Handles tools-related MCP methods.
@@ -57,9 +58,9 @@ class ToolsHandler {
 	 *
 	 * @return array<string, mixed> Response with all tools.
 	 */
-	public function list_all_tools(): array {
+	public function list_all_tools( ?WireEncoderInterface $encoder = null ): array {
 		// Return the standard tools list.
-		return $this->list_tools();
+		return $this->list_tools( $encoder );
 	}
 
 	/**
@@ -73,7 +74,7 @@ class ToolsHandler {
 	 *
 	 * @return array<string, mixed> Response with tools list.
 	 */
-	public function list_tools(): array {
+	public function list_tools( ?WireEncoderInterface $encoder = null ): array {
 		$tools = array_values( $this->mcp->get_tools() );
 
 		/**
@@ -95,7 +96,7 @@ class ToolsHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		$encoder = $this->mcp->get_wire_encoder();
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
 
 		return $encoder->list_tools_result(
 			array(
@@ -126,10 +127,13 @@ class ToolsHandler {
 	 * @param array $params Request params.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 * @param \stdClass|null $request_identity Optional identity-preserving JSON-RPC request object.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
 	 *
 	 * @return array<string, mixed> Tool-call result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function call_tool( array $params, $request_id = 0, ?\stdClass $request_identity = null ): array {
+	public function call_tool( array $params, $request_id = 0, ?\stdClass $request_identity = null, ?WireEncoderInterface $encoder = null ): array {
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -155,7 +159,7 @@ class ToolsHandler {
 					'warning'
 				);
 
-				return McpErrorFactory::tool_not_found( $request_id, $tool_name );
+				return McpErrorFactory::tool_not_found( $request_id, $tool_name, $encoder->revision() );
 			}
 
 			$permission = $mcp_tool->check_permission( $args );
@@ -176,7 +180,7 @@ class ToolsHandler {
 					);
 				}
 
-				return $this->create_error_result( $error_message );
+				return $this->create_error_result( $error_message, $encoder );
 			}
 
 			/**
@@ -196,7 +200,7 @@ class ToolsHandler {
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
-				return $this->create_error_result( $args->get_error_message() );
+				return $this->create_error_result( $args->get_error_message(), $encoder );
 			}
 
 			$result = $mcp_tool->execute( $args );
@@ -228,7 +232,7 @@ class ToolsHandler {
 					)
 				);
 
-				return $this->create_error_result( $result->get_error_message() );
+				return $this->create_error_result( $result->get_error_message(), $encoder );
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
@@ -240,7 +244,7 @@ class ToolsHandler {
 				&& is_string( $result['error'] )
 				&& '' !== trim( $result['error'] )
 			) {
-				return $this->create_error_result( $result['error'] );
+				return $this->create_error_result( $result['error'], $encoder );
 			}
 
 			// Successful tool execution - build the tool-call result.
@@ -281,7 +285,7 @@ class ToolsHandler {
 					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
-						return $this->mcp->get_wire_encoder()->call_tool_result(
+						return $encoder->call_tool_result(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_text_resource(
@@ -299,7 +303,7 @@ class ToolsHandler {
 					}
 
 					if ( $has_blob ) {
-						return $this->mcp->get_wire_encoder()->call_tool_result(
+						return $encoder->call_tool_result(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_blob_resource(
@@ -327,7 +331,7 @@ class ToolsHandler {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
-				return $this->mcp->get_wire_encoder()->call_tool_result(
+				return $encoder->call_tool_result(
 					array(
 						'content' => array(
 							ContentBlockHelper::image(
@@ -362,7 +366,7 @@ class ToolsHandler {
 			}
 			$payload['isError'] = false;
 
-			return $this->mcp->get_wire_encoder()->call_tool_result( $payload );
+			return $encoder->call_tool_result( $payload );
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -417,11 +421,12 @@ class ToolsHandler {
 	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 *
 	 * @param string $message The error message.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface $encoder Request-scoped encoder.
 	 *
 	 * @return array<string, mixed> Tool-call result with isError=true, in wire shape.
 	 */
-	private function create_error_result( string $message ): array {
-		return $this->mcp->get_wire_encoder()->call_tool_result(
+	private function create_error_result( string $message, WireEncoderInterface $encoder ): array {
+		return $encoder->call_tool_result(
 			array(
 				'content' => array( ContentBlockHelper::text( $message ) ),
 				'isError' => true,
