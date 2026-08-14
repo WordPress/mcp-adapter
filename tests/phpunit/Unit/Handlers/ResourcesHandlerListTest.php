@@ -9,13 +9,10 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult;
-use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 final class ResourcesHandlerListTest extends TestCase {
 
-	public function test_list_resources_returns_dto(): void {
+	public function test_list_resources_returns_resources_array(): void {
 		// Simulate logged-in for permission check.
 		wp_set_current_user( 1 );
 
@@ -36,16 +33,19 @@ final class ResourcesHandlerListTest extends TestCase {
 		$handler = new ResourcesHandler( $server );
 		$result  = $handler->list_resources();
 
-		// Verify it returns a ListResourcesResult DTO
-		$this->assertInstanceOf( ListResourcesResult::class, $result );
+		// Verify it returns the resources list in wire shape.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resources', $result );
 
-		// Use DTO getter methods
-		$resources = $result->getResources();
+		$resources = $result['resources'];
 		$this->assertNotEmpty( $resources );
-		$this->assertContainsOnlyInstancesOf( ResourceDto::class, $resources );
+		foreach ( $resources as $resource ) {
+			$this->assertIsArray( $resource );
+			$this->assertArrayHasKey( 'uri', $resource );
+		}
 
-		// Verify Resource DTO structure via toArray() for field checks
-		$resource_array = $resources[0]->toArray();
+		// Verify the resource array structure for field checks.
+		$resource_array = $resources[0];
 		$this->assertArrayHasKey( 'uri', $resource_array );
 		$this->assertArrayHasKey( 'name', $resource_array );
 	}
@@ -58,8 +58,9 @@ final class ResourcesHandlerListTest extends TestCase {
 
 		// The adapter has no resource-template concept, so the list is always empty,
 		// but the method must still respond so spec-compliant clients stop getting -32601.
-		$this->assertInstanceOf( ListResourceTemplatesResult::class, $result );
-		$this->assertSame( array(), $result->getResourceTemplates() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resourceTemplates', $result );
+		$this->assertSame( array(), $result['resourceTemplates'] );
 	}
 
 	public function test_list_resources_applies_resources_list_filter(): void {
@@ -68,7 +69,7 @@ final class ResourcesHandlerListTest extends TestCase {
 
 		// Verify resources exist before filtering.
 		$before = $handler->list_resources();
-		$this->assertNotEmpty( $before->getResources() );
+		$this->assertNotEmpty( $before['resources'] );
 
 		$filter = static function (): array {
 			return array();
@@ -76,8 +77,9 @@ final class ResourcesHandlerListTest extends TestCase {
 		add_filter( 'mcp_adapter_resources_list', $filter );
 
 		$result = $handler->list_resources();
-		$this->assertInstanceOf( ListResourcesResult::class, $result );
-		$this->assertEmpty( $result->getResources() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resources', $result );
+		$this->assertEmpty( $result['resources'] );
 
 		remove_filter( 'mcp_adapter_resources_list', $filter );
 	}
@@ -132,9 +134,9 @@ final class ResourcesHandlerListTest extends TestCase {
 		$result = $handler->list_resources();
 
 		// Verify the resource is in the list.
-		$this->assertInstanceOf( ListResourcesResult::class, $result );
-		$resources = $result->getResources();
-		$this->assertNotEmpty( $resources );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resources', $result );
+		$this->assertNotEmpty( $result['resources'] );
 
 		// Verify execute was NOT called.
 		$this->assertFalse( $execute_called, 'resources/list should NOT call ability execute()' );
@@ -150,12 +152,14 @@ final class ResourcesHandlerListTest extends TestCase {
 		$handler = new ResourcesHandler( $server );
 		$result  = $handler->list_resources();
 
-		$this->assertInstanceOf( ListResourcesResult::class, $result );
-		$resources = $result->getResources();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resources', $result );
+		$resources = $result['resources'];
 		$this->assertNotEmpty( $resources );
 
 		// Verify the resource contains metadata fields.
-		$resource_array = $resources[0]->toArray();
+		$resource_array = $resources[0];
+		$this->assertIsArray( $resource_array );
 
 		// Required metadata fields.
 		$this->assertArrayHasKey( 'uri', $resource_array );
@@ -183,8 +187,9 @@ final class ResourcesHandlerListTest extends TestCase {
 		DummyErrorHandler::reset();
 		$result = $handler->list_resources();
 
-		$this->assertInstanceOf( ListResourcesResult::class, $result );
-		$this->assertNotEmpty( $result->getResources() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resources', $result );
+		$this->assertNotEmpty( $result['resources'] );
 
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 		$last_log = end( DummyErrorHandler::$logs );

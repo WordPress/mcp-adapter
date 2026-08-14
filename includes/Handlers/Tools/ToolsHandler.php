@@ -51,13 +51,15 @@ class ToolsHandler {
 	 * Handles the tools/list/all request.
 	 *
 	 * This is a custom extension to the MCP spec that includes availability status.
-	 * Returns a ListToolsResult DTO containing all registered tools.
+	 * Returns the tools list result in wire shape.
 	 *
 	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with all tools.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with all tools.
 	 */
-	public function list_all_tools(): ListToolsResult {
+	public function list_all_tools(): array {
 		// Return the standard tools list.
 		return $this->list_tools();
 	}
@@ -65,13 +67,15 @@ class ToolsHandler {
 	/**
 	 * Handles the tools/list request.
 	 *
-	 * Returns a ListToolsResult DTO containing all registered tools.
-	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
+	 * Returns the tools list result in wire shape. Tool data is protocol-only;
+	 * internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with tools list.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with tools list.
 	 */
-	public function list_tools(): ListToolsResult {
+	public function list_tools(): array {
 		$tools = array_values( $this->mcp->get_tools() );
 
 		/**
@@ -97,28 +101,30 @@ class ToolsHandler {
 			array(
 				'tools' => $tools,
 			)
-		);
+		)->toArray();
 	}
 
 	/**
 	 * Handles the tools/call request.
 	 *
-	 * Returns either a CallToolResult DTO (for success or tool execution errors)
-	 * or a JSONRPCErrorResponse DTO (for protocol errors like tool not found).
+	 * Returns either a tool-call result array (for success or tool execution errors)
+	 * or a JSON-RPC error envelope array (for protocol errors like tool not found).
 	 *
 	 * The MCP spec distinguishes between:
-	 * 1. **Protocol errors** (tool not found, server error) → JSONRPCErrorResponse
-	 * 2. **Tool execution errors** (permission denied, runtime error) → CallToolResult with isError=true
+	 * 1. **Protocol errors** (tool not found, server error) → JSON-RPC error envelope
+	 * 2. **Tool execution errors** (permission denied, runtime error) → result with isError=true
 	 *
 	 * This distinction is critical for LLM self-correction - execution errors are
 	 * visible to the LLM, while protocol errors indicate infrastructure issues.
 	 *
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
 	 * @param array $params Request params.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed> Tool-call result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function call_tool( array $params, $request_id = 0 ) {
+	public function call_tool( array $params, $request_id = 0 ): array {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -232,7 +238,7 @@ class ToolsHandler {
 				return $this->create_error_result( $result['error'] );
 			}
 
-			// Successful tool execution - build CallToolResult DTO.
+			// Successful tool execution - build the tool-call result.
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
@@ -284,7 +290,7 @@ class ToolsHandler {
 								),
 								'isError' => false,
 							)
-						);
+						)->toArray();
 					}
 
 					if ( $has_blob ) {
@@ -302,7 +308,7 @@ class ToolsHandler {
 								),
 								'isError' => false,
 							)
-						);
+						)->toArray();
 					}
 				}
 			}
@@ -329,7 +335,7 @@ class ToolsHandler {
 						'structuredContent' => null,
 						'isError'           => false,
 					)
-				);
+				)->toArray();
 			}
 
 			// The generic fallback carries no `type` marker, so every key it holds is tool
@@ -349,7 +355,7 @@ class ToolsHandler {
 					'structuredContent' => $result,
 					'isError'           => false,
 				)
-			);
+			)->toArray();
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -364,21 +370,22 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Create an error CallToolResult from a message string.
+	 * Create an error tool-call result from a message string.
 	 *
 	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 *
 	 * @param string $message The error message.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult
+	 * @return array<string, mixed> Tool-call result with isError=true, in wire shape.
 	 */
-	private function create_error_result( string $message ): CallToolResult {
+	private function create_error_result( string $message ): array {
 		return CallToolResult::fromArray(
 			array(
 				'content'           => array( ContentBlockHelper::text( $message ) ),
 				'structuredContent' => null,
 				'isError'           => true,
 			)
-		);
+		)->toArray();
 	}
 }

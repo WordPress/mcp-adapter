@@ -49,18 +49,18 @@ class HttpSessionValidator {
 		// Check session header presence
 		$session_id = $context->session_id;
 		if ( ! $session_id ) {
-			return McpErrorFactory::invalid_request( null, 'Missing Mcp-Session-Id header' )->toArray();
+			return McpErrorFactory::invalid_request( null, 'Missing Mcp-Session-Id header' );
 		}
 
 		// Check user authentication
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return McpErrorFactory::unauthorized( null, 'User not authenticated' )->toArray();
+			return McpErrorFactory::unauthorized( null, 'User not authenticated' );
 		}
 
 		// Validate session using SessionManager
 		if ( ! SessionManager::validate_session( $user_id, $session_id, $error_handler ) ) {
-			return McpErrorFactory::session_not_found( null, 'Invalid or expired session' )->toArray();
+			return McpErrorFactory::session_not_found( null, 'Invalid or expired session' );
 		}
 
 		return true;
@@ -77,7 +77,7 @@ class HttpSessionValidator {
 		$session_id = $context->session_id;
 
 		if ( ! $session_id ) {
-			return McpErrorFactory::invalid_request( null, 'Missing Mcp-Session-Id header' )->toArray();
+			return McpErrorFactory::invalid_request( null, 'Missing Mcp-Session-Id header' );
 		}
 
 		return $session_id;
@@ -111,13 +111,13 @@ class HttpSessionValidator {
 	public static function create_session_with_error_handler( array $params, ?McpErrorHandlerInterface $error_handler ) {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return McpErrorFactory::unauthorized( null, 'User authentication required for session creation' )->toArray();
+			return McpErrorFactory::unauthorized( null, 'User authentication required for session creation' );
 		}
 
 		$session_id = SessionManager::create_session( $user_id, $params, $error_handler );
 
 		if ( ! $session_id ) {
-			return McpErrorFactory::internal_error( null, 'Failed to create session' )->toArray();
+			return McpErrorFactory::internal_error( null, 'Failed to create session' );
 		}
 
 		return $session_id;
@@ -152,13 +152,13 @@ class HttpSessionValidator {
 		// Validate session header
 		$session_id = $context->session_id;
 		if ( ! $session_id ) {
-			return McpErrorFactory::invalid_request( null, 'Missing Mcp-Session-Id header' )->toArray();
+			return McpErrorFactory::invalid_request( null, 'Missing Mcp-Session-Id header' );
 		}
 
 		// Validate user authentication
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
-			return McpErrorFactory::unauthorized( null, 'User not authenticated' )->toArray();
+			return McpErrorFactory::unauthorized( null, 'User not authenticated' );
 		}
 
 		// Terminate the session

@@ -77,7 +77,7 @@ class HttpRequestHandler {
 
 		// Method not allowed
 		return new \WP_REST_Response(
-			McpErrorFactory::invalid_request( null, 'Method not allowed' )->toArray(),
+			McpErrorFactory::invalid_request( null, 'Method not allowed' ),
 			405
 		);
 	}
@@ -95,7 +95,7 @@ class HttpRequestHandler {
 			// Validate request body
 			if ( null === $context->body ) {
 				return new \WP_REST_Response(
-					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' )->toArray(),
+					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' ),
 					400
 				);
 			}
@@ -112,7 +112,7 @@ class HttpRequestHandler {
 			);
 
 			return new \WP_REST_Response(
-				McpErrorFactory::internal_error( null, 'Handler error occurred' )->toArray(),
+				McpErrorFactory::internal_error( null, 'Handler error occurred' ),
 				500
 			);
 		}
@@ -165,7 +165,7 @@ class HttpRequestHandler {
 		// Validate JSON-RPC message format
 		$validation = McpErrorFactory::validate_jsonrpc_message( $message );
 		if ( true !== $validation ) {
-			return $validation->toArray();
+			return $validation;
 		}
 
 		// Handle notifications (no response required)
@@ -271,7 +271,7 @@ class HttpRequestHandler {
 				$context->protocol_version,
 				implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
 			)
-		)->toArray();
+		);
 	}
 
 	/**

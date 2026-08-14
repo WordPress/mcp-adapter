@@ -43,12 +43,13 @@ class InitializeHandler {
 	 * the server falls back to the latest supported version.
 	 *
 	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 *
 	 * @param string $client_protocol_version The protocol version requested by the client.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
+	 * @return array<string, mixed> Response with server capabilities and information, in wire shape.
 	 */
-	public function handle( string $client_protocol_version ): InitializeResult {
+	public function handle( string $client_protocol_version ): array {
 		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
 
 		$server_info = Implementation::fromArray(
@@ -80,20 +81,20 @@ class InitializeHandler {
 				'serverInfo'      => $server_info,
 				'instructions'    => $this->mcp->get_server_description(),
 			)
-		);
+		)->toArray();
 
 		/**
 		 * Filters the initialize response before returning to the client.
 		 *
 		 * Use this filter to modify server capabilities, instructions, or
-		 * other initialization data dynamically. To modify the result, call
-		 * `$result->toArray()`, change the data, and return
-		 * `InitializeResult::fromArray( $modified_data )`.
+		 * other initialization data dynamically. Modify the array keys
+		 * directly and return the array.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t The result is a revision-neutral array instead of an InitializeResult DTO.
 		 *
-		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
-		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
+		 * @param array<string, mixed>   $result The initialize result in wire shape.
+		 * @param \WP\MCP\Core\McpServer $server The MCP server instance.
 		 */
 		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );
 	}

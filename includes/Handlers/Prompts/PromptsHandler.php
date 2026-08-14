@@ -65,9 +65,11 @@ class PromptsHandler {
 	/**
 	 * Handles the prompts/list request.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\ListPromptsResult Response with prompts list DTO.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with prompts list, in wire shape.
 	 */
-	public function list_prompts(): ListPromptsResult {
+	public function list_prompts(): array {
 		$prompts = array_values( $this->mcp->get_prompts() );
 
 		/**
@@ -93,18 +95,20 @@ class PromptsHandler {
 			array(
 				'prompts' => $prompts,
 			)
-		);
+		)->toArray();
 	}
 
 	/**
 	 * Handles the prompts/get request.
 	 *
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
 	 * @param array           $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse Response with prompt execution results or error.
+	 * @return array<string, mixed> Prompt result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function get_prompt( array $params, $request_id = 0 ) {
+	public function get_prompt( array $params, $request_id = 0 ): array {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -192,7 +196,7 @@ class PromptsHandler {
 				return McpErrorFactory::internal_error( $request_id, $result->get_error_message() );
 			}
 
-			return $this->normalize_result_to_dto( $result, $prompt, $prompt_name );
+			return $this->normalize_result_to_dto( $result, $prompt, $prompt_name )->toArray();
 		} catch ( \Throwable $e ) {
 			$this->mcp->get_error_handler()->log(
 				'Prompt execution failed',

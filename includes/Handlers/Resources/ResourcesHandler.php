@@ -45,12 +45,14 @@ class ResourcesHandler {
 	/**
 	 * Handles the resources/list request.
 	 *
-	 * Returns a ListResourcesResult DTO containing all registered resources.
-	 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
+	 * Returns the resources list result in wire shape.
+	 * Any `_meta` fields are passed through unchanged.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourcesResult Response with resources list.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with resources list.
 	 */
-	public function list_resources(): ListResourcesResult {
+	public function list_resources(): array {
 		$resources = array_values( $this->mcp->get_resources() );
 
 		/**
@@ -76,7 +78,7 @@ class ResourcesHandler {
 			array(
 				'resources' => $resources,
 			)
-		);
+		)->toArray();
 	}
 
 	/**
@@ -87,31 +89,35 @@ class ResourcesHandler {
 	 * the base `resources` capability (no sub-flag gates it), which the server always
 	 * advertises, so spec-compliant clients call it during resource discovery.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult Empty resource-templates list.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Empty resource-templates list, in wire shape.
 	 */
-	public function list_resource_templates(): ListResourceTemplatesResult {
+	public function list_resource_templates(): array {
 		return ListResourceTemplatesResult::fromArray(
 			array(
 				'resourceTemplates' => array(),
 			)
-		);
+		)->toArray();
 	}
 
 	/**
 	 * Handles the resources/read request.
 	 *
-	 * Returns either a ReadResourceResult DTO (for success) or a JSONRPCErrorResponse DTO
-	 * (for protocol errors like missing parameter or resource not found).
+	 * Returns either a read-resource result array (for success) or a JSON-RPC error
+	 * envelope array (for protocol errors like missing parameter or resource not found).
 	 *
 	 * Unlike tools, resources don't have a concept of "execution errors" that should be
 	 * reported with isError=true. Resource reads either succeed or fail at the protocol level.
 	 *
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
 	 * @param array $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ReadResourceResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed> Read-resource result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function read_resource( array $params, $request_id = 0 ) {
+	public function read_resource( array $params, $request_id = 0 ): array {
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -208,7 +214,7 @@ class ResourcesHandler {
 				array(
 					'contents' => $content_dtos,
 				)
-			);
+			)->toArray();
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error reading resource',

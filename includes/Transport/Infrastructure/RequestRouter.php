@@ -11,10 +11,6 @@ namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
-use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -91,64 +87,46 @@ class RequestRouter {
 			// Calculate request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
 
-			// Handle DTO results from migrated handlers.
-			// DTOs are converted to arrays at the serialization boundary (here).
-			if ( $handler_result instanceof JSONRPCErrorResponse ) {
+			// Handlers return revision-neutral arrays in wire shape: either a
+			// result or a JSON-RPC error envelope carrying an `error` key. No
+			// wire-shape result type has a top-level `error` key, so its
+			// presence identifies the error outcome. A handler that violates
+			// its `array` return type raises a TypeError handled by the catch
+			// below.
+			if ( isset( $handler_result['error'] ) ) {
 				// Normalize to transport-level shape: only the JSON-RPC error object.
 				// The JSON-RPC envelope is created by the transport boundary.
-				$result                 = array( 'error' => $handler_result->getError()->toArray() );
+				$error                  = is_array( $handler_result['error'] ) ? $handler_result['error'] : array();
+				$result                 = array( 'error' => $handler_result['error'] );
 				$tags                   = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-				$tags['error_code']     = $handler_result->getError()->getCode();
-				$tags['failure_reason'] = $handler_result->getError()->getMessage();
+				$tags['error_code']     = $error['code'] ?? null;
+				$tags['failure_reason'] = $error['message'] ?? null;
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;
 			}
 
-			if ( $handler_result instanceof AbstractDataTransferObject ) {
-				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
-				// Note: If a future schema version ever returns nested DTO objects inside `toArray()`,
-				// we may need to add a deep normalizer at this boundary (before JSON serialization)
-				// to prevent placeholder `{}` objects in client output.
-				$raw_result = $handler_result->toArray();
-				$result     = $raw_result;
+			// Success result already in wire shape.
+			$result = $handler_result;
 
-				if ( null !== $new_session_id ) {
-					$component_tags['new_session_id'] = $new_session_id;
-					$result['_session_id']            = $new_session_id;
-				}
+			if ( null !== $new_session_id ) {
+				$component_tags['new_session_id'] = $new_session_id;
+				$result['_session_id']            = $new_session_id;
+			}
 
-				$status = 'success';
-				if ( $handler_result instanceof CallToolResult && true === $handler_result->getIsError() ) {
-					$status = 'error';
+			$status = 'success';
+			if ( true === ( $handler_result['isError'] ?? null ) ) {
+				$status = 'error';
 
-					if ( ! isset( $component_tags['failure_reason'] ) ) {
-						$content = $handler_result->getContent();
-						if ( isset( $content[0] ) && $content[0] instanceof TextContent ) {
-							$component_tags['failure_reason'] = $content[0]->getText();
-						}
+				if ( ! isset( $component_tags['failure_reason'] ) ) {
+					$content = $handler_result['content'] ?? null;
+					if ( is_array( $content ) && isset( $content[0] ) && is_array( $content[0] ) && 'text' === ( $content[0]['type'] ?? null ) && isset( $content[0]['text'] ) ) {
+						$component_tags['failure_reason'] = $content[0]['text'];
 					}
 				}
-
-				$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
-				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
-
-				return $result;
 			}
 
-			// Handlers should only return schema DTOs.
-			$actual_type = is_object( $handler_result ) ? get_class( $handler_result ) : gettype( $handler_result );
-			$this->context->error_handler->log(
-				sprintf( 'Handler for method "%s" returned unexpected type: %s', $method, $actual_type ),
-				array(
-					'method'      => $method,
-					'actual_type' => $actual_type,
-				)
-			);
-			$unexpected_error   = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
-			$result             = array( 'error' => $unexpected_error->getError()->toArray() );
-			$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-			$tags['error_code'] = $unexpected_error->getError()->getCode();
+			$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			return $result;
@@ -171,7 +149,7 @@ class RequestRouter {
 			// Create error response from exception.
 			$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Handler error occurred' );
 
-			return array( 'error' => $unexpected_error->getError()->toArray() );
+			return array( 'error' => $unexpected_error['error'] );
 		}
 	}
 
@@ -306,24 +284,24 @@ class RequestRouter {
 	/**
 	 * Handle initialize requests with session management.
 	 *
-	 * Converts InitializeResult DTO to array and adds session management.
+	 * Adds session management around the initialize result array.
 	 *
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
 	 * @param string|null $new_session_id Newly created session id, if any.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 * @return array<string, mixed> Initialize result or JSON-RPC error envelope, in wire shape.
 	 */
-	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
+	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): array {
 		// Extract client protocol version from params, defaulting to empty string if missing.
 		$client_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] ) ? $params['protocolVersion'] : '';
 
-		// Get the initialize response from the handler (returns InitializeResult DTO).
+		// Get the initialize response from the handler (wire-shape array).
 		$init_result = $this->context->initialize_handler->handle( $client_version );
 
 		// Handle session creation if HTTP context is provided.
-		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
+		// The initialize result never carries errors - errors would be thrown as exceptions.
 		if ( $http_context && ! $http_context->session_id ) {
 			$session_result = HttpSessionValidator::create_session_with_error_handler( $params, $this->context->error_handler );
 
@@ -350,9 +328,9 @@ class RequestRouter {
 	 * @param string $method The method that was not found.
 	 * @param mixed $request_id The request ID.
 	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed> JSON-RPC error envelope in wire shape.
 	 */
-	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
+	private function create_method_not_found_error( string $method, $request_id ): array {
 		return McpErrorFactory::method_not_found( $request_id, $method );
 	}
 

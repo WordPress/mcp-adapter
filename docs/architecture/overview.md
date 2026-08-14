@@ -184,14 +184,14 @@ Negotiates the MCP protocol version between client and server. If the client req
 - **Validation**: Ensures transport classes implement `McpTransportInterface`
 
 ### RequestRouter
-- **Purpose**: Routes MCP method calls to handlers that return schema DTOs
-- **DTO serialization boundary**: Converts `AbstractDataTransferObject` results to arrays via `toArray()` and `JSONRPCErrorResponse` results to error arrays
+- **Purpose**: Routes MCP method calls to handlers that return revision-neutral arrays in wire shape
+- **Outcome split**: A result carrying a top-level `error` key is a JSON-RPC error envelope; the router forwards only its `error` object as `['error' => ...]`. Everything else is a success result and passes through unchanged
 - **Observability**: Extracts per-component context from `McpComponentInterface::get_observability_context()` for request tagging
 
 ## Request flow
 
 ```
-AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Schema DTO --> Response
+AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Wire-shape array --> Response
 ```
 
 ### Detailed flow
@@ -199,26 +199,26 @@ AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface -
 2. **RequestRouter** maps method to appropriate handler
 3. **Handler** finds the `McpComponentInterface` component, validates input, and invokes execution
 4. **Component** delegates to a WordPress ability or direct callable, returning a result
-5. **Handler** wraps the result in a schema DTO (e.g., `CallToolResult`)
-6. **RequestRouter** calls `toArray()` on the DTO at the serialization boundary
+5. **Handler** serializes the result into a wire-shape array (the schema DTOs still validate and serialize internally until the dependency swap)
+6. **RequestRouter** forwards the array, splitting error envelopes from success results
 7. **Transport** wraps the array in a JSON-RPC envelope and returns it
 
 ### Method routing
 
-The `RequestRouter` maps MCP methods to handlers. All handlers return schema DTOs:
+The `RequestRouter` maps MCP methods to handlers. All handlers return revision-neutral arrays in wire shape:
 
-| Method | Handler | Return Type |
-|--------|---------|-------------|
-| `initialize` | `InitializeHandler::handle()` | `InitializeResult` |
-| `tools/list` | `ToolsHandler::list_tools()` | `ListToolsResult` |
-| `tools/call` | `ToolsHandler::call_tool()` | `CallToolResult` or `JSONRPCErrorResponse` |
-| `resources/list` | `ResourcesHandler::list_resources()` | `ListResourcesResult` |
-| `resources/read` | `ResourcesHandler::read_resource()` | `ReadResourceResult` or `JSONRPCErrorResponse` |
-| `prompts/list` | `PromptsHandler::list_prompts()` | `ListPromptsResult` |
-| `prompts/get` | `PromptsHandler::get_prompt()` | `GetPromptResult` or `JSONRPCErrorResponse` |
-| `ping` | `SystemHandler::ping()` | `Result` |
+| Method | Handler | Return Shape |
+|--------|---------|--------------|
+| `initialize` | `InitializeHandler::handle()` | Initialize result |
+| `tools/list` | `ToolsHandler::list_tools()` | Tools list result |
+| `tools/call` | `ToolsHandler::call_tool()` | Tool-call result or JSON-RPC error envelope |
+| `resources/list` | `ResourcesHandler::list_resources()` | Resources list result |
+| `resources/read` | `ResourcesHandler::read_resource()` | Read-resource result or JSON-RPC error envelope |
+| `prompts/list` | `PromptsHandler::list_prompts()` | Prompts list result |
+| `prompts/get` | `PromptsHandler::get_prompt()` | Prompt result or JSON-RPC error envelope |
+| `ping` | `SystemHandler::ping()` | Empty result |
 
-Protocol-level errors (tool not found, missing parameters) return `JSONRPCErrorResponse`. Execution-level errors (permission denied, runtime failure) return the appropriate result DTO with `isError: true`.
+Protocol-level errors (tool not found, missing parameters) return a JSON-RPC error envelope array. Execution-level errors (permission denied, runtime failure) return the appropriate result array with `isError: true`.
 
 ## Component creation
 
@@ -347,24 +347,24 @@ interface McpRestTransportInterface extends McpTransportInterface {
 
 Transports and the `RequestRouter` receive all dependencies through `McpTransportContext`, which bundles the server instance, all handlers, the router, error handler, and observability handler.
 
-### DTO-aware RequestRouter
+### Array-consuming RequestRouter
 
-The `RequestRouter` is the serialization boundary between typed DTOs and transport-level arrays:
+The `RequestRouter` consumes wire-shape arrays from handlers and splits outcomes for the transport:
 
-1. It dispatches to the appropriate handler, which returns an `AbstractDataTransferObject` or `JSONRPCErrorResponse`.
-2. For success DTOs, it calls `toArray()` and returns the resulting array.
-3. For error DTOs, it extracts the error object and returns `['error' => ...]`.
+1. It dispatches to the appropriate handler, which returns a revision-neutral array — a result in wire shape or a JSON-RPC error envelope.
+2. For error envelopes (identified by their top-level `error` key), it forwards only the error object as `['error' => ...]`.
+3. For success results, it forwards the array unchanged.
 4. The transport wraps the array in the JSON-RPC 2.0 envelope.
 
 ## Error handling
 
 ### Two-part system
 
-1. **Error Response Creation**: `McpErrorFactory` creates `JSONRPCErrorResponse` DTOs for protocol errors
+1. **Error Response Creation**: `McpErrorFactory` creates JSON-RPC error envelope arrays for protocol errors
 2. **Error Logging**: `McpErrorHandlerInterface` implementations log errors for monitoring
 
 ```php
-// Protocol error DTO (returned to clients via JSON-RPC)
+// Protocol error envelope array (returned to clients via JSON-RPC)
 $error_response = McpErrorFactory::tool_not_found( $request_id, $tool_name );
 
 // Error logging (for monitoring)

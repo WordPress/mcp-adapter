@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\System;
 
-use WP\McpSchema\Common\AbstractDataTransferObject;
 use WP\McpSchema\Common\Protocol\DTO\Result;
 
 /**
@@ -19,9 +18,11 @@ class SystemHandler {
 	/**
 	 * Handles the ping request.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Empty result DTO per MCP specification.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Empty result per MCP specification.
 	 */
-	public function ping(): AbstractDataTransferObject {
-		return Result::fromArray( array() );
+	public function ping(): array {
+		return Result::fromArray( array() )->toArray();
 	}
 }

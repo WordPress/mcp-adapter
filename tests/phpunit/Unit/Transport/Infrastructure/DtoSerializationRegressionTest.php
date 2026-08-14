@@ -2,8 +2,10 @@
 /**
  * Regression tests for DTO serialization at the transport boundary.
  *
- * These tests ensure schema DTOs round-trip to arrays and JSON without producing placeholder `{}` objects
- * for nested DTOs.
+ * These tests build vendor schema DTOs directly and guard the internal DTO round-trip that
+ * handlers still use to validate and serialize responses, ensuring nested DTOs round-trip to
+ * arrays and JSON without producing placeholder `{}` objects. They remain until the dependency
+ * swap replaces the DTOs with descriptor-backed encoders.
  *
  * @package McpAdapter
  */
