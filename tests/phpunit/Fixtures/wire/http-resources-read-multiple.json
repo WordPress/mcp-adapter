@@ -1,5 +1,5 @@
 {
     "status": 200,
     "session_header": "{{SESSION_ID}}",
-    "body": "{\"jsonrpc\":\"2.0\",\"id\":62,\"result\":{\"contents\":[{\"uri\":\"WordPress:\\/\\/local\\/resource-multi\\/part1\",\"mimeType\":\"text\\/plain\",\"text\":\"First content part\"},{\"uri\":\"WordPress:\\/\\/local\\/resource-multi\\/part2\",\"mimeType\":\"text\\/plain\",\"text\":\"Second content part\"}]}}"
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":62,\"result\":{\"contents\":[{\"uri\":\"WordPress:\\/\\/local\\/resource-multi\\/part1\",\"text\":\"First content part\",\"mimeType\":\"text\\/plain\"},{\"uri\":\"WordPress:\\/\\/local\\/resource-multi\\/part2\",\"text\":\"Second content part\",\"mimeType\":\"text\\/plain\"}]}}"
 }

@@ -23,7 +23,7 @@ use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 use WP\MCP\Transport\Infrastructure\SessionManager;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Generated\V20251125Constants;
 use WP_REST_Request;
 
 /**
@@ -89,7 +89,7 @@ final class RequestRouterTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'protocolVersion', $result );
-		$this->assertEquals( McpConstants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
+		$this->assertEquals( V20251125Constants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
 		$this->assertArrayHasKey( 'serverInfo', $result );
 
 		// Verify observability events (unified event name with status tag)

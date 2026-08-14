@@ -54,10 +54,16 @@
 			]
 		}
 	},
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "https://github.com/WordPress/php-mcp-schema.git"
+		}
+	],
 	"require": {
 		"php": "^7.4 || ^8.0",
 		"automattic/jetpack-autoloader": "^5.0",
-		"wordpress/php-mcp-schema": "^0.1.0",
+		"wordpress/php-mcp-schema": "dev-try/descriptor-backed-generic-record-model",
 		"ext-json": "*"
 	},
 	"require-dev": {

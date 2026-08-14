@@ -13,11 +13,6 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult;
-use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
-use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
 
 /**
  * Handles resources-related MCP methods.
@@ -74,11 +69,17 @@ class ResourcesHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		return ListResourcesResult::fromArray(
+		$encoder = $this->mcp->get_wire_encoder();
+
+		return $encoder->list_resources_result(
 			array(
-				'resources' => $resources,
+				'resources' => $this->encode_components(
+					$resources,
+					'uri',
+					static fn( array $item, string $subject ): ?array => $encoder->try_resource( $item, $subject )
+				),
 			)
-		)->toArray();
+		);
 	}
 
 	/**
@@ -94,11 +95,11 @@ class ResourcesHandler {
 	 * @return array<string, mixed> Empty resource-templates list, in wire shape.
 	 */
 	public function list_resource_templates(): array {
-		return ListResourceTemplatesResult::fromArray(
+		return $this->mcp->get_wire_encoder()->list_resource_templates_result(
 			array(
 				'resourceTemplates' => array(),
 			)
-		)->toArray();
+		);
 	}
 
 	/**
@@ -208,13 +209,13 @@ class ResourcesHandler {
 			// Seed the fallback content URI with the advertised URI, not the client's
 			// request URI, so contents[].uri matches resources/list even when the client
 			// lowercased the scheme (RFC 3986 3.1). For an exact-case read the two are equal.
-			$content_dtos = $this->convert_contents_to_dtos( $contents, $resource['uri'] );
+			$content_items = $this->convert_contents_to_arrays( $contents, $resource['uri'] );
 
-			return ReadResourceResult::fromArray(
+			return $this->mcp->get_wire_encoder()->read_resource_result(
 				array(
-					'contents' => $content_dtos,
+					'contents' => $content_items,
 				)
-			)->toArray();
+			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error reading resource',
@@ -229,7 +230,7 @@ class ResourcesHandler {
 	}
 
 	/**
-	 * Convert ability execution results to resource content DTOs.
+	 * Convert ability execution results to resource contents arrays.
 	 *
 	 * The MCP spec expects contents to be an array of TextResourceContents or BlobResourceContents.
 	 * This method handles various return formats from abilities and normalizes them.
@@ -237,9 +238,9 @@ class ResourcesHandler {
 	 * @param mixed $contents The contents returned by the ability.
 	 * @param string $uri The resource URI.
 	 *
-	 * @return array<\WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents>
+	 * @return array<int, array<string, mixed>>
 	 */
-	private function convert_contents_to_dtos( $contents, string $uri ): array {
+	private function convert_contents_to_arrays( $contents, string $uri ): array {
 		// If contents is already an array of properly structured items, convert each.
 		if ( is_array( $contents ) && ! empty( $contents ) ) {
 			// Check if this is an array of content items (has 'uri', 'text', or 'blob' in first item).
@@ -247,7 +248,7 @@ class ResourcesHandler {
 			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) || isset( $first_item['blob'] ) ) ) {
 				return array_map(
 					function ( $item ) use ( $uri ) {
-						return $this->create_content_dto( $item, $uri );
+						return $this->create_content_item( $item, $uri );
 					},
 					$contents
 				);
@@ -265,17 +266,15 @@ class ResourcesHandler {
 		}
 
 		return array(
-			TextResourceContents::fromArray(
-				array(
-					'uri'  => $uri,
-					'text' => $text,
-				)
+			array(
+				'uri'  => $uri,
+				'text' => $text,
 			),
 		);
 	}
 
 	/**
-	 * Create a content DTO from an array item.
+	 * Create a resource-contents array from an array item.
 	 *
 	 * `_meta` is carried through from the item so metadata a handler attaches to its
 	 * resource contents reaches the client. MCP Apps UI resources rely on this: they
@@ -290,35 +289,36 @@ class ResourcesHandler {
 	 * @param array{uri?: mixed, mimeType?: mixed, text?: mixed, blob?: mixed, _meta?: mixed} $item The content item array.
 	 * @param string $default_uri The URI to use when the item names none.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents
+	 * @return array<string, mixed> The resource-contents array.
 	 */
-	private function create_content_dto( array $item, string $default_uri ) {
+	private function create_content_item( array $item, string $default_uri ): array {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
 		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
 
-		// If there's blob data, create BlobResourceContents.
+		// Blob data wins when present; otherwise the item is text.
 		if ( isset( $item['blob'] ) ) {
-			return BlobResourceContents::fromArray(
-				array(
-					'uri'      => $item_uri,
-					'blob'     => (string) $item['blob'],
-					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
-					'_meta'    => $meta,
-				)
+			$contents = array(
+				'uri'  => $item_uri,
+				'blob' => (string) $item['blob'],
+			);
+		} else {
+			$contents = array(
+				'uri'  => $item_uri,
+				'text' => (string) ( $item['text'] ?? '' ),
 			);
 		}
 
-		// Default to TextResourceContents.
-		$text = $item['text'] ?? '';
+		// Optional fields are omitted rather than sent as null: the protocol types
+		// reject a null in a field that is typed.
+		if ( is_string( $mime_type ) ) {
+			$contents['mimeType'] = $mime_type;
+		}
 
-		return TextResourceContents::fromArray(
-			array(
-				'uri'      => $item_uri,
-				'text'     => (string) $text,
-				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
-				'_meta'    => $meta,
-			)
-		);
+		if ( null !== $meta ) {
+			$contents['_meta'] = $meta;
+		}
+
+		return $contents;
 	}
 }

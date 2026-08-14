@@ -11,7 +11,6 @@ namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -174,7 +173,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		return PromptDto::fromArray( $prompt_data )->toArray();
+		return $prompt_data;
 	}
 
 	/**

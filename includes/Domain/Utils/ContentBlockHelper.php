@@ -13,21 +13,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Utils;
 
-use WP\McpSchema\Common\Content\DTO\AudioContent;
-use WP\McpSchema\Common\Content\DTO\ImageContent;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-
 /**
  * Helper class for creating MCP content block arrays.
  *
  * Provides static factory methods that return content blocks as plain arrays.
  * These blocks are used in tool call results, prompt messages, and resource
- * contents throughout the MCP protocol. Each factory builds the matching schema
- * DTO internally, so the DTO's own validation still runs, and returns its array
- * form. Result DTOs rehydrate these arrays when they assemble a response.
+ * contents throughout the MCP protocol. Each factory returns a revision-neutral
+ * array. Validation happens once, at the response boundary, when the encoder
+ * hydrates the whole payload through the schema catalog.
  *
  * Every `_meta` argument passes through {@see McpValidator::normalize_meta()}, so a
  * PHP list is omitted instead of being serialized where MCP declares a JSON object.
@@ -47,15 +40,15 @@ final class ContentBlockHelper {
 	 * @return array<string, mixed> The created image content block.
 	 */
 	public static function image( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
-		return ImageContent::fromArray(
+		return self::decorate(
 			array(
-				'type'        => ImageContent::TYPE,
-				'data'        => $data,
-				'mimeType'    => $mime_type,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		)->toArray();
+				'type'     => 'image',
+				'data'     => $data,
+				'mimeType' => $mime_type,
+			),
+			$annotations,
+			$_meta
+		);
 	}
 
 	/**
@@ -69,15 +62,15 @@ final class ContentBlockHelper {
 	 * @return array<string, mixed> The created audio content block.
 	 */
 	public static function audio( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
-		return AudioContent::fromArray(
+		return self::decorate(
 			array(
-				'type'        => AudioContent::TYPE,
-				'data'        => $data,
-				'mimeType'    => $mime_type,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		)->toArray();
+				'type'     => 'audio',
+				'data'     => $data,
+				'mimeType' => $mime_type,
+			),
+			$annotations,
+			$_meta
+		);
 	}
 
 	/**
@@ -109,23 +102,28 @@ final class ContentBlockHelper {
 		?array $_meta = null,
 		?array $resource_meta = null
 	): array {
-		$resource = TextResourceContents::fromArray(
-			array(
-				'uri'      => $uri,
-				'text'     => $text,
-				'mimeType' => $mime_type,
-				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
-			)
+		$resource = array(
+			'uri'  => $uri,
+			'text' => $text,
 		);
 
-		return EmbeddedResource::fromArray(
+		if ( null !== $mime_type ) {
+			$resource['mimeType'] = $mime_type;
+		}
+
+		$contents_meta = McpValidator::normalize_meta( $resource_meta );
+		if ( null !== $contents_meta ) {
+			$resource['_meta'] = $contents_meta;
+		}
+
+		return self::decorate(
 			array(
-				'type'        => EmbeddedResource::TYPE,
-				'resource'    => $resource,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		)->toArray();
+				'type'     => 'resource',
+				'resource' => $resource,
+			),
+			$annotations,
+			$_meta
+		);
 	}
 
 	/**
@@ -157,23 +155,28 @@ final class ContentBlockHelper {
 		?array $_meta = null,
 		?array $resource_meta = null
 	): array {
-		$resource = BlobResourceContents::fromArray(
-			array(
-				'uri'      => $uri,
-				'blob'     => $blob,
-				'mimeType' => $mime_type,
-				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
-			)
+		$resource = array(
+			'uri'  => $uri,
+			'blob' => $blob,
 		);
 
-		return EmbeddedResource::fromArray(
+		if ( null !== $mime_type ) {
+			$resource['mimeType'] = $mime_type;
+		}
+
+		$contents_meta = McpValidator::normalize_meta( $resource_meta );
+		if ( null !== $contents_meta ) {
+			$resource['_meta'] = $contents_meta;
+		}
+
+		return self::decorate(
 			array(
-				'type'        => EmbeddedResource::TYPE,
-				'resource'    => $resource,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		)->toArray();
+				'type'     => 'resource',
+				'resource' => $resource,
+			),
+			$annotations,
+			$_meta
+		);
 	}
 
 	/**
@@ -202,14 +205,14 @@ final class ContentBlockHelper {
 	 * @return array<string, mixed> The created text content block.
 	 */
 	public static function text( string $text, ?array $annotations = null, ?array $_meta = null ): array {
-		return TextContent::fromArray(
+		return self::decorate(
 			array(
-				'type'        => TextContent::TYPE,
-				'text'        => $text,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		)->toArray();
+				'type' => 'text',
+				'text' => $text,
+			),
+			$annotations,
+			$_meta
+		);
 	}
 
 	/**
@@ -247,5 +250,34 @@ final class ContentBlockHelper {
 	 */
 	public static function to_array_list( array $blocks ): array {
 		return $blocks;
+	}
+
+	/**
+	 * Adds the optional annotations and _meta fields to a content block.
+	 *
+	 * Both fields are omitted when absent rather than emitted as null. The
+	 * protocol types reject a null in a field that is typed, so a key that has
+	 * no value must not be present at all.
+	 *
+	 * @param array<string, mixed>      $block       The block being built.
+	 * @param array<string, mixed>|null $annotations Optional annotations for the client.
+	 * @param array<string, mixed>|null $_meta       Optional metadata for the block.
+	 *
+	 * @return array<string, mixed> The block with its optional fields applied.
+	 */
+	private static function decorate( array $block, ?array $annotations, ?array $_meta ): array {
+		if ( null !== $annotations && ! empty( $annotations ) ) {
+			$clean = McpAnnotationMapper::sanitize( $annotations, 'resource', (string) ( $block['type'] ?? '' ) );
+			if ( ! empty( $clean ) ) {
+				$block['annotations'] = $clean;
+			}
+		}
+
+		$meta = McpValidator::normalize_meta( $_meta );
+		if ( null !== $meta ) {
+			$block['_meta'] = $meta;
+		}
+
+		return $block;
 	}
 }

@@ -13,7 +13,6 @@ namespace WP\MCP\Domain\Resources;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -97,14 +96,7 @@ class RegisterAbilityAsMcpResource {
 			return $data;
 		}
 
-		try {
-			return ResourceDto::fromArray( $data )->toArray();
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_schema_invalid',
-				$e->getMessage()
-			);
-		}
+		return $data;
 	}
 
 	/**
@@ -450,20 +442,7 @@ class RegisterAbilityAsMcpResource {
 			return $data;
 		}
 
-		try {
-			$resource_array = ResourceDto::fromArray( $data['resource_data'] )->toArray();
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Resource DTO for ability %1$s: %2$s', 'mcp-adapter' ),
-					$ability->get_name(),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
+		$resource_array = $data['resource_data'];
 
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );

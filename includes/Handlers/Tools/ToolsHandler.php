@@ -15,8 +15,6 @@ use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
-use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
 
 /**
  * Handles tools-related MCP methods.
@@ -97,11 +95,17 @@ class ToolsHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		return ListToolsResult::fromArray(
+		$encoder = $this->mcp->get_wire_encoder();
+
+		return $encoder->list_tools_result(
 			array(
-				'tools' => $tools,
+				'tools' => $this->encode_components(
+					$tools,
+					'name',
+					static fn( array $tool, string $subject ): ?array => $encoder->try_tool( $tool, $subject )
+				),
 			)
-		)->toArray();
+		);
 	}
 
 	/**
@@ -276,7 +280,7 @@ class ToolsHandler {
 					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
-						return CallToolResult::fromArray(
+						return $this->mcp->get_wire_encoder()->call_tool_result(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_text_resource(
@@ -290,11 +294,11 @@ class ToolsHandler {
 								),
 								'isError' => false,
 							)
-						)->toArray();
+						);
 					}
 
 					if ( $has_blob ) {
-						return CallToolResult::fromArray(
+						return $this->mcp->get_wire_encoder()->call_tool_result(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_blob_resource(
@@ -308,7 +312,7 @@ class ToolsHandler {
 								),
 								'isError' => false,
 							)
-						)->toArray();
+						);
 					}
 				}
 			}
@@ -322,9 +326,9 @@ class ToolsHandler {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
-				return CallToolResult::fromArray(
+				return $this->mcp->get_wire_encoder()->call_tool_result(
 					array(
-						'content'           => array(
+						'content' => array(
 							ContentBlockHelper::image(
 								$image_data,
 								$mime_type,
@@ -332,10 +336,9 @@ class ToolsHandler {
 								McpValidator::normalize_meta( $result['_meta'] ?? null )
 							),
 						),
-						'structuredContent' => null,
-						'isError'           => false,
+						'isError' => false,
 					)
-				)->toArray();
+				);
 			}
 
 			// The generic fallback carries no `type` marker, so every key it holds is tool
@@ -349,13 +352,13 @@ class ToolsHandler {
 				$json_text = '{}';
 			}
 
-			return CallToolResult::fromArray(
+			return $this->mcp->get_wire_encoder()->call_tool_result(
 				array(
 					'content'           => array( ContentBlockHelper::text( $json_text ) ),
 					'structuredContent' => $result,
 					'isError'           => false,
 				)
-			)->toArray();
+			);
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -380,12 +383,11 @@ class ToolsHandler {
 	 * @return array<string, mixed> Tool-call result with isError=true, in wire shape.
 	 */
 	private function create_error_result( string $message ): array {
-		return CallToolResult::fromArray(
+		return $this->mcp->get_wire_encoder()->call_tool_result(
 			array(
-				'content'           => array( ContentBlockHelper::text( $message ) ),
-				'structuredContent' => null,
-				'isError'           => true,
+				'content' => array( ContentBlockHelper::text( $message ) ),
+				'isError' => true,
 			)
-		)->toArray();
+		);
 	}
 }

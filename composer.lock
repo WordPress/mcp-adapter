@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "bfa32ba59be79ad50b3c83430daa6a4d",
+    "content-hash": "01b61ff86a6f2cfffa9ef46b718273d0",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -72,16 +72,16 @@
         },
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "v0.1.3",
+            "version": "dev-try/descriptor-backed-generic-record-model",
             "source": {
                 "type": "git",
-                "url": "https://github.com/WordPress/php-mcp-schema",
-                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2"
+                "url": "https://github.com/WordPress/php-mcp-schema.git",
+                "reference": "285d8fc0174336a626102b194dfe6a2563041967"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
-                "reference": "b2fcf97aa023ce46e9f03493c194a72d5a46bea2",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/285d8fc0174336a626102b194dfe6a2563041967",
+                "reference": "285d8fc0174336a626102b194dfe6a2563041967",
                 "shasum": ""
             },
             "require": {
@@ -96,7 +96,27 @@
                     "WP\\McpSchema\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "scripts": {
+                "analyse": [
+                    "phpstan analyse"
+                ],
+                "benchmark": [
+                    "php benchmarks/generic-record.php"
+                ],
+                "phpstan": [
+                    "@analyse"
+                ],
+                "demo": [
+                    "php examples/generic-record.php"
+                ],
+                "test": [
+                    "php tests/generic-record.php"
+                ],
+                "check": [
+                    "@test",
+                    "@analyse"
+                ]
+            },
             "license": [
                 "GPL-2.0-or-later"
             ],
@@ -106,16 +126,20 @@
                     "homepage": "https://wordpress.org"
                 }
             ],
-            "description": "PHP DTOs for the Model Context Protocol (MCP) specification",
+            "description": "Descriptor-backed PHP records for explicit Model Context Protocol revisions",
             "homepage": "https://github.com/WordPress/php-mcp-schema",
             "keywords": [
-                "dto",
                 "mcp",
                 "model-context-protocol",
                 "php",
+                "record",
                 "schema"
             ],
-            "time": "2026-08-10T09:12:14+00:00"
+            "support": {
+                "source": "https://github.com/WordPress/php-mcp-schema/tree/try/descriptor-backed-generic-record-model",
+                "issues": "https://github.com/WordPress/php-mcp-schema/issues"
+            },
+            "time": "2026-08-14T06:44:52+00:00"
         }
     ],
     "packages-dev": [
@@ -3250,7 +3274,9 @@
     ],
     "aliases": [],
     "minimum-stability": "dev",
-    "stability-flags": {},
+    "stability-flags": {
+        "wordpress/php-mcp-schema": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

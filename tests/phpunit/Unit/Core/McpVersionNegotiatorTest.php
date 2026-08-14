@@ -11,7 +11,7 @@ namespace WP\MCP\Tests\Unit\Core;
 
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Generated\V20251125Constants;
 
 /**
  * @since 0.5.0
@@ -81,15 +81,15 @@ final class McpVersionNegotiatorTest extends TestCase {
 	/**
 	 * Test that the latest supported version matches the schema package constant.
 	 *
-	 * McpConstants::LATEST_PROTOCOL_VERSION comes from the php-mcp-schema vendor
+	 * V20251125Constants::LATEST_PROTOCOL_VERSION comes from the php-mcp-schema vendor
 	 * package. If that package updates its constant but SUPPORTED_PROTOCOL_VERSIONS
 	 * is not updated, this test will catch the drift.
 	 */
-	public function test_latestSupportedVersion_matchesMcpConstantsLatest(): void {
+	public function test_latestSupportedVersion_matchesSchemaLatest(): void {
 		$this->assertSame(
-			McpConstants::LATEST_PROTOCOL_VERSION,
+			V20251125Constants::LATEST_PROTOCOL_VERSION,
 			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS[0],
-			'SUPPORTED_PROTOCOL_VERSIONS[0] must match McpConstants::LATEST_PROTOCOL_VERSION. '
+			'SUPPORTED_PROTOCOL_VERSIONS[0] must match V20251125Constants::LATEST_PROTOCOL_VERSION. '
 			. 'If the php-mcp-schema package was updated, add the new version to SUPPORTED_PROTOCOL_VERSIONS.'
 		);
 	}

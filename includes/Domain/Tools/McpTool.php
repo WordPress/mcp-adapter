@@ -12,10 +12,10 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 /**
@@ -134,6 +134,7 @@ final class McpTool implements McpComponentInterface {
 		if ( ! isset( $input_schema['type'] ) ) {
 			$input_schema['type'] = 'object';
 		}
+		$input_schema = SchemaTransformer::ensure_properties( $input_schema );
 
 		// Build tool data array.
 		$tool_data = array(
@@ -151,7 +152,7 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		if ( isset( $config['outputSchema'] ) && is_array( $config['outputSchema'] ) ) {
-			$tool_data['outputSchema'] = $config['outputSchema'];
+			$tool_data['outputSchema'] = SchemaTransformer::ensure_properties( $config['outputSchema'] );
 		}
 
 		// Validate and prepare icons if set.
@@ -168,25 +169,17 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Raw annotations stay in the data array; ToolDto::fromArray() hydrates them.
+		// Annotations are caller-supplied, so keys the protocol does not define are
+		// dropped here rather than left to fail encoding and cost the tool its
+		// place in tools/list.
 		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-			$tool_data['annotations'] = $config['annotations'];
+			$annotations = McpAnnotationMapper::sanitize( $config['annotations'], 'tool', (string) $config['name'] );
+			if ( ! empty( $annotations ) ) {
+				$tool_data['annotations'] = $annotations;
+			}
 		}
 
-		// Validate through the Tool DTO, then keep only its wire-shape array.
-		try {
-			$tool = SchemaTransformer::make_tool_schemas_hydratable( ToolDto::fromArray( $tool_data )->toArray() );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_tool_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
+		$tool = $tool_data;
 
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );

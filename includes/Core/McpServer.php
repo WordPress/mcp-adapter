@@ -17,6 +17,7 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Protocol\WireEncoder;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 
 /**
@@ -99,6 +100,13 @@ class McpServer {
 	 * @var bool
 	 */
 	private bool $mcp_validation_enabled;
+
+	/**
+	 * Encoder for protocol wire output, built on first use.
+	 *
+	 * @var \WP\MCP\Infrastructure\Protocol\WireEncoder|null
+	 */
+	private ?WireEncoder $wire_encoder = null;
 
 	/**
 	 * Transport permission callback.
@@ -332,6 +340,25 @@ class McpServer {
 	 */
 	public function get_error_handler(): McpErrorHandlerInterface {
 		return $this->error_handler;
+	}
+
+	/**
+	 * Get the encoder that turns adapter arrays into wire arrays.
+	 *
+	 * The encoder is bound to one protocol revision. Only one revision is
+	 * negotiable today, so it is built from the default context; when a second
+	 * revision joins the negotiator this becomes per-request.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return \WP\MCP\Infrastructure\Protocol\WireEncoder
+	 */
+	public function get_wire_encoder(): WireEncoder {
+		if ( null === $this->wire_encoder ) {
+			$this->wire_encoder = new WireEncoder( McpProtocolContext::default(), $this->error_handler );
+		}
+
+		return $this->wire_encoder;
 	}
 
 	/**

@@ -15,7 +15,6 @@ use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP_Error;
 
 /**
@@ -187,7 +186,7 @@ final class McpPrompt implements McpComponentInterface {
 				);
 			}
 
-			$prompt = PromptDto::fromArray( $prompt_data )->toArray();
+			$prompt = $prompt_data;
 		} catch ( \Throwable $e ) {
 			return new WP_Error(
 				'mcp_prompt_dto_creation_failed',
@@ -260,10 +259,10 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return self|\WP_Error
 	 */
 	public static function fromBuilder( McpPromptBuilderInterface $builder ) {
-		// Hydrating the built array through the Prompt DTO validates it; only the
-		// wire-shape array is stored.
+		// The builder returns a revision-neutral array; it is stored as-is and
+		// validated when the response is encoded.
 		try {
-			$prompt = PromptDto::fromArray( $builder->build() )->toArray();
+			$prompt = $builder->build();
 		} catch ( \Throwable $throwable ) {
 			return new WP_Error(
 				'mcp_prompt_builder_failed',

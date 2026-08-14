@@ -254,22 +254,26 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes Annotations::fromArray() to throw.
-		// The 'priority' field expects a float, not a string.
+	public function test_fromArray_drops_annotations_the_protocol_does_not_accept(): void {
+		// A mistyped annotation would be rejected while encoding and would cost the
+		// resource its place in resources/list, so it is dropped at registration.
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Utils\McpAnnotationMapper::sanitize' );
+
 		$result = McpResource::fromArray(
 			array(
 				'uri'         => 'WordPress://local/invalid-annotations',
 				'handler'     => static fn() => 'content',
 				'annotations' => array(
-					'priority' => 'not-a-float', // This will cause Annotations::fromArray() to throw.
+					'priority' => 'not-a-float',
+					'audience' => array( 'user' ),
 				),
 			)
 		);
 
-		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'mcp_resource_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected float', $result->get_error_message() );
+		$this->assertInstanceOf( McpResource::class, $result );
+
+		$resource = $result->get_protocol_dto();
+		$this->assertSame( array( 'audience' => array( 'user' ) ), $resource['annotations'] );
 	}
 
 	// =========================================================================

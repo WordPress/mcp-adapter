@@ -206,17 +206,18 @@ final class McpAnnotationMapperTest extends TestCase {
 	public function test_map_performs_light_type_validation(): void {
 		// Test with resource feature type since shared annotations apply to resources, not tools.
 		$annotations = array(
-			'audience'     => array( 'user', 'invalid-role' ), // Invalid role passed through
+			'audience'     => array( 'user', 'invalid-role' ), // Unknown roles are dropped
 			'lastModified' => '  whitespace  ',                // Strings get trimmed
 			'priority'     => -0.5,                            // Numbers cast to float, not clamped
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'resource' );
 
-		// Light validation: basic type checks and trimming only
-		$this->assertSame( array( 'user', 'invalid-role' ), $result['audience'] ); // Array passed through
-		$this->assertSame( 'whitespace', $result['lastModified'] );                 // String trimmed
-		$this->assertSame( -0.5, $result['priority'] );                             // Number not clamped
+		// A role the protocol does not define would be rejected during encoding and
+		// would cost the resource its place in the list, so it is dropped here.
+		$this->assertSame( array( 'user' ), $result['audience'] );
+		$this->assertSame( 'whitespace', $result['lastModified'] ); // String trimmed
+		$this->assertSame( -0.5, $result['priority'] );             // Number not clamped
 	}
 
 	public function test_map_performs_light_type_validation_for_tools(): void {

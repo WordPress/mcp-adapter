@@ -497,22 +497,27 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes ToolAnnotations::fromArray() to throw.
-		// The 'readOnlyHint' field expects a bool, not a string.
+	public function test_fromArray_drops_annotations_the_protocol_does_not_accept(): void {
+		// A mistyped annotation would be rejected while encoding and would cost the
+		// tool its place in tools/list, so it is dropped at registration instead.
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Utils\McpAnnotationMapper::sanitize' );
+
 		$result = McpTool::fromArray(
 			array(
 				'name'        => 'invalid-annotations-tool',
 				'handler'     => static fn( $args ) => array( 'ok' => true ),
 				'annotations' => array(
-					'readOnlyHint' => 'not-a-boolean', // This will cause ToolAnnotations::fromArray() to throw.
+					'readOnlyHint' => 'not-a-boolean',
+					'customHint'   => true,
+					'title'        => 'Kept',
 				),
 			)
 		);
 
-		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'mcp_tool_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected bool', $result->get_error_message() );
+		$this->assertInstanceOf( McpTool::class, $result );
+
+		$tool = $result->get_protocol_dto();
+		$this->assertSame( array( 'title' => 'Kept' ), $tool['annotations'] );
 	}
 
 	// =========================================================================

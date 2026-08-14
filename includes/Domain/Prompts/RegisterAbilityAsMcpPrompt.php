@@ -13,7 +13,6 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 use WP_Error;
 
 /**
@@ -132,11 +131,7 @@ class RegisterAbilityAsMcpPrompt {
 			return $built;
 		}
 
-		try {
-			return PromptDto::fromArray( $built['prompt_data'] )->toArray();
-		} catch ( \Throwable $e ) {
-			return new WP_Error( 'mcp_prompt_schema_invalid', $e->getMessage() );
-		}
+		return $built['prompt_data'];
 	}
 
 	/**
@@ -499,20 +494,7 @@ class RegisterAbilityAsMcpPrompt {
 			return $data;
 		}
 
-		try {
-			$prompt_array = PromptDto::fromArray( $data['prompt_data'] )->toArray();
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_prompt_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Prompt DTO for ability %1$s: %2$s', 'mcp-adapter' ),
-					$ability->get_name(),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
+		$prompt_array = $data['prompt_data'];
 
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );

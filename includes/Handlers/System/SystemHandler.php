@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\System;
 
-use WP\McpSchema\Common\Protocol\DTO\Result;
-
 /**
  * Handles system-related MCP methods.
  */
@@ -23,6 +21,8 @@ class SystemHandler {
 	 * @return array<string, mixed> Empty result per MCP specification.
 	 */
 	public function ping(): array {
-		return Result::fromArray( array() )->toArray();
+		// The protocol defines a ping result as an empty object. There is nothing
+		// to encode, so the encoder is not involved.
+		return array();
 	}
 }

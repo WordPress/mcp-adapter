@@ -11,10 +11,10 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -174,25 +174,17 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
-		// Raw annotations stay in the data array; ResourceDto::fromArray() hydrates them.
+		// Annotations are caller-supplied, so keys the protocol does not define are
+		// dropped here rather than left to fail encoding and cost the resource its
+		// place in resources/list.
 		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-			$resource_data['annotations'] = $config['annotations'];
+			$annotations = McpAnnotationMapper::sanitize( $config['annotations'], 'resource', (string) $config['uri'] );
+			if ( ! empty( $annotations ) ) {
+				$resource_data['annotations'] = $annotations;
+			}
 		}
 
-		// Validate through the Resource DTO, then keep only its wire-shape array.
-		try {
-			$resource = ResourceDto::fromArray( $resource_data )->toArray();
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Resource DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
+		$resource = $resource_data;
 
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );

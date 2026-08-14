@@ -11,9 +11,6 @@ namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Core\McpVersionNegotiator;
-use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
-use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
-use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
 
 /**
  * Handles the initialize MCP method.
@@ -52,36 +49,36 @@ class InitializeHandler {
 	public function handle( string $client_protocol_version ): array {
 		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
 
-		$server_info = Implementation::fromArray(
-			array(
-				'name'    => $this->mcp->get_server_name(),
-				'version' => $this->mcp->get_server_version(),
-			)
+		$server_info = array(
+			'name'    => $this->mcp->get_server_name(),
+			'version' => $this->mcp->get_server_version(),
 		);
 
 		// Capabilities should only be advertised if they are implemented end-to-end.
 		// IMPORTANT: We set explicit boolean values (not empty arrays) to ensure proper JSON serialization.
 		// Empty arrays `[]` serialize as JSON arrays `[]`, but MCP spec requires JSON objects `{}`.
 		// Setting explicit values like `listChanged: false` produces associative arrays that serialize correctly.
-		$capabilities = ServerCapabilities::fromArray(
-			array(
-				'prompts'   => array( 'listChanged' => false ),
-				'resources' => array(
-					'subscribe'   => false,
-					'listChanged' => false,
-				),
-				'tools'     => array( 'listChanged' => false ),
-			)
+		$capabilities = array(
+			'prompts'   => array( 'listChanged' => false ),
+			'resources' => array(
+				'subscribe'   => false,
+				'listChanged' => false,
+			),
+			'tools'     => array( 'listChanged' => false ),
 		);
 
-		$result = InitializeResult::fromArray(
-			array(
-				'protocolVersion' => $negotiated_version,
-				'capabilities'    => $capabilities,
-				'serverInfo'      => $server_info,
-				'instructions'    => $this->mcp->get_server_description(),
-			)
-		)->toArray();
+		$payload = array(
+			'protocolVersion' => $negotiated_version,
+			'capabilities'    => $capabilities,
+			'serverInfo'      => $server_info,
+		);
+
+		$instructions = $this->mcp->get_server_description();
+		if ( '' !== $instructions ) {
+			$payload['instructions'] = $instructions;
+		}
+
+		$result = $this->mcp->get_wire_encoder()->initialize_result( $payload );
 
 		/**
 		 * Filters the initialize response before returning to the client.

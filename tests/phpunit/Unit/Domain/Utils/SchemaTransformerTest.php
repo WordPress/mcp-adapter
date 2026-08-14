@@ -154,7 +154,13 @@ final class SchemaTransformerTest extends TestCase {
 		$this->assertNull( $result['wrapper_property'] );
 
 		$schema = $result['schema'];
-		$this->assertEquals( array( 'type' => 'object' ), $schema );
+		$this->assertEquals(
+			array(
+				'type'       => 'object',
+				'properties' => array(),
+			),
+			$schema
+		);
 	}
 
 	public function test_empty_array_schema_returns_minimal_object(): void {
@@ -165,7 +171,13 @@ final class SchemaTransformerTest extends TestCase {
 		$this->assertNull( $result['wrapper_property'] );
 
 		$schema = $result['schema'];
-		$this->assertEquals( array( 'type' => 'object' ), $schema );
+		$this->assertEquals(
+			array(
+				'type'       => 'object',
+				'properties' => array(),
+			),
+			$schema
+		);
 	}
 
 	public function test_schema_without_type_gets_object_type_added(): void {
@@ -314,7 +326,7 @@ final class SchemaTransformerTest extends TestCase {
 		$this->assertContains( 'result', $schema['required'] );
 	}
 
-	public function test_transform_withEmptyStdClassProperties_stripsProperties(): void {
+	public function test_transform_withEmptyStdClassProperties_keepsEmptyPropertiesMap(): void {
 		$schema = array(
 			'type'       => 'object',
 			'properties' => new \stdClass(),
@@ -323,11 +335,11 @@ final class SchemaTransformerTest extends TestCase {
 		$result = SchemaTransformer::transform_to_object_schema( $schema );
 
 		$this->assertFalse( $result['was_transformed'] );
-		$this->assertArrayNotHasKey( 'properties', $result['schema'] );
 		$this->assertSame( 'object', $result['schema']['type'] );
+		$this->assertSame( array(), $result['schema']['properties'] );
 	}
 
-	public function test_transform_withEmptyArrayProperties_stripsProperties(): void {
+	public function test_transform_withEmptyArrayProperties_keepsEmptyPropertiesMap(): void {
 		$schema = array(
 			'type'       => 'object',
 			'properties' => array(),
@@ -336,7 +348,7 @@ final class SchemaTransformerTest extends TestCase {
 		$result = SchemaTransformer::transform_to_object_schema( $schema );
 
 		$this->assertFalse( $result['was_transformed'] );
-		$this->assertArrayNotHasKey( 'properties', $result['schema'] );
+		$this->assertSame( array(), $result['schema']['properties'] );
 	}
 
 	public function test_transform_withStdClassProperties_convertsToArray(): void {

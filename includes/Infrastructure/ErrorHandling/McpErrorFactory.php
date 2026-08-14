@@ -9,28 +9,33 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Infrastructure\ErrorHandling;
 
-use WP\McpSchema\Common\JsonRpc\DTO\Error;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Generated\V20251125Constants;
 
 /**
  * Factory for creating standardized MCP error responses.
  *
  * This class provides static methods for creating various types of JSON-RPC
  * error responses according to the MCP specification. All methods return
- * revision-neutral arrays in wire shape; the schema DTOs still validate and
- * serialize each response internally until the dependency swap.
+ * revision-neutral arrays in wire shape.
+ *
+ * These envelopes are built here rather than through the schema encoder. A
+ * JSON-RPC error is a transport-level structure: the specification requires a
+ * null id when the request id could not be determined, which the protocol's own
+ * JSONRPCErrorResponse type cannot express, and an error path that can itself
+ * fail to encode is worse than no validation at all. The JSON-RPC codes and
+ * version are identical in every revision the adapter supports, which a test
+ * pins.
  */
 class McpErrorFactory {
 
 	/**
 	 * Standard JSON-RPC error codes as defined in the specification.
 	 */
-	public const PARSE_ERROR      = McpConstants::PARSE_ERROR;
-	public const INVALID_REQUEST  = McpConstants::INVALID_REQUEST;
-	public const METHOD_NOT_FOUND = McpConstants::METHOD_NOT_FOUND;
-	public const INVALID_PARAMS   = McpConstants::INVALID_PARAMS;
-	public const INTERNAL_ERROR   = McpConstants::INTERNAL_ERROR;
+	public const PARSE_ERROR      = V20251125Constants::PARSE_ERROR;
+	public const INVALID_REQUEST  = V20251125Constants::INVALID_REQUEST;
+	public const METHOD_NOT_FOUND = V20251125Constants::METHOD_NOT_FOUND;
+	public const INVALID_PARAMS   = V20251125Constants::INVALID_PARAMS;
+	public const INTERNAL_ERROR   = V20251125Constants::INTERNAL_ERROR;
 
 	/**
 	 * Implementation-defined server error codes (in -32000 to -32099 range as per JSON-RPC spec).
@@ -73,13 +78,18 @@ class McpErrorFactory {
 	 * @return array<string, mixed> JSON-RPC error envelope in wire shape (`id` omitted when null).
 	 */
 	public static function create_error_response( $id, int $code, string $message, $data = null ): array {
-		return JSONRPCErrorResponse::fromArray(
-			array(
-				'jsonrpc' => McpConstants::JSONRPC_VERSION,
-				'error'   => self::create_error( $code, $message, $data ),
-				'id'      => $id,
-			)
-		)->toArray();
+		$response = array(
+			'jsonrpc' => V20251125Constants::JSONRPC_VERSION,
+			'error'   => self::create_error( $code, $message, $data ),
+		);
+
+		// A null id means the request id could not be determined; the key is
+		// omitted rather than sent as null.
+		if ( null !== $id ) {
+			$response['id'] = $id;
+		}
+
+		return $response;
 	}
 
 	/**
@@ -92,13 +102,16 @@ class McpErrorFactory {
 	 * @return array<string, mixed> Error object in wire shape (`data` omitted when null).
 	 */
 	public static function create_error( int $code, string $message, $data = null ): array {
-		return Error::fromArray(
-			array(
-				'code'    => $code,
-				'message' => $message,
-				'data'    => $data,
-			)
-		)->toArray();
+		$error = array(
+			'code'    => $code,
+			'message' => $message,
+		);
+
+		if ( null !== $data ) {
+			$error['data'] = $data;
+		}
+
+		return $error;
 	}
 
 	/**
@@ -429,13 +442,13 @@ class McpErrorFactory {
 		}
 
 		// Must have jsonrpc field with value "2.0".
-		if ( ! isset( $message['jsonrpc'] ) || McpConstants::JSONRPC_VERSION !== $message['jsonrpc'] ) {
+		if ( ! isset( $message['jsonrpc'] ) || V20251125Constants::JSONRPC_VERSION !== $message['jsonrpc'] ) {
 			return self::invalid_request(
 				null,
 				sprintf(
 				/* translators: %s: JSON-RPC version */
 					__( 'jsonrpc version must be "%s"', 'mcp-adapter' ),
-					McpConstants::JSONRPC_VERSION
+					V20251125Constants::JSONRPC_VERSION
 				)
 			);
 		}

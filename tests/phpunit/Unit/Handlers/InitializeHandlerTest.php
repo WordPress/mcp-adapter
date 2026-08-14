@@ -9,7 +9,7 @@ use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Generated\V20251125Constants;
 
 final class InitializeHandlerTest extends TestCase {
 
@@ -27,11 +27,11 @@ final class InitializeHandlerTest extends TestCase {
 		);
 
 		$handler = new InitializeHandler( $server );
-		$result  = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
+		$result  = $handler->handle( V20251125Constants::LATEST_PROTOCOL_VERSION );
 
 		// Returns the initialize result in wire shape.
 		$this->assertIsArray( $result );
-		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
+		$this->assertSame( V20251125Constants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
 
 		// Server info.
 		$server_info = $result['serverInfo'];
@@ -61,11 +61,11 @@ final class InitializeHandlerTest extends TestCase {
 		);
 
 		$handler = new InitializeHandler( $server );
-		$array   = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
+		$array   = $handler->handle( V20251125Constants::LATEST_PROTOCOL_VERSION );
 
 		// Verify the handler produces the expected wire structure.
 		$this->assertIsArray( $array );
-		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $array['protocolVersion'] );
+		$this->assertSame( V20251125Constants::LATEST_PROTOCOL_VERSION, $array['protocolVersion'] );
 		$this->assertSame( 'Test Server', $array['serverInfo']['name'] );
 		$this->assertSame( '1.0.0', $array['serverInfo']['version'] );
 		$this->assertIsArray( $array['capabilities'] );
@@ -112,7 +112,7 @@ final class InitializeHandlerTest extends TestCase {
 		$handler = new InitializeHandler( $server );
 
 		// Simulate the JSON-RPC response serialization chain.
-		$result_array = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
+		$result_array = $handler->handle( V20251125Constants::LATEST_PROTOCOL_VERSION );
 		$json         = json_encode( $result_array, JSON_THROW_ON_ERROR );
 
 		// Decode as stdClass objects (not associative arrays) to verify JSON types.
@@ -191,7 +191,7 @@ final class InitializeHandlerTest extends TestCase {
 		$result  = $handler->handle( '9999-99-99' );
 
 		$this->assertIsArray( $result );
-		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
+		$this->assertSame( V20251125Constants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
 
 		// Verify other fields are still correct.
 		$this->assertSame( 'Test Server', $result['serverInfo']['name'] );
@@ -214,7 +214,7 @@ final class InitializeHandlerTest extends TestCase {
 		$result  = $handler->handle( '' );
 
 		$this->assertIsArray( $result );
-		$this->assertSame( McpConstants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
+		$this->assertSame( V20251125Constants::LATEST_PROTOCOL_VERSION, $result['protocolVersion'] );
 
 		// Verify other fields are still correct.
 		$this->assertSame( 'Test Server', $result['serverInfo']['name'] );
@@ -241,7 +241,7 @@ final class InitializeHandlerTest extends TestCase {
 		add_filter( 'mcp_adapter_initialize_response', $filter );
 
 		$handler = new InitializeHandler( $server );
-		$result  = $handler->handle( McpConstants::LATEST_PROTOCOL_VERSION );
+		$result  = $handler->handle( V20251125Constants::LATEST_PROTOCOL_VERSION );
 
 		$this->assertSame( 'Custom instructions', $result['instructions'] );
 
