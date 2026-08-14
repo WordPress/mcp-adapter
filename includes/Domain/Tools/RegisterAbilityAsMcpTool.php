@@ -45,16 +45,18 @@ class RegisterAbilityAsMcpTool {
 	}
 
 	/**
-	 * Build a clean Tool DTO and adapter metadata for internal wiring.
+	 * Build clean tool data and adapter metadata for internal wiring.
 	 *
-	 * This method returns a protocol-only Tool DTO and provides the adapter metadata
-	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
-	 * wiring to protocol surfaces.
+	 * This method returns protocol-only tool data in wire shape and provides the
+	 * adapter metadata separately. Validation still runs through the Tool DTO, but
+	 * only its serialized array leaves this method. This keeps the data stable across
+	 * MCP spec changes and avoids coupling internal execution wiring to protocol surfaces.
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{tool: \WP\McpSchema\Server\Tools\DTO\Tool, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{tool: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
+	 * @since n.e.x.t The 'tool' entry is a revision-neutral array instead of a DTO.
 	 *
 	 */
 	public static function build( \WP_Ability $ability ) {
@@ -66,7 +68,7 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		try {
-			$tool_dto = ToolDto::fromArray( $data['tool_data'] );
+			$tool_array = SchemaTransformer::make_tool_schemas_hydratable( ToolDto::fromArray( $data['tool_data'] )->toArray() );
 		} catch ( \Throwable $e ) {
 			return new WP_Error(
 				'mcp_tool_dto_creation_failed',
@@ -83,14 +85,14 @@ class RegisterAbilityAsMcpTool {
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpToolValidator::validate_tool_dto( $tool_dto );
+			$validation_result = McpToolValidator::validate_tool_data( $tool_array );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
 		}
 
 		return array(
-			'tool'         => $tool_dto,
+			'tool'         => $tool_array,
 			'adapter_meta' => $data['adapter_meta'],
 		);
 	}

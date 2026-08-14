@@ -77,7 +77,7 @@ final class DefaultServerFactoryTest extends TestCase {
 		$resources      = $server->get_resources();
 		$resource_names = array_map(
 			static function ( $resource ) {
-				return $resource->getName();
+				return $resource['name'];
 			},
 			$resources
 		);
@@ -105,7 +105,7 @@ final class DefaultServerFactoryTest extends TestCase {
 		$prompts      = $server->get_prompts();
 		$prompt_names = array_map(
 			static function ( $prompt ) {
-				return $prompt->getName();
+				return $prompt['name'];
 			},
 			$prompts
 		);
@@ -159,7 +159,7 @@ final class DefaultServerFactoryTest extends TestCase {
 		$tools      = $server->get_tools();
 		$tool_names = array_map(
 			static function ( $tool ) {
-				return $tool->getName();
+				return $tool['name'];
 			},
 			$tools
 		);

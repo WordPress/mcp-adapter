@@ -12,7 +12,6 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -123,26 +122,26 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	abstract protected function configure(): void;
 
 	/**
-	 * Build and return the Prompt DTO instance.
+	 * Build and return the prompt data in wire shape.
 	 *
-	 * This method converts the configured state into an MCP Prompt DTO.
-	 * Safe to call multiple times - always returns a fresh DTO based on
-	 * the current (immutable after construction) state.
+	 * This method converts the configured state into the MCP Prompt array shape.
+	 * Validation still runs through the Prompt DTO, but only its serialized array
+	 * leaves this method. Safe to call multiple times - always returns fresh data
+	 * based on the current (immutable after construction) state.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
+	 * @return array<string, mixed> The built prompt data.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 */
-	public function build(): PromptDto {
-		$argument_dtos = null;
+	public function build(): array {
+		$argument_data = null;
 		if ( ! empty( $this->arguments ) ) {
-			$argument_dtos = array_map(
-				static function ( array $arg ): PromptArgument {
-					return PromptArgument::fromArray(
-						array(
-							'name'        => $arg['name'],
-							'title'       => $arg['title'] ?? null,
-							'description' => $arg['description'] ?? null,
-							'required'    => $arg['required'] ?? null,
-						)
+			$argument_data = array_map(
+				static function ( array $arg ): array {
+					return array(
+						'name'        => $arg['name'],
+						'title'       => $arg['title'] ?? null,
+						'description' => $arg['description'] ?? null,
+						'required'    => $arg['required'] ?? null,
 					);
 				},
 				$this->arguments
@@ -162,7 +161,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			'name'        => $this->name,
 			'title'       => $this->title,
 			'description' => $this->description,
-			'arguments'   => $argument_dtos,
+			'arguments'   => $argument_data,
 		);
 
 		$prompt_meta = McpValidator::normalize_meta( $this->meta );
@@ -175,7 +174,7 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		return PromptDto::fromArray( $prompt_data );
+		return PromptDto::fromArray( $prompt_data )->toArray();
 	}
 
 	/**

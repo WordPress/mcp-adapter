@@ -13,9 +13,9 @@ namespace WP\MCP\Domain\Tools;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Domain\Utils\SchemaTransformer;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
-use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
 use WP_Error;
 
 /**
@@ -41,7 +41,7 @@ use WP_Error;
  * $tool = McpTool::fromAbility($ability);
  * ```
  *
- * McpTool wraps a protocol-only ToolDto for MCP serialization. Internal
+ * McpTool wraps protocol-only tool data for MCP serialization. Internal
  * adapter metadata and execution wiring live on this class and are never
  * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
  *
@@ -55,11 +55,11 @@ final class McpTool implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Clean Tool DTO (protocol-only).
+	 * Clean tool data (protocol-only, wire shape).
 	 *
-	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @var array<string, mixed>
 	 */
-	private ToolDto $tool;
+	private array $tool;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed tools).
@@ -103,9 +103,9 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
+	 * @param array<string, mixed> $tool The tool data in wire shape.
 	 */
-	private function __construct( ToolDto $tool ) {
+	private function __construct( array $tool ) {
 		$this->tool = $tool;
 	}
 
@@ -168,14 +168,14 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
-			}
+		// Raw annotations stay in the data array; ToolDto::fromArray() hydrates them.
+		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$tool_data['annotations'] = $config['annotations'];
+		}
 
-			$tool = ToolDto::fromArray( $tool_data );
+		// Validate through the Tool DTO, then keep only its wire-shape array.
+		try {
+			$tool = SchemaTransformer::make_tool_schemas_hydratable( ToolDto::fromArray( $tool_data )->toArray() );
 		} catch ( \Throwable $e ) {
 			return new WP_Error(
 				'mcp_tool_dto_creation_failed',
@@ -191,7 +191,7 @@ final class McpTool implements McpComponentInterface {
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpToolValidator::validate_tool_dto( $tool );
+			$validation_result = McpToolValidator::validate_tool_data( $tool );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
@@ -232,7 +232,7 @@ final class McpTool implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'tool',
-			'tool_name'      => $tool_data['tool']->getName(),
+			'tool_name'      => $tool_data['tool']['name'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -245,11 +245,14 @@ final class McpTool implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol data for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Tool data in wire shape.
 	 */
-	public function get_protocol_dto(): ToolDto {
+	public function get_protocol_dto(): array {
 		return $this->tool;
 	}
 
@@ -388,7 +391,7 @@ final class McpTool implements McpComponentInterface {
 			'Access denied.',
 			array(
 				'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY,
-				'tool_name'      => $this->tool->getName(),
+				'tool_name'      => $this->tool['name'],
 			)
 		);
 	}

@@ -38,17 +38,17 @@ includes/
 │   │   ├── ContentBlockHelper.php          # Factory for MCP content block arrays
 │   │   └── AbilityArgumentNormalizer.php   # Normalizes empty {} input to null
 │   ├── Tools/
-│   │   ├── McpTool.php                     # Wraps Tool DTO with execution logic
+│   │   ├── McpTool.php                     # Wraps protocol tool data with execution logic
 │   │   ├── RegisterAbilityAsMcpTool.php    # Converts a WordPress ability to McpTool
 │   │   └── McpToolValidator.php            # Validates tool names and schemas
 │   ├── Resources/
-│   │   ├── McpResource.php                 # Wraps Resource DTO with execution logic
+│   │   ├── McpResource.php                 # Wraps protocol resource data with execution logic
 │   │   ├── RegisterAbilityAsMcpResource.php # Converts a WordPress ability to McpResource
 │   │   └── McpResourceValidator.php        # Validates resource URIs and schemas
 │   └── Prompts/
 │       ├── Contracts/
 │       │   └── McpPromptBuilderInterface.php  # Interface for prompt message builders
-│       ├── McpPrompt.php                      # Wraps Prompt DTO with execution logic
+│       ├── McpPrompt.php                      # Wraps protocol prompt data with execution logic
 │       ├── McpPromptBuilder.php               # Builds prompt messages from ability output
 │       ├── McpPromptValidator.php             # Validates prompt names and arguments
 │       └── RegisterAbilityAsMcpPrompt.php     # Converts a WordPress ability to McpPrompt
@@ -121,11 +121,11 @@ All DTOs extend `AbstractDataTransferObject`, which provides `toArray()` and `fr
 
 ### Adapter layer (WordPress integration)
 
-The Adapter Layer wraps each protocol DTO with execution wiring and WordPress-specific metadata. Domain models `McpTool`, `McpResource`, and `McpPrompt` each implement the `McpComponentInterface` contract:
+The Adapter Layer wraps each component's protocol data with execution wiring and WordPress-specific metadata. Domain models `McpTool`, `McpResource`, and `McpPrompt` each implement the `McpComponentInterface` contract:
 
 ```php
 interface McpComponentInterface {
-    public function get_protocol_dto(): AbstractDataTransferObject;
+    public function get_protocol_dto(): array;
     public function execute( $arguments );
     public function check_permission( $arguments );
     public function get_adapter_meta(): array;
@@ -253,16 +253,15 @@ $tool = McpTool::fromArray( [
 ] );
 ```
 
-### Protocol DTO access
+### Protocol data access
 
-Each component exposes its clean protocol DTO for serialization:
+Each component exposes its clean protocol data for serialization:
 
 ```php
-$dto = $tool->get_protocol_dto();  // Returns WP\McpSchema\Server\Tools\DTO\Tool
-$array = $dto->toArray();          // Protocol-safe array for JSON responses
+$tool_data = $tool->get_protocol_dto();  // Returns array<string, mixed> in wire shape
 ```
 
-The DTO contains only MCP specification fields. Adapter metadata (ability reference, schema transformation flags) lives on the `McpTool` instance and is never serialized.
+The array contains only MCP specification fields. Adapter metadata (ability reference, schema transformation flags) lives on the `McpTool` instance and is never serialized.
 
 ## Utility classes
 
@@ -466,7 +465,7 @@ class MyObservabilityHandler implements McpObservabilityHandlerInterface {
 
 ## Design principles
 
-- **Two-layer DTO separation**: Protocol DTOs from `php-mcp-schema` carry no adapter-internal fields; `get_protocol_dto()->toArray()` always produces spec-compliant output
+- **Two-layer separation**: Protocol data validated through `php-mcp-schema` carries no adapter-internal fields; `get_protocol_dto()` always returns spec-compliant wire-shape arrays
 - **Dependency injection**: All transports receive dependencies through `McpTransportContext`; no global state beyond the `McpAdapter` singleton
 - **Interface-based design**: Error handlers, observability, and transports are all swappable via interfaces
 - **Event emission over counters**: Observability emits events; external systems handle aggregation — zero overhead when disabled

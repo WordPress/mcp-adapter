@@ -97,6 +97,37 @@ class SchemaTransformer {
 	}
 
 	/**
+	 * Fold the empty-properties object marker in tool schemas back to an array.
+	 *
+	 * Tool::toArray() serializes an empty `properties` map as a stdClass instance so
+	 * JSON encoding emits `{}`. A stored wire-shape array must stay hydratable by
+	 * Tool::fromArray(), which rejects objects at that position, so the marker is
+	 * folded back to an empty array here. Serialization through the DTO reintroduces
+	 * the object form, keeping the emitted bytes unchanged.
+	 *
+	 * @param array<string,mixed> $tool_data Tool data as produced by Tool::toArray().
+	 *
+	 * @return array<string,mixed> Tool data safe to pass back into Tool::fromArray().
+	 * @since n.e.x.t
+	 */
+	public static function make_tool_schemas_hydratable( array $tool_data ): array {
+		foreach ( array( 'inputSchema', 'outputSchema' ) as $schema_key ) {
+			if (
+				! isset( $tool_data[ $schema_key ] )
+				|| ! is_array( $tool_data[ $schema_key ] )
+				|| ! isset( $tool_data[ $schema_key ]['properties'] )
+				|| ! $tool_data[ $schema_key ]['properties'] instanceof \stdClass
+			) {
+				continue;
+			}
+
+			$tool_data[ $schema_key ]['properties'] = (array) $tool_data[ $schema_key ]['properties'];
+		}
+
+		return $tool_data;
+	}
+
+	/**
 	 * Convert objects to arrays and strip empty properties.
 	 *
 	 * @param array<string,mixed>|null $schema The schema to normalize.

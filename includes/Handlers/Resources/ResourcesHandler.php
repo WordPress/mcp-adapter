@@ -60,9 +60,10 @@ class ResourcesHandler {
 		 * or reorder the resources list.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t The resources are revision-neutral arrays instead of DTOs.
 		 *
-		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
-		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
+		 * @param array<int, array<string, mixed>> $resources Array of resource data arrays in wire shape.
+		 * @param \WP\MCP\Core\McpServer           $server    The MCP server instance.
 		 */
 		$resources = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp ),
@@ -126,14 +127,13 @@ class ResourcesHandler {
 			return McpErrorFactory::resource_not_found( $request_id, $uri );
 		}
 
-		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource */
 		$resource = $mcp_resource->get_protocol_dto();
 
 		try {
 			$has_permission = $mcp_resource->check_permission( $request_params );
 			if ( true !== $has_permission ) {
 				// Extract detailed error message if WP_Error was returned.
-				$error_message = 'Access denied for resource: ' . $resource->getName();
+				$error_message = 'Access denied for resource: ' . $resource['name'];
 
 				if ( is_wp_error( $has_permission ) ) {
 					$error_message = $has_permission->get_error_message();
@@ -202,7 +202,7 @@ class ResourcesHandler {
 			// Seed the fallback content URI with the advertised URI, not the client's
 			// request URI, so contents[].uri matches resources/list even when the client
 			// lowercased the scheme (RFC 3986 3.1). For an exact-case read the two are equal.
-			$content_dtos = $this->convert_contents_to_dtos( $contents, $resource->getUri() );
+			$content_dtos = $this->convert_contents_to_dtos( $contents, $resource['uri'] );
 
 			return ReadResourceResult::fromArray(
 				array(

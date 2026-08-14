@@ -14,7 +14,6 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
 use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
@@ -39,7 +38,7 @@ use WP_Error;
  * $resource = McpResource::fromAbility($ability);
  * ```
  *
- * McpResource wraps a protocol-only ResourceDto for MCP serialization. Internal
+ * McpResource wraps protocol-only resource data for MCP serialization. Internal
  * adapter metadata and execution wiring live on this class and are never
  * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
  *
@@ -53,11 +52,11 @@ final class McpResource implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Clean Resource DTO (protocol-only).
+	 * Clean resource data (protocol-only, wire shape).
 	 *
-	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
+	 * @var array<string, mixed>
 	 */
-	private ResourceDto $mcp_resource_dto;
+	private array $resource_data;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed resources).
@@ -101,10 +100,10 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
+	 * @param array<string, mixed> $resource_data The resource data in wire shape.
 	 */
-	private function __construct( ResourceDto $resource_dto ) {
-		$this->mcp_resource_dto = $resource_dto;
+	private function __construct( array $resource_data ) {
+		$this->resource_data = $resource_data;
 	}
 
 	// =========================================================================
@@ -175,14 +174,14 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
-		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since Annotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
-			}
+		// Raw annotations stay in the data array; ResourceDto::fromArray() hydrates them.
+		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$resource_data['annotations'] = $config['annotations'];
+		}
 
-			$resource = ResourceDto::fromArray( $resource_data );
+		// Validate through the Resource DTO, then keep only its wire-shape array.
+		try {
+			$resource = ResourceDto::fromArray( $resource_data )->toArray();
 		} catch ( \Throwable $e ) {
 			return new WP_Error(
 				'mcp_resource_dto_creation_failed',
@@ -198,7 +197,7 @@ final class McpResource implements McpComponentInterface {
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpResourceValidator::validate_resource_dto( $resource );
+			$validation_result = McpResourceValidator::validate_resource_metadata( $resource );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
@@ -240,7 +239,7 @@ final class McpResource implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'resource',
-			'resource_uri'   => $resource_data['resource']->getUri(),
+			'resource_uri'   => $resource_data['resource']['uri'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -253,12 +252,15 @@ final class McpResource implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol data for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
+	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Resource data in wire shape.
 	 */
-	public function get_protocol_dto(): ResourceDto {
-		return $this->mcp_resource_dto;
+	public function get_protocol_dto(): array {
+		return $this->resource_data;
 	}
 
 	/**

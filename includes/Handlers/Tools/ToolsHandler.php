@@ -81,9 +81,10 @@ class ToolsHandler {
 		 * or reorder the tools list.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t The tools are revision-neutral arrays instead of DTOs.
 		 *
-		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
-		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
+		 * @param array<int, array<string, mixed>> $tools  Array of tool data arrays in wire shape.
+		 * @param \WP\MCP\Core\McpServer           $server The MCP server instance.
 		 */
 		$tools = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),

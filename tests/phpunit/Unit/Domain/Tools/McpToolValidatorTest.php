@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Domain\Tools;
 
 use WP\MCP\Domain\Tools\McpToolValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 
 /**
  * Tests for McpToolValidator class.
@@ -16,91 +15,81 @@ use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 final class McpToolValidatorTest extends TestCase {
 
 	// =========================================================================
-	// validate_tool_dto Tests
+	// validate_tool_data Tests
 	// =========================================================================
 
-	public function test_validate_tool_dto_with_valid_tool(): void {
-		$tool = ToolDto::fromArray(
-			array(
-				'name'        => 'test-tool',
-				'inputSchema' => array( 'type' => 'object' ),
-			)
+	public function test_validate_tool_data_with_valid_tool(): void {
+		$tool_data = array(
+			'name'        => 'test-tool',
+			'inputSchema' => array( 'type' => 'object' ),
 		);
 
-		$result = McpToolValidator::validate_tool_dto( $tool );
+		$result = McpToolValidator::validate_tool_data( $tool_data );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_tool_dto_rejects_invalid_name(): void {
-		$tool = ToolDto::fromArray(
-			array(
-				'name'        => 'invalid/name',
-				'inputSchema' => array( 'type' => 'object' ),
-			)
+	public function test_validate_tool_data_rejects_invalid_name(): void {
+		$tool_data = array(
+			'name'        => 'invalid/name',
+			'inputSchema' => array( 'type' => 'object' ),
 		);
 
-		$result = McpToolValidator::validate_tool_dto( $tool );
+		$result = McpToolValidator::validate_tool_data( $tool_data );
 		$this->assertWPError( $result );
 		$this->assertSame( 'mcp_tool_validation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'Tool name', $result->get_error_message() );
 	}
 
-	public function test_validate_tool_dto_rejects_invalid_icons(): void {
-		$tool = ToolDto::fromArray(
-			array(
-				'name'        => 'test-tool',
-				'inputSchema' => array( 'type' => 'object' ),
-				'icons'       => array(
-					array(
-						'src'      => 'https://example.com/icon.png',
-						'mimeType' => 'image/png',
-					),
-					array( 'src' => 'invalid-url' ), // Invalid src
+	public function test_validate_tool_data_rejects_invalid_icons(): void {
+		$tool_data = array(
+			'name'        => 'test-tool',
+			'inputSchema' => array( 'type' => 'object' ),
+			'icons'       => array(
+				array(
+					'src'      => 'https://example.com/icon.png',
+					'mimeType' => 'image/png',
 				),
-			)
+				array( 'src' => 'invalid-url' ), // Invalid src
+			),
 		);
 
-		$result = McpToolValidator::validate_tool_dto( $tool );
+		$result = McpToolValidator::validate_tool_data( $tool_data );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'Icon at index 1', $result->get_error_message() );
 	}
 
-	public function test_validate_tool_dto_validates_input_schema(): void {
-		$tool = ToolDto::fromArray(
-			array(
-				'name'        => 'test-tool',
-				'inputSchema' => array(
-					'type'       => 'object',
-					'properties' => array(
-						'test_prop' => array( 'type' => 'string' ),
-					),
-					'required'   => array( 'nonexistent_prop' ), // Required prop not in properties
+	public function test_validate_tool_data_validates_input_schema(): void {
+		$tool_data = array(
+			'name'        => 'test-tool',
+			'inputSchema' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'test_prop' => array( 'type' => 'string' ),
 				),
-			)
+				'required'   => array( 'nonexistent_prop' ), // Required prop not in properties
+			),
 		);
 
-		$result = McpToolValidator::validate_tool_dto( $tool );
+		$result = McpToolValidator::validate_tool_data( $tool_data );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'inputSchema', $result->get_error_message() );
 		$this->assertStringContainsString( 'does not exist in properties', $result->get_error_message() );
 	}
 
-	public function test_validate_tool_dto_validates_output_schema(): void {
-		$tool = ToolDto::fromArray(
-			array(
-				'name'         => 'test-tool',
-				'inputSchema'  => array( 'type' => 'object' ),
-				'outputSchema' => array(
-					'type'       => 'object',
-					'properties' => array(
-						'result' => array( 'type' => 'string' ),
-					),
-					'required'   => array( 'missing_field' ), // Required prop not in properties
+	public function test_validate_tool_data_validates_output_schema(): void {
+		$tool_data = array(
+			'name'         => 'test-tool',
+			'inputSchema'  => array( 'type' => 'object' ),
+			'outputSchema' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'result' => array( 'type' => 'string' ),
 				),
-			)
+				'required'   => array( 'missing_field' ), // Required prop not in properties
+			),
 		);
 
-		$result = McpToolValidator::validate_tool_dto( $tool );
+		$result = McpToolValidator::validate_tool_data( $tool_data );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'outputSchema', $result->get_error_message() );
 		$this->assertStringContainsString( 'does not exist in properties', $result->get_error_message() );

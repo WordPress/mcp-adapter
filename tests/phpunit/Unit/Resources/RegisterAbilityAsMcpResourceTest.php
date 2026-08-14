@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Resources;
 
 use WP\MCP\Domain\Resources\RegisterAbilityAsMcpResource;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 final class RegisterAbilityAsMcpResourceTest extends TestCase {
 
@@ -14,10 +13,10 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$ability = wp_get_ability( 'test/resource' );
 		$this->assertNotNull( $ability, 'Ability test/resource should be registered' );
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
-		$this->assertInstanceOf( ResourceDto::class, $resource );
-		$arr = $resource->toArray();
+		$this->assertIsArray( $resource );
+		$arr = $resource;
 		$this->assertSame( 'WordPress://local/resource-1', $arr['uri'] );
-		$this->assertNull( $resource->get_meta() );
+		$this->assertNull( ( $resource['_meta'] ?? null ) );
 	}
 
 	public function test_annotations_are_mapped_to_mcp_format(): void {
@@ -54,7 +53,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// Verify MCP-format annotations.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -105,7 +104,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// Verify only provided annotations are present.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -125,7 +124,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// Verify annotations field is not present when empty.
 		$this->assertArrayNotHasKey( 'annotations', $arr );
@@ -156,7 +155,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 		$this->assertSame( 'WordPress://local/resource-whitespace', $arr['uri'] );
 
 		// Cleanup.
@@ -170,7 +169,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// Verify core fields.
 		$this->assertSame( 'test/resource-new-meta', $arr['name'] );
@@ -219,7 +218,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// The descriptor carries whatever the author declared.
 		$this->assertArrayHasKey( 'mimeType', $arr );
@@ -233,7 +232,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		$this->assertArrayHasKey( 'size', $arr );
 		$this->assertSame( 2048, $arr['size'] );
@@ -246,7 +245,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		$this->assertArrayHasKey( 'icons', $arr );
 		$this->assertCount( 1, $arr['icons'] );
@@ -268,7 +267,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 		$this->assertSame( 'filtered-test/resource', $arr['name'] );
 
 		remove_filter( 'mcp_adapter_resource_name', $filter_callback, 10 );
@@ -287,7 +286,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 		$this->assertSame( 'WordPress://filtered/resource-1', $arr['uri'] );
 
 		remove_filter( 'mcp_adapter_resource_uri', $filter_callback, 10 );
@@ -347,7 +346,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		// Resource should still be created successfully (graceful degradation).
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// Annotations should NOT be present (all dropped due to validation errors).
 		$this->assertArrayNotHasKey( 'annotations', $arr );
@@ -391,7 +390,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		// Resource should still be created successfully.
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// ALL annotations should be dropped even though priority was valid.
 		// This is because we drop all if ANY are invalid.
@@ -408,7 +407,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// Valid annotations should be preserved.
 		$this->assertArrayHasKey( 'annotations', $arr );
@@ -439,7 +438,7 @@ final class RegisterAbilityAsMcpResourceTest extends TestCase {
 		$resource = RegisterAbilityAsMcpResource::make( $ability );
 		$this->assertNotWPError( $resource );
 
-		$arr = $resource->toArray();
+		$arr = $resource;
 
 		// mimeType should be present with valid format.
 		$this->assertArrayHasKey( 'mimeType', $arr );

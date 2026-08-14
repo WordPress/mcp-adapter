@@ -9,16 +9,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Contracts;
 
-use WP\McpSchema\Common\AbstractDataTransferObject;
-
 /**
  * Interface McpComponentInterface.
  *
  * Classes implementing this interface encapsulate:
- * - a clean protocol DTO (Tool/Resource/Prompt) that is safe to expose to MCP clients, and
+ * - clean protocol data (Tool/Resource/Prompt shape) that is safe to expose to MCP clients, and
  * - MCP Adapter internal metadata and execution wiring (ability-backed OR direct-callable).
  *
- * This keeps protocol DTOs free of internal adapter fields, while still
+ * This keeps protocol data free of internal adapter fields, while still
  * providing a uniform execution and permission-check surface for handlers.
  *
  * @internal
@@ -28,16 +26,18 @@ use WP\McpSchema\Common\AbstractDataTransferObject;
 interface McpComponentInterface {
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol data for MCP responses.
 	 *
-	 * This DTO is used only for protocol serialization and MUST NOT include
-	 * internal adapter metadata or execution wiring.
+	 * This array is used only for protocol serialization and MUST NOT include
+	 * internal adapter metadata or execution wiring. Its shape matches the
+	 * wire representation of the component (Tool/Resource/Prompt).
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Protocol-only DTO.
+	 * @return array<string, mixed> Protocol-only component data.
 	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 *
 	 */
-	public function get_protocol_dto(): AbstractDataTransferObject;
+	public function get_protocol_dto(): array;
 
 	/**
 	 * Execute the component using the configured strategy.
