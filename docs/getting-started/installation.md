@@ -1,8 +1,8 @@
 # Installation Guide
 
-MCP Adapter is distributed as a WordPress plugin. Install and activate it like any other plugin. Requires WordPress 6.9 or newer.
+MCP Adapter is distributed as a WordPress plugin. Install and activate it like any other plugin.
 
-## Installing the plugin
+## Installing the plugin manually
 
 Download the latest release from [GitHub](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other WordPress plugin, or use WP-CLI:
 
@@ -11,6 +11,20 @@ wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/downl
 ```
 
 The plugin automatically initializes and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
+
+### With wp-env
+
+To include MCP Adapter in a [`wp-env`](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/) environment, add it to the `plugins` array in `.wp-env.json`:
+
+```jsonc
+// .wp-env.json
+{
+  "$schema": "https://schemas.wp.org/trunk/wp-env.json",
+  "plugins": [
+    "https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip"
+  ]
+}
+```
 
 ## Depending on MCP Adapter from your own plugin
 
