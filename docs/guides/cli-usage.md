@@ -110,7 +110,7 @@ Many MCP clients can launch subprocess servers. Point the client's config at the
         "--path=/path/to/your/wordpress/site",
         "mcp-adapter",
         "serve",
-        // Change the server ID to your desired server.
+        // Change the server ID and user as needed
         "--server=mcp-adapter-default-server",
         "--user=admin"
       ]
@@ -123,30 +123,18 @@ Many MCP clients can launch subprocess servers. Point the client's config at the
 
 The [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automattic/mcp-wordpress-remote) proxy runs locally and translates STDIO-based MCP communication from AI clients into HTTP REST API calls that WordPress understands. Authentication uses [WordPress Application Passwords](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/).
 
-```json
+```jsonc
 {
   "mcpServers": {
-    "wordpress-http-default": {
+    "wordpress": {
       "command": "npx",
       "args": [
         "-y",
         "@automattic/mcp-wordpress-remote@latest"
       ],
       "env": {
+        // Update these to match your environment details
         "WP_API_URL": "http://your-site.test/wp-json/mcp/mcp-adapter-default-server",
-        "LOG_FILE": "/path/to/logs/mcp-adapter.log",
-        "WP_API_USERNAME": "your-username",
-        "WP_API_PASSWORD": "your-application-password"
-      }
-    },
-    "wordpress-http-custom": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@automattic/mcp-wordpress-remote@latest"
-      ],
-      "env": {
-        "WP_API_URL": "http://your-site.test/wp-json/your-namespace/your-route",
         "LOG_FILE": "/path/to/logs/mcp-adapter.log",
         "WP_API_USERNAME": "your-username",
         "WP_API_PASSWORD": "your-application-password"
