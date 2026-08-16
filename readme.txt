@@ -27,6 +27,8 @@ The MCP Adapter bridges WordPress's Abilities API with the [Model Context Protoc
 
 == Installation ==
 
+Download the latest plugin ZIP from the [GitHub releases page](https://github.com/WordPress/mcp-adapter/releases) before following the steps below.
+
 1. Upload the plugin files to the `/wp-content/plugins/mcp-adapter` directory, or install the plugin through the WordPress plugins screen directly.
 2. Activate the plugin through the 'Plugins' screen in WordPress.
 3. The adapter initializes automatically and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
