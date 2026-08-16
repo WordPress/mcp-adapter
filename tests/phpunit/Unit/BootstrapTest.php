@@ -113,31 +113,20 @@ final class BootstrapTest extends TestCase {
 	}
 
 	/**
-	 * The plugin's own directory must be recognised as the canonical source.
-	 */
-	public function test_classes_are_recognised_as_loaded_from_the_plugin_directory(): void {
-		$this->assertTrue( $this->is_loaded_from( WP_MCP_DIR ) );
-	}
-
-	/**
-	 * A directory the classes did not come from must not be accepted.
+	 * The bootstrap must recognise its own copy as the one that is running.
 	 *
-	 * This is the case the previous `defined( 'WP_MCP_DIR' )` check could not
-	 * see: the plugin is active, so the constant exists, but a bundled copy
-	 * elsewhere is the code actually running.
+	 * The takeover check in `mcp-adapter.php` compares the loaded class file
+	 * against `WP_MCP_DIR`. On a plain plugin install those must agree, or every
+	 * site would be told a foreign copy had won.
 	 */
-	public function test_foreign_directory_is_not_accepted_as_the_canonical_source(): void {
-		$this->assertFalse( $this->is_loaded_from( '/var/www/html/wp-content/plugins/some-other-plugin/vendor/wordpress/mcp-adapter' ) );
-	}
+	public function test_loaded_classes_come_from_the_plugin_directory(): void {
+		$class_file = ( new \ReflectionClass( McpAdapter::class ) )->getFileName();
 
-	/**
-	 * Matching must be on path segments, not a bare string prefix.
-	 *
-	 * `mcp-adapter-fork/` starts with the same characters as `mcp-adapter/`, so
-	 * a naive `strpos()` against an unterminated directory would accept it.
-	 */
-	public function test_directory_with_a_shared_prefix_is_not_accepted(): void {
-		$this->assertFalse( $this->is_loaded_from( untrailingslashit( WP_MCP_DIR ) . '-fork' ) );
+		$this->assertIsString( $class_file );
+		$this->assertStringStartsWith(
+			wp_normalize_path( (string) realpath( WP_MCP_DIR ) ) . '/',
+			wp_normalize_path( (string) realpath( $class_file ) )
+		);
 	}
 
 	/**
@@ -161,18 +150,6 @@ final class BootstrapTest extends TestCase {
 			has_action( 'init', array( McpAdapter::class, 'warn_if_not_canonical_plugin' ) ),
 			'The check should run immediately rather than hook an init action that already fired.'
 		);
-	}
-
-	/**
-	 * Calls the private provenance check.
-	 *
-	 * @param string $directory Absolute path to test against.
-	 */
-	private function is_loaded_from( string $directory ): bool {
-		$method = new \ReflectionMethod( McpAdapter::class, 'is_loaded_from' );
-		$method->setAccessible( true );
-
-		return (bool) $method->invoke( null, $directory );
 	}
 
 	/**
