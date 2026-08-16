@@ -76,13 +76,13 @@ wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/downl
 }
 ```
 
-### As a Composer Library (for plugin developers)
+### As a Composer Library (Deprecated)
 
-Plugin developers may wish to install MCP Adapter as a Composer dependency to integrate MCP functionality into their own plugins.
-
-```bash
-composer require wordpress/mcp-adapter
-```
+> **Deprecated:** Installing MCP Adapter directly via `composer require wordpress/mcp-adapter` is no longer supported. Use [wpackagist](https://wpackagist.org/) instead, which mirrors the WordPress.org plugin as a Composer package:
+>
+> ```bash
+> composer require wpackagist-plugin/mcp-adapter
+> ```
 
 #### Using Jetpack Autoloader (Highly Recommended)
 
