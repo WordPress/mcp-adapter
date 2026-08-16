@@ -91,27 +91,100 @@ final class McpAdapter {
 	}
 
 	/**
-	 * Warns when the adapter is running outside of the canonical plugin.
+	 * Warns when the code being executed is not the canonical plugin's copy.
 	 *
-	 * `WP_MCP_DIR` is defined by the plugin bootstrap, so its absence means the
-	 * `WP\MCP\` classes came from somewhere else — in practice a copy bundled
-	 * into another plugin via `composer require wordpress/mcp-adapter`. That
-	 * still runs, but it is not a supported way to consume MCP Adapter: the
-	 * hooks, REST routes, and default server ID are global, so a bundled copy
-	 * silently competes with every other copy on the site.
+	 * The MCP Adapter plugin is the canonical copy: it owns the `WP\MCP\`
+	 * namespace, the hooks, the REST routes, and the default server ID. Those are
+	 * all global, so a second copy does not coexist with it — it replaces it.
+	 *
+	 * Two distinct situations get flagged, because the fix differs:
+	 *
+	 * - The plugin is not active at all, and something else supplied the classes.
+	 * - The plugin is active, but the classes that actually loaded came from a
+	 *   different directory. Jetpack Autoloader resolves every copy on the site
+	 *   to the newest one, so a plugin bundling a newer release silently takes
+	 *   over from the installed plugin.
+	 *
+	 * Checking the constant alone cannot tell these apart: the plugin bootstrap
+	 * defines `WP_MCP_DIR` whether or not its own classes are the ones running.
+	 * So this compares where the class was actually loaded from.
 	 *
 	 * @internal For use by instance initialization only.
 	 */
 	public static function warn_if_not_canonical_plugin(): void {
-		if ( defined( 'WP_MCP_DIR' ) ) {
+		if ( ! defined( 'WP_MCP_DIR' ) ) {
+			_doing_it_wrong(
+				self::class . '::instance',
+				esc_html__( 'The MCP Adapter plugin is not active, so MCP Adapter is running from another copy of its code. Install and activate the MCP Adapter plugin, and declare it from your own plugin with the "Requires Plugins" header. Loading MCP Adapter any other way, such as bundling it as a Composer library, is not supported and may stop working in a future release.', 'mcp-adapter' ),
+				'0.6.2'
+			);
+
+			return;
+		}
+
+		if ( self::is_loaded_from( (string) constant( 'WP_MCP_DIR' ) ) ) {
 			return;
 		}
 
 		_doing_it_wrong(
 			self::class . '::instance',
-			esc_html__( 'MCP Adapter is running from a copy bundled inside another plugin rather than from the MCP Adapter plugin. Install and activate the MCP Adapter plugin, and declare it with the "Requires Plugins" plugin header instead. Bundling MCP Adapter as a Composer library is not supported and may stop working in a future release.', 'mcp-adapter' ),
+			sprintf(
+				/* translators: %s: Absolute path to the file the class was loaded from. */
+				esc_html__( 'The MCP Adapter plugin is active, but the MCP Adapter code being executed was loaded from %s instead. Whichever plugin ships that copy should depend on the MCP Adapter plugin with the "Requires Plugins" header rather than bundling its own, since the bundled copy replaces the installed plugin site-wide.', 'mcp-adapter' ),
+				esc_html( (string) self::class_file() )
+			),
 			'0.6.2'
 		);
+	}
+
+	/**
+	 * Checks whether this class was loaded from inside the given directory.
+	 *
+	 * Both sides are resolved with `realpath()` before comparison, because
+	 * symlinked plugin directories are common in local and Bedrock-style setups
+	 * and would otherwise look like a foreign copy.
+	 *
+	 * @param string $directory Absolute path to the directory to test against.
+	 */
+	private static function is_loaded_from( string $directory ): bool {
+		$class_file = self::class_file();
+
+		// Without a file to compare, assume the best rather than cry wolf.
+		if ( null === $class_file ) {
+			return true;
+		}
+
+		$directory = self::real_path( $directory );
+
+		if ( '' === $directory ) {
+			return true;
+		}
+
+		return 0 === strpos( $class_file, trailingslashit( $directory ) );
+	}
+
+	/**
+	 * Resolves the file this class was loaded from, or null if it cannot be determined.
+	 */
+	private static function class_file(): ?string {
+		$file = ( new \ReflectionClass( self::class ) )->getFileName();
+
+		if ( ! is_string( $file ) || '' === $file ) {
+			return null;
+		}
+
+		return self::real_path( $file );
+	}
+
+	/**
+	 * Normalizes a path for comparison, resolving symlinks where possible.
+	 *
+	 * @param string $path Path to normalize.
+	 */
+	private static function real_path( string $path ): string {
+		$resolved = realpath( $path );
+
+		return wp_normalize_path( false === $resolved ? $path : $resolved );
 	}
 
 	/**

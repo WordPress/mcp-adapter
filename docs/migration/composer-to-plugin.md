@@ -156,7 +156,10 @@ Two copies of `mcp-adapter.php` were loaded as plugins. Current versions bail ou
 
 **Notice: "`WP\MCP\Core\McpAdapter::instance` was called incorrectly"**
 
-This is MCP Adapter telling you it is running from a bundled copy rather than from the plugin — the situation this whole guide is about. It appears only with `WP_DEBUG` enabled, and nothing stops working because of it. Follow the [migration steps](#migrating-off-a-bundled-copy) and it goes away.
+MCP Adapter checks that the code running is the plugin's own copy, and this says it is not. It appears only with `WP_DEBUG` enabled, and nothing stops working because of it. There are two versions:
+
+- *"The MCP Adapter plugin is not active"* — the classes came from somewhere else entirely, usually a bundled copy. Install the plugin and follow the [migration steps](#migrating-off-a-bundled-copy).
+- *"…the code being executed was loaded from `<path>` instead"* — the plugin **is** active, but a bundled copy is the one actually running. Jetpack Autoloader loads the newest copy on the site, so a plugin shipping a newer release quietly takes over from the installed plugin. The path in the message tells you which plugin to fix.
 
 **Admin notice: "The Composer autoloader was not found"**
 
