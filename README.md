@@ -50,7 +50,7 @@ For a full breakdown of the component structure, see the [Architecture Overview]
 
 - **PHP**: >= 7.4
 - **WordPress**: >= 6.9 (includes the [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) in core — no separate plugin)
-- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types — installed automatically via Composer
+- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types
 
 ## Installation
 
@@ -92,8 +92,6 @@ The `WP\MCP` classes are provided by the MCP Adapter plugin, so declare it as a 
  * Requires Plugins: mcp-adapter
  */
 ```
-
-WordPress then ensures MCP Adapter is installed and active before your plugin loads. If you also need to enforce a minimum version, check the `WP_MCP_VERSION` constant at runtime alongside the availability check shown below.
 
 ### Using MCP Adapter in Your Plugin
 
