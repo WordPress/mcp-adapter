@@ -32,7 +32,7 @@ For detailed installation instructions, see the [Installation Guide](docs/gettin
 
 Follow the [Quick Start Guide](docs/getting-started/README.md) to register your first ability and expose it via MCP, or jump straight to the [Basic Examples](docs/getting-started/basic-examples.md) for complete tool, resource, and prompt samples.
 
-WordPress abilities are private by default. Set `meta.public` (or `meta.mcp.public`) to `true` to expose one, then reach it through the [default server's](docs/guides/default-server.md) three meta-tools (`discover-abilities`, `get-ability-info`, `execute-ability`) — see [Creating Abilities](docs/guides/creating-abilities.md) for the full opt-in model.
+WordPress abilities are private by default. Set `meta.public` (or `meta.mcp.public`) to `true` to expose one, then reach it through the [default server's](docs/guides/default-server.md) three meta-tools (`mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, `mcp-adapter/execute-ability`) — see [Creating Abilities](docs/guides/creating-abilities.md) for the full opt-in model.
 
 ## Connecting MCP Clients
 
