@@ -16,27 +16,26 @@ The plugin automatically initializes and creates a default MCP server at `/wp-js
 
 Requires WordPress 6.9 or newer. The Abilities API ships with core — you do not need a separate abilities-api plugin.
 
-### Method 2: Composer Package (for plugin developers)
+### Method 2: As a Composer Library (Deprecated)
 
-If you are building a plugin that depends on MCP Adapter, install it as a Composer package:
-
-```bash
-composer require wordpress/mcp-adapter
-```
+> **Deprecated:** Installing MCP Adapter directly via composer require wordpress/mcp-adapter is no longer supported. Use [wpackagist](https://wpackagist.org/) instead, which mirrors the WordPress.org plugin as a Composer package:
+>
+> ```bash
+> composer require wpackagist-plugin/mcp-adapter
+> ```
 
 #### Using Jetpack Autoloader (Highly Recommended)
 
-When multiple plugins use the MCP Adapter, use the [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) to prevent version conflicts:
+When multiple plugins use the MCP Adapter, it's highly recommended to use the  [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) to prevent version conflicts. The Jetpack Autoloader ensures that only the latest version of shared packages is loaded, eliminating conflicts when different plugins use different versions of the same dependency.
 
 ```bash
 composer require automattic/jetpack-autoloader
 ```
 
-Then load it in your plugin:
+Then load it in your main plugin file instead of the standard Composer autoloader:
 
 ```php
 <?php
-// Load the Jetpack autoloader instead of vendor/autoload.php
 require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload_packages.php';
 
 use WP\MCP\Core\McpAdapter;
