@@ -4,12 +4,6 @@ Common issues and quick solutions for the MCP Adapter.
 
 ## Quick Fixes
 
-### MCP Adapter Not Found
-```bash
-# Check plugin is installed and active
-wp plugin status mcp-adapter
-```
-
 ### REST API 404 Errors
 ```bash
 # Check WordPress REST API works
