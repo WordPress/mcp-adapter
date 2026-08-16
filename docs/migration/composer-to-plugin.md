@@ -11,7 +11,7 @@ If you install MCP Adapter as a plugin, nothing here applies to you.
 One copy of MCP Adapter per site, installed as a plugin, shared by every plugin that needs it.
 
 - **MCP Adapter is the canonical plugin.** It owns the `WP\MCP\` namespace, the `mcp_adapter_init` and `wp_mcp_init` hooks, the default server ID, and the REST routes.
-- **Your plugin declares it as a dependency** with the `Requires Plugins` header, so WordPress installs, activates, and load-orders it for you.
+- **Your plugin declares it as a dependency** with the `Requires Plugins` header, so WordPress surfaces the dependency relationship and prevents your plugin from being activated while MCP Adapter is missing or inactive.
 - **Namespace-prefixed copies are not supported.** Prefixing (with PHP-Scoper or similar) gives you a second `McpAdapter` class and a second singleton, while the hooks, filters, routes, and server IDs stay global. That collides — see [#172](https://github.com/WordPress/mcp-adapter/issues/172).
 
 See the [Installation Guide](../getting-started/installation.md) for how to install and activate the plugin.
@@ -39,7 +39,7 @@ Add the [`Requires Plugins`](https://developer.wordpress.org/plugins/plugin-basi
  */
 ```
 
-This is what replaces the bundled copy. WordPress will not let your plugin activate until MCP Adapter is installed and active, and it loads MCP Adapter first, so the `WP\MCP\` classes are there by the time your plugin runs. No autoloader to wire up.
+This is what replaces the bundled copy. WordPress will not let your plugin activate until MCP Adapter is installed and active. The header does not control plugin load order, so wait until `plugins_loaded` before checking for or using the `WP\MCP\` classes, as shown below. There is no autoloader to wire up.
 
 The header takes WordPress.org plugin slugs, so it starts working once MCP Adapter is listed there.
 
