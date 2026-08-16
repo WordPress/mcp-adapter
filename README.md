@@ -93,6 +93,8 @@ The `WP\MCP` classes are provided by the MCP Adapter plugin, so declare it as a 
  */
 ```
 
+Already bundling MCP Adapter in your plugin's `vendor/` directory? See [Composer library to canonical plugin](docs/migration/composer-to-plugin.md) for how to move off it.
+
 ### Using MCP Adapter in Your Plugin
 
 Check availability and initialize on `plugins_loaded` so all plugins are available before the adapter starts:
@@ -347,6 +349,7 @@ See the [Observability Guide](docs/guides/observability.md) for detailed metrics
 
 ## Migration
 
+- [Migration Guide: Composer library to canonical plugin](docs/migration/composer-to-plugin.md) — Moving off a bundled copy of MCP Adapter
 - [Migration Guide: v0.5.0](docs/migration/v0.5.0.md) — Breaking changes and upgrade instructions
 - [Migration Guide: v0.3.0](docs/migration/v0.3.0.md) — Transport, observability, and hook name changes
 

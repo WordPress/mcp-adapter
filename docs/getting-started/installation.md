@@ -16,6 +16,8 @@ The plugin automatically initializes and creates a default MCP server at `/wp-js
 
 The `WP\MCP` classes are provided by the MCP Adapter plugin. Declare it as a plugin dependency using the `Requires Plugins` field in your [plugin header](https://developer.wordpress.org/plugins/plugin-basics/header-requirements/).
 
+If you currently bundle MCP Adapter in your plugin's `vendor/` directory, see [Composer library to canonical plugin](../migration/composer-to-plugin.md) for how to move off it.
+
 ```php
 <?php
 /**

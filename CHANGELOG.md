@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
+### Fixed
+- A second copy of MCP Adapter loaded as a plugin no longer takes the site down. Because the package type is `wordpress-plugin`, Composer relocates a `composer require wordpress/mcp-adapter` install into `wp-content/plugins/`, where it can be activated alongside the canonical plugin. WordPress then loaded `mcp-adapter.php` twice and fataled with `Cannot redeclare WP\MCP\constants()`. The second copy now bails out instead.
+- The "Composer autoloader was not found" admin notice is no longer shown when the `WP\MCP\` classes are already provided by another autoloader. A copy installed as a Composer dependency has no `vendor/` directory of its own, because Composer flattens dependencies into the root project, so the notice pointed at a file that was never going to exist. A source checkout with genuinely missing dependencies still gets the notice.
+
+### Added
+- A [migration guide](docs/migration/composer-to-plugin.md) for plugins that bundle MCP Adapter as a Composer library, covering the `Requires Plugins` header, removing the Jetpack Autoloader, and what still works during the transition.
+
 ## [0.6.1] - 2026-08-13
 
 ### Fixed
