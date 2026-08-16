@@ -4,15 +4,6 @@ Common issues and quick solutions for the MCP Adapter.
 
 ## Quick Fixes
 
-### MCP Adapter Not Found
-```bash
-# Check plugin is active
-wp plugin status mcp-adapter
-
-# If using Composer, verify Jetpack autoloader
-ls vendor/autoload_packages.php
-```
-
 ### REST API 404 Errors
 ```bash
 # Check WordPress REST API works
@@ -81,49 +72,30 @@ wp plugin activate mcp-adapter
 wp plugin status mcp-adapter
 ```
 
-### Composer Dependencies Missing
+### Composer Autoloader Missing
+
+If you see *"The Composer autoloader was not found"*, the plugin's dependencies have not been installed. The release zip ships with its `vendor/` directory, so this only happens when the plugin was installed from a source checkout.
+
 ```bash
-# Install dependencies including Jetpack Autoloader
+# Install dependencies in the plugin directory
 cd wp-content/plugins/mcp-adapter
-composer require automattic/jetpack-autoloader
 composer install
 
-# Check Jetpack autoloader exists
+# Check the autoloader exists (Jetpack Autoloader, not autoload.php)
 ls vendor/autoload_packages.php
 ```
 
-### Why Use Jetpack Autoloader?
+Alternatively, install a release build instead of a source checkout:
 
-**Problem**: Multiple plugins using different versions of MCP Adapter can cause conflicts:
+```bash
+wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate --force
 ```
-Plugin A uses MCP Adapter v1.0 → loads first
-Plugin B uses MCP Adapter v1.2 → can't load, causes errors
-```
-
-**Solution**: Jetpack Autoloader automatically loads the **latest version**:
-```
-Plugin A uses MCP Adapter v1.0 + Jetpack Autoloader
-Plugin B uses MCP Adapter v1.2 + Jetpack Autoloader
-→ Both plugins use v1.2 (latest), no conflicts
-```
-
-**Benefits**:
-- ✅ **Prevents version conflicts** between plugins
-- ✅ **Automatic latest version** loading
-- ✅ **WordPress optimized** for plugin environments
-- ✅ **Zero configuration** needed
 
 ### Class Not Found
-```php
-// For Composer projects, check Jetpack autoloader
-if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
-    // Load Jetpack autoloader
-    if ( is_file( __DIR__ . '/vendor/autoload_packages.php' ) ) {
-        require_once __DIR__ . '/vendor/autoload_packages.php';
-    }
-}
 
-// For plugin usage, check plugin is active
+`WP\MCP\*` classes are provided by the MCP Adapter plugin. If they are missing, the plugin is not active. Check for it rather than trying to load an autoloader yourself:
+
+```php
 if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
     add_action( 'admin_notices', function() {
         echo '<div class="notice notice-error"><p>MCP Adapter plugin must be active.</p></div>';
@@ -131,6 +103,8 @@ if ( ! class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
     return;
 }
 ```
+
+Add `Requires Plugins: mcp-adapter` to your plugin header so WordPress loads MCP Adapter before your plugin.
 
 ### Abilities API Missing
 ```php

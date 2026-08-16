@@ -1,10 +1,8 @@
 # Installation Guide
 
-This guide covers different installation methods for the MCP Adapter.
+MCP Adapter is distributed as a WordPress plugin. Install and activate it like any other plugin. Requires WordPress 6.9 or newer.
 
-## Installation Methods
-
-### Method 1: WordPress Plugin (Recommended)
+## Installing the plugin
 
 Download the latest release from [GitHub](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other WordPress plugin, or use WP-CLI:
 
@@ -14,53 +12,17 @@ wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/downl
 
 The plugin automatically initializes and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
 
-Requires WordPress 6.9 or newer. The Abilities API ships with core — you do not need a separate abilities-api plugin.
+## Depending on MCP Adapter from your own plugin
 
-### Method 2: Composer Package (for plugin developers)
-
-If you are building a plugin that depends on MCP Adapter, install it as a Composer package:
-
-```bash
-composer require wordpress/mcp-adapter
-```
-
-#### Using Jetpack Autoloader (Highly Recommended)
-
-When multiple plugins use the MCP Adapter, use the [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) to prevent version conflicts:
-
-```bash
-composer require automattic/jetpack-autoloader
-```
-
-Then load it in your plugin:
-
-```php
-<?php
-// Load the Jetpack autoloader instead of vendor/autoload.php
-require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload_packages.php';
-
-use WP\MCP\Core\McpAdapter;
-
-// Initialize the adapter
-McpAdapter::instance();
-```
-
-#### Benefits
-- Version conflict resolution
-- Plugin compatibility 
-- WordPress optimized
-- Automatic dependency management
-
-#### Using MCP Adapter in Your Plugin
-
-Once the MCP Adapter plugin is active, you can use it in your own plugins:
+The `WP\MCP` classes are provided by the MCP Adapter plugin. Declare it as a plugin dependency using the `Requires Plugins` field in your [plugin header](https://developer.wordpress.org/plugins/plugin-basics/header-requirements/).
 
 ```php
 <?php
 /**
- * Plugin Name: My MCP Plugin
- * Description: Demonstrates MCP Adapter integration
- * Version: 1.0.0
+ * Plugin Name:      My MCP Plugin
+ * Description:      Demonstrates MCP Adapter integration
+ * Version:          1.0.0
+ * Requires Plugins: mcp-adapter
  */
 
 // Prevent direct access
@@ -197,7 +159,11 @@ add_action( 'wp_loaded', function() {
 **MCP Adapter plugin not found**
 - Verify the plugin is installed in `wp-content/plugins/mcp-adapter/`
 - Check the plugin is activated in WordPress admin
+
+**"The Composer autoloader was not found"**
+- Only affects source checkouts; the release zip ships with its `vendor/` directory
 - Run `composer install` in the plugin directory
+- Check `vendor/autoload_packages.php` exists
 
 **"WordPress Abilities API not available"**
 - Requires WordPress 6.9 or higher. The Abilities API is part of core — there is no separate plugin to install.
@@ -206,10 +172,6 @@ add_action( 'wp_loaded', function() {
 - Check WordPress REST API is enabled
 - Verify permalink structure is not "Plain"
 - Test basic REST API: `curl "https://yoursite.com/wp-json/"`
-
-**Composer autoloader missing**
-- Run `composer install` in the plugin directory
-- Check `vendor/autoload.php` exists
 
 ### Debug Mode
 
@@ -238,7 +200,7 @@ Once installation is complete:
 - **WordPress**: >= 6.9
 
 ### Optional
-- **Composer**: For dependency management
 - **WP-CLI**: For command-line MCP server testing
+- **Composer**: Only needed to build from a source checkout; release builds ship with their dependencies
 
 The MCP Adapter automatically handles initialization and creates a default server when activated.

@@ -61,6 +61,8 @@ No, exposure is opt-in. An ability is only reachable over MCP if it has been mar
 
 On the [GitHub repository](https://github.com/WordPress/mcp-adapter/issues). Security issues should follow the process in [SECURITY.md](https://github.com/WordPress/mcp-adapter/blob/trunk/SECURITY.md) rather than being reported publicly.
 
+Plugin developers should depend on MCP Adapter by adding `Requires Plugins: mcp-adapter` to their plugin header. See the [README](https://github.com/WordPress/mcp-adapter#installation) for WP-CLI and wp-env options.
+
 == Changelog ==
 
 = 0.6.1 - 2026-08-13 =
