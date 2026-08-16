@@ -73,13 +73,13 @@ if ( class_exists( Plugin::class ) ) {
 }
 
 /*
- * Report when a copy of the adapter outside this plugin won the autoload race.
+ * Report copies of the adapter that live outside this plugin.
  *
- * This cannot live in `McpAdapter`, because when another copy wins, `McpAdapter`
- * *is* that copy: a release older than this check has no way to report its own
- * takeover. This file, by contrast, always runs while the plugin is active, no
- * matter which copy the autoloader resolved, so it is the one place the check
- * can be relied on.
+ * This cannot live in `McpAdapter`, because when another copy wins the autoload
+ * race, `McpAdapter` *is* that copy: a release older than this check has no way
+ * to report its own takeover. This file, by contrast, always runs while the
+ * plugin is active, no matter which copy the autoloader resolved, so it is the
+ * one place the check can be relied on.
  *
  * For the same reason it must not call into the loaded classes — the method it
  * would call may not exist in whichever version won, which would turn a notice
@@ -93,42 +93,106 @@ if ( class_exists( Plugin::class ) ) {
 add_action(
 	'init',
 	static function (): void {
-		// Nothing loaded the adapter this request, so there is nothing to check.
-		if ( ! class_exists( Core\McpAdapter::class, false ) ) {
-			return;
-		}
-
-		$reflection = new \ReflectionClass( Core\McpAdapter::class );
-		$class_file = $reflection->getFileName();
-
-		if ( ! is_string( $class_file ) || '' === $class_file ) {
-			return;
-		}
-
-		// Resolve both sides, since symlinked plugin directories are normal in
-		// local and Bedrock-style setups and would otherwise look foreign.
+		// Resolve every path the same way, since symlinked plugin directories are
+		// normal in local and Bedrock-style setups and would otherwise look foreign.
 		$resolve = static function ( string $path ): string {
 			$resolved = realpath( $path );
 
 			return wp_normalize_path( false === $resolved ? $path : $resolved );
 		};
 
-		$class_file = $resolve( $class_file );
 		$plugin_dir = trailingslashit( $resolve( WP_MCP_DIR ) );
 
-		if ( 0 === strpos( $class_file, $plugin_dir ) ) {
+		/*
+		 * Case 1: another copy is the one actually executing.
+		 */
+		if ( class_exists( Core\McpAdapter::class, false ) ) {
+			$reflection = new \ReflectionClass( Core\McpAdapter::class );
+			$class_file = $reflection->getFileName();
+
+			if ( is_string( $class_file ) && '' !== $class_file ) {
+				$class_file = $resolve( $class_file );
+
+				if ( 0 !== strpos( $class_file, $plugin_dir ) ) {
+					$loaded_version = $reflection->getConstant( 'VERSION' );
+
+					_doing_it_wrong(
+						'WP\MCP\Core\McpAdapter',
+						sprintf(
+							/* translators: 1: Version of the copy that loaded, 2: Absolute path to that copy, 3: Version of the installed plugin. */
+							esc_html__( 'MCP Adapter %1$s was loaded from %2$s, so it is running instead of the MCP Adapter plugin (version %3$s) installed on this site. Whichever plugin ships that copy should depend on the MCP Adapter plugin with the "Requires Plugins" header rather than bundling its own, since the bundled copy replaces the installed plugin site-wide.', 'mcp-adapter' ),
+							esc_html( is_string( $loaded_version ) ? $loaded_version : __( '(unknown version)', 'mcp-adapter' ) ),
+							esc_html( $class_file ),
+							esc_html( WP_MCP_VERSION )
+						),
+						'0.6.2'
+					);
+
+					return;
+				}
+			}
+		}
+
+		/*
+		 * Case 2: this plugin's copy is running, but another one is installed and
+		 * could win instead.
+		 *
+		 * Which copy wins is decided by autoloader registration order, which
+		 * follows plugin load order — not by anything either plugin controls. So a
+		 * site can look healthy for months and then quietly switch to a bundled
+		 * copy because a plugin was deactivated and reactivated. Reporting only the
+		 * takeover would mean staying silent right up until it happens.
+		 *
+		 * Registered Composer autoloaders can be asked where they *would* find a
+		 * class without loading it, which finds dormant copies without touching the
+		 * filesystem. `findFile()` is duck-typed rather than checked against
+		 * `Composer\Autoload\ClassLoader`, so scoped and prefixed builds of Composer
+		 * are covered too.
+		 */
+		$autoloaders = spl_autoload_functions();
+
+		if ( ! is_array( $autoloaders ) ) {
 			return;
 		}
 
-		$loaded_version = $reflection->getConstant( 'VERSION' );
+		$dormant = array();
+
+		foreach ( $autoloaders as $callback ) {
+			if ( ! is_array( $callback ) || ! is_object( $callback[0] ) ) {
+				continue;
+			}
+
+			$find_file = array( $callback[0], 'findFile' );
+
+			if ( ! is_callable( $find_file ) ) {
+				continue;
+			}
+
+			$candidate = $find_file( 'WP\MCP\Core\McpAdapter' );
+
+			if ( ! is_string( $candidate ) || '' === $candidate ) {
+				continue;
+			}
+
+			$candidate = $resolve( $candidate );
+
+			if ( 0 === strpos( $candidate, $plugin_dir ) ) {
+				continue;
+			}
+
+			$dormant[ $candidate ] = true;
+		}
+
+		if ( array() === $dormant ) {
+			return;
+		}
 
 		_doing_it_wrong(
 			'WP\MCP\Core\McpAdapter',
 			sprintf(
-				/* translators: 1: Version of the copy that loaded, 2: Absolute path to that copy, 3: Version of the installed plugin. */
-				esc_html__( 'MCP Adapter %1$s was loaded from %2$s, so it is running instead of the MCP Adapter plugin (version %3$s) installed on this site. Whichever plugin ships that copy should depend on the MCP Adapter plugin with the "Requires Plugins" header rather than bundling its own, since the bundled copy replaces the installed plugin site-wide.', 'mcp-adapter' ),
-				esc_html( is_string( $loaded_version ) ? $loaded_version : __( '(unknown version)', 'mcp-adapter' ) ),
-				esc_html( $class_file ),
+				/* translators: 1: Comma-separated absolute paths to the other copies, 2: Version of the installed plugin. */
+				esc_html__( 'Another copy of MCP Adapter is installed at %1$s. Only one copy can run per request, and which one wins is decided by plugin load order, so this site may start running that copy instead of the MCP Adapter plugin (version %2$s) without anything changing. Whichever plugin ships it should depend on the MCP Adapter plugin with the "Requires Plugins" header rather than bundling its own.', 'mcp-adapter' ),
+				esc_html( implode( ', ', array_keys( $dormant ) ) ),
 				esc_html( WP_MCP_VERSION )
 			),
 			'0.6.2'

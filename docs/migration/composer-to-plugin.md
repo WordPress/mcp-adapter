@@ -160,6 +160,7 @@ MCP Adapter checks that the code running is the plugin's own copy, and this says
 
 - *"The MCP Adapter plugin is not active"* — the classes came from somewhere else entirely, usually a bundled copy. Install the plugin and follow the [migration steps](#migrating-off-a-bundled-copy).
 - *"MCP Adapter `<version>` was loaded from `<path>`, so it is running instead of the MCP Adapter plugin"* — the plugin **is** active, but a bundled copy is the one actually running. Without Jetpack Autoloader this is decided by plugin load order, so a bundled copy can win regardless of whether it is newer or older than the installed plugin. The message names the file and both versions, so you can tell which plugin to fix and how stale its copy is.
+- *"Another copy of MCP Adapter is installed at `<path>`"* — the plugin is running correctly right now, but a bundled copy is present and could win on a future request. Nothing has to change for that to happen: deactivating and reactivating a plugin is enough to reorder autoloader registration. Treat it as the same problem caught earlier.
 
 **Admin notice: "The Composer autoloader was not found"**
 
