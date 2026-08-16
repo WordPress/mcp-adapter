@@ -1,0 +1,3 @@
+{
+    "line": "{\"jsonrpc\":\"2.0\",\"id\":190,\"result\":{\"resultType\":\"input_required\",\"inputRequests\":{\"confirm\":{\"method\":\"elicitation\\/create\",\"params\":{\"mode\":\"form\",\"message\":\"Confirm this operation\",\"requestedSchema\":{\"type\":\"object\",\"properties\":{\"confirmed\":{\"type\":\"boolean\"}},\"required\":[\"confirmed\"]}}}},\"requestState\":\"{{REQUEST_STATE}}\",\"_meta\":{\"io.modelcontextprotocol\\/serverInfo\":{\"name\":\"Wire Baseline Server\",\"version\":\"0.0.1\"}}}}"
+}

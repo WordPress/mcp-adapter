@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":24,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"ok\\\":true,\\\"_meta\\\":{\\\"mcp_adapter\\\":{\\\"should_not\\\":\\\"leak\\\"},\\\"keep\\\":\\\"top\\\"},\\\"nested\\\":{\\\"value\\\":123,\\\"_meta\\\":{\\\"mcp_adapter\\\":{\\\"should_not\\\":\\\"leak\\\"},\\\"keep\\\":\\\"nested\\\"}}}\"}],\"structuredContent\":{\"ok\":true,\"_meta\":{\"mcp_adapter\":{\"should_not\":\"leak\"},\"keep\":\"top\"},\"nested\":{\"value\":123,\"_meta\":{\"mcp_adapter\":{\"should_not\":\"leak\"},\"keep\":\"nested\"}}},\"isError\":false}}"
+}

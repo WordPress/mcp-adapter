@@ -12,8 +12,12 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Cli;
 
+use WP\MCP\Core\McpProtocolContext;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder;
 use WP\MCP\Transport\Infrastructure\JsonRpcResponseBuilder;
 use WP\MCP\Transport\Infrastructure\RequestRouter;
 
@@ -46,6 +50,15 @@ class StdioServerBridge {
 	 * @var bool
 	 */
 	private bool $is_running = false;
+
+	/**
+	 * Legacy revision retained after initialize on this stream.
+	 *
+	 * Modern requests still select their revision independently per line.
+	 *
+	 * @var string|null
+	 */
+	private ?string $legacy_protocol_version = null;
 
 	/**
 	 * Initialize the STDIO server bridge.
@@ -176,10 +189,10 @@ class StdioServerBridge {
 	 */
 	private function handle_request( string $json_input ): string {
 		try {
-			// Parse JSON-RPC request
-			$request = json_decode( $json_input, true );
-
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
+			// Parse JSON-RPC request without collapsing objects into arrays.
+			try {
+				$request_identity = JsonRpcRequestDecoder::decode( $json_input );
+			} catch ( \JsonException $exception ) {
 				return $this->create_error_response(
 					null,
 					McpErrorFactory::PARSE_ERROR,
@@ -189,13 +202,18 @@ class StdioServerBridge {
 			}
 
 			// Validate JSON-RPC structure
-			if ( ! is_array( $request ) ) {
+			if ( ! $request_identity instanceof \stdClass ) {
 				return $this->create_error_response(
 					null,
 					McpErrorFactory::INVALID_REQUEST,
 					'Invalid Request',
 					'The JSON sent is not a valid Request object.'
 				);
+			}
+
+			$request = JsonRpcRequestDecoder::to_associative( $request_identity );
+			if ( ! is_array( $request ) ) {
+				throw new \LogicException( 'A decoded JSON object must have an associative representation.' );
 			}
 
 			// Check for JSON-RPC version
@@ -231,13 +249,27 @@ class StdioServerBridge {
 				$params = array();
 			}
 
+			$protocol_context = $this->resolve_protocol_context( $method, $params, $id );
+			if ( is_array( $protocol_context ) ) {
+				return $this->encode_response( $protocol_context );
+			}
+
 			// Route the request to the appropriate handler
-			$result = $this->request_router->route_request(
+			$new_session_id = null;
+			$result         = $this->request_router->route_request(
 				$method,
 				$params,
 				$id,
-				'stdio'
+				'stdio',
+				null,
+				$request_identity,
+				$new_session_id,
+				$protocol_context
 			);
+
+			if ( 'initialize' === $method && ! isset( $result['error'] ) && isset( $result['protocolVersion'] ) && is_string( $result['protocolVersion'] ) ) {
+				$this->legacy_protocol_version = $result['protocolVersion'];
+			}
 
 			// If this is a notification (no id), don't send a response
 			if ( null === $id ) {
@@ -255,6 +287,45 @@ class StdioServerBridge {
 				$e->getMessage()
 			);
 		}
+	}
+
+	/**
+	 * Resolve one STDIO line to an exact request catalog.
+	 *
+	 * @param string $method JSON-RPC method.
+	 * @param array<string, mixed> $params Request parameters.
+	 * @param string|int|null $request_id Request id.
+	 *
+	 * @return \WP\MCP\Core\McpProtocolContext|array<string, mixed> Context or a complete typed error envelope.
+	 */
+	private function resolve_protocol_context( string $method, array $params, $request_id ) {
+		if ( 'initialize' === $method ) {
+			return McpProtocolContext::for_revision( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
+		}
+
+		$request_version = McpVersionNegotiator::request_protocol_version( $params );
+		if ( null !== $request_version && ! McpVersionNegotiator::is_supported( $request_version ) ) {
+			$encoder = $this->server->get_wire_encoder_for_revision( McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+			if ( ! $encoder instanceof V20260728WireEncoder ) {
+				throw new \LogicException( 'Modern MCP revision resolved to the wrong encoder.' );
+			}
+
+			return $encoder->unsupported_protocol_version_error(
+				$request_id,
+				$request_version,
+				McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS
+			);
+		}
+
+		if ( null !== $request_version ) {
+			return McpProtocolContext::for_revision( $request_version );
+		}
+
+		if ( 'server/discover' === $method ) {
+			return McpProtocolContext::for_revision( McpVersionNegotiator::MODERN_PROTOCOL_VERSION );
+		}
+
+		return McpProtocolContext::for_revision( $this->legacy_protocol_version ?? McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
 	}
 
 	/**

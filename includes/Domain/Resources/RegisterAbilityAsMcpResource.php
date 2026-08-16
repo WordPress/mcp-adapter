@@ -13,7 +13,6 @@ namespace WP\MCP\Domain\Resources;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -74,7 +73,8 @@ class RegisterAbilityAsMcpResource {
 	 * @param \WP_Ability $ability The ability.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource|\WP_Error Returns Resource DTO or WP_Error if validation fails.
+	 * @return array<string, mixed>|\WP_Error Resource data in wire shape, or WP_Error if validation fails.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 */
 	public static function make( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
 		$resource = new self( $ability, $error_handler );
@@ -83,11 +83,12 @@ class RegisterAbilityAsMcpResource {
 	}
 
 	/**
-	 * Get the MCP resource instance.
+	 * Get the MCP resource data in wire shape.
 	 *
-	 * Resource schema validity is enforced by the php-mcp-schema DTO constructor.
+	 * Resource schema validity is enforced by the php-mcp-schema DTO constructor;
+	 * only the serialized array leaves this method.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource|\WP_Error Returns the Resource DTO or WP_Error if validation fails.
+	 * @return array<string, mixed>|\WP_Error Resource data array or WP_Error if validation fails.
 	 */
 	private function get_resource() {
 		$data = $this->get_data();
@@ -95,14 +96,7 @@ class RegisterAbilityAsMcpResource {
 			return $data;
 		}
 
-		try {
-			return ResourceDto::fromArray( $data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_schema_invalid',
-				$e->getMessage()
-			);
-		}
+		return $data;
 	}
 
 	/**
@@ -425,17 +419,19 @@ class RegisterAbilityAsMcpResource {
 	}
 
 	/**
-	 * Build a clean Resource DTO and adapter metadata for internal wiring.
+	 * Build clean resource data and adapter metadata for internal wiring.
 	 *
-	 * This method returns a protocol-only Resource DTO and provides the adapter metadata
-	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
-	 * wiring to protocol surfaces.
+	 * This method returns protocol-only resource data in wire shape and provides the
+	 * adapter metadata separately. Validation still runs through the Resource DTO, but
+	 * only its serialized array leaves this method. This keeps the data stable across
+	 * MCP spec changes and avoids coupling internal execution wiring to protocol surfaces.
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
 	 *
-	 * @return array{resource: \WP\McpSchema\Server\Resources\DTO\Resource, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{resource: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
+	 * @since n.e.x.t The 'resource' entry is a revision-neutral array instead of a DTO.
 	 *
 	 */
 	public static function build( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
@@ -446,32 +442,19 @@ class RegisterAbilityAsMcpResource {
 			return $data;
 		}
 
-		try {
-			$resource_dto = ResourceDto::fromArray( $data['resource_data'] );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Resource DTO for ability %1$s: %2$s', 'mcp-adapter' ),
-					$ability->get_name(),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
+		$resource_array = $data['resource_data'];
 
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpResourceValidator::validate_resource_dto( $resource_dto );
+			$validation_result = McpResourceValidator::validate_resource_metadata( $resource_array );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
 		}
 
 		return array(
-			'resource'     => $resource_dto,
+			'resource'     => $resource_array,
 			'adapter_meta' => $data['adapter_meta'],
 		);
 	}

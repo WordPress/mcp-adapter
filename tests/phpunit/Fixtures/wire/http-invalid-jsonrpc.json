@@ -1,0 +1,5 @@
+{
+    "status": 400,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32600,\"message\":\"Invalid Request: jsonrpc version must be \\\"2.0\\\"\"}}"
+}

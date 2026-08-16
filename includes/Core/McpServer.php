@@ -17,8 +17,10 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
+use WP\MCP\Infrastructure\Protocol\WireEncoder;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -100,6 +102,13 @@ class McpServer {
 	 * @var bool
 	 */
 	private bool $mcp_validation_enabled;
+
+	/**
+	 * Revision-bound encoders for protocol wire output, built on first use.
+	 *
+	 * @var array<string, \WP\MCP\Infrastructure\Protocol\WireEncoderInterface>
+	 */
+	private array $wire_encoders = array();
 
 	/**
 	 * Transport permission callback.
@@ -336,9 +345,67 @@ class McpServer {
 	}
 
 	/**
+	 * Get the encoder that turns adapter arrays into wire arrays.
+	 *
+	 * Direct handler callers have no request-scoped revision, so this compatibility
+	 * seam remains explicitly legacy. Transports call
+	 * {@see self::get_wire_encoder_for_revision()} after resolving the request era.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @return \WP\MCP\Infrastructure\Protocol\WireEncoder
+	 */
+	public function get_wire_encoder(): WireEncoder {
+		$encoder = $this->get_wire_encoder_for_revision( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
+		if ( ! $encoder instanceof WireEncoder ) {
+			throw new \LogicException( 'Legacy MCP encoder selection returned the wrong implementation.' );
+		}
+
+		return $encoder;
+	}
+
+	/**
+	 * Get the encoder for one already-resolved protocol revision.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $revision Exact supported protocol revision.
+	 *
+	 * @throws \LogicException When the revision has no Adapter encoder.
+	 */
+	public function get_wire_encoder_for_revision( string $revision ): WireEncoderInterface {
+		if ( isset( $this->wire_encoders[ $revision ] ) ) {
+			return $this->wire_encoders[ $revision ];
+		}
+
+		$context = McpProtocolContext::for_revision( $revision );
+
+		if ( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION === $revision ) {
+			$encoder = new WireEncoder( $context, $this->error_handler );
+		} elseif ( McpVersionNegotiator::MODERN_PROTOCOL_VERSION === $revision ) {
+			$encoder = new V20260728WireEncoder(
+				$context,
+				$this->error_handler,
+				array(
+					'name'    => $this->server_name,
+					'version' => $this->server_version,
+				)
+			);
+		} else {
+			throw new \LogicException( 'No MCP wire encoder for revision ' . $revision );
+		}
+
+		$this->wire_encoders[ $revision ] = $encoder;
+
+		return $encoder;
+	}
+
+	/**
 	 * Get all tools registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Tools\DTO\Tool>
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
+	 * @return array<string, array<string, mixed>> Tool data arrays keyed by tool name.
 	 */
 	public function get_tools(): array {
 		return $this->component_registry->get_tools();
@@ -347,7 +414,9 @@ class McpServer {
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Resources\DTO\Resource>
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
+	 * @return array<string, array<string, mixed>> Resource data arrays keyed by resource URI.
 	 */
 	public function get_resources(): array {
 		return $this->component_registry->get_resources();
@@ -356,7 +425,9 @@ class McpServer {
 	/**
 	 * Get all prompts registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Prompts\DTO\Prompt>
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
+	 * @return array<string, array<string, mixed>> Prompt data arrays keyed by prompt name.
 	 */
 	public function get_prompts(): array {
 		return $this->component_registry->get_prompts();
@@ -393,11 +464,13 @@ class McpServer {
 	/**
 	 * Get a specific prompt by name.
 	 *
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|null
+	 * @return array<string, mixed>|null Prompt data in wire shape, or null when not registered.
 	 */
-	public function get_prompt( string $prompt_name ): ?PromptDto {
+	public function get_prompt( string $prompt_name ): ?array {
 		$mcp_prompt = $this->component_registry->get_mcp_prompt( $prompt_name );
 
 		return $mcp_prompt ? $mcp_prompt->get_protocol_dto() : null;

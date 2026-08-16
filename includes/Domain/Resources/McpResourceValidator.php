@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -48,33 +47,36 @@ class McpResourceValidator {
 	}
 
 	/**
-	 * Validate a Resource DTO against the MCP schema.
+	 * Validate resource metadata (the `resources/list` Resource shape) against the MCP schema.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The resource DTO to validate.
+	 * Validates the metadata object advertised by `resources/list` (uri, icons,
+	 * annotations). For resource CONTENTS validation (`resources/read` results),
+	 * use get_validation_errors() instead.
+	 *
+	 * @param array<string, mixed> $resource_data The resource metadata to validate.
 	 *
 	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
+	 * @since n.e.x.t Replaces the DTO-typed validate_resource_dto().
 	 */
-	public static function validate_resource_dto( ResourceDto $resource_dto ) {
+	public static function validate_resource_metadata( array $resource_data ) {
 		$errors = array();
 
 		// Validate URI.
-		if ( ! McpValidator::validate_resource_uri( $resource_dto->getUri() ) ) {
+		$uri = $resource_data['uri'] ?? '';
+		if ( ! is_string( $uri ) || ! McpValidator::validate_resource_uri( $uri ) ) {
 			$errors[] = __( 'Resource URI must be a valid URI string', 'mcp-adapter' );
 		}
 
 		// Validate icons if present.
-		$icons = $resource_dto->getIcons();
-		if ( ! empty( $icons ) ) {
-			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
-			$icons_result = McpValidator::validate_icons_array( $icons_array );
+		if ( ! empty( $resource_data['icons'] ) && is_array( $resource_data['icons'] ) ) {
+			$icons_result = McpValidator::validate_icons_array( $resource_data['icons'] );
 			$icons_errors = self::format_icon_validation_errors( $icons_result );
 			$errors       = array_merge( $errors, $icons_errors );
 		}
 
 		// Validate annotations if present.
-		$annotations = $resource_dto->getAnnotations();
-		if ( $annotations ) {
-			$annotation_errors = McpValidator::get_annotation_validation_errors( $annotations->toArray() );
+		if ( ! empty( $resource_data['annotations'] ) && is_array( $resource_data['annotations'] ) ) {
+			$annotation_errors = McpValidator::get_annotation_validation_errors( $resource_data['annotations'] );
 			$errors            = array_merge( $errors, $annotation_errors );
 		}
 
@@ -100,7 +102,7 @@ class McpResourceValidator {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	public static function validate_resource_instance( McpResource $the_resource ) {
-		return self::validate_resource_dto( $the_resource->get_protocol_dto() );
+		return self::validate_resource_metadata( $the_resource->get_protocol_dto() );
 	}
 
 	/**
@@ -111,7 +113,7 @@ class McpResourceValidator {
 	 * - `content` blocks of type `resource` (`EmbeddedResource.resource`)
 	 *
 	 * It does NOT validate the `Resource` metadata object returned by `resources/list`.
-	 * For `Resource` DTO validation (resources/list), use validate_resource_dto() instead.
+	 * For resource metadata validation (resources/list), use validate_resource_metadata() instead.
 	 *
 	 * This validator focuses on the MCP-required fields and ignores unknown fields to remain
 	 * forward-compatible with future schema versions.

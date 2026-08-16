@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Domain\Resources;
 
 use WP\MCP\Domain\Resources\McpResourceValidator;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 
 /**
  * Tests for McpResourceValidator class.
@@ -16,127 +15,110 @@ use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 final class McpResourceValidatorTest extends TestCase {
 
 	// =========================================================================
-	// validate_resource_dto Tests
+	// validate_resource_metadata Tests
 	// =========================================================================
 
-	public function test_validate_resource_dto_with_valid_resource(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'  => 'test://resource',
-				'name' => 'test-resource',
-			)
+	public function test_validate_resource_metadata_with_valid_resource(): void {
+		$resource = array(
+			'uri'  => 'test://resource',
+			'name' => 'test-resource',
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_dto_rejects_invalid_uri(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'  => 'not a valid uri',
-				'name' => 'test-resource',
-			)
+	public function test_validate_resource_metadata_rejects_invalid_uri(): void {
+		$resource = array(
+			'uri'  => 'not a valid uri',
+			'name' => 'test-resource',
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertWPError( $result );
 		$this->assertSame( 'mcp_resource_validation_failed', $result->get_error_code() );
 		$this->assertStringContainsString( 'URI must be a valid URI', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_dto_accepts_any_mime_type_string(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'      => 'test://resource',
-				'name'     => 'test-resource',
-				'mimeType' => 'invalid-mime',
-			)
+	public function test_validate_resource_metadata_accepts_any_mime_type_string(): void {
+		$resource = array(
+			'uri'      => 'test://resource',
+			'name'     => 'test-resource',
+			'mimeType' => 'invalid-mime',
 		);
 
-		$this->assertTrue( McpResourceValidator::validate_resource_dto( $resource ) );
+		$this->assertTrue( McpResourceValidator::validate_resource_metadata( $resource ) );
 	}
 
-	public function test_validate_resource_dto_accepts_valid_mime_type(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'      => 'test://resource',
-				'name'     => 'test-resource',
-				'mimeType' => 'application/json',
-			)
+	public function test_validate_resource_metadata_accepts_valid_mime_type(): void {
+		$resource = array(
+			'uri'      => 'test://resource',
+			'name'     => 'test-resource',
+			'mimeType' => 'application/json',
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertTrue( $result );
 	}
 
-	public function test_validate_resource_dto_rejects_invalid_icons(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'   => 'test://resource',
-				'name'  => 'test-resource',
-				'icons' => array(
-					array(
-						'src'      => 'https://example.com/icon.png',
-						'mimeType' => 'image/png',
-					),
-					array( 'src' => 'invalid-url' ), // Invalid src
+	public function test_validate_resource_metadata_rejects_invalid_icons(): void {
+		$resource = array(
+			'uri'   => 'test://resource',
+			'name'  => 'test-resource',
+			'icons' => array(
+				array(
+					'src'      => 'https://example.com/icon.png',
+					'mimeType' => 'image/png',
 				),
-			)
+				array( 'src' => 'invalid-url' ), // Invalid src
+			),
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'Icon at index 1', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_dto_rejects_invalid_annotation_values(): void {
-		// Note: The DTO validates structure (e.g., audience must be array).
-		// Our validator tests for invalid VALUES within valid structure.
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'         => 'test://resource',
-				'name'        => 'test-resource',
-				'annotations' => array(
-					'audience' => array( 'admin' ), // Invalid role - should be 'user' or 'assistant'
-				),
-			)
+	public function test_validate_resource_metadata_rejects_invalid_annotation_values(): void {
+		// The validator tests for invalid VALUES within valid structure.
+		$resource = array(
+			'uri'         => 'test://resource',
+			'name'        => 'test-resource',
+			'annotations' => array(
+				'audience' => array( 'admin' ), // Invalid role - should be 'user' or 'assistant'
+			),
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'valid roles', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_dto_rejects_invalid_annotation_priority(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'         => 'test://resource',
-				'name'        => 'test-resource',
-				'annotations' => array(
-					'priority' => 1.5, // Out of range - should be 0.0 to 1.0
-				),
-			)
+	public function test_validate_resource_metadata_rejects_invalid_annotation_priority(): void {
+		$resource = array(
+			'uri'         => 'test://resource',
+			'name'        => 'test-resource',
+			'annotations' => array(
+				'priority' => 1.5, // Out of range - should be 0.0 to 1.0
+			),
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertWPError( $result );
 		$this->assertStringContainsString( 'priority must be between', $result->get_error_message() );
 	}
 
-	public function test_validate_resource_dto_accepts_valid_annotations(): void {
-		$resource = ResourceDto::fromArray(
-			array(
-				'uri'         => 'test://resource',
-				'name'        => 'test-resource',
-				'annotations' => array(
-					'audience' => array( 'user', 'assistant' ),
-					'priority' => 0.8,
-				),
-			)
+	public function test_validate_resource_metadata_accepts_valid_annotations(): void {
+		$resource = array(
+			'uri'         => 'test://resource',
+			'name'        => 'test-resource',
+			'annotations' => array(
+				'audience' => array( 'user', 'assistant' ),
+				'priority' => 0.8,
+			),
 		);
 
-		$result = McpResourceValidator::validate_resource_dto( $resource );
+		$result = McpResourceValidator::validate_resource_metadata( $resource );
 		$this->assertTrue( $result );
 	}
 

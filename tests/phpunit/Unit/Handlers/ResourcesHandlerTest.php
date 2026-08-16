@@ -11,11 +11,6 @@ namespace WP\MCP\Tests\Unit\Handlers;
 
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
-use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 /**
@@ -23,13 +18,14 @@ use WP_Error;
  */
 final class ResourcesHandlerTest extends TestCase {
 
-	public function test_list_resources_returns_dto(): void {
+	public function test_list_resources_returns_resources_array(): void {
 		wp_set_current_user( 1 );
 		$server  = $this->makeServer( array(), array( 'test/resource' ), array() );
 		$handler = new ResourcesHandler( $server );
 		$result  = $handler->list_resources();
 
-		$this->assertInstanceOf( ListResourcesResult::class, $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'resources', $result );
 	}
 
 	public function test_list_resources_returns_registered_resources(): void {
@@ -38,10 +34,12 @@ final class ResourcesHandlerTest extends TestCase {
 		$handler = new ResourcesHandler( $server );
 		$result  = $handler->list_resources();
 
-		// Use DTO getter methods
-		$resources = $result->getResources();
+		$resources = $result['resources'];
 		$this->assertNotEmpty( $resources );
-		$this->assertContainsOnlyInstancesOf( ResourceDto::class, $resources );
+		foreach ( $resources as $resource ) {
+			$this->assertIsArray( $resource );
+			$this->assertArrayHasKey( 'uri', $resource );
+		}
 	}
 
 	public function test_list_resources_returns_empty_array_when_no_resources(): void {
@@ -49,8 +47,7 @@ final class ResourcesHandlerTest extends TestCase {
 		$handler = new ResourcesHandler( $server );
 		$result  = $handler->list_resources();
 
-		// Use DTO getter methods
-		$resources = $result->getResources();
+		$resources = $result['resources'];
 		$this->assertIsArray( $resources );
 		$this->assertEmpty( $resources );
 	}
@@ -60,11 +57,10 @@ final class ResourcesHandlerTest extends TestCase {
 		$handler = new ResourcesHandler( $server );
 		$result  = $handler->read_resource( array( 'params' => array() ) );
 
-		// Missing uri is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// Missing uri is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 	}
 
 	public function test_read_resource_not_found_returns_error(): void {
@@ -78,11 +74,10 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		// Resource not found is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// Resource not found is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 	}
 
 	public function test_read_resource_with_wp_error_from_get_ability(): void {
@@ -126,11 +121,13 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( ReadResourceResult::class, $result );
-		$contents = $result->getContents();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'contents', $result );
+		$contents = $result['contents'];
 		$this->assertNotEmpty( $contents );
-		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
-		$this->assertSame( 'ok', $contents[0]->getText() );
+		$this->assertIsArray( $contents[0] );
+		$this->assertArrayHasKey( 'text', $contents[0] );
+		$this->assertSame( 'ok', $contents[0]['text'] );
 	}
 
 	public function test_read_resource_with_wp_error_from_execute(): void {
@@ -174,11 +171,10 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		// WP_Error from execute is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// WP_Error from execute is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/wp-error-resource-execute' );
@@ -225,11 +221,10 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		// Exception is a protocol error - returns JSONRPCErrorResponse
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// Exception is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/resource-execute-exception' );
@@ -253,12 +248,13 @@ final class ResourcesHandlerTest extends TestCase {
 			)
 		);
 
-		// Successful read returns ReadResourceResult DTO
-		$this->assertInstanceOf( ReadResourceResult::class, $result );
+		// Successful read returns a read-resource result array.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'contents', $result );
 
-		// Use DTO getter methods
-		$contents = $result->getContents();
+		$contents = $result['contents'];
 		$this->assertNotEmpty( $contents );
-		$this->assertInstanceOf( TextResourceContents::class, $contents[0] );
+		$this->assertIsArray( $contents[0] );
+		$this->assertArrayHasKey( 'text', $contents[0] );
 	}
 }

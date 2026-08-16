@@ -1,0 +1,3 @@
+{
+    "line": "{\"jsonrpc\":\"2.0\",\"id\":191,\"result\":{\"resultType\":\"complete\",\"content\":[{\"type\":\"text\",\"text\":\"{\\\"completed\\\":true,\\\"city\\\":\\\"Bucharest\\\",\\\"state\\\":\\\"tool:Bucharest\\\",\\\"action\\\":\\\"accept\\\"}\"}],\"structuredContent\":{\"completed\":true,\"city\":\"Bucharest\",\"state\":\"tool:Bucharest\",\"action\":\"accept\"},\"isError\":false,\"_meta\":{\"io.modelcontextprotocol/serverInfo\":{\"name\":\"Wire Baseline Server\",\"version\":\"0.0.1\"}}}}"
+}

@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":41,\"error\":{\"code\":-32602,\"message\":\"Missing required parameter: tool name\"}}"
+}

@@ -1,0 +1,5 @@
+{
+    "status": 404,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":83,\"error\":{\"code\":-32004,\"message\":\"Prompt not found: test-not-a-prompt\"}}"
+}

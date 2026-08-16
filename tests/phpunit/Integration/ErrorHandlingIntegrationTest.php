@@ -13,12 +13,11 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
 
 final class ErrorHandlingIntegrationTest extends TestCase {
 
 	public function test_error_factory_creates_consistent_errors(): void {
-		// Test that all error factory methods return DTOs with consistent structure
+		// Test that all error factory methods return error envelope arrays with consistent structure
 		$errors = array(
 			McpErrorFactory::missing_parameter( 1, 'test' ),
 			McpErrorFactory::method_not_found( 2, 'test/method' ),
@@ -35,23 +34,19 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		);
 
 		foreach ( $errors as $error ) {
-			// McpErrorFactory now returns DTOs
-			$this->assertInstanceOf( JSONRPCErrorResponse::class, $error );
-			$this->assertSame( '2.0', $error->getJsonrpc() );
-			$this->assertNotNull( $error->getId() );
-			$this->assertNotNull( $error->getError() );
-			$this->assertIsNumeric( $error->getError()->getCode() );
-			$this->assertIsString( $error->getError()->getMessage() );
-			$this->assertNotEmpty( $error->getError()->getMessage() );
-
-			// Verify toArray() produces correct structure
-			$array = $error->toArray();
-			$this->assertArrayHasKey( 'jsonrpc', $array );
-			$this->assertSame( '2.0', $array['jsonrpc'] );
-			$this->assertArrayHasKey( 'id', $array );
-			$this->assertArrayHasKey( 'error', $array );
-			$this->assertArrayHasKey( 'code', $array['error'] );
-			$this->assertArrayHasKey( 'message', $array['error'] );
+			// McpErrorFactory returns error envelope arrays
+			$this->assertIsArray( $error );
+			$this->assertArrayHasKey( 'jsonrpc', $error );
+			$this->assertSame( '2.0', $error['jsonrpc'] );
+			$this->assertArrayHasKey( 'id', $error );
+			$this->assertNotNull( $error['id'] );
+			$this->assertArrayHasKey( 'error', $error );
+			$this->assertNotNull( $error['error'] );
+			$this->assertArrayHasKey( 'code', $error['error'] );
+			$this->assertIsNumeric( $error['error']['code'] );
+			$this->assertArrayHasKey( 'message', $error['error'] );
+			$this->assertIsString( $error['error']['message'] );
+			$this->assertNotEmpty( $error['error']['message'] );
 		}
 	}
 
@@ -89,14 +84,14 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$handler = new ToolsHandler( $server );
 
 		// Test missing parameter error
-		// ToolsHandler now returns DTOs, convert to array for testing.
-		$result = $handler->call_tool( array( 'params' => array() ) )->toArray();
+		// ToolsHandler returns error envelope arrays in wire shape.
+		$result = $handler->call_tool( array( 'params' => array() ) );
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
 		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result['error']['code'] );
 
 		// Test tool not found error
-		$result = $handler->call_tool( array( 'params' => array( 'name' => 'nonexistent-tool' ) ) )->toArray();
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'nonexistent-tool' ) ) );
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertArrayHasKey( 'code', $result['error'] );
 		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $result['error']['code'] );
@@ -107,8 +102,8 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		$handler = new ToolsHandler( $server );
 
 		// This should trigger an error and log it
-		// ToolsHandler now returns DTOs, convert to array for testing.
-		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-permission-exception' ) ) )->toArray();
+		// ToolsHandler returns tool execution error arrays in wire shape.
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-permission-exception' ) ) );
 
 		// Permission exceptions are tool execution errors (isError: true)
 		$this->assertArrayHasKey( 'isError', $result );
@@ -130,15 +125,16 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		);
 		$this->assertTrue( McpErrorFactory::validate_jsonrpc_message( $valid_message ) );
 
-		// Invalid version - now returns DTO instead of array
+		// Invalid version - returns an error envelope array
 		$invalid_message = array(
 			'jsonrpc' => '1.0',
 			'method'  => 'test',
 			'id'      => 1,
 		);
 		$result          = McpErrorFactory::validate_jsonrpc_message( $invalid_message );
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertNotNull( $result->getError() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotNull( $result['error'] );
 
 		// Missing method (but has id and result - response message)
 		$response_message = array(
@@ -148,15 +144,16 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 		);
 		$this->assertTrue( McpErrorFactory::validate_jsonrpc_message( $response_message ) );
 
-		// Completely invalid - now returns DTO
+		// Completely invalid - returns an error envelope array
 		$invalid_message = array(
 			'jsonrpc' => '2.0',
 			'id'      => 1,
 			// No method, result, or error
 		);
 		$result = McpErrorFactory::validate_jsonrpc_message( $invalid_message );
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$this->assertNotNull( $result->getError() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotNull( $result['error'] );
 	}
 
 	public function test_error_codes_are_properly_defined(): void {

@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Prompts;
 
 use WP\MCP\Domain\Prompts\McpPromptBuilder;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
 
 // Test prompt class
 class TestPrompt extends McpPromptBuilder {
@@ -173,17 +172,17 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPrompt();
 		$prompt  = $builder->build();
 
-		$this->assertInstanceOf( PromptDto::class, $prompt );
-		$this->assertSame( 'test-prompt', $prompt->getName() );
-		$this->assertSame( 'Test Prompt', $prompt->getTitle() );
-		$this->assertSame( 'A test prompt for unit testing', $prompt->getDescription() );
+		$this->assertIsArray( $prompt );
+		$this->assertSame( 'test-prompt', $prompt['name'] );
+		$this->assertSame( 'Test Prompt', $prompt['title'] );
+		$this->assertSame( 'A test prompt for unit testing', $prompt['description'] );
 
-		$arguments = $prompt->getArguments();
+		$arguments = $prompt['arguments'];
 		$this->assertCount( 2, $arguments );
-		$this->assertSame( 'input', $arguments[0]->getName() );
-		$this->assertTrue( $arguments[0]->getRequired() );
-		$this->assertSame( 'optional', $arguments[1]->getName() );
-		$this->assertNull( $arguments[1]->getRequired() );
+		$this->assertSame( 'input', $arguments[0]['name'] );
+		$this->assertTrue( ( $arguments[0]['required'] ?? null ) );
+		$this->assertSame( 'optional', $arguments[1]['name'] );
+		$this->assertNull( ( $arguments[1]['required'] ?? null ) );
 	}
 
 	public function test_prompt_can_be_registered_with_server(): void {
@@ -195,7 +194,7 @@ final class McpPromptBuilderTest extends TestCase {
 
 		$prompt = $server->get_prompt( 'test-prompt' );
 		$this->assertNotNull( $prompt );
-		$this->assertSame( 'test-prompt', $prompt->getName() );
+		$this->assertSame( 'test-prompt', $prompt['name'] );
 	}
 
 	public function test_prompt_execution_bypasses_abilities(): void {
@@ -244,9 +243,9 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPromptWithIcons();
 		$prompt  = $builder->build();
 
-		$this->assertInstanceOf( PromptDto::class, $prompt );
+		$this->assertIsArray( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify icons array is present.
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -269,7 +268,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPromptWithMixedIcons();
 		$prompt  = $builder->build();
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Should have only 2 valid icons (one without src was filtered out).
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -284,7 +283,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPrompt();
 		$prompt  = $builder->build();
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify icons key is not present when builder has no icons.
 		$this->assertArrayNotHasKey( 'icons', $arr );
@@ -317,7 +316,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPromptWithMeta();
 		$prompt  = $builder->build();
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify _meta is present.
 		$this->assertArrayHasKey( '_meta', $arr );
@@ -337,7 +336,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPrompt();
 		$prompt  = $builder->build();
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		$this->assertArrayNotHasKey( '_meta', $arr );
 	}
@@ -369,7 +368,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$builder = new TestPromptWithIconsAndMeta();
 		$prompt  = $builder->build();
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 
 		// Verify icons are present.
 		$this->assertArrayHasKey( 'icons', $arr );
@@ -394,7 +393,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$prompt = $server->get_prompt( 'test-prompt-with-icons' );
 		$this->assertNotNull( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 		$this->assertArrayHasKey( 'icons', $arr );
 		$this->assertCount( 2, $arr['icons'] );
 	}
@@ -409,7 +408,7 @@ final class McpPromptBuilderTest extends TestCase {
 		$prompt = $server->get_prompt( 'test-prompt-with-meta' );
 		$this->assertNotNull( $prompt );
 
-		$arr = $prompt->toArray();
+		$arr = $prompt;
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayHasKey( 'custom_vendor', $arr['_meta'] );
 	}
@@ -427,9 +426,9 @@ final class McpPromptBuilderTest extends TestCase {
 		$prompt3 = $builder->build();
 
 		// All should have exactly 3 arguments (not accumulating).
-		$this->assertCount( 3, $prompt1->getArguments() );
-		$this->assertCount( 3, $prompt2->getArguments() );
-		$this->assertCount( 3, $prompt3->getArguments() );
+		$this->assertCount( 3, $prompt1['arguments'] );
+		$this->assertCount( 3, $prompt2['arguments'] );
+		$this->assertCount( 3, $prompt3['arguments'] );
 	}
 
 	public function test_getters_do_not_accumulate_arguments(): void {
@@ -445,7 +444,7 @@ final class McpPromptBuilderTest extends TestCase {
 
 		// Build should still have exactly 3 arguments.
 		$prompt = $builder->build();
-		$this->assertCount( 3, $prompt->getArguments() );
+		$this->assertCount( 3, $prompt['arguments'] );
 	}
 
 	public function test_mixed_getter_and_build_calls_do_not_accumulate(): void {
@@ -460,11 +459,11 @@ final class McpPromptBuilderTest extends TestCase {
 
 		// Final build should still have exactly 3 arguments.
 		$prompt = $builder->build();
-		$this->assertCount( 3, $prompt->getArguments() );
+		$this->assertCount( 3, $prompt['arguments'] );
 
 		// Verify argument names are correct (no duplicates).
-		$args      = $prompt->getArguments();
-		$arg_names = array_map( static fn( $arg ) => $arg->getName(), $args );
+		$args      = $prompt['arguments'];
+		$arg_names = array_map( static fn( $arg ) => $arg['name'], $args );
 		$this->assertSame( array( 'code', 'language', 'focus' ), $arg_names );
 	}
 

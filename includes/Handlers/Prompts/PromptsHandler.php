@@ -10,13 +10,11 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
-use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 
 /**
  * Handles prompts-related MCP methods.
@@ -66,9 +64,11 @@ class PromptsHandler {
 	/**
 	 * Handles the prompts/list request.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\ListPromptsResult Response with prompts list DTO.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with prompts list, in wire shape.
 	 */
-	public function list_prompts(): ListPromptsResult {
+	public function list_prompts( ?WireEncoderInterface $encoder = null ): array {
 		$prompts = array_values( $this->mcp->get_prompts() );
 
 		/**
@@ -78,9 +78,10 @@ class PromptsHandler {
 		 * or reorder the prompts list.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t The prompts are revision-neutral arrays instead of DTOs.
 		 *
-		 * @param array<\WP\McpSchema\Server\Prompts\DTO\Prompt> $prompts Array of Prompt DTOs.
-		 * @param \WP\MCP\Core\McpServer                         $server  The MCP server instance.
+		 * @param array<int, array<string, mixed>> $prompts Array of prompt data arrays in wire shape.
+		 * @param \WP\MCP\Core\McpServer           $server  The MCP server instance.
 		 */
 		$prompts = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp ),
@@ -89,9 +90,15 @@ class PromptsHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		return ListPromptsResult::fromArray(
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
+		return $encoder->list_prompts_result(
 			array(
-				'prompts' => $prompts,
+				'prompts' => $this->encode_components(
+					$prompts,
+					'name',
+					static fn( array $prompt, string $subject ): ?array => $encoder->try_prompt( $prompt, $subject )
+				),
 			)
 		);
 	}
@@ -99,12 +106,18 @@ class PromptsHandler {
 	/**
 	 * Handles the prompts/get request.
 	 *
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
 	 * @param array           $params Request parameters.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
+	 * @param array<string, mixed>|null $continuation Validated modern continuation data.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse Response with prompt execution results or error.
+	 * @return array<string, mixed> Prompt result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function get_prompt( array $params, $request_id = 0 ) {
+	public function get_prompt( array $params, $request_id = 0, ?WireEncoderInterface $encoder = null, ?array $continuation = null ): array {
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -122,10 +135,13 @@ class PromptsHandler {
 		$mcp_prompt = $this->mcp->get_mcp_prompt( $prompt_name );
 
 		if ( ! $mcp_prompt ) {
-			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name );
+			return McpErrorFactory::prompt_not_found( $request_id, $prompt_name, $encoder->revision() );
 		}
 
-		/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt */
+		if ( null !== $continuation && ! $mcp_prompt->supports_input_required() ) {
+			return McpErrorFactory::invalid_params( $request_id, 'This prompt does not accept continuation data' );
+		}
+
 		$prompt = $mcp_prompt->get_protocol_dto();
 
 		// Get the arguments for the prompt.
@@ -162,7 +178,7 @@ class PromptsHandler {
 				return McpErrorFactory::internal_error( $request_id, $arguments->get_error_message() );
 			}
 
-			$result = $mcp_prompt->execute( $arguments );
+			$result = $mcp_prompt->execute( $arguments, $continuation );
 
 			/**
 			 * Filters the prompt execution result before normalization.
@@ -193,7 +209,18 @@ class PromptsHandler {
 				return McpErrorFactory::internal_error( $request_id, $result->get_error_message() );
 			}
 
-			return $this->normalize_result_to_dto( $result, $prompt, $prompt_name );
+			if (
+				$mcp_prompt->supports_input_required()
+				&& McpVersionNegotiator::is_modern( $encoder->revision() )
+				&& is_array( $result )
+				&& 'input_required' === ( $result['resultType'] ?? null )
+			) {
+				return $result;
+			}
+
+			return $encoder->get_prompt_result(
+				$this->normalize_result_to_dto( $result, $prompt, $prompt_name )
+			);
 		} catch ( \Throwable $e ) {
 			$this->mcp->get_error_handler()->log(
 				'Prompt execution failed',
@@ -225,16 +252,16 @@ class PromptsHandler {
 	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result from prompt execution.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO for description fallback.
+	 * @param array<string, mixed>                  $prompt      The prompt data for description fallback.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 * @return array<string, mixed> The get-prompt result payload.
 	 */
 	private function normalize_result_to_dto(
 		array $result,
-		PromptDto $prompt,
+		array $prompt,
 		string $prompt_name
-	): GetPromptResult {
+	): array {
 		// Tier 1: Full MCP format with 'messages' array.
 		if ( isset( $result['messages'] ) && is_array( $result['messages'] ) ) {
 			return $this->normalize_tier1_messages( $result, $prompt, $prompt_name );
@@ -265,16 +292,16 @@ class PromptsHandler {
 	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result with 'messages' key.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
+	 * @param array<string, mixed>                  $prompt      The prompt data.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 * @return array<string, mixed> The get-prompt result payload.
 	 */
 	private function normalize_tier1_messages(
 		array $result,
-		PromptDto $prompt,
+		array $prompt,
 		string $prompt_name
-	): GetPromptResult {
+	): array {
 		$message_dtos = array();
 
 		foreach ( $result['messages'] as $index => $message ) {
@@ -296,23 +323,16 @@ class PromptsHandler {
 
 		// Ensure we have at least one message.
 		if ( empty( $message_dtos ) ) {
-			$message_dtos[] = PromptMessage::fromArray(
-				array(
-					'role'    => self::$default_role,
-					'content' => array(
-						'type' => 'text',
-						'text' => '(No messages returned)',
-					),
-				)
+			$message_dtos[] = array(
+				'role'    => self::$default_role,
+				'content' => array(
+					'type' => 'text',
+					'text' => '(No messages returned)',
+				),
 			);
 		}
 
-		return GetPromptResult::fromArray(
-			array(
-				'messages'    => $message_dtos,
-				'description' => $result['description'] ?? $prompt->getDescription(),
-			)
-		);
+		return $this->build_prompt_result( $message_dtos, $result['description'] ?? $prompt['description'] ?? null );
 	}
 
 	/**
@@ -323,11 +343,11 @@ class PromptsHandler {
 	 * @since 0.5.0
 	 *
 	 * @param array                                 $result Raw result with 'text' key.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO.
+	 * @param array<string, mixed>                  $prompt The prompt data.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 * @return array<string, mixed> The get-prompt result payload.
 	 */
-	private function normalize_tier2_text( array $result, PromptDto $prompt ): GetPromptResult {
+	private function normalize_tier2_text( array $result, array $prompt ): array {
 		$content = array(
 			'type' => 'text',
 			'text' => (string) $result['text'],
@@ -338,19 +358,12 @@ class PromptsHandler {
 			$content['annotations'] = $result['annotations'];
 		}
 
-		$message_dto = PromptMessage::fromArray(
-			array(
-				'role'    => self::$default_role,
-				'content' => $content,
-			)
+		$message_dto = array(
+			'role'    => self::$default_role,
+			'content' => $content,
 		);
 
-		return GetPromptResult::fromArray(
-			array(
-				'messages'    => array( $message_dto ),
-				'description' => $result['description'] ?? $prompt->getDescription(),
-			)
-		);
+		return $this->build_prompt_result( array( $message_dto ), $result['description'] ?? $prompt['description'] ?? null );
 	}
 
 	/**
@@ -359,24 +372,19 @@ class PromptsHandler {
 	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result with 'role' and 'content' keys.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
+	 * @param array<string, mixed>                  $prompt      The prompt data.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 * @return array<string, mixed> The get-prompt result payload.
 	 */
 	private function normalize_tier3_single_message(
 		array $result,
-		PromptDto $prompt,
+		array $prompt,
 		string $prompt_name
-	): GetPromptResult {
+	): array {
 		$message_dto = $this->validate_and_create_message( $result, $prompt_name );
 
-		return GetPromptResult::fromArray(
-			array(
-				'messages'    => array( $message_dto ),
-				'description' => $result['description'] ?? $prompt->getDescription(),
-			)
-		);
+		return $this->build_prompt_result( array( $message_dto ), $result['description'] ?? $prompt['description'] ?? null );
 	}
 
 	/**
@@ -387,11 +395,11 @@ class PromptsHandler {
 	 * @since 0.5.0
 	 *
 	 * @param array                                 $result Raw result with 'texts' key.
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The prompt DTO.
+	 * @param array<string, mixed>                  $prompt The prompt data.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 * @return array<string, mixed> The get-prompt result payload.
 	 */
-	private function normalize_tier4_texts( array $result, PromptDto $prompt ): GetPromptResult {
+	private function normalize_tier4_texts( array $result, array $prompt ): array {
 		$role         = $this->validate_role( $result['role'] ?? self::$default_role, '' );
 		$message_dtos = array();
 
@@ -400,36 +408,27 @@ class PromptsHandler {
 				continue;
 			}
 
-			$message_dtos[] = PromptMessage::fromArray(
-				array(
-					'role'    => $role,
-					'content' => array(
-						'type' => 'text',
-						'text' => $text,
-					),
-				)
+			$message_dtos[] = array(
+				'role'    => $role,
+				'content' => array(
+					'type' => 'text',
+					'text' => $text,
+				),
 			);
 		}
 
 		// Ensure we have at least one message.
 		if ( empty( $message_dtos ) ) {
-			$message_dtos[] = PromptMessage::fromArray(
-				array(
-					'role'    => $role,
-					'content' => array(
-						'type' => 'text',
-						'text' => '(No texts provided)',
-					),
-				)
+			$message_dtos[] = array(
+				'role'    => $role,
+				'content' => array(
+					'type' => 'text',
+					'text' => '(No texts provided)',
+				),
 			);
 		}
 
-		return GetPromptResult::fromArray(
-			array(
-				'messages'    => $message_dtos,
-				'description' => $result['description'] ?? $prompt->getDescription(),
-			)
-		);
+		return $this->build_prompt_result( $message_dtos, $result['description'] ?? $prompt['description'] ?? null );
 	}
 
 	/**
@@ -440,16 +439,16 @@ class PromptsHandler {
 	 * @since 0.5.0
 	 *
 	 * @param array                                 $result      Raw result (arbitrary structure).
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt      The prompt DTO.
+	 * @param array<string, mixed>                  $prompt      The prompt data.
 	 * @param string                                $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult
+	 * @return array<string, mixed> The get-prompt result payload.
 	 */
 	private function normalize_tier5_fallback(
 		array $result,
-		PromptDto $prompt,
+		array $prompt,
 		string $prompt_name
-	): GetPromptResult {
+	): array {
 		// Log observability event for fallback normalization.
 		$this->mcp->get_observability_handler()->record_event(
 			'prompt_result_fallback_normalization',
@@ -464,22 +463,15 @@ class PromptsHandler {
 			$json_content = '{}';
 		}
 
-		$message_dto = PromptMessage::fromArray(
-			array(
-				'role'    => self::$default_role,
-				'content' => array(
-					'type' => 'text',
-					'text' => $json_content,
-				),
-			)
+		$message_dto = array(
+			'role'    => self::$default_role,
+			'content' => array(
+				'type' => 'text',
+				'text' => $json_content,
+			),
 		);
 
-		return GetPromptResult::fromArray(
-			array(
-				'messages'    => array( $message_dto ),
-				'description' => $prompt->getDescription(),
-			)
-		);
+		return $this->build_prompt_result( array( $message_dto ), $prompt['description'] ?? null );
 	}
 
 	// =========================================================================
@@ -496,9 +488,9 @@ class PromptsHandler {
 	 * @param array  $message     Raw message array.
 	 * @param string $prompt_name Prompt name for logging.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\PromptMessage
+	 * @return array<string, mixed> The prompt message.
 	 */
-	private function validate_and_create_message( array $message, string $prompt_name ): PromptMessage {
+	private function validate_and_create_message( array $message, string $prompt_name ): array {
 		// Validate and normalize role.
 		$role = $this->validate_role( $message['role'] ?? self::$default_role, $prompt_name );
 
@@ -515,11 +507,9 @@ class PromptsHandler {
 		$content = $this->validate_content_type( $content, $prompt_name );
 		$content = $this->normalize_content_block( $content );
 
-		return PromptMessage::fromArray(
-			array(
-				'role'    => $role,
-				'content' => $content,
-			)
+		return array(
+			'role'    => $role,
+			'content' => $content,
 		);
 	}
 
@@ -539,7 +529,7 @@ class PromptsHandler {
 	 *
 	 * @param array $content Content block as the prompt returned it.
 	 *
-	 * @return array Content block safe to hand to PromptMessage::fromArray().
+	 * @return array Content block safe to hand to .
 	 */
 	private function normalize_content_block( array $content ): array {
 		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
@@ -653,5 +643,27 @@ class PromptsHandler {
 		}
 
 		return self::$default_role;
+	}
+
+	/**
+	 * Assemble a get-prompt result payload.
+	 *
+	 * The description is omitted when there is none. The protocol type rejects a
+	 * null in a typed field, so an absent description must not be present as a
+	 * key at all.
+	 *
+	 * @param array<int, array<string, mixed>> $messages    The prompt messages.
+	 * @param mixed                            $description The description, when the prompt has one.
+	 *
+	 * @return array<string, mixed> The get-prompt result payload.
+	 */
+	private function build_prompt_result( array $messages, $description ): array {
+		$payload = array( 'messages' => $messages );
+
+		if ( is_string( $description ) && '' !== $description ) {
+			$payload['description'] = $description;
+		}
+
+		return $payload;
 	}
 }

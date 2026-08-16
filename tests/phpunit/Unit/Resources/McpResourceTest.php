@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Resources;
 
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
 use WP_Error;
 
 final class McpResourceTest extends TestCase {
@@ -21,9 +20,9 @@ final class McpResourceTest extends TestCase {
 		$this->assertInstanceOf( McpResource::class, $mcp_resource );
 
 		$dto = $mcp_resource->get_protocol_dto();
-		$this->assertInstanceOf( ResourceDto::class, $dto );
+		$this->assertIsArray( $dto );
 
-		$arr = $dto->toArray();
+		$arr = $dto;
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayHasKey( 'custom_field', $arr['_meta'] );
 		$this->assertSame( 'custom_value', $arr['_meta']['custom_field'] );
@@ -79,7 +78,7 @@ final class McpResourceTest extends TestCase {
 		);
 
 		$dto = $mcp_resource->get_protocol_dto();
-		$arr = $dto->toArray();
+		$arr = $dto;
 
 		$this->assertArrayHasKey( '_meta', $arr );
 		$this->assertArrayHasKey( 'foo', $arr['_meta'] );
@@ -101,10 +100,10 @@ final class McpResourceTest extends TestCase {
 
 		$dto = $resource->get_protocol_dto();
 
-		$this->assertInstanceOf( ResourceDto::class, $dto );
-		$this->assertSame( 'WordPress://local/minimal', $dto->getUri() );
+		$this->assertIsArray( $dto );
+		$this->assertSame( 'WordPress://local/minimal', $dto['uri'] );
 		// Name defaults to URI when not provided
-		$this->assertSame( 'WordPress://local/minimal', $dto->getName() );
+		$this->assertSame( 'WordPress://local/minimal', $dto['name'] );
 	}
 
 	public function test_fromArray_with_all_options(): void {
@@ -127,14 +126,14 @@ final class McpResourceTest extends TestCase {
 		);
 
 		$dto  = $resource->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
-		$this->assertSame( 'WordPress://local/full', $dto->getUri() );
-		$this->assertSame( 'full-resource', $dto->getName() );
-		$this->assertSame( 'Full Resource', $dto->getTitle() );
-		$this->assertSame( 'A comprehensive test resource', $dto->getDescription() );
-		$this->assertSame( 'text/plain', $dto->getMimeType() );
-		$this->assertSame( 1024, $dto->getSize() );
+		$this->assertSame( 'WordPress://local/full', $dto['uri'] );
+		$this->assertSame( 'full-resource', $dto['name'] );
+		$this->assertSame( 'Full Resource', ( $dto['title'] ?? null ) );
+		$this->assertSame( 'A comprehensive test resource', ( $dto['description'] ?? null ) );
+		$this->assertSame( 'text/plain', ( $dto['mimeType'] ?? null ) );
+		$this->assertSame( 1024, ( $dto['size'] ?? null ) );
 		$this->assertArrayHasKey( 'annotations', $data );
 		$this->assertArrayHasKey( '_meta', $data );
 		$this->assertSame( '1.0', $data['_meta']['version'] );
@@ -255,22 +254,26 @@ final class McpResourceTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes Annotations::fromArray() to throw.
-		// The 'priority' field expects a float, not a string.
+	public function test_fromArray_drops_annotations_the_protocol_does_not_accept(): void {
+		// A mistyped annotation would be rejected while encoding and would cost the
+		// resource its place in resources/list, so it is dropped at registration.
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Utils\McpAnnotationMapper::sanitize' );
+
 		$result = McpResource::fromArray(
 			array(
 				'uri'         => 'WordPress://local/invalid-annotations',
 				'handler'     => static fn() => 'content',
 				'annotations' => array(
-					'priority' => 'not-a-float', // This will cause Annotations::fromArray() to throw.
+					'priority' => 'not-a-float',
+					'audience' => array( 'user' ),
 				),
 			)
 		);
 
-		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'mcp_resource_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected float', $result->get_error_message() );
+		$this->assertInstanceOf( McpResource::class, $result );
+
+		$resource = $result->get_protocol_dto();
+		$this->assertSame( array( 'audience' => array( 'user' ) ), $resource['annotations'] );
 	}
 
 	// =========================================================================

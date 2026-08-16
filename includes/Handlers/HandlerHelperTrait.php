@@ -61,4 +61,42 @@ trait HandlerHelperTrait {
 
 		return $original;
 	}
+
+	/**
+	 * Encodes each component of a list, dropping the ones that do not validate.
+	 *
+	 * One malformed component must never cost a site its whole catalog, so a
+	 * component that fails to encode is left out and the rest are returned. The
+	 * omission is logged and reported through _doing_it_wrong by the encoder.
+	 * MCP has no partial-result signal, so a client cannot be told that
+	 * something was dropped; those records are the only trace.
+	 *
+	 * @param array<int, array<string, mixed>> $components The components to encode.
+	 * @param string                           $id_key     Key holding the component identity, for logs.
+	 * @param callable                         $encode_one Encoder method for one component.
+	 *
+	 * @return array<int, array<string, mixed>> The components that encoded successfully.
+	 */
+	protected function encode_components( array $components, string $id_key, callable $encode_one ): array {
+		$encoded = array();
+
+		foreach ( $components as $component ) {
+			if ( ! is_array( $component ) ) {
+				continue;
+			}
+
+			$subject = isset( $component[ $id_key ] ) && is_scalar( $component[ $id_key ] )
+				? (string) $component[ $id_key ]
+				: '';
+
+			$wire = $encode_one( $component, $subject );
+			if ( ! is_array( $wire ) ) {
+				continue;
+			}
+
+			$encoded[] = $wire;
+		}
+
+		return $encoded;
+	}
 }

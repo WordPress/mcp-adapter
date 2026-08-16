@@ -6,7 +6,6 @@ namespace WP\MCP\Tests\Unit\Tools;
 
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 final class McpToolTest extends TestCase {
@@ -47,9 +46,9 @@ final class McpToolTest extends TestCase {
 		$this->assertNotWPError( $mcp_tool );
 
 		$dto = $mcp_tool->get_protocol_dto();
-		$this->assertInstanceOf( ToolDto::class, $dto );
+		$this->assertIsArray( $dto );
 
-		$data = $dto->toArray();
+		$data = $dto;
 
 		// User-provided _meta is preserved.
 		$this->assertArrayHasKey( '_meta', $data );
@@ -180,13 +179,13 @@ final class McpToolTest extends TestCase {
 
 		$dto = $tool->get_protocol_dto();
 
-		$this->assertInstanceOf( ToolDto::class, $dto );
-		$this->assertSame( 'minimal-tool', $dto->getName() );
-		$this->assertNull( $dto->getTitle() );
-		$this->assertNull( $dto->getDescription() );
+		$this->assertIsArray( $dto );
+		$this->assertSame( 'minimal-tool', $dto['name'] );
+		$this->assertNull( ( $dto['title'] ?? null ) );
+		$this->assertNull( ( $dto['description'] ?? null ) );
 
 		// Input schema defaults to object type
-		$input_schema = $dto->getInputSchema()->toArray();
+		$input_schema = $dto['inputSchema'];
 		$this->assertSame( 'object', $input_schema['type'] );
 	}
 
@@ -222,11 +221,11 @@ final class McpToolTest extends TestCase {
 		);
 
 		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
-		$this->assertSame( 'full-featured-tool', $dto->getName() );
-		$this->assertSame( 'Full Featured Tool', $dto->getTitle() );
-		$this->assertSame( 'A comprehensive test tool', $dto->getDescription() );
+		$this->assertSame( 'full-featured-tool', $dto['name'] );
+		$this->assertSame( 'Full Featured Tool', ( $dto['title'] ?? null ) );
+		$this->assertSame( 'A comprehensive test tool', ( $dto['description'] ?? null ) );
 
 		// Check input schema
 		$this->assertArrayHasKey( 'inputSchema', $data );
@@ -260,7 +259,7 @@ final class McpToolTest extends TestCase {
 		);
 
 		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
 		$this->assertArrayHasKey( 'annotations', $data );
 		$this->assertTrue( $data['annotations']['readOnlyHint'] );
@@ -281,7 +280,7 @@ final class McpToolTest extends TestCase {
 		);
 
 		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
 		$this->assertArrayHasKey( 'annotations', $data );
 		$this->assertTrue( $data['annotations']['destructiveHint'] );
@@ -304,7 +303,7 @@ final class McpToolTest extends TestCase {
 		);
 
 		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
 		$this->assertSame( 'Custom Annotation Title', $data['annotations']['title'] );
 		$this->assertFalse( $data['annotations']['readOnlyHint'] );
@@ -409,11 +408,11 @@ final class McpToolTest extends TestCase {
 		);
 
 		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
-		$this->assertSame( 'array-tool', $dto->getName() );
-		$this->assertSame( 'Array Tool', $dto->getTitle() );
-		$this->assertSame( 'Created from array', $dto->getDescription() );
+		$this->assertSame( 'array-tool', $dto['name'] );
+		$this->assertSame( 'Array Tool', ( $dto['title'] ?? null ) );
+		$this->assertSame( 'Created from array', ( $dto['description'] ?? null ) );
 		$this->assertTrue( $data['annotations']['readOnlyHint'] );
 
 		// Execute
@@ -453,7 +452,7 @@ final class McpToolTest extends TestCase {
 		);
 
 		$dto  = $tool->get_protocol_dto();
-		$data = $dto->toArray();
+		$data = $dto;
 
 		$this->assertArrayHasKey( '_meta', $data );
 		$this->assertSame( '1.0.0', $data['_meta']['version'] );
@@ -498,22 +497,27 @@ final class McpToolTest extends TestCase {
 		$this->assertSame( 'Permission check exploded', $result->get_error_message() );
 	}
 
-	public function test_fromArray_returns_wp_error_when_annotations_throw(): void {
-		// Pass invalid annotations data that causes ToolAnnotations::fromArray() to throw.
-		// The 'readOnlyHint' field expects a bool, not a string.
+	public function test_fromArray_drops_annotations_the_protocol_does_not_accept(): void {
+		// A mistyped annotation would be rejected while encoding and would cost the
+		// tool its place in tools/list, so it is dropped at registration instead.
+		$this->setExpectedIncorrectUsage( 'WP\MCP\Domain\Utils\McpAnnotationMapper::sanitize' );
+
 		$result = McpTool::fromArray(
 			array(
 				'name'        => 'invalid-annotations-tool',
 				'handler'     => static fn( $args ) => array( 'ok' => true ),
 				'annotations' => array(
-					'readOnlyHint' => 'not-a-boolean', // This will cause ToolAnnotations::fromArray() to throw.
+					'readOnlyHint' => 'not-a-boolean',
+					'customHint'   => true,
+					'title'        => 'Kept',
 				),
 			)
 		);
 
-		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'mcp_tool_dto_creation_failed', $result->get_error_code() );
-		$this->assertStringContainsString( 'Expected bool', $result->get_error_message() );
+		$this->assertInstanceOf( McpTool::class, $result );
+
+		$tool = $result->get_protocol_dto();
+		$this->assertSame( array( 'title' => 'Kept' ), $tool['annotations'] );
 	}
 
 	// =========================================================================

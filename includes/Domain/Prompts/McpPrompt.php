@@ -15,8 +15,6 @@ use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 use WP_Error;
 
 /**
@@ -48,7 +46,7 @@ use WP_Error;
  * $prompt = McpPrompt::fromBuilder($builder);
  * ```
  *
- * McpPrompt wraps a protocol-only PromptDto for MCP serialization. Internal
+ * McpPrompt wraps protocol-only prompt data for MCP serialization. Internal
  * adapter metadata and execution wiring live on this class and are never
  * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
  *
@@ -62,11 +60,11 @@ final class McpPrompt implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Clean Prompt DTO (protocol-only).
+	 * Clean prompt data (protocol-only, wire shape).
 	 *
-	 * @var \WP\McpSchema\Server\Prompts\DTO\Prompt
+	 * @var array<string, mixed>
 	 */
-	private PromptDto $prompt;
+	private array $prompt;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed prompts).
@@ -97,6 +95,13 @@ final class McpPrompt implements McpComponentInterface {
 	private $permission_callback = null;
 
 	/**
+	 * Whether this direct component opted into modern input-required results.
+	 *
+	 * @var bool
+	 */
+	private bool $supports_input_required = false;
+
+	/**
 	 * Internal adapter metadata (never exposed to clients).
 	 *
 	 * @var array<string, mixed>
@@ -117,9 +122,9 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The Prompt DTO.
+	 * @param array<string, mixed> $prompt The prompt data in wire shape.
 	 */
-	private function __construct( PromptDto $prompt ) {
+	private function __construct( array $prompt ) {
 		$this->prompt = $prompt;
 	}
 
@@ -170,26 +175,25 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		// Create the Prompt DTO - wrap in try-catch since PromptArgument::fromArray() and PromptDto::fromArray() can throw.
+		// Validate through the Prompt DTO, then keep only its wire-shape array. The argument
+		// mapping stays inside the try-catch so a malformed argument entry becomes a WP_Error.
 		try {
-			// Process arguments inside try-catch since PromptArgument::fromArray() can throw.
+			// Keep only the recognized argument keys; PromptDto::fromArray() hydrates the raw arrays.
 			if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
 				$prompt_data['arguments'] = array_map(
-					static function ( array $arg ): PromptArgument {
-						return PromptArgument::fromArray(
-							array(
-								'name'        => $arg['name'],
-								'title'       => $arg['title'] ?? null,
-								'description' => $arg['description'] ?? null,
-								'required'    => $arg['required'] ?? null,
-							)
+					static function ( array $arg ): array {
+						return array(
+							'name'        => $arg['name'],
+							'title'       => $arg['title'] ?? null,
+							'description' => $arg['description'] ?? null,
+							'required'    => $arg['required'] ?? null,
 						);
 					},
 					$config['arguments']
 				);
 			}
 
-			$prompt = PromptDto::fromArray( $prompt_data );
+			$prompt = $prompt_data;
 		} catch ( \Throwable $e ) {
 			return new WP_Error(
 				'mcp_prompt_dto_creation_failed',
@@ -205,14 +209,15 @@ final class McpPrompt implements McpComponentInterface {
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpPromptValidator::validate_prompt_dto( $prompt );
+			$validation_result = McpPromptValidator::validate_prompt_data( $prompt );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
 		}
 
-		$instance          = new self( $prompt );
-		$instance->handler = $config['handler'];
+		$instance                          = new self( $prompt );
+		$instance->handler                 = $config['handler'];
+		$instance->supports_input_required = true === ( $config['supports_input_required'] ?? false );
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
 			$instance->permission_callback = $config['permission'];
@@ -246,7 +251,7 @@ final class McpPrompt implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'prompt',
-			'prompt_name'    => $prompt_data['prompt']->getName(),
+			'prompt_name'    => $prompt_data['prompt']['name'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -262,6 +267,8 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return self|\WP_Error
 	 */
 	public static function fromBuilder( McpPromptBuilderInterface $builder ) {
+		// The builder returns a revision-neutral array; it is stored as-is and
+		// validated when the response is encoded.
 		try {
 			$prompt = $builder->build();
 		} catch ( \Throwable $throwable ) {
@@ -275,7 +282,7 @@ final class McpPrompt implements McpComponentInterface {
 		// Optional deep validation if enabled.
 		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
 		if ( $mcp_validation_enabled ) {
-			$validation_result = McpPromptValidator::validate_prompt_dto( $prompt );
+			$validation_result = McpPromptValidator::validate_prompt_data( $prompt );
 			if ( is_wp_error( $validation_result ) ) {
 				return $validation_result;
 			}
@@ -291,7 +298,7 @@ final class McpPrompt implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'prompt',
-			'prompt_name'    => $prompt->getName(),
+			'prompt_name'    => $prompt['name'],
 			'source'         => 'builder',
 		);
 
@@ -303,22 +310,26 @@ final class McpPrompt implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol data for MCP responses.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt
+	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Prompt data in wire shape.
 	 */
-	public function get_protocol_dto(): PromptDto {
+	public function get_protocol_dto(): array {
 		return $this->prompt;
 	}
 
 	/**
 	 * Execute the prompt.
 	 *
-	 * @param mixed $arguments Prompt arguments.
+	 * @param mixed             $arguments    Prompt arguments.
+	 * @param array<string, mixed>|null $continuation Validated continuation data for opted-in direct callbacks.
 	 *
 	 * @return mixed
 	 */
-	public function execute( $arguments ) {
+	public function execute( $arguments, ?array $continuation = null ) {
 		$args = $this->unwrap_input_if_needed( $arguments );
 		$args = is_array( $args ) ? $args : array();
 
@@ -346,7 +357,9 @@ final class McpPrompt implements McpComponentInterface {
 			}
 		} elseif ( null !== $this->handler ) {
 			try {
-				$result = call_user_func( $this->handler, $args );
+				$result = $this->supports_input_required
+					? call_user_func( $this->handler, $args, $continuation )
+					: call_user_func( $this->handler, $args );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_execution_failed',
@@ -454,6 +467,13 @@ final class McpPrompt implements McpComponentInterface {
 	 */
 	public function get_adapter_meta(): array {
 		return $this->adapter_meta;
+	}
+
+	/**
+	 * Whether this direct prompt opted into modern continuation callbacks.
+	 */
+	public function supports_input_required(): bool {
+		return $this->supports_input_required;
 	}
 
 	/**

@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":180,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"resultType\\\":\\\"input_required\\\",\\\"inputRequests\\\":{\\\"confirm\\\":{\\\"method\\\":\\\"elicitation\\\\\\/create\\\",\\\"params\\\":{\\\"mode\\\":\\\"form\\\",\\\"message\\\":\\\"Confirm this operation\\\",\\\"requestedSchema\\\":{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"confirmed\\\":{\\\"type\\\":\\\"boolean\\\"}},\\\"required\\\":[\\\"confirmed\\\"]}}}},\\\"requestState\\\":\\\"tool:Bucharest\\\"}\"}],\"structuredContent\":{\"resultType\":\"input_required\",\"inputRequests\":{\"confirm\":{\"method\":\"elicitation\\/create\",\"params\":{\"mode\":\"form\",\"message\":\"Confirm this operation\",\"requestedSchema\":{\"type\":\"object\",\"properties\":{\"confirmed\":{\"type\":\"boolean\"}},\"required\":[\"confirmed\"]}}}},\"requestState\":\"tool:Bucharest\"},\"isError\":false}}"
+}

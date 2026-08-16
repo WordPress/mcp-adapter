@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": ""
+}

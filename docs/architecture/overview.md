@@ -35,20 +35,20 @@ includes/
 │   │   ├── McpValidator.php                # Validates names, URIs, and schemas
 │   │   ├── McpAnnotationMapper.php         # Maps ability meta.annotations to MCP DTOs
 │   │   ├── SchemaTransformer.php           # Transforms JSON Schema formats
-│   │   ├── ContentBlockHelper.php          # Factory for MCP content block DTOs
+│   │   ├── ContentBlockHelper.php          # Factory for MCP content block arrays
 │   │   └── AbilityArgumentNormalizer.php   # Normalizes empty {} input to null
 │   ├── Tools/
-│   │   ├── McpTool.php                     # Wraps Tool DTO with execution logic
+│   │   ├── McpTool.php                     # Wraps protocol tool data with execution logic
 │   │   ├── RegisterAbilityAsMcpTool.php    # Converts a WordPress ability to McpTool
 │   │   └── McpToolValidator.php            # Validates tool names and schemas
 │   ├── Resources/
-│   │   ├── McpResource.php                 # Wraps Resource DTO with execution logic
+│   │   ├── McpResource.php                 # Wraps protocol resource data with execution logic
 │   │   ├── RegisterAbilityAsMcpResource.php # Converts a WordPress ability to McpResource
 │   │   └── McpResourceValidator.php        # Validates resource URIs and schemas
 │   └── Prompts/
 │       ├── Contracts/
 │       │   └── McpPromptBuilderInterface.php  # Interface for prompt message builders
-│       ├── McpPrompt.php                      # Wraps Prompt DTO with execution logic
+│       ├── McpPrompt.php                      # Wraps protocol prompt data with execution logic
 │       ├── McpPromptBuilder.php               # Builds prompt messages from ability output
 │       ├── McpPromptValidator.php             # Validates prompt names and arguments
 │       └── RegisterAbilityAsMcpPrompt.php     # Converts a WordPress ability to McpPrompt
@@ -91,6 +91,7 @@ includes/
 │       ├── HttpRequestContext.php         # Encapsulates HTTP request data
 │       ├── HttpRequestHandler.php         # Processes raw HTTP requests
 │       ├── HttpSessionValidator.php       # Validates Mcp-Session-Id header
+│       ├── JsonRpcRequestDecoder.php       # Preserves JSON object/list identity
 │       ├── JsonRpcResponseBuilder.php     # Builds JSON-RPC responses
 │       ├── McpTransportContext.php        # Bundles server + handlers for transport use
 │       ├── McpTransportHelperTrait.php    # Shared transport utilities
@@ -121,11 +122,11 @@ All DTOs extend `AbstractDataTransferObject`, which provides `toArray()` and `fr
 
 ### Adapter layer (WordPress integration)
 
-The Adapter Layer wraps each protocol DTO with execution wiring and WordPress-specific metadata. Domain models `McpTool`, `McpResource`, and `McpPrompt` each implement the `McpComponentInterface` contract:
+The Adapter Layer wraps each component's protocol data with execution wiring and WordPress-specific metadata. Domain models `McpTool`, `McpResource`, and `McpPrompt` each implement the `McpComponentInterface` contract:
 
 ```php
 interface McpComponentInterface {
-    public function get_protocol_dto(): AbstractDataTransferObject;
+    public function get_protocol_dto(): array;
     public function execute( $arguments );
     public function check_permission( $arguments );
     public function get_adapter_meta(): array;
@@ -184,14 +185,14 @@ Negotiates the MCP protocol version between client and server. If the client req
 - **Validation**: Ensures transport classes implement `McpTransportInterface`
 
 ### RequestRouter
-- **Purpose**: Routes MCP method calls to handlers that return schema DTOs
-- **DTO serialization boundary**: Converts `AbstractDataTransferObject` results to arrays via `toArray()` and `JSONRPCErrorResponse` results to error arrays
+- **Purpose**: Routes MCP method calls to handlers that return revision-neutral arrays in wire shape
+- **Outcome split**: A result carrying a top-level `error` key is a JSON-RPC error envelope; the router forwards only its `error` object as `['error' => ...]`. Everything else is a success result and passes through unchanged
 - **Observability**: Extracts per-component context from `McpComponentInterface::get_observability_context()` for request tagging
 
 ## Request flow
 
 ```
-AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Schema DTO --> Response
+AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface --> Wire-shape array --> Response
 ```
 
 ### Detailed flow
@@ -199,26 +200,26 @@ AI Agent --> Transport --> RequestRouter --> Handler --> McpComponentInterface -
 2. **RequestRouter** maps method to appropriate handler
 3. **Handler** finds the `McpComponentInterface` component, validates input, and invokes execution
 4. **Component** delegates to a WordPress ability or direct callable, returning a result
-5. **Handler** wraps the result in a schema DTO (e.g., `CallToolResult`)
-6. **RequestRouter** calls `toArray()` on the DTO at the serialization boundary
+5. **Handler** serializes the result into a wire-shape array (the schema DTOs still validate and serialize internally until the dependency swap)
+6. **RequestRouter** forwards the array, splitting error envelopes from success results
 7. **Transport** wraps the array in a JSON-RPC envelope and returns it
 
 ### Method routing
 
-The `RequestRouter` maps MCP methods to handlers. All handlers return schema DTOs:
+The `RequestRouter` maps MCP methods to handlers. All handlers return revision-neutral arrays in wire shape:
 
-| Method | Handler | Return Type |
-|--------|---------|-------------|
-| `initialize` | `InitializeHandler::handle()` | `InitializeResult` |
-| `tools/list` | `ToolsHandler::list_tools()` | `ListToolsResult` |
-| `tools/call` | `ToolsHandler::call_tool()` | `CallToolResult` or `JSONRPCErrorResponse` |
-| `resources/list` | `ResourcesHandler::list_resources()` | `ListResourcesResult` |
-| `resources/read` | `ResourcesHandler::read_resource()` | `ReadResourceResult` or `JSONRPCErrorResponse` |
-| `prompts/list` | `PromptsHandler::list_prompts()` | `ListPromptsResult` |
-| `prompts/get` | `PromptsHandler::get_prompt()` | `GetPromptResult` or `JSONRPCErrorResponse` |
-| `ping` | `SystemHandler::ping()` | `Result` |
+| Method | Handler | Return Shape |
+|--------|---------|--------------|
+| `initialize` | `InitializeHandler::handle()` | Initialize result |
+| `tools/list` | `ToolsHandler::list_tools()` | Tools list result |
+| `tools/call` | `ToolsHandler::call_tool()` | Tool-call result or JSON-RPC error envelope |
+| `resources/list` | `ResourcesHandler::list_resources()` | Resources list result |
+| `resources/read` | `ResourcesHandler::read_resource()` | Read-resource result or JSON-RPC error envelope |
+| `prompts/list` | `PromptsHandler::list_prompts()` | Prompts list result |
+| `prompts/get` | `PromptsHandler::get_prompt()` | Prompt result or JSON-RPC error envelope |
+| `ping` | `SystemHandler::ping()` | Empty result |
 
-Protocol-level errors (tool not found, missing parameters) return `JSONRPCErrorResponse`. Execution-level errors (permission denied, runtime failure) return the appropriate result DTO with `isError: true`.
+Protocol-level errors (tool not found, missing parameters) return a JSON-RPC error envelope array. Execution-level errors (permission denied, runtime failure) return the appropriate result array with `isError: true`.
 
 ## Component creation
 
@@ -253,16 +254,15 @@ $tool = McpTool::fromArray( [
 ] );
 ```
 
-### Protocol DTO access
+### Protocol data access
 
-Each component exposes its clean protocol DTO for serialization:
+Each component exposes its clean protocol data for serialization:
 
 ```php
-$dto = $tool->get_protocol_dto();  // Returns WP\McpSchema\Server\Tools\DTO\Tool
-$array = $dto->toArray();          // Protocol-safe array for JSON responses
+$tool_data = $tool->get_protocol_dto();  // Returns array<string, mixed> in wire shape
 ```
 
-The DTO contains only MCP specification fields. Adapter metadata (ability reference, schema transformation flags) lives on the `McpTool` instance and is never serialized.
+The array contains only MCP specification fields. Adapter metadata (ability reference, schema transformation flags) lives on the `McpTool` instance and is never serialized.
 
 ## Utility classes
 
@@ -283,18 +283,18 @@ $name = McpNameSanitizer::sanitize_name( 'my-plugin/action-name' );
 
 ### ContentBlockHelper
 
-Factory for creating typed content block DTOs used in tool call results, prompt messages, and resource contents.
+Factory for creating content block arrays used in tool call results, prompt messages, and resource contents. Each method builds the matching schema DTO internally, so DTO validation still runs, and returns its array form.
 
 | Method | Returns | Purpose |
 |--------|---------|---------|
-| `text( $text )` | `TextContent` | Plain text content |
-| `json_text( $data, $flags )` | `TextContent` | JSON-encoded data as text (flags: `JSON_*` constants) |
-| `image( $data, $mime_type )` | `ImageContent` | Base64-encoded image |
-| `audio( $data, $mime_type )` | `AudioContent` | Base64-encoded audio |
-| `embedded_text_resource( $uri, $text )` | `EmbeddedResource` | Text resource embedded in content |
-| `embedded_blob_resource( $uri, $blob )` | `EmbeddedResource` | Binary resource embedded in content |
-| `error_text( $message )` | `TextContent` | Semantic alias for error messages |
-| `to_array_list( $blocks )` | `array[]` | Converts content block DTOs to arrays |
+| `text( $text )` | `array` | Plain text content |
+| `json_text( $data, $flags )` | `array` | JSON-encoded data as text (flags: `JSON_*` constants) |
+| `image( $data, $mime_type )` | `array` | Base64-encoded image |
+| `audio( $data, $mime_type )` | `array` | Base64-encoded audio |
+| `embedded_text_resource( $uri, $text )` | `array` | Text resource embedded in content |
+| `embedded_blob_resource( $uri, $blob )` | `array` | Binary resource embedded in content |
+| `error_text( $message )` | `array` | Semantic alias for error messages |
+| `to_array_list( $blocks )` | `array[]` | Returns content blocks in array form |
 
 ### AbilityArgumentNormalizer
 
@@ -348,24 +348,24 @@ interface McpRestTransportInterface extends McpTransportInterface {
 
 Transports and the `RequestRouter` receive all dependencies through `McpTransportContext`, which bundles the server instance, all handlers, the router, error handler, and observability handler.
 
-### DTO-aware RequestRouter
+### Array-consuming RequestRouter
 
-The `RequestRouter` is the serialization boundary between typed DTOs and transport-level arrays:
+The `RequestRouter` consumes wire-shape arrays from handlers and splits outcomes for the transport:
 
-1. It dispatches to the appropriate handler, which returns an `AbstractDataTransferObject` or `JSONRPCErrorResponse`.
-2. For success DTOs, it calls `toArray()` and returns the resulting array.
-3. For error DTOs, it extracts the error object and returns `['error' => ...]`.
+1. It dispatches to the appropriate handler, which returns a revision-neutral array — a result in wire shape or a JSON-RPC error envelope.
+2. For error envelopes (identified by their top-level `error` key), it forwards only the error object as `['error' => ...]`.
+3. For success results, it forwards the array unchanged.
 4. The transport wraps the array in the JSON-RPC 2.0 envelope.
 
 ## Error handling
 
 ### Two-part system
 
-1. **Error Response Creation**: `McpErrorFactory` creates `JSONRPCErrorResponse` DTOs for protocol errors
+1. **Error Response Creation**: `McpErrorFactory` creates JSON-RPC error envelope arrays for protocol errors
 2. **Error Logging**: `McpErrorHandlerInterface` implementations log errors for monitoring
 
 ```php
-// Protocol error DTO (returned to clients via JSON-RPC)
+// Protocol error envelope array (returned to clients via JSON-RPC)
 $error_response = McpErrorFactory::tool_not_found( $request_id, $tool_name );
 
 // Error logging (for monitoring)
@@ -422,12 +422,24 @@ class MyTransport implements McpRestTransportInterface {
     }
 
     public function handle_request( WP_REST_Request $request ): WP_REST_Response {
-        $body   = $request->get_json_params();
+        try {
+            $request_identity = JsonRpcRequestDecoder::decode( (string) $request->get_body() );
+        } catch ( JsonException $exception ) {
+            return new WP_REST_Response( ['error' => 'Invalid JSON'], 400 );
+        }
+
+        if ( ! $request_identity instanceof stdClass ) {
+            return new WP_REST_Response( ['error' => 'MCP request object required'], 400 );
+        }
+
+        $body   = JsonRpcRequestDecoder::to_associative( $request_identity );
         $result = $this->context->request_router->route_request(
             $body['method'],
             $body['params'] ?? [],
             $body['id'] ?? 0,
-            'my-transport'
+            'my-transport',
+            null,
+            $request_identity
         );
 
         return new WP_REST_Response( $result );
@@ -466,7 +478,7 @@ class MyObservabilityHandler implements McpObservabilityHandlerInterface {
 
 ## Design principles
 
-- **Two-layer DTO separation**: Protocol DTOs from `php-mcp-schema` carry no adapter-internal fields; `get_protocol_dto()->toArray()` always produces spec-compliant output
+- **Two-layer separation**: Protocol data validated through `php-mcp-schema` carries no adapter-internal fields; `get_protocol_dto()` always returns spec-compliant wire-shape arrays
 - **Dependency injection**: All transports receive dependencies through `McpTransportContext`; no global state beyond the `McpAdapter` singleton
 - **Interface-based design**: Error handlers, observability, and transports are all swappable via interfaces
 - **Event emission over counters**: Observability emits events; external systems handle aggregation — zero overhead when disabled

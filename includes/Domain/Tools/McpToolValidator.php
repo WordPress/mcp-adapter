@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 /**
@@ -69,81 +68,7 @@ class McpToolValidator {
 	 * @return bool|\WP_Error True if valid, WP_Error if validation fails.
 	 */
 	public static function validate_tool_instance( McpTool $tool, string $context = '' ) {
-		return self::validate_tool_data( $tool->get_protocol_dto()->toArray(), $context );
-	}
-
-	/**
-	 * Validate a Tool DTO against the MCP schema.
-	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The tool DTO to validate.
-	 *
-	 * @return bool|\WP_Error True if valid, WP_Error otherwise.
-	 */
-	public static function validate_tool_dto( ToolDto $tool ) {
-		$errors = array();
-
-		// Validate name (required, 1-128 chars, alphanumeric + _.-).
-		if ( ! McpValidator::validate_name( $tool->getName() ) ) {
-			$errors[] = __( 'Tool name must be 1-128 characters and contain only [A-Za-z0-9_.-]', 'mcp-adapter' );
-		}
-
-		// Validate icons if present.
-		$icons = $tool->getIcons();
-		if ( ! empty( $icons ) ) {
-			// Convert DTO icons to arrays for validation.
-			$icons_array  = array_map( static fn( $icon ) => $icon->toArray(), $icons );
-			$icons_result = McpValidator::validate_icons_array( $icons_array );
-			$icons_errors = self::format_icon_validation_errors( $icons_result );
-			$errors       = array_merge( $errors, $icons_errors );
-		}
-
-		// Validate annotations if present (tool-specific only).
-		$annotations = $tool->getAnnotations();
-		if ( $annotations ) {
-			$annotations_array = $annotations->toArray();
-			$annotation_errors = self::get_tool_annotation_validation_errors( $annotations_array );
-			$errors            = array_merge( $errors, $annotation_errors );
-		}
-
-		// Validate execution if present.
-		$execution = $tool->getExecution();
-		if ( $execution ) {
-			$execution_array  = $execution->toArray();
-			$execution_errors = self::get_execution_validation_errors( $execution_array );
-			$errors           = array_merge( $errors, $execution_errors );
-		}
-
-		// Validate schemas (inputSchema and outputSchema).
-		$tool_array = $tool->toArray();
-
-		// Validate inputSchema (required field).
-		$input_schema_errors = self::get_schema_validation_errors(
-			$tool_array['inputSchema'] ?? null,
-			'inputSchema'
-		);
-		$errors              = array_merge( $errors, $input_schema_errors );
-
-		// Validate outputSchema if present (optional field).
-		if ( isset( $tool_array['outputSchema'] ) ) {
-			$output_schema_errors = self::get_schema_validation_errors(
-				$tool_array['outputSchema'],
-				'outputSchema'
-			);
-			$errors               = array_merge( $errors, $output_schema_errors );
-		}
-
-		if ( ! empty( $errors ) ) {
-			return new WP_Error(
-				'mcp_tool_validation_failed',
-				sprintf(
-				/* translators: %s: list of validation errors */
-					__( 'Tool validation failed: %s', 'mcp-adapter' ),
-					implode( '; ', $errors )
-				)
-			);
-		}
-
-		return true;
+		return self::validate_tool_data( $tool->get_protocol_dto(), $context );
 	}
 
 	/**
@@ -265,8 +190,8 @@ class McpToolValidator {
 			);
 		}
 
-		// Normalize stdClass properties (e.g. an empty `{}` emitted by the schema DTO for
-		// parameter-less tools) to an array so the structural checks below treat it as a valid object.
+		// Inspect author-provided or decoded JSON Schema objects as arrays without
+		// changing the identity retained for protocol serialization.
 		if ( isset( $schema['properties'] ) && $schema['properties'] instanceof \stdClass ) {
 			$schema['properties'] = (array) $schema['properties'];
 		}

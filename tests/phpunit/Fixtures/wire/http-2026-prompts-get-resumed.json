@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":171,\"result\":{\"resultType\":\"complete\",\"messages\":[{\"role\":\"assistant\",\"content\":{\"type\":\"text\",\"text\":\"Prompt resumed with accept\"}}],\"description\":\"A direct prompt that requires confirmation.\",\"_meta\":{\"io.modelcontextprotocol\\/serverInfo\":{\"name\":\"Wire Baseline Server\",\"version\":\"0.0.1\"}}}}"
+}

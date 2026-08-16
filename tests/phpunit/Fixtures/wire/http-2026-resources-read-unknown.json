@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": null,
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":123,\"error\":{\"code\":-32602,\"message\":\"Resource not found: WordPress:\\/\\/local\\/does-not-exist\"}}"
+}

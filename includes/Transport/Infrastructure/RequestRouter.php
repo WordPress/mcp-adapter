@@ -9,12 +9,13 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpProtocolContext;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
-use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
+use WP\MCP\Infrastructure\Protocol\ContinuationManager;
+use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
+use WP\MCP\Infrastructure\Protocol\WireEncoder;
 
 /**
  * Service for routing MCP requests to appropriate handlers.
@@ -31,6 +32,9 @@ class RequestRouter {
 	 */
 	private McpTransportContext $context;
 
+	/** @var \WP\MCP\Infrastructure\Protocol\ContinuationManager */
+	private ContinuationManager $continuation_manager;
+
 	/**
 	 * Initialize the request router.
 	 *
@@ -39,116 +43,185 @@ class RequestRouter {
 	public function __construct(
 		McpTransportContext $context
 	) {
-		$this->context = $context;
+		$this->context              = $context;
+		$this->continuation_manager = new ContinuationManager( $context->mcp_server->get_server_id() );
 	}
 
 	/**
 	 * Route a request to the appropriate handler.
+	 *
+	 * @since n.e.x.t Adds identity-preserving request input and out-of-band session output.
 	 *
 	 * @param string $method The MCP method name.
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID (for JSON-RPC) - string, number, or null.
 	 * @param string $transport_name Transport name for observability.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @param \stdClass|null $request_identity Identity-preserving JSON-RPC request object.
+	 * @param string|null $new_session_id Newly created session id, if any.
+	 * @param \WP\MCP\Core\McpProtocolContext|null $protocol_context Already-resolved request revision. Defaults to legacy for custom transports.
 	 *
 	 * @return array
 	 */
-	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null ): array {
+	public function route_request( string $method, array $params, $request_id = 0, string $transport_name = 'unknown', ?HttpRequestContext $http_context = null, ?\stdClass $request_identity = null, ?string &$new_session_id = null, ?McpProtocolContext $protocol_context = null ): array {
 		// Track request start time.
 		$start_time = microtime( true );
 
-		$new_session_id = null;
-		$component_tags = $this->resolve_component_observability_context( $method, $params );
+		$new_session_id   = null;
+		$protocol_context = $protocol_context ?? McpProtocolContext::for_revision( McpVersionNegotiator::LEGACY_PROTOCOL_VERSION );
+		$wire_encoder     = $this->context->mcp_server->get_wire_encoder_for_revision( $protocol_context->revision() );
+		$is_modern        = McpVersionNegotiator::is_modern( $protocol_context->revision() );
+		$component_tags   = $this->resolve_component_observability_context( $method, $params );
+		$continuation     = null;
 
 		// Common tags for all metrics.
 		$common_tags = array(
-			'method'     => $method,
-			'transport'  => $transport_name,
-			'server_id'  => $this->context->mcp_server->get_server_id(),
-			'params'     => $this->sanitize_params_for_logging( $params ),
-			'request_id' => $request_id,
-			'session_id' => $http_context ? $http_context->session_id : null,
-		);
-
-		$handlers = array(
-			'initialize'               => function () use ( $params, $request_id, $http_context, &$new_session_id ) {
-				return $this->handle_initialize_with_session( $params, $request_id, $http_context, $new_session_id );
-			},
-			'ping'                     => fn() => $this->context->system_handler->ping(),
-			'tools/list'               => fn() => $this->context->tools_handler->list_tools(),
-			'tools/list/all'           => fn() => $this->context->tools_handler->list_all_tools(),
-			'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id ),
-			'resources/list'           => fn() => $this->context->resources_handler->list_resources(),
-			'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates(),
-			'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id ),
-			'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts(),
-			'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id ),
+			'method'           => $method,
+			'transport'        => $transport_name,
+			'server_id'        => $this->context->mcp_server->get_server_id(),
+			'params'           => $this->sanitize_params_for_logging( $params ),
+			'request_id'       => $request_id,
+			'session_id'       => ! $is_modern && $http_context ? $http_context->session_id : null,
+			'protocol_version' => $protocol_context->revision(),
 		);
 
 		try {
-			$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			$handler_result = null;
+			if ( $wire_encoder instanceof V20260728WireEncoder ) {
+				try {
+					$wire_encoder->validate_request_metadata( $params );
+				} catch ( \WP\McpSchema\Runtime\ValidationException $exception ) {
+					$invalid_params = McpErrorFactory::invalid_params( $request_id, $exception->getMessage() );
+					$handler_result = array( 'error' => $invalid_params['error'] );
+				}
+
+				if ( null === $handler_result && $this->continuation_manager->has_continuation_fields( $params ) ) {
+					if ( ! $this->continuation_manager->supports_method( $method ) ) {
+						$invalid_params = McpErrorFactory::invalid_params( $request_id, 'This method does not accept continuation data' );
+						$handler_result = array( 'error' => $invalid_params['error'] );
+					} else {
+						try {
+							$validated_params = $wire_encoder->continuation_request_params( $method, $params );
+							$continuation     = $this->continuation_manager->resume( $method, $validated_params, $request_identity );
+						} catch ( \WP\McpSchema\Runtime\ValidationException | \InvalidArgumentException $exception ) {
+							$invalid_params = McpErrorFactory::invalid_params( $request_id, $exception->getMessage() );
+							$handler_result = array( 'error' => $invalid_params['error'] );
+						}
+					}
+				}
+			} elseif ( $this->continuation_manager->has_continuation_fields( $params ) ) {
+				$invalid_params = McpErrorFactory::invalid_params( $request_id, 'Continuation data requires MCP 2026-07-28' );
+				$handler_result = array( 'error' => $invalid_params['error'] );
+			}
+
+			$handlers = array(
+				'tools/list'               => fn() => $this->context->tools_handler->list_tools( $wire_encoder ),
+				'tools/call'               => fn() => $this->context->tools_handler->call_tool( $params, $request_id, $request_identity, $wire_encoder, $continuation ),
+				'resources/list'           => fn() => $this->context->resources_handler->list_resources( $wire_encoder ),
+				'resources/templates/list' => fn() => $this->context->resources_handler->list_resource_templates( $wire_encoder ),
+				'resources/read'           => fn() => $this->context->resources_handler->read_resource( $params, $request_id, $wire_encoder, $continuation ),
+				'prompts/list'             => fn() => $this->context->prompts_handler->list_prompts( $wire_encoder ),
+				'prompts/get'              => fn() => $this->context->prompts_handler->get_prompt( $params, $request_id, $wire_encoder, $continuation ),
+			);
+
+			if ( $wire_encoder instanceof WireEncoder ) {
+				$handlers['initialize']     = function () use ( $params, $request_id, $http_context, $wire_encoder, &$new_session_id ) {
+					return $this->handle_initialize_with_session( $params, $request_id, $http_context, $wire_encoder, $new_session_id );
+				};
+				$handlers['ping']           = fn() => $this->context->system_handler->ping();
+				$handlers['tools/list/all'] = fn() => $this->context->tools_handler->list_all_tools( $wire_encoder );
+			} elseif ( $wire_encoder instanceof V20260728WireEncoder ) {
+				$handlers['server/discover'] = fn() => $this->context->initialize_handler->discover( $wire_encoder );
+			} else {
+				throw new \LogicException( 'Resolved MCP revision has no matching request encoder.' );
+			}
+
+			if ( null === $handler_result ) {
+				$handler_result = isset( $handlers[ $method ] ) ? $handlers[ $method ]() : $this->create_method_not_found_error( $method, $request_id );
+			}
+
+			if ( ! isset( $handler_result['error'] ) && 'input_required' === ( $handler_result['resultType'] ?? null ) ) {
+				if ( ! $wire_encoder instanceof V20260728WireEncoder ) {
+					$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Input-required results require MCP 2026-07-28' );
+					$handler_result   = array( 'error' => $unexpected_error['error'] );
+				} else {
+					try {
+						$input_requests = $handler_result['inputRequests'] ?? array();
+						if ( ! is_array( $input_requests ) ) {
+							throw new \InvalidArgumentException( 'inputRequests must be an object-shaped array.' );
+						}
+
+						$meta                 = isset( $params['_meta'] ) && is_array( $params['_meta'] ) ? $params['_meta'] : array();
+						$client_capabilities  = isset( $meta['io.modelcontextprotocol/clientCapabilities'] ) && is_array( $meta['io.modelcontextprotocol/clientCapabilities'] )
+							? $meta['io.modelcontextprotocol/clientCapabilities']
+							: array();
+						$missing_capabilities = $this->continuation_manager->missing_capabilities( $input_requests, $client_capabilities );
+
+						if ( ! empty( $missing_capabilities ) ) {
+							$capability_error = $wire_encoder->missing_required_client_capability_error( $request_id, $missing_capabilities );
+							$handler_result   = array( 'error' => $capability_error['error'] );
+						} else {
+							$prepared_result = $this->continuation_manager->prepare_result( $method, $params, $request_identity, $handler_result );
+							$handler_result  = $wire_encoder->input_required_result( $prepared_result );
+						}
+					} catch ( \WP\McpSchema\Runtime\ValidationException | \InvalidArgumentException $exception ) {
+						$this->context->error_handler->log(
+							'Invalid MCP input-required result returned by a component.',
+							array(
+								'method'   => $method,
+								'revision' => $protocol_context->revision(),
+								'error'    => $exception->getMessage(),
+							)
+						);
+
+						$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Invalid input-required result' );
+						$handler_result   = array( 'error' => $unexpected_error['error'] );
+					}
+				}
+			}
 
 			// Calculate request duration.
 			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
 
-			// Handle DTO results from migrated handlers.
-			// DTOs are converted to arrays at the serialization boundary (here).
-			if ( $handler_result instanceof JSONRPCErrorResponse ) {
+			// Handlers return revision-neutral arrays in wire shape: either a
+			// result or a JSON-RPC error envelope carrying an `error` key. No
+			// wire-shape result type has a top-level `error` key, so its
+			// presence identifies the error outcome. A handler that violates
+			// its `array` return type raises a TypeError handled by the catch
+			// below.
+			if ( isset( $handler_result['error'] ) ) {
 				// Normalize to transport-level shape: only the JSON-RPC error object.
 				// The JSON-RPC envelope is created by the transport boundary.
-				$result                 = array( 'error' => $handler_result->getError()->toArray() );
+				$error                  = is_array( $handler_result['error'] ) ? $handler_result['error'] : array();
+				$result                 = array( 'error' => $handler_result['error'] );
 				$tags                   = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-				$tags['error_code']     = $handler_result->getError()->getCode();
-				$tags['failure_reason'] = $handler_result->getError()->getMessage();
+				$tags['error_code']     = $error['code'] ?? null;
+				$tags['failure_reason'] = $error['message'] ?? null;
 				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 				return $result;
 			}
 
-			if ( $handler_result instanceof AbstractDataTransferObject ) {
-				// Success DTO (ListToolsResult, CallToolResult, etc.) - convert to array.
-				// Note: If a future schema version ever returns nested DTO objects inside `toArray()`,
-				// we may need to add a deep normalizer at this boundary (before JSON serialization)
-				// to prevent placeholder `{}` objects in client output.
-				$raw_result = $handler_result->toArray();
-				$result     = $raw_result;
+			// Success result already in wire shape.
+			$result = $handler_result;
 
-				if ( null !== $new_session_id ) {
-					$component_tags['new_session_id'] = $new_session_id;
-					$result['_session_id']            = $new_session_id;
-				}
+			if ( null !== $new_session_id ) {
+				$component_tags['new_session_id'] = $new_session_id;
+			}
 
-				$status = 'success';
-				if ( $handler_result instanceof CallToolResult && true === $handler_result->getIsError() ) {
-					$status = 'error';
+			$status = 'success';
+			if ( true === ( $handler_result['isError'] ?? null ) ) {
+				$status = 'error';
 
-					if ( ! isset( $component_tags['failure_reason'] ) ) {
-						$content = $handler_result->getContent();
-						if ( isset( $content[0] ) && $content[0] instanceof TextContent ) {
-							$component_tags['failure_reason'] = $content[0]->getText();
-						}
+				if ( ! isset( $component_tags['failure_reason'] ) ) {
+					$content = $handler_result['content'] ?? null;
+					if ( is_array( $content ) && isset( $content[0] ) && is_array( $content[0] ) && 'text' === ( $content[0]['type'] ?? null ) && isset( $content[0]['text'] ) ) {
+						$component_tags['failure_reason'] = $content[0]['text'];
 					}
 				}
-
-				$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
-				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
-
-				return $result;
 			}
 
-			// Handlers should only return schema DTOs.
-			$actual_type = is_object( $handler_result ) ? get_class( $handler_result ) : gettype( $handler_result );
-			$this->context->error_handler->log(
-				sprintf( 'Handler for method "%s" returned unexpected type: %s', $method, $actual_type ),
-				array(
-					'method'      => $method,
-					'actual_type' => $actual_type,
-				)
-			);
-			$unexpected_error   = McpErrorFactory::internal_error( $request_id, 'Handler returned invalid response type.' );
-			$result             = array( 'error' => $unexpected_error->getError()->toArray() );
-			$tags               = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-			$tags['error_code'] = $unexpected_error->getError()->getCode();
+			$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
 			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
 
 			return $result;
@@ -171,7 +244,7 @@ class RequestRouter {
 			// Create error response from exception.
 			$unexpected_error = McpErrorFactory::internal_error( $request_id, 'Handler error occurred' );
 
-			return array( 'error' => $unexpected_error->getError()->toArray() );
+			return array( 'error' => $unexpected_error['error'] );
 		}
 	}
 
@@ -306,26 +379,30 @@ class RequestRouter {
 	/**
 	 * Handle initialize requests with session management.
 	 *
-	 * Converts InitializeResult DTO to array and adds session management.
+	 * Adds session management around the initialize result array.
 	 *
 	 * @param array $params The request parameters.
 	 * @param mixed $request_id The request ID.
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext|null $http_context HTTP context for session management.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoder $encoder Legacy request encoder.
 	 * @param string|null $new_session_id Newly created session id, if any.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject
+	 * @return array<string, mixed> Initialize result or JSON-RPC error envelope, in wire shape.
 	 */
-	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, ?string &$new_session_id = null ): AbstractDataTransferObject {
+	private function handle_initialize_with_session( array $params, $request_id, ?HttpRequestContext $http_context, WireEncoder $encoder, ?string &$new_session_id = null ): array {
 		// Extract client protocol version from params, defaulting to empty string if missing.
 		$client_version = isset( $params['protocolVersion'] ) && is_string( $params['protocolVersion'] ) ? $params['protocolVersion'] : '';
 
-		// Get the initialize response from the handler (returns InitializeResult DTO).
-		$init_result = $this->context->initialize_handler->handle( $client_version );
+		// Get the initialize response from the handler (wire-shape array).
+		$init_result = $this->context->initialize_handler->handle( $client_version, $encoder );
 
 		// Handle session creation if HTTP context is provided.
-		// InitializeResult DTO never has errors - errors would be thrown as exceptions.
+		// The initialize result never carries errors - errors would be thrown as exceptions.
 		if ( $http_context && ! $http_context->session_id ) {
-			$session_result = HttpSessionValidator::create_session_with_error_handler( $params, $this->context->error_handler );
+			$negotiated_version = isset( $init_result['protocolVersion'] ) && is_string( $init_result['protocolVersion'] )
+				? $init_result['protocolVersion']
+				: McpVersionNegotiator::LEGACY_PROTOCOL_VERSION;
+			$session_result     = HttpSessionValidator::create_session_with_error_handler( $params, $this->context->error_handler, $negotiated_version );
 
 			if ( is_array( $session_result ) ) {
 				$error = $session_result['error'] ?? array();
@@ -350,9 +427,9 @@ class RequestRouter {
 	 * @param string $method The method that was not found.
 	 * @param mixed $request_id The request ID.
 	 *
-	 * @return \WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed> JSON-RPC error envelope in wire shape.
 	 */
-	private function create_method_not_found_error( string $method, $request_id ): JSONRPCErrorResponse {
+	private function create_method_not_found_error( string $method, $request_id ): array {
 		return McpErrorFactory::method_not_found( $request_id, $method );
 	}
 

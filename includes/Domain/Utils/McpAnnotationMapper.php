@@ -36,6 +36,14 @@ class McpAnnotationMapper {
 	 *
 	 * @var array<string, array{type: string, features: array<string>, ability_property: string|null}>
 	 */
+	/**
+	 * Audience roles the protocol allows.
+	 *
+	 * @var array<int, string>
+	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
+	public const ALLOWED_AUDIENCE_ROLES = array( 'user', 'assistant' );
+
 	private static array $mcp_annotations = array(
 		// Shared annotations - Resources only (NOT Tools or Prompt templates per MCP spec).
 		// ToolAnnotations is a separate type that does not include these fields.
@@ -113,7 +121,7 @@ class McpAnnotationMapper {
 				continue;
 			}
 
-			$normalized = self::normalize_annotation_value( $config['type'], $value );
+			$normalized = self::normalize_annotation_value( $config['type'], $value, $mcp_field );
 			if ( null === $normalized ) {
 				continue;
 			}
@@ -151,10 +159,15 @@ class McpAnnotationMapper {
 	 *
 	 * @param string $field_type Expected MCP type (boolean, string, array, number).
 	 * @param mixed $value Raw annotation value.
+	 * @param string $mcp_field The MCP field name, when a field needs its own rule.
 	 *
 	 * @return mixed|null Normalized value or null if invalid.
 	 */
-	private static function normalize_annotation_value( string $field_type, $value ) {
+	private static function normalize_annotation_value( string $field_type, $value, string $mcp_field = '' ) {
+		if ( 'audience' === $mcp_field ) {
+			return self::normalize_audience( $value );
+		}
+
 		switch ( $field_type ) {
 			case 'boolean':
 				return self::normalize_boolean( $value );
@@ -228,5 +241,92 @@ class McpAnnotationMapper {
 
 		// All other types (arrays, objects, floats, null) are invalid.
 		return null;
+	}
+
+	/**
+	 * Normalize the audience annotation to the roles the protocol defines.
+	 *
+	 * The schema only accepts 'user' and 'assistant'. Anything else is dropped
+	 * rather than passed on, because an unknown role would be rejected during
+	 * encoding and would cost the whole component its place in the response.
+	 *
+	 * @param mixed $value Raw audience value.
+	 *
+	 * @return array<int, string>|null Filtered roles, or null when nothing usable remains.
+	 */
+	private static function normalize_audience( $value ): ?array {
+		if ( ! is_array( $value ) ) {
+			return null;
+		}
+
+		$roles = array();
+		foreach ( $value as $role ) {
+			if ( ! in_array( $role, self::ALLOWED_AUDIENCE_ROLES, true ) ) {
+				continue;
+			}
+
+			$roles[] = $role;
+		}
+
+		return empty( $roles ) ? null : $roles;
+	}
+
+	/**
+	 * Drop annotation keys the protocol does not define for a feature type.
+	 *
+	 * Annotations are the one field the adapter passes through wholesale from
+	 * caller-supplied configuration. An unknown or mistyped key used to be
+	 * discarded silently on its way to the wire. It now has to be discarded
+	 * here instead, because the schema rejects it, and a rejection would cost
+	 * the whole component its place in the response. Callers are told about the
+	 * drop through _doing_it_wrong so the mistake is still visible in
+	 * development.
+	 *
+	 * @param array<string, mixed> $annotations  Caller-supplied annotations.
+	 * @param string               $feature_type The MCP feature type ('tool' or 'resource').
+	 * @param string               $subject      Component identity for the notice, e.g. a tool name.
+	 *
+	 * @return array<string, mixed> Annotations containing only usable keys.
+	 */
+	public static function sanitize( array $annotations, string $feature_type, string $subject = '' ): array {
+		$result  = array();
+		$dropped = array();
+
+		foreach ( $annotations as $field => $value ) {
+			if ( ! is_string( $field ) || ! isset( self::$mcp_annotations[ $field ] ) ) {
+				$dropped[] = (string) $field;
+				continue;
+			}
+
+			$config = self::$mcp_annotations[ $field ];
+			if ( ! in_array( $feature_type, $config['features'], true ) ) {
+				$dropped[] = (string) $field;
+				continue;
+			}
+
+			$normalized = self::normalize_annotation_value( $config['type'], $value, $field );
+			if ( null === $normalized ) {
+				$dropped[] = (string) $field;
+				continue;
+			}
+
+			$result[ $field ] = $normalized;
+		}
+
+		if ( ! empty( $dropped ) ) {
+			_doing_it_wrong(
+				__METHOD__,
+				sprintf(
+					/* translators: 1: comma-separated annotation names, 2: feature type, 3: component identity. */
+					esc_html__( 'Dropped MCP annotations %1$s: they are not valid %2$s annotations (%3$s).', 'mcp-adapter' ),
+					esc_html( implode( ', ', $dropped ) ),
+					esc_html( $feature_type ),
+					esc_html( '' === $subject ? 'unnamed component' : $subject )
+				),
+				'n.e.x.t'
+			);
+		}
+
+		return $result;
 	}
 }

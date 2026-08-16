@@ -7,11 +7,6 @@ namespace WP\MCP\Tests\Unit\Handlers;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse;
-use WP\McpSchema\Server\Prompts\DTO\GetPromptResult;
-use WP\McpSchema\Server\Prompts\DTO\ListPromptsResult;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptMessage;
 use WP_Error;
 
 final class PromptsHandlerTest extends TestCase {
@@ -22,11 +17,15 @@ final class PromptsHandlerTest extends TestCase {
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->list_prompts();
 
-		// Returns ListPromptsResult DTO.
-		$this->assertInstanceOf( ListPromptsResult::class, $result );
-		$prompts = $result->getPrompts();
+		// Returns the prompts list in wire shape.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'prompts', $result );
+		$prompts = $result['prompts'];
 		$this->assertNotEmpty( $prompts );
-		$this->assertContainsOnlyInstancesOf( PromptDto::class, $prompts );
+		foreach ( $prompts as $prompt ) {
+			$this->assertIsArray( $prompt );
+			$this->assertArrayHasKey( 'name', $prompt );
+		}
 	}
 
 	public function test_list_prompts_applies_prompts_list_filter(): void {
@@ -39,8 +38,9 @@ final class PromptsHandlerTest extends TestCase {
 		add_filter( 'mcp_adapter_prompts_list', $filter );
 
 		$result = $handler->list_prompts();
-		$this->assertInstanceOf( ListPromptsResult::class, $result );
-		$this->assertEmpty( $result->getPrompts() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'prompts', $result );
+		$this->assertEmpty( $result['prompts'] );
 
 		remove_filter( 'mcp_adapter_prompts_list', $filter );
 	}
@@ -50,11 +50,10 @@ final class PromptsHandlerTest extends TestCase {
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->get_prompt( array( 'params' => array() ) );
 
-		// Missing name is a protocol error - returns JSONRPCErrorResponse.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// Missing name is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 	}
 
 	public function test_get_prompt_unknown_returns_error(): void {
@@ -62,11 +61,10 @@ final class PromptsHandlerTest extends TestCase {
 		$handler = new PromptsHandler( $server );
 		$result  = $handler->get_prompt( array( 'params' => array( 'name' => 'unknown' ) ) );
 
-		// Prompt not found is a protocol error - returns JSONRPCErrorResponse.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// Prompt not found is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 	}
 
 	public function test_get_prompt_success_runs_ability(): void {
@@ -81,11 +79,16 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Successful execution returns GetPromptResult DTO.
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		// Successful execution returns a get-prompt result array.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertNotEmpty( $messages );
-		$this->assertContainsOnlyInstancesOf( PromptMessage::class, $messages );
+		foreach ( $messages as $message ) {
+			$this->assertIsArray( $message );
+			$this->assertArrayHasKey( 'role', $message );
+			$this->assertArrayHasKey( 'content', $message );
+		}
 	}
 
 	public function test_get_prompt_does_not_require_ability_lookup_at_runtime(): void {
@@ -135,8 +138,9 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$this->assertNotEmpty( $result->getMessages() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$this->assertNotEmpty( $result['messages'] );
 	}
 
 	public function test_get_prompt_with_wp_error_from_execute(): void {
@@ -182,11 +186,10 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// WP_Error from execute is a protocol error - returns JSONRPCErrorResponse.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// WP_Error from execute is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 
 		// Clean up.
 		wp_unregister_ability( 'test/wp-error-prompt-execute' );
@@ -235,11 +238,10 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Exception is a protocol error - returns JSONRPCErrorResponse.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertNotEmpty( $error->getMessage() );
+		// Exception is a protocol error - returns a JSON-RPC error envelope.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertNotEmpty( $result['error']['message'] );
 
 		// Clean up.
 		wp_unregister_ability( 'test/prompt-execute-exception' );
@@ -290,12 +292,11 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		// Short-circuit returns JSONRPCErrorResponse with internal_error code.
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertSame( -32603, $error->getCode() );
-		$this->assertStringContainsString( 'Prompt access blocked', $error->getMessage() );
+		// Short-circuit returns a JSON-RPC error envelope with internal_error code.
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertSame( -32603, $result['error']['code'] );
+		$this->assertStringContainsString( 'Prompt access blocked', $result['error']['message'] );
 
 		remove_filter( 'mcp_adapter_pre_prompt_get', $filter );
 	}
@@ -391,11 +392,12 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 2, $messages );
-		$this->assertEquals( 'user', $messages[0]->getRole() );
-		$this->assertEquals( 'assistant', $messages[1]->getRole() );
+		$this->assertEquals( 'user', $messages[0]['role'] );
+		$this->assertEquals( 'assistant', $messages[1]['role'] );
 
 		wp_unregister_ability( 'test/tier1-prompt' );
 	}
@@ -443,14 +445,15 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 1, $messages );
-		$this->assertEquals( 'user', $messages[0]->getRole() );
+		$this->assertEquals( 'user', $messages[0]['role'] );
 
-		$content = $messages[0]->getContent();
-		$this->assertEquals( 'text', $content->getType() );
-		$this->assertEquals( 'Simple text response', $content->getText() );
+		$content = $messages[0]['content'];
+		$this->assertEquals( 'text', $content['type'] );
+		$this->assertEquals( 'Simple text response', $content['text'] );
 
 		wp_unregister_ability( 'test/tier2-prompt' );
 	}
@@ -502,14 +505,15 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 1, $messages );
-		$this->assertEquals( 'assistant', $messages[0]->getRole() );
+		$this->assertEquals( 'assistant', $messages[0]['role'] );
 
-		$content = $messages[0]->getContent();
-		$this->assertEquals( 'text', $content->getType() );
-		$this->assertEquals( 'Assistant message', $content->getText() );
+		$content = $messages[0]['content'];
+		$this->assertEquals( 'text', $content['type'] );
+		$this->assertEquals( 'Assistant message', $content['text'] );
 
 		wp_unregister_ability( 'test/tier3-prompt' );
 	}
@@ -561,19 +565,20 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 3, $messages );
 
 		// All messages should have 'user' role (default).
 		foreach ( $messages as $message ) {
-			$this->assertEquals( 'user', $message->getRole() );
+			$this->assertEquals( 'user', $message['role'] );
 		}
 
 		// Verify message content.
-		$this->assertEquals( 'First message', $messages[0]->getContent()->getText() );
-		$this->assertEquals( 'Second message', $messages[1]->getContent()->getText() );
-		$this->assertEquals( 'Third message', $messages[2]->getContent()->getText() );
+		$this->assertEquals( 'First message', $messages[0]['content']['text'] );
+		$this->assertEquals( 'Second message', $messages[1]['content']['text'] );
+		$this->assertEquals( 'Third message', $messages[2]['content']['text'] );
 
 		wp_unregister_ability( 'test/tier4-prompt' );
 	}
@@ -625,13 +630,14 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 2, $messages );
 
 		// All messages should have 'assistant' role.
 		foreach ( $messages as $message ) {
-			$this->assertEquals( 'assistant', $message->getRole() );
+			$this->assertEquals( 'assistant', $message['role'] );
 		}
 
 		wp_unregister_ability( 'test/tier4-role-prompt' );
@@ -683,16 +689,17 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 1, $messages );
-		$this->assertEquals( 'user', $messages[0]->getRole() );
+		$this->assertEquals( 'user', $messages[0]['role'] );
 
 		// Content should be JSON-encoded.
-		$content = $messages[0]->getContent();
-		$this->assertEquals( 'text', $content->getType() );
+		$content = $messages[0]['content'];
+		$this->assertEquals( 'text', $content['type'] );
 
-		$decoded = json_decode( $content->getText(), true );
+		$decoded = json_decode( $content['text'], true );
 		$this->assertEquals( 'custom_value', $decoded['custom_key'] );
 		$this->assertEquals( 123, $decoded['nested']['data'] );
 
@@ -743,8 +750,9 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$this->assertEquals( 'Custom runtime description', $result->getDescription() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$this->assertEquals( 'Custom runtime description', $result['description'] );
 
 		wp_unregister_ability( 'test/description-prompt' );
 	}
@@ -796,11 +804,12 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 1, $messages );
 		// Invalid role should fall back to 'user'.
-		$this->assertEquals( 'user', $messages[0]->getRole() );
+		$this->assertEquals( 'user', $messages[0]['role'] );
 
 		wp_unregister_ability( 'test/invalid-role-prompt' );
 	}
@@ -857,12 +866,13 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 1, $messages );
 
-		$content = $messages[0]->getContent();
-		$this->assertEquals( 'image', $content->getType() );
+		$content = $messages[0]['content'];
+		$this->assertEquals( 'image', $content['type'] );
 
 		wp_unregister_ability( 'test/image-content-prompt' );
 	}
@@ -918,16 +928,17 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
-		$messages = $result->getMessages();
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
+		$messages = $result['messages'];
 		$this->assertCount( 1, $messages );
 
 		// Invalid content type should be converted to text.
-		$content = $messages[0]->getContent();
-		$this->assertEquals( 'text', $content->getType() );
+		$content = $messages[0]['content'];
+		$this->assertEquals( 'text', $content['type'] );
 
 		// The text should be JSON-encoded original content.
-		$decoded = json_decode( $content->getText(), true );
+		$decoded = json_decode( $content['text'], true );
 		$this->assertEquals( 'invalid_type', $decoded['type'] );
 		$this->assertEquals( 'some value', $decoded['value'] );
 
@@ -947,11 +958,10 @@ final class PromptsHandlerTest extends TestCase {
 			1
 		);
 
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertSame( -32602, $error->getCode() );
-		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertSame( -32602, $result['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $result['error']['message'] );
 	}
 
 	public function test_get_prompt_with_integer_arguments_returns_invalid_params_error(): void {
@@ -967,11 +977,10 @@ final class PromptsHandlerTest extends TestCase {
 			1
 		);
 
-		$this->assertInstanceOf( JSONRPCErrorResponse::class, $result );
-		$error = $result->getError();
-		$this->assertNotNull( $error );
-		$this->assertSame( -32602, $error->getCode() );
-		$this->assertStringContainsString( 'arguments must be an object', $error->getMessage() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertSame( -32602, $result['error']['code'] );
+		$this->assertStringContainsString( 'arguments must be an object', $result['error']['message'] );
 	}
 
 	public function test_get_prompt_with_null_arguments_succeeds(): void {
@@ -987,7 +996,8 @@ final class PromptsHandlerTest extends TestCase {
 		);
 
 		// null arguments should default to empty array and succeed.
-		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
 	}
 
 	public function test_get_prompt_with_missing_arguments_succeeds(): void {
@@ -1002,7 +1012,8 @@ final class PromptsHandlerTest extends TestCase {
 		);
 
 		// Missing arguments should default to empty array and succeed.
-		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
 	}
 
 	public function test_list_prompts_with_filter_returning_non_array_falls_back_to_original(): void {
@@ -1017,8 +1028,9 @@ final class PromptsHandlerTest extends TestCase {
 		DummyErrorHandler::reset();
 		$result = $handler->list_prompts();
 
-		$this->assertInstanceOf( ListPromptsResult::class, $result );
-		$this->assertNotEmpty( $result->getPrompts() );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'prompts', $result );
+		$this->assertNotEmpty( $result['prompts'] );
 
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
 		$last_log = end( DummyErrorHandler::$logs );
@@ -1060,7 +1072,8 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
 
 		$block = $this->first_content_block( $result );
 		$this->assertArrayNotHasKey( '_meta', $block );
@@ -1088,7 +1101,8 @@ final class PromptsHandlerTest extends TestCase {
 			)
 		);
 
-		$this->assertInstanceOf( GetPromptResult::class, $result );
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'messages', $result );
 		$this->assertSame( array( 'block' => 'level' ), $this->first_content_block( $result )['_meta'] );
 		$this->assertSame(
 			array( 'ui' => array( 'prefersBorder' => true ) ),
@@ -1102,9 +1116,9 @@ final class PromptsHandlerTest extends TestCase {
 	 *
 	 * @param array $shape The prompt result to normalize.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\GetPromptResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array Get-prompt result or JSON-RPC error envelope, in wire shape.
 	 */
-	private function get_prompt_returning( array $shape ) {
+	private function get_prompt_returning( array $shape ): array {
 		$server  = $this->makeServer( array(), array(), array( 'test/prompt' ) );
 		$handler = new PromptsHandler( $server );
 
@@ -1131,11 +1145,11 @@ final class PromptsHandlerTest extends TestCase {
 	/**
 	 * The emitted array of the first message's content block.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\GetPromptResult $result The prompt result.
+	 * @param array $result The get-prompt result in wire shape.
 	 *
 	 * @return array
 	 */
-	private function first_content_block( GetPromptResult $result ): array {
-		return $result->getMessages()[0]->getContent()->toArray();
+	private function first_content_block( array $result ): array {
+		return $result['messages'][0]['content'];
 	}
 }

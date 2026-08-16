@@ -58,6 +58,7 @@ class MyTransport implements McpRestTransportInterface {
 ```php
 <?php
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
 
@@ -98,7 +99,17 @@ class ApiKeyTransport implements McpRestTransportInterface {
     }
     
     public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
-        $body = $request->get_json_params();
+        try {
+            $request_identity = JsonRpcRequestDecoder::decode( (string) $request->get_body() );
+        } catch ( \JsonException $exception ) {
+            return new \WP_REST_Response( ['error' => 'Invalid JSON'], 400 );
+        }
+
+        if ( ! $request_identity instanceof \stdClass ) {
+            return new \WP_REST_Response( ['error' => 'MCP request object required'], 400 );
+        }
+
+        $body = JsonRpcRequestDecoder::to_associative( $request_identity );
         
         if ( empty( $body['method'] ) ) {
             return new \WP_REST_Response( 
@@ -112,7 +123,9 @@ class ApiKeyTransport implements McpRestTransportInterface {
             $body['method'],
             $body['params'] ?? [],
             $body['id'] ?? 0,
-            $this->get_transport_name()
+            $this->get_transport_name(),
+            null,
+            $request_identity
         );
         
         return rest_ensure_response( $result );
@@ -178,6 +191,15 @@ $result = $this->context->request_router->route_request(
     $this->get_transport_name()
 );
 ```
+
+When a transport starts from raw JSON, decode it with
+`JsonRpcRequestDecoder::decode()` and pass the resulting request object as the
+sixth argument to `route_request()`. The router still receives associative
+`$params`, so handlers and WordPress callbacks keep their existing array
+contract, while the identity object lets the Adapter distinguish `{}` from
+`[]` and numeric-key objects from lists. Do not use associative `json_decode()`
+or `WP_REST_Request::get_json_params()` before this boundary; both discard that
+wire identity.
 
 ## Next Steps
 

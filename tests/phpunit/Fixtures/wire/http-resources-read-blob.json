@@ -1,0 +1,5 @@
+{
+    "status": 200,
+    "session_header": "{{SESSION_ID}}",
+    "body": "{\"jsonrpc\":\"2.0\",\"id\":61,\"result\":{\"contents\":[{\"uri\":\"WordPress:\\/\\/local\\/resource-blob\",\"blob\":\"YmluYXJ5LWRhdGEtaGVyZQ==\",\"mimeType\":\"application\\/octet-stream\"}]}}"
+}

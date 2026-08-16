@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts\Contracts;
 
-use WP\McpSchema\Server\Prompts\DTO\Prompt;
-
 /**
  * Interface for building MCP prompts.
  *
@@ -20,11 +18,20 @@ use WP\McpSchema\Server\Prompts\DTO\Prompt;
 interface McpPromptBuilderInterface {
 
 	/**
-	 * Build and return the Prompt DTO instance.
+	 * Build and return the prompt data in wire shape.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
+	 * The returned array uses the MCP Prompt keys:
+	 * - 'name' (string, required): Unique prompt identifier.
+	 * - 'title' (string, optional): Human-readable display name.
+	 * - 'description' (string, optional): Human-readable description.
+	 * - 'arguments' (list<array{name: string, title?: string, description?: string, required?: bool}>, optional).
+	 * - 'icons' (list<array<string, mixed>>, optional): Icon definitions for UI display.
+	 * - '_meta' (array<string, mixed>, optional): Additional metadata for MCP clients.
+	 *
+	 * @return array<string, mixed> The built prompt data.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 */
-	public function build(): Prompt;
+	public function build(): array;
 
 	/**
 	 * Get the unique name for this prompt.

@@ -11,9 +11,8 @@ namespace WP\MCP\Handlers\Initialize;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Core\McpVersionNegotiator;
-use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
-use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
-use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
+use WP\MCP\Infrastructure\Protocol\V20260728WireEncoder;
+use WP\MCP\Infrastructure\Protocol\WireEncoder;
 
 /**
  * Handles the initialize MCP method.
@@ -43,58 +42,97 @@ class InitializeHandler {
 	 * the server falls back to the latest supported version.
 	 *
 	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 *
 	 * @param string $client_protocol_version The protocol version requested by the client.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoder|null $encoder Legacy request encoder.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
+	 * @return array<string, mixed> Response with server capabilities and information, in wire shape.
 	 */
-	public function handle( string $client_protocol_version ): InitializeResult {
+	public function handle( string $client_protocol_version, ?WireEncoder $encoder = null ): array {
 		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
+		$encoder            = $encoder ?? $this->mcp->get_wire_encoder();
 
-		$server_info = Implementation::fromArray(
-			array(
-				'name'    => $this->mcp->get_server_name(),
-				'version' => $this->mcp->get_server_version(),
-			)
+		$payload = array(
+			'protocolVersion' => $negotiated_version,
+			'capabilities'    => $this->capabilities(),
+			'serverInfo'      => $this->server_info(),
 		);
 
-		// Capabilities should only be advertised if they are implemented end-to-end.
-		// IMPORTANT: We set explicit boolean values (not empty arrays) to ensure proper JSON serialization.
-		// Empty arrays `[]` serialize as JSON arrays `[]`, but MCP spec requires JSON objects `{}`.
-		// Setting explicit values like `listChanged: false` produces associative arrays that serialize correctly.
-		$capabilities = ServerCapabilities::fromArray(
-			array(
-				'prompts'   => array( 'listChanged' => false ),
-				'resources' => array(
-					'subscribe'   => false,
-					'listChanged' => false,
-				),
-				'tools'     => array( 'listChanged' => false ),
-			)
-		);
+		$instructions = $this->mcp->get_server_description();
+		if ( '' !== $instructions ) {
+			$payload['instructions'] = $instructions;
+		}
 
-		$result = InitializeResult::fromArray(
-			array(
-				'protocolVersion' => $negotiated_version,
-				'capabilities'    => $capabilities,
-				'serverInfo'      => $server_info,
-				'instructions'    => $this->mcp->get_server_description(),
-			)
-		);
+		$result = $encoder->initialize_result( $payload );
 
 		/**
 		 * Filters the initialize response before returning to the client.
 		 *
 		 * Use this filter to modify server capabilities, instructions, or
-		 * other initialization data dynamically. To modify the result, call
-		 * `$result->toArray()`, change the data, and return
-		 * `InitializeResult::fromArray( $modified_data )`.
+		 * other initialization data dynamically. Modify the array keys
+		 * directly and return the array.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t The result is a revision-neutral array instead of an InitializeResult DTO.
 		 *
-		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
-		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
+		 * @param array<string, mixed>   $result The initialize result in wire shape.
+		 * @param \WP\MCP\Core\McpServer $server The MCP server instance.
 		 */
 		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );
+	}
+
+	/**
+	 * Handle modern stateless server discovery.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param \WP\MCP\Infrastructure\Protocol\V20260728WireEncoder $encoder Modern request encoder.
+	 *
+	 * @return array<string, mixed> Schema-validated discovery result.
+	 */
+	public function discover( V20260728WireEncoder $encoder ): array {
+		$payload = array(
+			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
+			'capabilities'      => $this->capabilities(),
+		);
+
+		$instructions = $this->mcp->get_server_description();
+		if ( '' !== $instructions ) {
+			$payload['instructions'] = $instructions;
+		}
+
+		return $encoder->discover_result( $payload );
+	}
+
+	/**
+	 * Capabilities implemented end-to-end in both supported eras.
+	 *
+	 * Explicit false values tell legacy clients that list-change notifications
+	 * and resource subscriptions are not emitted.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function capabilities(): array {
+		return array(
+			'prompts'   => array( 'listChanged' => false ),
+			'resources' => array(
+				'subscribe'   => false,
+				'listChanged' => false,
+			),
+			'tools'     => array( 'listChanged' => false ),
+		);
+	}
+
+	/**
+	 * Server implementation identity.
+	 *
+	 * @return array{name: string, version: string}
+	 */
+	private function server_info(): array {
+		return array(
+			'name'    => $this->mcp->get_server_name(),
+			'version' => $this->mcp->get_server_version(),
+		);
 	}
 }

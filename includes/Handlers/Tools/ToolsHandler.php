@@ -10,13 +10,13 @@ declare( strict_types=1 );
 namespace WP\MCP\Handlers\Tools;
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
-use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
+use WP\MCP\Infrastructure\Protocol\WireEncoderInterface;
 
 /**
  * Handles tools-related MCP methods.
@@ -51,27 +51,31 @@ class ToolsHandler {
 	 * Handles the tools/list/all request.
 	 *
 	 * This is a custom extension to the MCP spec that includes availability status.
-	 * Returns a ListToolsResult DTO containing all registered tools.
+	 * Returns the tools list result in wire shape.
 	 *
 	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with all tools.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with all tools.
 	 */
-	public function list_all_tools(): ListToolsResult {
+	public function list_all_tools( ?WireEncoderInterface $encoder = null ): array {
 		// Return the standard tools list.
-		return $this->list_tools();
+		return $this->list_tools( $encoder );
 	}
 
 	/**
 	 * Handles the tools/list request.
 	 *
-	 * Returns a ListToolsResult DTO containing all registered tools.
-	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
+	 * Returns the tools list result in wire shape. Tool data is protocol-only;
+	 * internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with tools list.
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
+	 *
+	 * @return array<string, mixed> Response with tools list.
 	 */
-	public function list_tools(): ListToolsResult {
+	public function list_tools( ?WireEncoderInterface $encoder = null ): array {
 		$tools = array_values( $this->mcp->get_tools() );
 
 		/**
@@ -81,9 +85,10 @@ class ToolsHandler {
 		 * or reorder the tools list.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t The tools are revision-neutral arrays instead of DTOs.
 		 *
-		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
-		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
+		 * @param array<int, array<string, mixed>> $tools  Array of tool data arrays in wire shape.
+		 * @param \WP\MCP\Core\McpServer           $server The MCP server instance.
 		 */
 		$tools = $this->validate_filtered_list(
 			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),
@@ -92,9 +97,15 @@ class ToolsHandler {
 			$this->mcp->get_error_handler()
 		);
 
-		return ListToolsResult::fromArray(
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
+		return $encoder->list_tools_result(
 			array(
-				'tools' => $tools,
+				'tools' => $this->encode_components(
+					$tools,
+					'name',
+					static fn( array $tool, string $subject ): ?array => $encoder->try_tool( $tool, $subject )
+				),
 			)
 		);
 	}
@@ -102,22 +113,29 @@ class ToolsHandler {
 	/**
 	 * Handles the tools/call request.
 	 *
-	 * Returns either a CallToolResult DTO (for success or tool execution errors)
-	 * or a JSONRPCErrorResponse DTO (for protocol errors like tool not found).
+	 * Returns either a tool-call result array (for success or tool execution errors)
+	 * or a JSON-RPC error envelope array (for protocol errors like tool not found).
 	 *
 	 * The MCP spec distinguishes between:
-	 * 1. **Protocol errors** (tool not found, server error) → JSONRPCErrorResponse
-	 * 2. **Tool execution errors** (permission denied, runtime error) → CallToolResult with isError=true
+	 * 1. **Protocol errors** (tool not found, server error) → JSON-RPC error envelope
+	 * 2. **Tool execution errors** (permission denied, runtime error) → result with isError=true
 	 *
 	 * This distinction is critical for LLM self-correction - execution errors are
 	 * visible to the LLM, while protocol errors indicate infrastructure issues.
 	 *
+	 * @since n.e.x.t Returns revision-neutral arrays instead of DTOs.
+	 *
 	 * @param array $params Request params.
 	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \stdClass|null $request_identity Optional identity-preserving JSON-RPC request object.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface|null $encoder Request-scoped encoder. Defaults to legacy.
+	 * @param array<string, mixed>|null $continuation Validated modern continuation data.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed> Tool-call result or JSON-RPC error envelope, in wire shape.
 	 */
-	public function call_tool( array $params, $request_id = 0 ) {
+	public function call_tool( array $params, $request_id = 0, ?\stdClass $request_identity = null, ?WireEncoderInterface $encoder = null, ?array $continuation = null ): array {
+		$encoder = $encoder ?? $this->mcp->get_wire_encoder();
+
 		// Extract parameters using helper method.
 		$request_params = $this->extract_params( $params );
 
@@ -125,7 +143,7 @@ class ToolsHandler {
 			return McpErrorFactory::missing_parameter( $request_id, 'tool name' );
 		}
 
-		if ( isset( $request_params['arguments'] ) && ! is_array( $request_params['arguments'] ) ) {
+		if ( isset( $request_params['arguments'] ) && ( ! is_array( $request_params['arguments'] ) || $this->arguments_are_non_object( $request_params['arguments'], $request_identity ) ) ) {
 			return McpErrorFactory::invalid_params( $request_id, 'arguments must be an object' );
 		}
 
@@ -143,7 +161,11 @@ class ToolsHandler {
 					'warning'
 				);
 
-				return McpErrorFactory::tool_not_found( $request_id, $tool_name );
+				return McpErrorFactory::tool_not_found( $request_id, $tool_name, $encoder->revision() );
+			}
+
+			if ( null !== $continuation && ! $mcp_tool->supports_input_required() ) {
+				return McpErrorFactory::invalid_params( $request_id, 'This tool does not accept continuation data' );
 			}
 
 			$permission = $mcp_tool->check_permission( $args );
@@ -164,7 +186,7 @@ class ToolsHandler {
 					);
 				}
 
-				return $this->create_error_result( $error_message );
+				return $this->create_error_result( $error_message, $encoder );
 			}
 
 			/**
@@ -184,10 +206,10 @@ class ToolsHandler {
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
-				return $this->create_error_result( $args->get_error_message() );
+				return $this->create_error_result( $args->get_error_message(), $encoder );
 			}
 
-			$result = $mcp_tool->execute( $args );
+			$result = $mcp_tool->execute( $args, $continuation );
 
 			/**
 			 * Filters the tool execution result before response assembly.
@@ -216,7 +238,16 @@ class ToolsHandler {
 					)
 				);
 
-				return $this->create_error_result( $result->get_error_message() );
+				return $this->create_error_result( $result->get_error_message(), $encoder );
+			}
+
+			if (
+				$mcp_tool->supports_input_required()
+				&& McpVersionNegotiator::is_modern( $encoder->revision() )
+				&& is_array( $result )
+				&& 'input_required' === ( $result['resultType'] ?? null )
+			) {
+				return $result;
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
@@ -228,10 +259,10 @@ class ToolsHandler {
 				&& is_string( $result['error'] )
 				&& '' !== trim( $result['error'] )
 			) {
-				return $this->create_error_result( $result['error'] );
+				return $this->create_error_result( $result['error'], $encoder );
 			}
 
-			// Successful tool execution - build CallToolResult DTO.
+			// Successful tool execution - build the tool-call result.
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
@@ -269,7 +300,7 @@ class ToolsHandler {
 					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
-						return CallToolResult::fromArray(
+						return $encoder->call_tool_result(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_text_resource(
@@ -287,7 +318,7 @@ class ToolsHandler {
 					}
 
 					if ( $has_blob ) {
-						return CallToolResult::fromArray(
+						return $encoder->call_tool_result(
 							array(
 								'content' => array(
 									ContentBlockHelper::embedded_blob_resource(
@@ -315,9 +346,9 @@ class ToolsHandler {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
-				return CallToolResult::fromArray(
+				return $encoder->call_tool_result(
 					array(
-						'content'           => array(
+						'content' => array(
 							ContentBlockHelper::image(
 								$image_data,
 								$mime_type,
@@ -325,8 +356,7 @@ class ToolsHandler {
 								McpValidator::normalize_meta( $result['_meta'] ?? null )
 							),
 						),
-						'structuredContent' => null,
-						'isError'           => false,
+						'isError' => false,
 					)
 				);
 			}
@@ -342,13 +372,16 @@ class ToolsHandler {
 				$json_text = '{}';
 			}
 
-			return CallToolResult::fromArray(
-				array(
-					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $result,
-					'isError'           => false,
-				)
+			$payload = array(
+				'content' => array( ContentBlockHelper::text( $json_text ) ),
 			);
+
+			if ( ! is_array( $result ) || ! self::is_non_empty_list( $result ) ) {
+				$payload['structuredContent'] = $result;
+			}
+			$payload['isError'] = false;
+
+			return $encoder->call_tool_result( $payload );
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -363,20 +396,55 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Create an error CallToolResult from a message string.
+	 * Determine whether tool arguments came from a non-object JSON value.
+	 *
+	 * The primary params remain associative arrays for callback compatibility.
+	 * When available, the identity-preserving request object distinguishes a
+	 * numeric-key JSON object from a JSON list. Direct PHP callers have no such
+	 * identity, so a non-empty sequential array is treated as a list.
+	 *
+	 * @param array<mixed> $arguments Associative callback-facing arguments.
+	 * @param \stdClass|null $request_identity Identity-preserving request object.
+	 *
+	 * @return bool True when the arguments are a non-empty JSON/PHP list.
+	 */
+	private function arguments_are_non_object( array $arguments, ?\stdClass $request_identity ): bool {
+		if ( null !== $request_identity && isset( $request_identity->params ) && $request_identity->params instanceof \stdClass && property_exists( $request_identity->params, 'arguments' ) ) {
+			$identity_arguments = $request_identity->params->arguments;
+
+			return is_array( $identity_arguments ) && array() !== $identity_arguments;
+		}
+
+		return self::is_non_empty_list( $arguments );
+	}
+
+	/**
+	 * Determine whether an array is a non-empty list.
+	 *
+	 * @param array<mixed> $value Value to inspect.
+	 *
+	 * @return bool True for sequential integer keys starting at zero.
+	 */
+	private static function is_non_empty_list( array $value ): bool {
+		return array() !== $value && array_keys( $value ) === range( 0, count( $value ) - 1 );
+	}
+
+	/**
+	 * Create an error tool-call result from a message string.
 	 *
 	 * @since 0.5.0
+	 * @since n.e.x.t Returns a revision-neutral array instead of a DTO.
 	 *
 	 * @param string $message The error message.
+	 * @param \WP\MCP\Infrastructure\Protocol\WireEncoderInterface $encoder Request-scoped encoder.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult
+	 * @return array<string, mixed> Tool-call result with isError=true, in wire shape.
 	 */
-	private function create_error_result( string $message ): CallToolResult {
-		return CallToolResult::fromArray(
+	private function create_error_result( string $message, WireEncoderInterface $encoder ): array {
+		return $encoder->call_tool_result(
 			array(
-				'content'           => array( ContentBlockHelper::text( $message ) ),
-				'structuredContent' => null,
-				'isError'           => true,
+				'content' => array( ContentBlockHelper::text( $message ) ),
+				'isError' => true,
 			)
 		);
 	}
