@@ -10,25 +10,18 @@ The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, al
 
 - **PHP 7.4 or higher**
 - **WordPress 6.9 or higher** (Abilities API is built into core — no separate plugin)
-- **Composer** (optional — for plugin developers bundling the adapter as a dependency)
 
 ## Quick Start
 
 ### Step 1: Install MCP Adapter
 
-**Recommended: WordPress plugin**
+MCP Adapter is a WordPress plugin. Install and activate it:
 
 ```bash
 wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
 ```
 
-Or download the latest release from [GitHub](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other plugin.
-
-**For plugin developers: Composer package**
-
-```bash
-composer require wordpress/mcp-adapter
-```
+Or download the latest release from [GitHub](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other plugin. See the [Installation Guide](installation.md) for more options.
 
 ### Step 2: Register a Simple Ability
 
@@ -74,36 +67,7 @@ add_action( 'wp_abilities_api_init', function() {
 });
 ```
 
-### Step 3: Initialize MCP Adapter
-
-**If using Composer with Jetpack Autoloader (Recommended):**
-```php
-<?php
-// Load Jetpack autoloader (handles version conflicts)
-require_once __DIR__ . '/vendor/autoload_packages.php';
-
-use WP\MCP\Core\McpAdapter;
-
-// Initialize the adapter
-McpAdapter::instance();
-```
-
-**If using standard Composer autoloader:**
-```php
-<?php
-// Load standard Composer autoloader
-require_once __DIR__ . '/vendor/autoload.php';
-
-use WP\MCP\Core\McpAdapter;
-
-// Initialize the adapter
-McpAdapter::instance();
-```
-
-**If using WordPress Plugin:**
-The adapter initializes automatically when the plugin is activated.
-
-### Step 4: Create Your MCP Server (Optional)
+### Step 3: Create Your MCP Server (Optional)
 
 The adapter creates a default server automatically, but you can create custom servers:
 
@@ -124,7 +88,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
 });
 ```
 
-### Step 5: Test Your Setup
+### Step 4: Test Your Setup
 
 Test your MCP server:
 

@@ -27,11 +27,13 @@ The MCP Adapter bridges WordPress's Abilities API with the [Model Context Protoc
 
 == Installation ==
 
-Install MCP Adapter as a WordPress plugin from the [latest GitHub release](https://github.com/WordPress/mcp-adapter/releases/latest), or see the [README](https://github.com/WordPress/mcp-adapter#installation) for WP-CLI and wp-env options.
-
-Plugin developers can also add it as a Composer dependency: `composer require wordpress/mcp-adapter`
+1. Upload the plugin files to the `/wp-content/plugins/mcp-adapter` directory, or install the plugin through the WordPress plugins screen directly.
+2. Activate the plugin through the 'Plugins' screen in WordPress.
+3. The adapter initializes automatically and creates a default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
 
 Requires WordPress 6.9 or newer (the Abilities API is included in core).
+
+Plugin developers should depend on MCP Adapter by adding `Requires Plugins: mcp-adapter` to their plugin header. See the [README](https://github.com/WordPress/mcp-adapter#installation) for WP-CLI and wp-env options.
 
 == Changelog ==
 
