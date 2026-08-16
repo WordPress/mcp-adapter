@@ -41,24 +41,47 @@ final class Autoloader {
 		}
 
 		// Jetpack Autoloader uses `autoload_packages.php` instead of `autoload.php`.
-		$autoloader      = WP_MCP_DIR . '/vendor/autoload_packages.php';
-		self::$is_loaded = self::require_autoloader( $autoloader );
+		$autoloader = WP_MCP_DIR . '/vendor/autoload_packages.php';
 
-		return self::$is_loaded;
+		if ( is_readable( $autoloader ) ) {
+			self::$is_loaded = self::require_autoloader( $autoloader );
+
+			return self::$is_loaded;
+		}
+
+		/*
+		 * There is no `vendor/` directory next to this copy. That is expected
+		 * when the copy is a Composer dependency of another project, because
+		 * Composer flattens dependencies into the root project's `vendor/`
+		 * directory rather than nesting one per package. In that case the
+		 * `WP\MCP\` classes are already registered with the root project's
+		 * autoloader and there is nothing left for us to load.
+		 */
+		if ( self::is_autoloaded_elsewhere() ) {
+			self::$is_loaded = true;
+
+			return self::$is_loaded;
+		}
+
+		self::missing_autoloader_notice();
+
+		return false;
 	}
 
 	/**
-	 * Attempts to load the autoloader file, if it exists.
+	 * Checks whether the plugin classes are already resolvable via an autoloader
+	 * registered by another project.
+	 */
+	private static function is_autoloaded_elsewhere(): bool {
+		return class_exists( Plugin::class );
+	}
+
+	/**
+	 * Loads the autoloader file.
 	 *
 	 * @param string $autoloader_file The path to the autoloader file.
 	 */
 	private static function require_autoloader( string $autoloader_file ): bool {
-		if ( ! is_readable( $autoloader_file ) ) {
-			self::missing_autoloader_notice();
-
-			return false;
-		}
-
 		return (bool) require_once $autoloader_file; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable -- Autoloader is a Composer file.
 	}
 

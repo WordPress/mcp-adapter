@@ -29,23 +29,38 @@ namespace WP\MCP;
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit();
 
-/**
- * Define the plugin constants.
+/*
+ * Bail if another copy of MCP Adapter has already bootstrapped.
+ *
+ * Composer publishes `wordpress/mcp-adapter` as a `wordpress-plugin`, so a
+ * project that requires it as a library alongside `composer/installers` gets it
+ * relocated to `wp-content/plugins/mcp-adapter/`. If that copy and the
+ * canonical plugin are both active, WordPress loads this file twice from two
+ * different paths.
+ *
+ * The constants below are defined inline rather than from a named function on
+ * purpose. PHP binds unconditional top-level function declarations while the
+ * file is compiled, so a `function constants() {}` here would fatal with
+ * "Cannot redeclare" before this guard ever got the chance to run.
  */
-function constants(): void {
-	/**
-	 * Shortcut constant to the path of this file.
-	 */
-	define( 'WP_MCP_DIR', plugin_dir_path( __FILE__ ) );
-
-	/**
-	 * Version of the plugin.
-	 */
-	define( 'WP_MCP_VERSION', '0.6.1' );
+if ( defined( 'WP_MCP_DIR' ) ) {
+	return;
 }
 
-constants();
-require_once __DIR__ . '/includes/Autoloader.php';
+/**
+ * Shortcut constant to the path of this file.
+ */
+define( 'WP_MCP_DIR', plugin_dir_path( __FILE__ ) );
+
+/**
+ * Version of the plugin.
+ */
+define( 'WP_MCP_VERSION', '0.6.1' );
+
+// Another copy loaded as a Composer dependency may have declared this already.
+if ( ! class_exists( Autoloader::class, false ) ) {
+	require_once __DIR__ . '/includes/Autoloader.php';
+}
 
 // If autoloader failed, we cannot proceed.
 if ( ! Autoloader::autoload() ) {
