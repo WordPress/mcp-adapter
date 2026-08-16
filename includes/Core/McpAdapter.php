@@ -58,6 +58,8 @@ final class McpAdapter {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
 
+			self::schedule_canonical_plugin_check();
+
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
 				add_action( 'init', array( self::$instance, 'init' ), 20 );
@@ -68,6 +70,48 @@ final class McpAdapter {
 		}
 
 		return self::$instance;
+	}
+
+	/**
+	 * Queues the check for whether the adapter is running from the canonical plugin.
+	 *
+	 * Deferred to `init` for two reasons. Every plugin file has been loaded by
+	 * then, so an active canonical plugin has certainly defined its constants and
+	 * cannot be mistaken for a bundled copy. And `_doing_it_wrong()` translates
+	 * its message, which must not happen before `init`.
+	 */
+	private static function schedule_canonical_plugin_check(): void {
+		if ( did_action( 'init' ) ) {
+			self::warn_if_not_canonical_plugin();
+
+			return;
+		}
+
+		add_action( 'init', array( self::class, 'warn_if_not_canonical_plugin' ), 0 );
+	}
+
+	/**
+	 * Warns when the adapter is running outside of the canonical plugin.
+	 *
+	 * `WP_MCP_DIR` is defined by the plugin bootstrap, so its absence means the
+	 * `WP\MCP\` classes came from somewhere else — in practice a copy bundled
+	 * into another plugin via `composer require wordpress/mcp-adapter`. That
+	 * still runs, but it is not a supported way to consume MCP Adapter: the
+	 * hooks, REST routes, and default server ID are global, so a bundled copy
+	 * silently competes with every other copy on the site.
+	 *
+	 * @internal For use by instance initialization only.
+	 */
+	public static function warn_if_not_canonical_plugin(): void {
+		if ( defined( 'WP_MCP_DIR' ) ) {
+			return;
+		}
+
+		_doing_it_wrong(
+			self::class . '::instance',
+			esc_html__( 'MCP Adapter is running from a copy bundled inside another plugin rather than from the MCP Adapter plugin. Install and activate the MCP Adapter plugin, and declare it with the "Requires Plugins" plugin header instead. Bundling MCP Adapter as a Composer library is not supported and may stop working in a future release.', 'mcp-adapter' ),
+			'0.6.2'
+		);
 	}
 
 	/**

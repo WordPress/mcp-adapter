@@ -154,6 +154,10 @@ If a Composer-relocated copy also gets activated as a plugin, MCP Adapter detect
 
 Two copies of `mcp-adapter.php` were loaded as plugins. Current versions bail out of the second copy, but versions up to and including 0.6.1 cannot: PHP binds the redeclared function while the second file is compiled, before any runtime guard gets to run. Upgrade both copies, or deactivate one.
 
+**Notice: "`WP\MCP\Core\McpAdapter::instance` was called incorrectly"**
+
+This is MCP Adapter telling you it is running from a bundled copy rather than from the plugin — the situation this whole guide is about. It appears only with `WP_DEBUG` enabled, and nothing stops working because of it. Follow the [migration steps](#migrating-off-a-bundled-copy) and it goes away.
+
 **Admin notice: "The Composer autoloader was not found"**
 
 The plugin found no `vendor/` directory next to itself and could not resolve `WP\MCP\` through any other autoloader.

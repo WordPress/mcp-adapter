@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace WP\MCP\Tests\Unit;
 
 use WP\MCP\Autoloader;
+use WP\MCP\Core\McpAdapter;
 use WP\MCP\Plugin;
 use WP\MCP\Tests\TestCase;
 
@@ -91,6 +92,47 @@ final class BootstrapTest extends TestCase {
 
 		$this->assertTrue( $method->invoke( null ) );
 		$this->assertTrue( Autoloader::autoload() );
+	}
+
+	/**
+	 * A normal plugin install must never be reported as non-canonical usage.
+	 *
+	 * This is the failure mode that would actually hurt people: every site
+	 * running the plugin the intended way logging a `_doing_it_wrong()` notice.
+	 * `WP_MCP_DIR` is defined by the bootstrap, which the test suite loads, so
+	 * this exercises the same state a real plugin install is in.
+	 */
+	public function test_canonical_plugin_install_is_not_reported_as_doing_it_wrong(): void {
+		$this->assertTrue( defined( 'WP_MCP_DIR' ), 'Precondition: the plugin bootstrap has run.' );
+
+		// setExpectedIncorrectUsage() is deliberately not called — if the check
+		// fires here, WP_UnitTestCase fails the test on the unexpected notice.
+		McpAdapter::warn_if_not_canonical_plugin();
+
+		$this->assertTrue( true );
+	}
+
+	/**
+	 * The check must still run when the adapter is instantiated after `init`.
+	 *
+	 * It is queued on `init`, so a late `McpAdapter::instance()` — from
+	 * `rest_api_init`, say — would otherwise hook an action that has already
+	 * fired and silently never report anything.
+	 */
+	public function test_check_is_not_queued_on_an_init_hook_that_already_fired(): void {
+		$this->assertGreaterThan( 0, did_action( 'init' ), 'Precondition: init has already fired.' );
+
+		$before = has_action( 'init', array( McpAdapter::class, 'warn_if_not_canonical_plugin' ) );
+
+		$method = new \ReflectionMethod( McpAdapter::class, 'schedule_canonical_plugin_check' );
+		$method->setAccessible( true );
+		$method->invoke( null );
+
+		$this->assertSame(
+			$before,
+			has_action( 'init', array( McpAdapter::class, 'warn_if_not_canonical_plugin' ) ),
+			'The check should run immediately rather than hook an init action that already fired.'
+		);
 	}
 
 	/**

@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - The "Composer autoloader was not found" admin notice is no longer shown when the `WP\MCP\` classes are already provided by another autoloader. A copy installed as a Composer dependency has no `vendor/` directory of its own, because Composer flattens dependencies into the root project, so the notice pointed at a file that was never going to exist. A source checkout with genuinely missing dependencies still gets the notice.
 
 ### Added
+- `McpAdapter::instance()` now raises a `_doing_it_wrong()` notice when the adapter is running from a copy bundled inside another plugin rather than from the MCP Adapter plugin, pointing developers at the `Requires Plugins` header. The notice is only visible with `WP_DEBUG` enabled and does not change runtime behavior.
 - A [migration guide](docs/migration/composer-to-plugin.md) for plugins that bundle MCP Adapter as a Composer library, covering the `Requires Plugins` header, removing the Jetpack Autoloader, and what still works during the transition.
 
 ## [0.6.1] - 2026-08-13
