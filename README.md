@@ -50,21 +50,25 @@ For a full breakdown of the component structure, see the [Architecture Overview]
 
 - **PHP**: >= 7.4
 - **WordPress**: >= 6.9 (includes the [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) in core — no separate plugin)
-- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types — installed automatically via Composer
+- **[php-mcp-schema](https://github.com/WordPress/php-mcp-schema)** (`^0.1.0`): Typed DTOs for MCP protocol types
 
 ## Installation
 
-### As a WordPress Plugin (Recommended)
+MCP Adapter is distributed as a WordPress plugin. Install and activate it like any other plugin. The release ships with everything it needs, so there is no autoloader to wire up and no build step to run.
 
-MCP Adapter is designed to be installed as a WordPress plugin. To install you should download the latest stable release from the [GitHub Releases page](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other WordPress plugin.
+Requires WordPress 6.9 or newer; the Abilities API is part of core, so there is no separate plugin to install.
 
-#### With WP-CLI
+### Manually
+
+Download the latest stable `mcp-adapter.zip` from the [GitHub Releases page](https://github.com/WordPress/mcp-adapter/releases/latest), then upload it from **Plugins → Add Plugin → Upload Plugin** and activate it.
+
+### With WP-CLI
 
 ```bash
 wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
 ```
 
-#### With WP-Env
+### With WP-Env
 
 ```jsonc
 // .wp-env.json
@@ -76,27 +80,17 @@ wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/downl
 }
 ```
 
-### As a Composer Library (Deprecated)
+### As a dependency of your plugin
 
-> **Deprecated:** Installing MCP Adapter directly via `composer require wordpress/mcp-adapter` is no longer supported. Use [wpackagist](https://wpackagist.org/) instead, which mirrors the WordPress.org plugin as a Composer package:
->
-> ```bash
-> composer require wpackagist-plugin/mcp-adapter
-> ```
-
-#### Using Jetpack Autoloader (Highly Recommended)
-
-When multiple plugins use the MCP Adapter, it's highly recommended to use the [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) to prevent version conflicts. The Jetpack Autoloader ensures that only the latest version of shared packages is loaded, eliminating conflicts when different plugins use different versions of the same dependency.
-
-```bash
-composer require automattic/jetpack-autoloader
-```
-
-Then load it in your main plugin file instead of the standard Composer autoloader:
+The `WP\MCP` classes are provided by the MCP Adapter plugin, so declare it as a plugin dependency using the `Requires Plugins` field in your [plugin header](https://developer.wordpress.org/plugins/plugin-basics/header-requirements/):
 
 ```php
 <?php
-require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload_packages.php';
+/**
+ * Plugin Name:      My Plugin
+ * Description:      Adds MCP tools for my feature.
+ * Requires Plugins: mcp-adapter
+ */
 ```
 
 ### Using MCP Adapter in Your Plugin
