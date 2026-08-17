@@ -18,6 +18,21 @@ Requires WordPress 6.9 or newer. The Abilities API ships with core — you do no
 
 > **Deprecated:** Installing MCP Adapter directly via composer require wordpress/mcp-adapter is no longer supported. Use [wpackagist](https://wpackagist.org/) instead, which mirrors the WordPress.org plugin as a Composer package:
 >
+> If your project does not already include the wpackagist repository, add it to `composer.json` first:
+>
+> ```json
+> {
+>   "repositories": [
+>     {
+>       "type": "composer",
+>       "url": "https://wpackagist.org"
+>     }
+>   ]
+> }
+> ```
+>
+> Then install the plugin package:
+>
 > ```bash
 > composer require wpackagist-plugin/mcp-adapter
 > ```
