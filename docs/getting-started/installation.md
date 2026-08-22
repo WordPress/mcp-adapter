@@ -37,7 +37,7 @@ Requires WordPress 6.9 or newer. The Abilities API ships with core — you do no
 > composer require wpackagist-plugin/mcp-adapter
 > ```
 
-#### Using Jetpack Autoloader (Highly Recommended)
+#### Using Jetpack Autoloader
 
 When multiple plugins use the MCP Adapter, it's highly recommended to use the  [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) to prevent version conflicts. The Jetpack Autoloader ensures that only the latest version of shared packages is loaded, eliminating conflicts when different plugins use different versions of the same dependency.
 
