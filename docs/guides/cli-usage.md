@@ -95,11 +95,13 @@ The STDIO transport uses JSON-RPC 2.0 protocol for communication:
 
 ### Using with MCP Clients
 
-Many MCP clients can launch subprocess servers. Here's how to configure them:
+Configure MCP clients (Claude Desktop, Claude Code, VS Code, Cursor, etc.) to connect to your WordPress MCP servers. Many MCP clients can launch subprocess servers directly via STDIO; others need an HTTP proxy.
 
-#### Claude Desktop Configuration
+#### STDIO transport (local sites)
 
-```json
+Many MCP clients can launch subprocess servers. Point the client's config at the `wp` binary:
+
+```jsonc
 {
   "mcpServers": {
     "wordpress": {
@@ -108,14 +110,41 @@ Many MCP clients can launch subprocess servers. Here's how to configure them:
         "--path=/path/to/your/wordpress/site",
         "mcp-adapter",
         "serve",
-        "--server=your-server-id",
+        // Change the server ID and user as needed
+        "--server=mcp-adapter-default-server",
         "--user=admin"
       ]
+    },
+  }
+}
+```
+
+#### HTTP transport via proxy
+
+The [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automattic/mcp-wordpress-remote) proxy runs locally and translates STDIO-based MCP communication from AI clients into HTTP REST API calls that WordPress understands. Authentication uses [WordPress Application Passwords](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/).
+
+```jsonc
+{
+  "mcpServers": {
+    "wordpress": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        // Update these to match your environment details
+        "WP_API_URL": "http://your-site.test/wp-json/mcp/mcp-adapter-default-server",
+        "LOG_FILE": "/path/to/logs/mcp-adapter.log",
+        "WP_API_USERNAME": "your-username",
+        "WP_API_PASSWORD": "your-application-password"
+      }
     }
   }
 }
 ```
 
+For more information, see the [@automattic/mcp-wordpress-remote](https://www.npmjs.com/package/@automattic/mcp-wordpress-remote) package documentation.
 
 ### Development Workflow
 
@@ -148,7 +177,6 @@ wp mcp-adapter serve --user=editor
 # Run as specific user ID
 wp mcp-adapter serve --user=123
 ```
-
 
 ### Permission Debugging
 

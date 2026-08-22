@@ -10,10 +10,7 @@ Join the `#core-ai` channel [on WordPress Slack](http://wordpress.slack.com) ([s
 
 ## Coding standards
 
-In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/). All code in the MCP Adapter must follow these requirements:
-
-- **WordPress**: 6.9+
-- **PHP**: 7.4+
+In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/).
 
 We include [several tools](#useful-commands) to help ensure your code meets these standards.
 

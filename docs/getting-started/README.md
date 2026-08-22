@@ -114,8 +114,8 @@ curl -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
 
 ## Next Steps
 
+- **[Installation Guide](./installation.md)** - Detailed installation options
 - **[Creating Abilities](../guides/creating-abilities.md)** - Build tools, resources, and prompts
-- **[Installation Guide](installation.md)** - Detailed installation options
 - **[Architecture Overview](../architecture/overview.md)** - Understand system design
 - **[Error Handling](../guides/error-handling.md)** - Custom logging and monitoring
 - **[Transport Permissions](../guides/transport-permissions.md)** - Authentication and authorization
