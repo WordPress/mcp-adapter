@@ -144,7 +144,6 @@ The [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automatt
 }
 ```
 
-
 ### Development Workflow
 
 The CLI commands are particularly useful for development:
@@ -176,7 +175,6 @@ wp mcp-adapter serve --user=editor
 # Run as specific user ID
 wp mcp-adapter serve --user=123
 ```
-
 
 ### Permission Debugging
 
