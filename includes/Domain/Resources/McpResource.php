@@ -11,6 +11,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Domain\Utils\ThrowableGuardTrait;
@@ -251,11 +252,15 @@ final class McpResource implements McpComponentInterface {
 	 * @return mixed
 	 */
 	public function execute( $arguments ) {
-		// Ability-backed resources match existing behavior: no args passed to abilities.
+		// Ability-backed resources receive no ability input: the resources/read
+		// params (uri) are protocol-level, not ability arguments. The empty
+		// argument set is normalized so abilities with an object input schema
+		// receive an empty array instead of null, matching McpTool and McpPrompt.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, array() );
 
-			return self::guard( 'mcp_execution_failed', static fn() => $ability->execute() );
+			return self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		}
 
 		if ( null !== $this->handler ) {
@@ -275,11 +280,15 @@ final class McpResource implements McpComponentInterface {
 	 * @return bool|\WP_Error
 	 */
 	public function check_permission( $arguments ) {
-		// Ability-backed resources match existing behavior: no args passed to abilities.
+		// Ability-backed resources receive no ability input: the resources/read
+		// params (uri) are protocol-level, not ability arguments. The empty
+		// argument set is normalized so abilities with an object input schema
+		// receive an empty array instead of null, matching McpTool and McpPrompt.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, array() );
 
-			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions() );
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
 		}
 
 		if ( null !== $this->permission_callback ) {
