@@ -11,6 +11,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -269,10 +270,15 @@ final class McpResource implements McpComponentInterface {
 	 * @return mixed
 	 */
 	public function execute( $arguments ) {
-		// Ability-backed resources match existing behavior: no args passed to abilities.
+		// Ability-backed resources receive no ability input: the resources/read
+		// params (uri) are protocol-level, not ability arguments. The empty
+		// argument set is normalized so abilities with an object input schema
+		// receive an empty array instead of null, matching McpTool and McpPrompt.
 		if ( null !== $this->ability ) {
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, array() );
+
 			try {
-				return $this->ability->execute();
+				return $this->ability->execute( $args );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_execution_failed',
@@ -305,10 +311,15 @@ final class McpResource implements McpComponentInterface {
 	 * @return bool|\WP_Error
 	 */
 	public function check_permission( $arguments ) {
-		// Ability-backed resources match existing behavior: no args passed to abilities.
+		// Ability-backed resources receive no ability input: the resources/read
+		// params (uri) are protocol-level, not ability arguments. The empty
+		// argument set is normalized so abilities with an object input schema
+		// receive an empty array instead of null, matching McpTool and McpPrompt.
 		if ( null !== $this->ability ) {
+			$args = AbilityArgumentNormalizer::normalize( $this->ability, array() );
+
 			try {
-				return $this->ability->check_permissions();
+				return $this->ability->check_permissions( $args );
 			} catch ( \Throwable $throwable ) {
 				return new WP_Error(
 					'mcp_permission_check_failed',
