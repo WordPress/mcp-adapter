@@ -30,7 +30,8 @@ use WP_REST_Response;
  *
  * Tests cover:
  * - POST requests with JSON-RPC messages
- * - GET requests for SSE streaming (currently returns 405)
+ * - GET requests for SSE streaming (session/protocol validation; the actual
+ *   stream is only exercised via WP_REST_Server dispatch, not unit tests)
  * - DELETE requests for session termination
  * - OPTIONS requests for CORS preflight
  * - Session management
@@ -323,14 +324,71 @@ final class HttpTransportTest extends TestCase {
 
 	// ========== GET Request Tests ==========
 
-	public function test_get_request_for_sse_stream(): void {
+	public function test_get_request_for_sse_stream_without_session_id(): void {
 		$request = new WP_REST_Request( 'GET', '/test-mcp' );
 		$request->set_header( 'Accept', 'text/event-stream' );
 
 		$response = $this->transport->handle_request( $request );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
-		// SSE not implemented returns 405 with no body per HTTP standards
+		$this->assertEquals( 400, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertStringContainsString( 'Missing Mcp-Session-Id header', $data['error']['message'] );
+	}
+
+	public function test_get_request_for_sse_stream_with_valid_session(): void {
+		// First create a session
+		$init_request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		$init_response = $this->transport->handle_request( $init_request );
+		$this->assertArrayHasKey( 'result', $init_response->get_data(), 'Initialize must succeed' );
+
+		// The session header is set via a rest_post_dispatch filter which doesn't
+		// fire when calling handle_request() directly, so read the session ID
+		// straight from where it was persisted instead.
+		$sessions = get_user_meta( get_current_user_id(), self::session_meta_key(), true );
+		$this->assertNotEmpty( $sessions, 'Initialize must create a session in user meta' );
+		$session_id = (string) array_key_last( $sessions );
+
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		// Calling handle_request() directly never triggers the actual stream
+		// (that only happens via the `rest_pre_serve_request` filter during a
+		// real WP_REST_Server dispatch), so this assertion completes immediately.
+		$response = $this->transport->handle_request( $request );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+		$this->assertNull( $response->get_data() );
+	}
+
+	public function test_get_request_for_sse_stream_can_be_disabled_via_filter(): void {
+		add_filter( 'mcp_adapter_enable_http_sse_stream', '__return_false' );
+
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+
+		$response = $this->transport->handle_request( $request );
+
+		remove_filter( 'mcp_adapter_enable_http_sse_stream', '__return_false' );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
 		$this->assertEquals( 405, $response->get_status() );
 		$this->assertNull( $response->get_data() );
 	}

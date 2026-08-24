@@ -292,7 +292,7 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertNull( $response->get_data() );
 	}
 
-	public function test_handle_request_get_sse(): void {
+	public function test_handle_request_get_sse_without_session_id(): void {
 		$request = new WP_REST_Request( 'GET', '/test-mcp' );
 		$request->set_header( 'Accept', 'text/event-stream' );
 
@@ -301,8 +301,86 @@ final class HttpRequestHandlerTest extends TestCase {
 		$response = $this->handler->handle_request( $context );
 
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 400, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertStringContainsString( 'Missing Mcp-Session-Id header', $data['error']['message'] );
+	}
+
+	public function test_handle_request_get_sse_with_invalid_session_id(): void {
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+		$request->set_header( 'Mcp-Session-Id', 'invalid-session' );
+
+		$context = new HttpRequestContext( $request );
+
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 404, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertStringContainsString( 'Invalid or expired session', $data['error']['message'] );
+	}
+
+	public function test_handle_request_get_sse_with_valid_session_returns_immediately(): void {
+		$session_id = $this->initializeAndGetSessionId();
+
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		$context = new HttpRequestContext( $request );
+
+		// Calling the handler directly (as opposed to going through
+		// WP_REST_Server::serve_request()) must never block: the actual
+		// stream only runs from the `rest_pre_serve_request` filter.
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+		$this->assertNull( $response->get_data() );
+	}
+
+	public function test_handle_request_get_sse_with_unsupported_protocol_version_returns_error(): void {
+		$session_id = $this->initializeAndGetSessionId();
+
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+		$request->set_header( 'Mcp-Protocol-Version', '9999-99-99' );
+
+		$context = new HttpRequestContext( $request );
+
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 400, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertStringContainsString( 'Unsupported protocol version', $data['error']['message'] );
+	}
+
+	public function test_handle_request_get_sse_disabled_via_filter_returns_405(): void {
+		$session_id = $this->initializeAndGetSessionId();
+
+		add_filter( 'mcp_adapter_enable_http_sse_stream', '__return_false' );
+
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+		$request->set_header( 'Mcp-Session-Id', $session_id );
+
+		$context = new HttpRequestContext( $request );
+
+		$response = $this->handler->handle_request( $context );
+
+		remove_filter( 'mcp_adapter_enable_http_sse_stream', '__return_false' );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
 		$this->assertEquals( 405, $response->get_status() );
-		// SSE not implemented returns 405 with no body per HTTP standards
 		$this->assertNull( $response->get_data() );
 	}
 
