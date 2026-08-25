@@ -24,9 +24,9 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ## Migration guides
 
-- **[Composer library to canonical plugin](migration/composer-to-plugin.md)** - Moving off a bundled copy of MCP Adapter
-- **[Migrating to v0.3.0](migration/v0.3.0.md)** - Breaking changes and upgrade steps for v0.3.0
-- **[Migrating to v0.5.0](migration/v0.5.0.md)** - Breaking changes and upgrade steps for v0.5.0
+- **[Migrating to vx.y.z](migration/vx.y.z.md)**
+- **[Migrating to v0.5.0](migration/v0.5.0.md)**
+- **[Migrating to v0.3.0](migration/v0.3.0.md)**
 
 ## Troubleshooting
 

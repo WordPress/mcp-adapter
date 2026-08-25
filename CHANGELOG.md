@@ -4,13 +4,8 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
-### Fixed
-- A second copy of MCP Adapter loaded as a plugin no longer takes the site down. Because the package type is `wordpress-plugin`, Composer relocates a `composer require wordpress/mcp-adapter` install into `wp-content/plugins/`, where it can be activated alongside the canonical plugin. WordPress then loaded `mcp-adapter.php` twice and fataled with `Cannot redeclare WP\MCP\constants()`. The second copy now bails out instead.
-- The "Composer autoloader was not found" admin notice is no longer shown when the `WP\MCP\` classes are already provided by another autoloader. A copy installed as a Composer dependency has no `vendor/` directory of its own, because Composer flattens dependencies into the root project, so the notice pointed at a file that was never going to exist. A source checkout with genuinely missing dependencies still gets the notice.
-
-### Added
-- A `_doing_it_wrong()` notice when MCP Adapter is being loaded from anywhere other than the plugin, pointing developers at the `Requires Plugins` header. Three cases are covered: the plugin is not active and something else supplied the classes; a copy bundled inside another plugin won the autoload race and is running instead of the plugin; and a bundled copy is installed but dormant, which matters because which copy wins is decided by plugin load order and can change without anything being reconfigured. The last two are reported from the plugin bootstrap, since a bundled copy that wins may predate this check and cannot report its own takeover. Dormant copies are found by asking registered Composer autoloaders where they would resolve the class, so no filesystem scanning is involved. At most one notice is raised per request, it is only visible with `WP_DEBUG` enabled, and runtime behavior is unchanged.
-- A [migration guide](docs/migration/composer-to-plugin.md) for plugins that bundle MCP Adapter as a Composer library, covering the `Requires Plugins` header, removing the Jetpack Autoloader, and what still works during the transition.
+### Changed
+- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
 
 ## [0.6.1] - 2026-08-13
 

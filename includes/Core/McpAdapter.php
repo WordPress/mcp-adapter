@@ -58,8 +58,6 @@ final class McpAdapter {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
 
-			self::schedule_canonical_plugin_check();
-
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
 				add_action( 'init', array( self::$instance, 'init' ), 20 );
@@ -73,53 +71,6 @@ final class McpAdapter {
 	}
 
 	/**
-	 * Queues the check for whether the adapter is running from the canonical plugin.
-	 *
-	 * Deferred to `init` for two reasons. Every plugin file has been loaded by
-	 * then, so an active canonical plugin has certainly defined its constants and
-	 * cannot be mistaken for a bundled copy. And `_doing_it_wrong()` translates
-	 * its message, which must not happen before `init`.
-	 */
-	private static function schedule_canonical_plugin_check(): void {
-		if ( did_action( 'init' ) ) {
-			self::warn_if_not_canonical_plugin();
-
-			return;
-		}
-
-		add_action( 'init', array( self::class, 'warn_if_not_canonical_plugin' ), 0 );
-	}
-
-	/**
-	 * Warns when the adapter is running on a site with no MCP Adapter plugin.
-	 *
-	 * The MCP Adapter plugin is the canonical copy: it owns the `WP\MCP\`
-	 * namespace, the hooks, the REST routes, and the default server ID. Those are
-	 * all global, so a second copy does not coexist with it — it replaces it.
-	 * `WP_MCP_DIR` is defined by the plugin bootstrap, so its absence means the
-	 * plugin is not active and these classes were supplied by something else.
-	 *
-	 * The mirror case — the plugin *is* active, but a copy elsewhere won the
-	 * autoload race — is deliberately not handled here. When that happens this
-	 * class is the copy that won, and a release predating this check cannot
-	 * report its own takeover. `mcp-adapter.php` covers it instead, since the
-	 * plugin bootstrap runs whichever copy the autoloader resolved.
-	 *
-	 * @internal For use by instance initialization only.
-	 */
-	public static function warn_if_not_canonical_plugin(): void {
-		if ( defined( 'WP_MCP_DIR' ) ) {
-			return;
-		}
-
-		_doing_it_wrong(
-			self::class . '::instance',
-			esc_html__( 'The MCP Adapter plugin is not active, so MCP Adapter is running from another copy of its code. Install and activate the MCP Adapter plugin, and declare it from your own plugin with the "Requires Plugins" header. Loading MCP Adapter any other way, such as bundling it as a Composer library, is not supported and may stop working in a future release.', 'mcp-adapter' ),
-			'0.6.2'
-		);
-	}
-
-	/**
 	 * Initialize the registry
 	 *
 	 * @internal For use by instance initialization only.
@@ -128,6 +79,8 @@ final class McpAdapter {
 		if ( self::$initialized ) {
 			return;
 		}
+
+		$this->check_plugin_loaded();
 
 		$this->maybe_create_default_server();
 
@@ -145,6 +98,33 @@ final class McpAdapter {
 		do_action( 'mcp_adapter_init', $this );
 		$this->register_wp_cli_commands();
 		self::$initialized = true;
+	}
+
+	/**
+	 * Checks whether the MCP Adapter plugin is loaded and logs a deprecation notice if not.
+	 *
+	 * @internal
+	 */
+	private function check_plugin_loaded(): void {
+		// The constant is defined in Plugin::constants() and will not exist if McpAdapter is only loaded as a library.
+		if ( defined( 'WP_MCP_VERSION' ) ) {
+			return;
+		}
+
+		_deprecated_function(
+			self::class,
+			'x.y.z',
+			sprintf(
+				// translators: %s: class name
+				esc_html__( '%s is currently loaded as a bundled dependency instead of via the canonical MCP Adapter plugin. This is not recommended and may not be supported in future versions. Please install the MCP Adapter plugin and migrate accordingly.', 'mcp-adapter' ),
+				self::class
+			)
+		);
+
+		// @todo Add an admin notice with an installation link once the plugin is on w.org.
+
+		// Redefine the version constant so bad plugins don't break those that follow best practices.
+		define( 'WP_MCP_VERSION', self::VERSION );
 	}
 
 	/**

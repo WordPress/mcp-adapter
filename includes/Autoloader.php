@@ -40,25 +40,21 @@ final class Autoloader {
 			return self::$is_loaded;
 		}
 
+		// If the class already exists that means another copy of the plugin is already loaded.
+		if ( self::is_loaded_elsewhere() ) {
+			self::$is_loaded = true;
+
+			return self::$is_loaded;
+		}
+
+		// This is conditionally redefined in Plugin::constants().
+		define( 'WP_MCP_DIR', plugin_dir_path( __DIR__ ) );
+
 		// Jetpack Autoloader uses `autoload_packages.php` instead of `autoload.php`.
 		$autoloader = WP_MCP_DIR . '/vendor/autoload_packages.php';
 
 		if ( is_readable( $autoloader ) ) {
 			self::$is_loaded = self::require_autoloader( $autoloader );
-
-			return self::$is_loaded;
-		}
-
-		/*
-		 * There is no `vendor/` directory next to this copy. That is expected
-		 * when the copy is a Composer dependency of another project, because
-		 * Composer flattens dependencies into the root project's `vendor/`
-		 * directory rather than nesting one per package. In that case the
-		 * `WP\MCP\` classes are already registered with the root project's
-		 * autoloader and there is nothing left for us to load.
-		 */
-		if ( self::is_autoloaded_elsewhere() ) {
-			self::$is_loaded = true;
 
 			return self::$is_loaded;
 		}
@@ -69,19 +65,69 @@ final class Autoloader {
 	}
 
 	/**
-	 * Checks whether the plugin classes are already resolvable via an autoloader
-	 * registered by another project.
+	 * Checks if the the plugin classes are already registered with another autoloader.
 	 */
-	private static function is_autoloaded_elsewhere(): bool {
-		return class_exists( Plugin::class );
+	private static function is_loaded_elsewhere(): bool {
+		if ( ! class_exists( Core\McpAdapter::class ) ) {
+			return false;
+		}
+
+		self::loaded_elsewhere_notice();
+		return true;
 	}
 
 	/**
-	 * Loads the autoloader file.
+	 * Displays a notice if the plugin classes are already registered with another autoloader.
+	 */
+	private static function loaded_elsewhere_notice(): void {
+		// Defer notice until translation functions are available.
+		add_action(
+			'init',
+			static function () {
+				$error_message = __( 'Another version of MCP Adapter is already loaded and will be used instead of this one. This is usually caused by an outdated plugin bundling its own copy MCP Adapter as a dependency. Update that plugin to the latest version to ensure compatibility.', 'mcp-adapter' );
+
+				// Log a notice.
+				_doing_it_wrong(
+					Core\McpAdapter::class,
+					esc_html( $error_message ),
+					'x.y.z'
+				);
+
+				// Log an admin notice.
+				$hooks = array(
+					'admin_notices',
+					'network_admin_notices',
+				);
+				foreach ( $hooks as $hook ) {
+					add_action(
+						$hook,
+						static function () use ( $error_message ) {
+							wp_admin_notice(
+								esc_html( $error_message ),
+								array(
+									'type'    => 'error',
+									'dismiss' => false,
+								),
+							);
+						}
+					);
+				}
+			}
+		);
+	}
+
+	/**
+	 * Attempts to load the autoloader file, if it exists.
 	 *
 	 * @param string $autoloader_file The path to the autoloader file.
 	 */
 	private static function require_autoloader( string $autoloader_file ): bool {
+		if ( ! is_readable( $autoloader_file ) ) {
+			self::missing_autoloader_notice();
+
+			return false;
+		}
+
 		return (bool) require_once $autoloader_file; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable -- Autoloader is a Composer file.
 	}
 
@@ -89,30 +135,39 @@ final class Autoloader {
 	 * Displays a notice if the autoloader is missing.
 	 */
 	private static function missing_autoloader_notice(): void {
+		// Defer notice until translation functions are available.
+		add_action(
+			'init',
+			static function () {
+				$error_message = __( 'MCP Adapter: The Composer autoloader was not found. If you installed the plugin from the GitHub source code, make sure to run `composer install`.', 'mcp-adapter' );
 
-		$hooks = array(
-			'admin_notices',
-			'network_admin_notices',
-		);
+				// Log a notice.
+				_doing_it_wrong(
+					self::class,
+					esc_html( $error_message ),
+					'x.y.z'
+				);
 
-		foreach ( $hooks as $hook ) {
-			add_action(
-				$hook,
-				static function () {
-					$error_message = __( 'MCP Adapter: The Composer autoloader was not found. If you installed the plugin from the GitHub source code, make sure to run `composer install`.', 'mcp-adapter' );
-
-					if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-						error_log( esc_html( $error_message ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- This is a development notice.
-					}
-					?>
-					<div class="error notice">
-						<p>
-							<?php echo esc_html( $error_message ); ?>
-						</p>
-					</div>
-					<?php
+				// Log an admin notice.
+				$hooks = array(
+					'admin_notices',
+					'network_admin_notices',
+				);
+				foreach ( $hooks as $hook ) {
+					add_action(
+						$hook,
+						static function () use ( $error_message ) {
+							wp_admin_notice(
+								esc_html( $error_message ),
+								array(
+									'type'    => 'error',
+									'dismiss' => false,
+								),
+							);
+						}
+					);
 				}
-			);
-		}
+			}
+		);
 	}
 }
