@@ -18,12 +18,12 @@ The MCP Adapter bridges WordPress's Abilities API with the [Model Context Protoc
 
 **Features:**
 
-* **Ability-to-MCP Conversion** – Automatically converts WordPress abilities into MCP tools, resources, and prompts.
-* **Multi-Server Management** – Create and manage multiple MCP servers with unique configurations.
-* **Extensible Transport Layer** – Built-in HTTP and STDIO transports, plus support for custom transport protocols.
-* **Flexible Error Handling** – Default WordPress-compatible error logging with support for custom, server-specific handlers.
-* **Observability** – Zero-overhead metrics tracking with configurable handlers.
-* **Permission Control** – Granular, configurable permission checking for all exposed functionality.
+* **Ability-to-MCP Conversion** - Automatically converts WordPress abilities into MCP tools, resources, and prompts.
+* **Multi-Server Management** - Create and manage multiple MCP servers with unique configurations.
+* **Extensible Transport Layer** - Built-in HTTP and STDIO transports, plus support for custom transport protocols.
+* **Flexible Error Handling** - Default WordPress-compatible error logging with support for custom, server-specific handlers.
+* **Observability** - Zero-overhead metrics tracking with configurable handlers.
+* **Permission Control** - Granular, configurable permission checking for all exposed functionality.
 
 == Installation ==
 
