@@ -48,14 +48,14 @@ class McpServer {
 	/**
 	 * Server URL.
 	 *
-	 * @var string
+	 * @var non-falsy-string
 	 */
 	private string $server_route_namespace;
 
 	/**
 	 * Server route.
 	 *
-	 * @var string
+	 * @var non-falsy-string
 	 */
 	private string $server_route;
 
@@ -112,12 +112,12 @@ class McpServer {
 	/**
 	 * Constructor.
 	 *
-	 * @param string $server_id Unique identifier for the server.
-	 * @param string $server_route_namespace Server route namespace.
-	 * @param string $server_route Server route.
-	 * @param string $server_name Human-readable server name.
-	 * @param string $server_description Server description.
-	 * @param string $server_version Server version.
+	 * @param string           $server_id Unique identifier for the server.
+	 * @param non-falsy-string $server_route_namespace Server route namespace.
+	 * @param non-falsy-string $server_route Server route.
+	 * @param string           $server_name Human-readable server name.
+	 * @param string           $server_description Server description.
+	 * @param string           $server_version Server version.
 	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
 	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
 	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
@@ -264,7 +264,7 @@ class McpServer {
 	/**
 	 * Get server route namespace.
 	 *
-	 * @return string
+	 * @return non-falsy-string
 	 */
 	public function get_server_route_namespace(): string {
 		return $this->server_route_namespace;
@@ -273,7 +273,7 @@ class McpServer {
 	/**
 	 * Get server route.
 	 *
-	 * @return string
+	 * @return non-falsy-string
 	 */
 	public function get_server_route(): string {
 		return $this->server_route;
