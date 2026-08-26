@@ -26,8 +26,8 @@ final class StdioServerBridgeTest extends TestCase {
 	private StdioServerBridge $bridge;
 	private McpServer $server;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		// Set current user for session management
 		wp_set_current_user( 1 );
@@ -68,7 +68,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -103,7 +105,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -123,7 +127,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$result = $handle_request_method->invoke( $this->bridge, 'invalid json' );
 
@@ -141,7 +147,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -164,7 +172,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -187,7 +197,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection             = new \ReflectionClass( $this->bridge );
 		$format_response_method = $reflection->getMethod( 'format_response' );
-		$format_response_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$format_response_method->setAccessible( true );
+		}
 
 		$result = array(
 			'protocolVersion' => '2025-11-25',
@@ -213,7 +225,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection             = new \ReflectionClass( $this->bridge );
 		$format_response_method = $reflection->getMethod( 'format_response' );
-		$format_response_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$format_response_method->setAccessible( true );
+		}
 
 		$result = array(
 			'error' => array(
@@ -243,7 +257,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection          = new \ReflectionClass( $this->bridge );
 		$create_error_method = $reflection->getMethod( 'create_error_response' );
-		$create_error_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$create_error_method->setAccessible( true );
+		}
 
 		$response = $create_error_method->invoke(
 			$this->bridge,
@@ -271,7 +287,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection          = new \ReflectionClass( $this->bridge );
 		$create_error_method = $reflection->getMethod( 'create_error_response' );
-		$create_error_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$create_error_method->setAccessible( true );
+		}
 
 		$response = $create_error_method->invoke(
 			$this->bridge,
@@ -294,7 +312,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private property
 		$reflection      = new \ReflectionClass( $this->bridge );
 		$router_property = $reflection->getProperty( 'request_router' );
-		$router_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$router_property->setAccessible( true );
+		}
 
 		$router = $router_property->getValue( $this->bridge );
 
@@ -305,7 +325,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private property
 		$reflection          = new \ReflectionClass( $this->bridge );
 		$is_running_property = $reflection->getProperty( 'is_running' );
-		$is_running_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$is_running_property->setAccessible( true );
+		}
 
 		// Initially should be false
 		$this->assertFalse( $is_running_property->getValue( $this->bridge ) );
@@ -321,7 +343,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -344,7 +368,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with object params (should be converted to array)
 		$json_input = wp_json_encode(
@@ -367,7 +393,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with string params (should be converted to empty array)
 		$json_input = wp_json_encode(
@@ -391,7 +419,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with a method that might cause issues
 		$json_input = wp_json_encode(
@@ -428,7 +458,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with numeric ID
 		$json_input = wp_json_encode(
@@ -457,7 +489,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with a JSON string that parses to a non-array (e.g., a string)
 		$json_input = '"just a string"';
@@ -475,7 +509,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with JSON null
 		$json_input = 'null';
@@ -492,7 +528,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -516,7 +554,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -540,7 +580,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection             = new \ReflectionClass( $this->bridge );
 		$format_response_method = $reflection->getMethod( 'format_response' );
-		$format_response_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$format_response_method->setAccessible( true );
+		}
 
 		// Test error result with missing optional fields (code and message)
 		$result = array(
@@ -562,7 +604,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with string ID (JSON-RPC allows string IDs)
 		$json_input = wp_json_encode(
@@ -586,7 +630,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test with null ID (should be treated as notification but with explicit null)
 		$json_input = wp_json_encode(
@@ -608,7 +654,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -631,7 +679,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -654,7 +704,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		$json_input = wp_json_encode(
 			array(
@@ -677,7 +729,9 @@ final class StdioServerBridgeTest extends TestCase {
 		// Use reflection to access private method
 		$reflection            = new \ReflectionClass( $this->bridge );
 		$handle_request_method = $reflection->getMethod( 'handle_request' );
-		$handle_request_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$handle_request_method->setAccessible( true );
+		}
 
 		// Test request without params field - should default to empty array
 		$json_input = wp_json_encode(

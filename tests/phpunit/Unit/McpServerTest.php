@@ -103,7 +103,9 @@ final class McpServerTest extends TestCase {
 		// Access private property via reflection
 		$reflection          = new \ReflectionClass( $server );
 		$validation_property = $reflection->getProperty( 'mcp_validation_enabled' );
-		$validation_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$validation_property->setAccessible( true );
+		}
 
 		$this->assertTrue( $validation_property->getValue( $server ) );
 

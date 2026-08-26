@@ -70,8 +70,8 @@ final class McpComponentRegistryTest extends TestCase {
 	private McpComponentRegistry $registry;
 	private McpServer $server;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		// Enable component registration recording for tests
 		add_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
@@ -95,10 +95,10 @@ final class McpComponentRegistryTest extends TestCase {
 		);
 	}
 
-	public function tear_down(): void {
+	public function tearDown(): void {
 		// Remove the filter to ensure clean state
 		remove_filter( 'mcp_adapter_observability_record_component_registration', '__return_true' );
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	public function test_register_tools_with_valid_ability(): void {

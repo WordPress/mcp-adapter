@@ -20,8 +20,8 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 
 	private string $original_error_log;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		// Skip tests that require file system access in containerized environment
 		if ( ! is_writable( sys_get_temp_dir() ) ) {
@@ -40,13 +40,13 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 		ini_set( 'error_log', $temp_log );
 	}
 
-	public function tear_down(): void {
+	public function tearDown(): void {
 		// Restore original error log setting
 		if ( $this->original_error_log ) {
 			ini_set( 'error_log', $this->original_error_log );
 		}
 
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	public function test_implements_observability_interface(): void {
@@ -167,7 +167,9 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 		// Use reflection to access private method
 		$reflection         = new \ReflectionClass( ErrorLogMcpObservabilityHandler::class );
 		$format_tags_method = $reflection->getMethod( 'format_tags' );
-		$format_tags_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$format_tags_method->setAccessible( true );
+		}
 
 		$tags = array(
 			'key1' => 'value1',
@@ -187,7 +189,9 @@ final class ErrorLogMcpObservabilityHandlerTest extends TestCase {
 		// Use reflection to access private method
 		$reflection         = new \ReflectionClass( ErrorLogMcpObservabilityHandler::class );
 		$format_tags_method = $reflection->getMethod( 'format_tags' );
-		$format_tags_method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$format_tags_method->setAccessible( true );
+		}
 
 		$result = $format_tags_method->invoke( null, array() );
 

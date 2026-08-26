@@ -25,8 +25,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 	 */
 	private $user_id;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 		$this->user_id = $this->factory()->user->create(
 			array(
 				'user_login' => 'testuser',
@@ -39,10 +39,10 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		wp_set_current_user( $this->user_id );
 	}
 
-	public function tear_down(): void {
+	public function tearDown(): void {
 		// Reset current user after each test
 		wp_set_current_user( 0 );
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	public function test_register_creates_ability(): void {

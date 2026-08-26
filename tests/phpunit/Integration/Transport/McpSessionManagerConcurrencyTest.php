@@ -27,8 +27,8 @@ final class McpSessionManagerConcurrencyTest extends TestCase {
 	/**
 	 * Create the test user.
 	 */
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		$this->test_user_id = self::factory()->user->create();
 	}
@@ -36,11 +36,11 @@ final class McpSessionManagerConcurrencyTest extends TestCase {
 	/**
 	 * Delete the test user.
 	 */
-	public function tear_down(): void {
+	public function tearDown(): void {
 		wp_delete_user( $this->test_user_id );
 		self::commit_transaction();
 
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	/**
