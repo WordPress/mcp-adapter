@@ -31,7 +31,7 @@
 	},
 	"devDependencies": {
 		"@wordpress/env": "^11.13.0",
-		"@wordpress/scripts": "^32.6.0",
+		"@wordpress/scripts": "^34.1.0",
 		"@wordpress/prettier-config": "^4.53.0"
 	},
 	"overrides": {
@@ -42,7 +42,8 @@
 		"prettier": "npm:wp-prettier@^3",
 		"react": "^18.3.1",
 		"react-dom": "^18.3.1",
-		"serialize-javascript@<=7.0.2": ">=7.0.3",
-		"webpack-dev-server@<=5.2.0": ">=5.2.1"
+		"serialize-javascript@<7.0.3": ">=7.0.3",
+		"uuid@<11.1.1": ">=11.1.1",
+		"webpack-dev-server@<5.2.1": ">=5.2.1"
 	}
 }
