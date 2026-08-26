@@ -69,6 +69,13 @@ final class Autoloader {
 	 */
 	private static function is_loaded_elsewhere(): bool {
 		if ( ! class_exists( Core\McpAdapter::class ) ) {
+			// Recheck this later in case other plugins haven't been loaded. No reason to block the autoloader.
+			add_action(
+				'plugins_loaded',
+				static function () {
+					self::is_loaded_elsewhere();
+				}
+			);
 			return false;
 		}
 
@@ -84,7 +91,7 @@ final class Autoloader {
 		add_action(
 			'init',
 			static function () {
-				$error_message = __( 'Another version of MCP Adapter is already loaded and will be used instead of this one. This is usually caused by an outdated plugin bundling its own copy MCP Adapter as a dependency. Update that plugin to the latest version to ensure compatibility.', 'mcp-adapter' );
+				$error_message = __( 'Another version of MCP Adapter is already loaded and may cause conflicts. This is usually caused by an outdated plugin bundling its own copy MCP Adapter as a dependency. Update that plugin to the latest version to ensure compatibility.', 'mcp-adapter' );
 
 				// Log a notice.
 				_doing_it_wrong(
