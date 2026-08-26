@@ -27,7 +27,7 @@ jobs:
       # The `mcp-adapter` name is referenced by the publish workflow's
       # blueprint via the {{ARTIFACT_URL:mcp-adapter}} placeholder.
       artifacts: mcp-adapter=mcp-adapter.zip
-      php-version: '8.2'
+      php-version: '8.5'
       node-version: '22'
       build-command: |
         composer install --no-dev --prefer-dist --no-interaction --no-progress

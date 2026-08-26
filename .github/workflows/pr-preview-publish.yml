@@ -25,6 +25,9 @@ jobs:
             "php": "8.5",
             "wp": "latest"
           },
+          "features": {
+            "networking": true
+          },
           "steps": [
             {
               "step": "installPlugin",
