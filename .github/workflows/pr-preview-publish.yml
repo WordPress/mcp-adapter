@@ -1,0 +1,40 @@
+name: PR Preview - Publish
+
+on:
+  workflow_run:
+    workflows: ['PR Preview - Build']
+    types:
+      - completed
+
+permissions:
+  contents: write # Required to host the built zip on a public release URL.
+  pull-requests: write # Required to update the pull request description.
+
+jobs:
+  publish:
+    name: Publish Playground preview
+    uses: WordPress/action-wp-playground-pr-preview/.github/workflows/preview-publish.yml@43fc435558bc6cee69f5b214d6b8ca4f9f80c31d # v3
+    with:
+      # Mirrors the live demo blueprint from .wordpress-org/blueprints/blueprint.json.
+      blueprint: |
+        {
+          "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+          "login": true,
+          "landingPage": "/wp-admin/plugins.php",
+          "preferredVersions": {
+            "php": "8.5",
+            "wp": "latest"
+          },
+          "steps": [
+            {
+              "step": "installPlugin",
+              "pluginData": {
+                "resource": "url",
+                "url": "{{ARTIFACT_URL:mcp-adapter}}"
+              },
+              "options": {
+                "activate": true
+              }
+            }
+          ]
+        }
