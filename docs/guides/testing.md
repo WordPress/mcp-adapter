@@ -152,7 +152,7 @@ npm run wp-env:test start
 
 ## Continuous Integration
 
-The repository has comprehensive CI testing via GitHub Actions ([`.github/workflows/test.yml`](.github/workflows/test.yml)):
+The repository has comprehensive CI testing via GitHub Actions ([`.github/workflows/test.yml`](../../.github/workflows/test.yml)):
 
 **Automated Checks:**
 - PHPUnit tests via `npm run test:php`
