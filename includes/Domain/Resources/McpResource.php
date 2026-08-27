@@ -252,10 +252,7 @@ final class McpResource implements McpComponentInterface {
 	 * @return mixed
 	 */
 	public function execute( $arguments ) {
-		// Ability-backed resources receive no ability input: the resources/read
-		// params (uri) are protocol-level, not ability arguments. The empty
-		// argument set is normalized so abilities with an object input schema
-		// receive an empty array instead of null, matching McpTool and McpPrompt.
+		// resources/read params are protocol-level, so the ability gets no input.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
 			$args    = AbilityArgumentNormalizer::normalize( $ability, array() );
@@ -280,10 +277,7 @@ final class McpResource implements McpComponentInterface {
 	 * @return bool|\WP_Error
 	 */
 	public function check_permission( $arguments ) {
-		// Ability-backed resources receive no ability input: the resources/read
-		// params (uri) are protocol-level, not ability arguments. The empty
-		// argument set is normalized so abilities with an object input schema
-		// receive an empty array instead of null, matching McpTool and McpPrompt.
+		// resources/read params are protocol-level, so the ability gets no input.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
 			$args    = AbilityArgumentNormalizer::normalize( $ability, array() );
