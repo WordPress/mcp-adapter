@@ -56,10 +56,10 @@ final class McpResourceTest extends TestCase {
 				'category'            => 'test',
 				'input_schema'        => array( 'type' => 'object' ),
 				'execute_callback'    => static function ( $input ) {
-					return is_array( $input ) ? 'object schema content' : 'unexpected input';
+					return array() === $input ? 'object schema content' : 'unexpected input';
 				},
 				'permission_callback' => static function ( $input ) {
-					return is_array( $input );
+					return array() === $input;
 				},
 				'meta'                => array(
 					'mcp' => array(
@@ -77,17 +77,17 @@ final class McpResourceTest extends TestCase {
 		$mcp_resource = McpResource::fromAbility( $ability );
 		$this->assertNotWPError( $mcp_resource );
 
-		// resources/read passes protocol-level params (uri); the ability must
-		// receive a normalized empty argument set that satisfies its object
-		// schema instead of a zero-argument call that validates null against it.
-		$permission = $mcp_resource->check_permission( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
-		$this->assertTrue( $permission );
+		// The uri is protocol-level, so the ability must receive [], not null.
+		try {
+			$permission = $mcp_resource->check_permission( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
+			$this->assertTrue( $permission );
 
-		$result = $mcp_resource->execute( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
-		$this->assertNotWPError( $result );
-		$this->assertSame( 'object schema content', $result );
-
-		wp_unregister_ability( 'test/resource-object-schema' );
+			$result = $mcp_resource->execute( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
+			$this->assertNotWPError( $result );
+			$this->assertSame( 'object schema content', $result );
+		} finally {
+			wp_unregister_ability( 'test/resource-object-schema' );
+		}
 	}
 
 	public function test_permission_callback_supports_zero_arg_callable(): void {
