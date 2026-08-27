@@ -57,6 +57,8 @@
 	<rule ref="WordPress-VIP-Go">
 		<!-- Deprecated: @todo remove in PHPCS 4.0 -->
 		<exclude name="WordPressVIPMinimum.JS" />
+		<!-- Support non-VIP environments -->
+		<exclude name="WordPressVIPMinimum.Classes.RestrictedExtendClasses.wp_cli" />
 	</rule>
 	<rule ref="WordPress-Extra">
 		<!-- Needed to typehint, see: https://github.com/WordPress/WordPress-Coding-Standards/issues/403 -->
