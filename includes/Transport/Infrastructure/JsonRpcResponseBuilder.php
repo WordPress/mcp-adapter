@@ -26,7 +26,7 @@ class JsonRpcResponseBuilder {
 	 * @param mixed                 $result The result data to return.
 	 *
 	 * @return array{
-	 * 	jsonrpc: string,
+	 *  jsonrpc: string,
 	 *  id: string|int|float|null,
 	 *  result: object
 	 * } The formatted JSON-RPC response.
@@ -47,7 +47,7 @@ class JsonRpcResponseBuilder {
 	 * @param array{code: int, message: string, data?: mixed} $error     The error array.
 	 *
 	 * @return array{
-	 * 	jsonrpc: string,
+	 *  jsonrpc: string,
 	 *  id: string|int|float|null,
 	 *  error: array{
 	 *    code: int,
