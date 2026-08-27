@@ -254,10 +254,10 @@ class HttpRequestHandler {
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
 	 * @return array{
-		 *   code: int,
-		 *   message: string,
-		 *   data: mixed|null
-		 * }|null Null when the header is absent or valid, error payload otherwise.
+	 *   code: int,
+	 *   message: string,
+	 *   data: mixed|null
+	 * }|null Null when the header is absent or valid, error payload otherwise.
 	 */
 	private function validate_protocol_version_header( HttpRequestContext $context ): ?array {
 		if ( null === $context->protocol_version ) {
