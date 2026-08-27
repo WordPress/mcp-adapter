@@ -130,7 +130,7 @@ final class StdioServerBridge {
 					// Use fwrite() for precise binary-safe JSON-RPC protocol communication.
 					// WP_CLI output functions would add formatting/prefixes that break MCP protocol.
 					// MCP requires exact control over stdout for machine-to-machine communication.
-					fwrite( STDOUT, $response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- This is for CLI output.
+					fwrite( STDOUT, $response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite, WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- This is for CLI output.
 					fflush( STDOUT );
 				}
 			} catch ( \Throwable $e ) {
@@ -150,7 +150,7 @@ final class StdioServerBridge {
 					)
 				);
 
-				fwrite( STDOUT, $error_response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- This is for CLI output.
+				fwrite( STDOUT, $error_response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- This is for CLI output.
 				fflush( STDOUT );
 			}
 		}
@@ -164,7 +164,7 @@ final class StdioServerBridge {
 	 * @param string $message The message to log.
 	 */
 	private function log_to_stderr( string $message ): void {
-		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- This is for CLI output.
+		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- This is for CLI output.
 	}
 
 	/**
