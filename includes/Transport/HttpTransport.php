@@ -41,12 +41,20 @@ class HttpTransport implements McpRestTransportInterface {
 	protected HttpRequestHandler $request_handler;
 
 	/**
-	 * Initialize the class and register routes
+	 * Initialize the transport with the provided context.
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context The transport context.
 	 */
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->request_handler = new HttpRequestHandler( $transport_context );
+	}
+
+	/**
+	 * Boot the transport and register WordPress hooks.
+	 *
+	 * Called by McpTransportFactory after construction so constructors stay free of hook side effects.
+	 */
+	public function boot(): void {
 		add_action( 'rest_api_init', array( $this, 'register_routes' ), 16 );
 	}
 

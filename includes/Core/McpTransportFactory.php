@@ -83,8 +83,9 @@ class McpTransportFactory {
 			}
 
 			// Interface-based instantiation with dependency injection
-			$context = $this->create_transport_context();
-			new $mcp_transport( $context );
+			$context   = $this->create_transport_context();
+			$transport = new $mcp_transport( $context );
+			$transport->boot();
 		}
 	}
 

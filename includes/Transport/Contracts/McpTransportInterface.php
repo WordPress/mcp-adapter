@@ -29,6 +29,14 @@ interface McpTransportInterface {
 	public function __construct( McpTransportContext $context );
 
 	/**
+	 * Boot the transport after construction.
+	 *
+	 * Register WordPress hooks here rather than in the constructor.
+	 * Called by McpTransportFactory immediately after instantiation.
+	 */
+	public function boot(): void;
+
+	/**
 	 * Register transport-specific routes.
 	 *
 	 * Called during WordPress REST API initialization to register
