@@ -4,7 +4,9 @@ Part of the [**AI Building Blocks for WordPress** initiative](https://make.wordp
 
 The official WordPress package for MCP integration that exposes WordPress abilities as [Model Context Protocol (MCP)](https://modelcontextprotocol.io) tools, resources, and prompts for AI agents.
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/WordPress/mcp-adapter)
+[![WordPress Playground Demo](https://img.shields.io/wordpress/plugin/v/mcp-adapter?logo=wordpress&logoColor=FFFFFF&label=Live%20Demo&labelColor=3858E9&color=3858E9)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/WordPress/mcp-adapter/trunk/.wordpress-org/blueprints/blueprint.json)
+
+[![Test](https://github.com/WordPress/mcp-adapter/actions/workflows/test.yml/badge.svg)](https://github.com/WordPress/mcp-adapter/actions/workflows/test.yml) [![Plugin Check](https://github.com/WordPress/mcp-adapter/actions/workflows/plugin-check.yml/badge.svg)](https://github.com/WordPress/mcp-adapter/actions/workflows/plugin-check.yml) [![Dependency Review](https://github.com/WordPress/mcp-adapter/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/WordPress/mcp-adapter/actions/workflows/dependency-review.yml)
 
 ## Overview
 
