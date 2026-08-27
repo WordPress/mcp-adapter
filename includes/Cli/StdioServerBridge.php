@@ -260,10 +260,10 @@ final class StdioServerBridge {
 	/**
 	 * Create a JSON-RPC error response.
 	 *
-	 * @param mixed $id The request ID (can be null).
-	 * @param int $code The error code.
-	 * @param string $message The error message.
-	 * @param string $data Optional error data.
+	 * @param int|string|float|null $id      The request ID, parsed from the JSON-RPC request (or null for notifications).
+	 * @param int                   $code    The error code.
+	 * @param string                $message The error message.
+	 * @param string                $data    Optional error data.
 	 *
 	 * @return string The JSON error response string.
 	 */
@@ -305,7 +305,7 @@ final class StdioServerBridge {
 	 * Format a handler result as a JSON-RPC response.
 	 *
 	 * @param array<string,mixed> $result The handler result.
-	 * @param mixed $id The request ID.
+	 * @param int|string|float    $id     The request ID, parsed from the JSON-RPC request.
 	 *
 	 * @return string The JSON-RPC response string.
 	 */

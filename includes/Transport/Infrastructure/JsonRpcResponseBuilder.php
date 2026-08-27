@@ -22,10 +22,14 @@ class JsonRpcResponseBuilder {
 	/**
 	 * Create a JSON-RPC 2.0 success response.
 	 *
-	 * @param mixed $request_id The request ID from the original JSON-RPC request (string, number, or null).
-	 * @param mixed $result The result data to return.
+	 * @param string|int|float|null $request_id The request ID from the original JSON-RPC request.
+	 * @param mixed                 $result The result data to return.
 	 *
-	 * @return array The formatted JSON-RPC response.
+	 * @return array{
+	 * 	jsonrpc: string,
+	 *  id: string|int|float|null,
+	 *  result: object
+	 * } The formatted JSON-RPC response.
 	 */
 	public static function create_success_response( $request_id, $result ): array {
 		return array(
@@ -39,10 +43,18 @@ class JsonRpcResponseBuilder {
 	/**
 	 * Create a JSON-RPC 2.0 error response.
 	 *
-	 * @param mixed $request_id The request ID from the original JSON-RPC request (string, number, or null).
-	 * @param array $error The error array with 'code', 'message', and optional 'data'.
+	 * @param string|int|float|null                          $request_id The request ID from the original JSON-RPC request.
+	 * @param array{code: int, message: string, data?: mixed} $error     The error array.
 	 *
-	 * @return array The formatted JSON-RPC error response.
+	 * @return array{
+	 * 	jsonrpc: string,
+	 *  id: string|int|float|null,
+	 *  error: array{
+	 *    code: int,
+	 *    message: string,
+	 *    data?: mixed
+	 *  }
+	 * } The formatted JSON-RPC error response.
 	 */
 	public static function create_error_response( $request_id, array $error ): array {
 		return array(
