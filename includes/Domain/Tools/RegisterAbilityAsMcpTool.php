@@ -14,7 +14,6 @@ use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
 use WP_Error;
 
 /**
@@ -45,15 +44,15 @@ class RegisterAbilityAsMcpTool {
 	}
 
 	/**
-	 * Build a clean Tool DTO and adapter metadata for internal wiring.
+	 * Build clean revision-neutral tool data and adapter metadata.
 	 *
-	 * This method returns a protocol-only Tool DTO and provides the adapter metadata
-	 * separately. This keeps the DTO stable across MCP spec changes and avoids coupling internal execution
+	 * This method returns protocol-only data and provides the adapter metadata
+	 * separately. Projection through each selected MCP schema happens in McpTool.
 	 * wiring to protocol surfaces.
 	 *
 	 * @param \WP_Ability $ability The ability.
 	 *
-	 * @return array{tool: \WP\McpSchema\Server\Tools\DTO\Tool, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @return array{tool_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
 	 *
 	 */
@@ -65,38 +64,14 @@ class RegisterAbilityAsMcpTool {
 			return $data;
 		}
 
-		try {
-			$tool_dto = ToolDto::fromArray( $data['tool_data'] );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_tool_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Tool DTO for ability %1$s: %2$s', 'mcp-adapter' ),
-					$ability->get_name(),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
-
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpToolValidator::validate_tool_dto( $tool_dto );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
-		}
-
 		return array(
-			'tool'         => $tool_dto,
+			'tool_data'    => $data['tool_data'],
 			'adapter_meta' => $data['adapter_meta'],
 		);
 	}
 
 	/**
-	 * Build Tool DTO data and adapter metadata.
+	 * Build tool data and adapter metadata.
 	 *
 	 * @return array{tool_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
 	 * @since 0.5.0
@@ -182,7 +157,7 @@ class RegisterAbilityAsMcpTool {
 
 		// Build Tool `_meta`:
 		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
-		// - Adapter metadata is NEVER included in protocol DTO meta; it is returned separately in adapter_meta.
+		// - Adapter metadata is NEVER included in protocol meta; it is returned separately in adapter_meta.
 		$tool_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
 		if ( null !== $tool_meta ) {
 			$tool_data['_meta'] = $tool_meta;

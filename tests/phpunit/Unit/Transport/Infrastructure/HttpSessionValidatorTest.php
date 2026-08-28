@@ -199,7 +199,36 @@ final class HttpSessionValidatorTest extends TestCase {
 		$result = HttpSessionValidator::validate_session_header( $context );
 
 		$this->assertIsArray( $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
+	}
+
+	/** A transport that has decoded a safe request ID preserves it on preflight errors. */
+	public function test_validate_session_header_error_preserves_readable_id(): void {
+		$request = new WP_REST_Request( 'POST', '/test' );
+		$context = new HttpRequestContext( $request );
+
+		$result = HttpSessionValidator::validate_session_header( $context, 'request-17' );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'request-17', $result['id'] );
+	}
+
+	/** Request metadata retains only protocol routing headers. */
+	public function test_http_context_does_not_copy_credentials_into_request_metadata(): void {
+		$request = new WP_REST_Request( 'POST', '/test' );
+		$request->set_header( 'Authorization', 'Bearer secret' );
+		$request->set_header( 'Cookie', 'session=secret' );
+		$request->set_header( 'Origin', 'https://example.org' );
+		$request->set_header( 'Mcp-Method', 'tools/call' );
+		$request->set_header( 'Mcp-Param-Region', 'eu' );
+
+		$context = new HttpRequestContext( $request );
+
+		$this->assertSame( 'https://example.org', $context->origin_header );
+		$this->assertCount( 2, $context->headers );
+		$this->assertSame( 'tools/call', $context->headers['mcp-method'] );
+		$this->assertSame( 'eu', $context->headers['mcp-param-region'] );
 	}
 
 	/**
@@ -219,7 +248,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -239,7 +269,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -254,7 +285,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -272,7 +304,8 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 
 	/**
@@ -291,6 +324,7 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$this->assertIsArray( $result );
 		$this->assertArrayHasKey( 'error', $result );
-		$this->assertArrayNotHasKey( 'id', $result );
+		$this->assertArrayHasKey( 'id', $result );
+		$this->assertNull( $result['id'] );
 	}
 }

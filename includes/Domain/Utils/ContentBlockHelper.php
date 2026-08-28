@@ -1,55 +1,26 @@
 <?php
 /**
- * ContentBlockHelper - Factory for creating MCP content block DTOs.
+ * Revision-neutral MCP content block builders.
  *
- * This helper provides convenience methods for constructing typed content block DTOs
- * from the php-mcp-schema library. It simplifies the creation of TextContent,
- * ImageContent, AudioContent, and EmbeddedResource instances.
- *
- * @package WP\MCP\Domain\Utils
+ * @package McpAdapter
  */
 
 declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Utils;
 
-use WP\McpSchema\Common\Content\DTO\AudioContent;
-use WP\McpSchema\Common\Content\DTO\ImageContent;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
-
 /**
- * Helper class for creating MCP content block DTOs.
- *
- * Provides static factory methods to create typed content blocks that implement
- * ContentBlockInterface. These DTOs are used in tool call results, prompt messages,
- * and resource contents throughout the MCP protocol.
- *
- * Every `_meta` argument passes through {@see McpValidator::normalize_meta()}, so a
- * PHP list is omitted instead of being serialized where MCP declares a JSON object.
+ * Builds neutral arrays that are validated with the selected result schema.
  *
  * @since 0.5.0
  */
 final class ContentBlockHelper {
 
-	/**
-	 * Creates an ImageContent DTO.
-	 *
-	 * @param string $data Base64-encoded image data.
-	 * @param string $mime_type The MIME type of the image (e.g., 'image/png').
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\ImageContent The created ImageContent DTO.
-	 */
-	public static function image( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): ImageContent {
-		return ImageContent::fromArray(
+	/** Build image content. */
+	public static function image( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
+		return self::without_nulls(
 			array(
-				'type'        => ImageContent::TYPE,
+				'type'        => 'image',
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
@@ -58,20 +29,11 @@ final class ContentBlockHelper {
 		);
 	}
 
-	/**
-	 * Creates an AudioContent DTO.
-	 *
-	 * @param string $data Base64-encoded audio data.
-	 * @param string $mime_type The MIME type of the audio (e.g., 'audio/mp3').
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\AudioContent The created AudioContent DTO.
-	 */
-	public static function audio( string $data, string $mime_type, ?Annotations $annotations = null, ?array $_meta = null ): AudioContent {
-		return AudioContent::fromArray(
+	/** Build audio content. */
+	public static function audio( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
+		return self::without_nulls(
 			array(
-				'type'        => AudioContent::TYPE,
+				'type'        => 'audio',
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
@@ -80,131 +42,62 @@ final class ContentBlockHelper {
 		);
 	}
 
-	/**
-	 * Creates an EmbeddedResource DTO with TextResourceContents.
-	 *
-	 * Use this for embedding text-based resources (files, documents, etc.) in content.
-	 *
-	 * The DTO tree has two levels that each carry their own `_meta`: the content
-	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
-	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
-	 * the spec and are not interchangeable.
-	 *
-	 * @since 0.6.0 Added the optional $resource_meta parameter.
-	 *
-	 * @param string $uri The URI of the resource.
-	 * @param string $text The text content of the resource.
-	 * @param string|null $mime_type Optional MIME type of the resource.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
-	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
-	 */
+	/** Build embedded text resource content. */
 	public static function embedded_text_resource(
 		string $uri,
 		string $text,
 		?string $mime_type = null,
-		?Annotations $annotations = null,
+		?array $annotations = null,
 		?array $_meta = null,
 		?array $resource_meta = null
-	): EmbeddedResource {
-		$resource = TextResourceContents::fromArray(
-			array(
-				'uri'      => $uri,
-				'text'     => $text,
-				'mimeType' => $mime_type,
-				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
-			)
-		);
-
-		return EmbeddedResource::fromArray(
-			array(
-				'type'        => EmbeddedResource::TYPE,
-				'resource'    => $resource,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
+	): array {
+		return self::embedded_resource(
+			self::without_nulls(
+				array(
+					'uri'      => $uri,
+					'text'     => $text,
+					'mimeType' => $mime_type,
+					'_meta'    => McpValidator::normalize_meta( $resource_meta ),
+				)
+			),
+			$annotations,
+			$_meta
 		);
 	}
 
-	/**
-	 * Creates an EmbeddedResource DTO with BlobResourceContents.
-	 *
-	 * Use this for embedding binary resources (images, PDFs, etc.) in content.
-	 *
-	 * The DTO tree has two levels that each carry their own `_meta`: the content
-	 * block wrapper and the resource contents nested inside it. `$_meta` sets the
-	 * wrapper's; `$resource_meta` sets the contents'. They are distinct fields in
-	 * the spec and are not interchangeable.
-	 *
-	 * @since 0.6.0 Added the optional $resource_meta parameter.
-	 *
-	 * @param string $uri The URI of the resource.
-	 * @param string $blob Base64-encoded binary data.
-	 * @param string|null $mime_type Optional MIME type of the resource.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 * @param array|null $resource_meta Optional metadata for the nested resource contents.
-	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\EmbeddedResource The created EmbeddedResource DTO.
-	 */
+	/** Build embedded blob resource content. */
 	public static function embedded_blob_resource(
 		string $uri,
 		string $blob,
 		?string $mime_type = null,
-		?Annotations $annotations = null,
+		?array $annotations = null,
 		?array $_meta = null,
 		?array $resource_meta = null
-	): EmbeddedResource {
-		$resource = BlobResourceContents::fromArray(
-			array(
-				'uri'      => $uri,
-				'blob'     => $blob,
-				'mimeType' => $mime_type,
-				'_meta'    => McpValidator::normalize_meta( $resource_meta ),
-			)
-		);
-
-		return EmbeddedResource::fromArray(
-			array(
-				'type'        => EmbeddedResource::TYPE,
-				'resource'    => $resource,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
+	): array {
+		return self::embedded_resource(
+			self::without_nulls(
+				array(
+					'uri'      => $uri,
+					'blob'     => $blob,
+					'mimeType' => $mime_type,
+					'_meta'    => McpValidator::normalize_meta( $resource_meta ),
+				)
+			),
+			$annotations,
+			$_meta
 		);
 	}
 
-	/**
-	 * Creates a TextContent DTO for error messages.
-	 *
-	 * Convenience method for creating text content specifically for error responses.
-	 * This is semantically equivalent to text() but makes the intent clearer in code.
-	 *
-	 * @param string $message The error message.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
-	 */
-	public static function error_text( string $message, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
+	/** Build text content used for an error. */
+	public static function error_text( string $message, ?array $annotations = null, ?array $_meta = null ): array {
 		return self::text( $message, $annotations, $_meta );
 	}
 
-	/**
-	 * Creates a TextContent DTO.
-	 *
-	 * @param string $text The text content.
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
-	 */
-	public static function text( string $text, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
-		return TextContent::fromArray(
+	/** Build text content. */
+	public static function text( string $text, ?array $annotations = null, ?array $_meta = null ): array {
+		return self::without_nulls(
 			array(
-				'type'        => TextContent::TYPE,
+				'type'        => 'text',
 				'text'        => $text,
 				'annotations' => $annotations,
 				'_meta'       => McpValidator::normalize_meta( $_meta ),
@@ -213,19 +106,11 @@ final class ContentBlockHelper {
 	}
 
 	/**
-	 * Creates a TextContent DTO with JSON-encoded data.
+	 * Build text content from JSON-encodable data.
 	 *
-	 * Convenience method for creating text content from structured data.
-	 * The data is encoded as JSON and wrapped in a TextContent DTO.
-	 *
-	 * @param mixed $data The data to JSON-encode.
-	 * @param int $flags JSON encoding flags (default: 0).
-	 * @param \WP\McpSchema\Common\Protocol\DTO\Annotations|null $annotations Optional annotations for the client.
-	 * @param array|null $_meta Optional metadata for the content block.
-	 *
-	 * @return \WP\McpSchema\Common\Content\DTO\TextContent The created TextContent DTO.
+	 * @param mixed $data JSON-encodable data.
 	 */
-	public static function json_text( $data, int $flags = 0, ?Annotations $annotations = null, ?array $_meta = null ): TextContent {
+	public static function json_text( $data, int $flags = 0, ?array $annotations = null, ?array $_meta = null ): array {
 		$json = wp_json_encode( $data, $flags );
 		if ( false === $json ) {
 			$json = '{}';
@@ -235,20 +120,29 @@ final class ContentBlockHelper {
 	}
 
 	/**
-	 * Converts an array of ContentBlockInterface DTOs to their array representations.
+	 * Normalize neutral block arrays.
 	 *
-	 * Use this at the serialization boundary when preparing content blocks for JSON output.
-	 *
-	 * @param \WP\McpSchema\Common\Protocol\Union\ContentBlockInterface[] $blocks Array of content block DTOs.
-	 *
-	 * @return array[] Array of content block arrays.
+	 * @param array<int, array<string, mixed>> $blocks Blocks.
+	 * @return array<int, array<string, mixed>>
 	 */
 	public static function to_array_list( array $blocks ): array {
-		return array_map(
-			static function ( ContentBlockInterface $block ): array {
-				return $block->toArray();
-			},
-			$blocks
+		return array_values( $blocks );
+	}
+
+	/** Build the embedded wrapper. */
+	private static function embedded_resource( array $resource_data, ?array $annotations, ?array $_meta ): array {
+		return self::without_nulls(
+			array(
+				'type'        => 'resource',
+				'resource'    => $resource_data,
+				'annotations' => $annotations,
+				'_meta'       => McpValidator::normalize_meta( $_meta ),
+			)
 		);
+	}
+
+	/** Remove optional null fields while preserving false, zero, and empty strings. */
+	private static function without_nulls( array $data ): array {
+		return array_filter( $data, static fn( $value ): bool => null !== $value );
 	}
 }

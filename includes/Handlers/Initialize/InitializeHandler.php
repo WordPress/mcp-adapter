@@ -9,11 +9,10 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Initialize;
 
+use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
-use WP\MCP\Core\McpVersionNegotiator;
-use WP\McpSchema\Common\Lifecycle\DTO\Implementation;
-use WP\McpSchema\Common\Protocol\DTO\InitializeResult;
-use WP\McpSchema\Server\Lifecycle\DTO\ServerCapabilities;
+use WP\McpSchema\Record\InitializeRequest;
+use WP\McpSchema\Record\InitializeResult;
 
 /**
  * Handles the initialize MCP method.
@@ -38,46 +37,33 @@ class InitializeHandler {
 	/**
 	 * Handles the initialize request.
 	 *
-	 * Negotiates the protocol version with the client using McpVersionNegotiator.
-	 * If the client requests a supported version, that version is used. Otherwise
-	 * the server falls back to the latest supported version.
-	 *
 	 * @since 0.5.0
+	 * @since n.e.x.t Accepts an exact validated request record and Core context.
 	 *
-	 * @param string $client_protocol_version The protocol version requested by the client.
+	 * @param \WP\McpSchema\Record\InitializeRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\InitializeResult Response with server capabilities and information.
+	 * @return \WP\McpSchema\Record\InitializeResult Response with server capabilities and information.
 	 */
-	public function handle( string $client_protocol_version ): InitializeResult {
-		$negotiated_version = McpVersionNegotiator::negotiate( $client_protocol_version );
-
-		$server_info = Implementation::fromArray(
+	public function handle( InitializeRequest $request, McpRequestContext $request_context ): InitializeResult {
+		unset( $request );
+		$schema = $request_context->schema();
+		$result = $schema->fromArray(
+			InitializeResult::class,
 			array(
-				'name'    => $this->mcp->get_server_name(),
-				'version' => $this->mcp->get_server_version(),
-			)
-		);
-
-		// Capabilities should only be advertised if they are implemented end-to-end.
-		// IMPORTANT: We set explicit boolean values (not empty arrays) to ensure proper JSON serialization.
-		// Empty arrays `[]` serialize as JSON arrays `[]`, but MCP spec requires JSON objects `{}`.
-		// Setting explicit values like `listChanged: false` produces associative arrays that serialize correctly.
-		$capabilities = ServerCapabilities::fromArray(
-			array(
-				'prompts'   => array( 'listChanged' => false ),
-				'resources' => array(
-					'subscribe'   => false,
-					'listChanged' => false,
+				'protocolVersion' => $request_context->revision(),
+				'capabilities'    => array(
+					'prompts'   => array( 'listChanged' => false ),
+					'resources' => array(
+						'subscribe'   => false,
+						'listChanged' => false,
+					),
+					'tools'     => array( 'listChanged' => false ),
 				),
-				'tools'     => array( 'listChanged' => false ),
-			)
-		);
-
-		$result = InitializeResult::fromArray(
-			array(
-				'protocolVersion' => $negotiated_version,
-				'capabilities'    => $capabilities,
-				'serverInfo'      => $server_info,
+				'serverInfo'      => array(
+					'name'    => $this->mcp->get_server_name(),
+					'version' => $this->mcp->get_server_version(),
+				),
 				'instructions'    => $this->mcp->get_server_description(),
 			)
 		);
@@ -87,14 +73,15 @@ class InitializeHandler {
 		 *
 		 * Use this filter to modify server capabilities, instructions, or
 		 * other initialization data dynamically. To modify the result, call
-		 * `$result->toArray()`, change the data, and return
-		 * `InitializeResult::fromArray( $modified_data )`.
+		 * `$result->jsonSerialize()`, change the data, and reconstruct it through
+		 * the selected schema.
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param \WP\McpSchema\Common\Protocol\DTO\InitializeResult $result The initialize result DTO.
+		 * @param \WP\McpSchema\Record\InitializeResult $result The initialize result record.
 		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
+		 * @param \WP\McpSchema\Schema                                $schema Selected schema.
 		 */
-		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp );
+		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp, $schema );
 	}
 }

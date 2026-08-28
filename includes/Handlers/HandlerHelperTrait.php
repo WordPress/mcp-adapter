@@ -16,17 +16,40 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
  */
 trait HandlerHelperTrait {
 	/**
-	 * Extracts parameters from a request message.
+	 * Convert validated JSON arguments at the WordPress callback boundary.
 	 *
-	 * Handles both direct params and nested params structure for backward compatibility.
-	 * This normalizes the dual parameter patterns found throughout handlers.
-	 *
-	 * @param array $data Request data that may have params at root or nested.
-	 *
-	 * @return array Extracted parameters.
+	 * @param \stdClass|null $arguments Validated argument object.
+	 * @return array<string, mixed> Associative callback parameters.
 	 */
-	protected function extract_params( array $data ): array {
-		return $data['params'] ?? $data;
+	protected function callback_arguments( ?\stdClass $arguments ): array {
+		$value = $this->callback_value( $arguments ?? new \stdClass() );
+
+		return is_array( $value ) ? $value : array();
+	}
+
+	/**
+	 * Convert one validated JSON value immediately before a WordPress callback.
+	 *
+	 * @param mixed $value Validated JSON-compatible value.
+	 * @return mixed
+	 */
+	protected function callback_value( $value ) {
+		if ( $value instanceof \JsonSerializable ) {
+			return $this->callback_value( $value->jsonSerialize() );
+		}
+		if ( $value instanceof \stdClass ) {
+			$result = array();
+			foreach ( get_object_vars( $value ) as $key => $item ) {
+				$result[ $key ] = $this->callback_value( $item );
+			}
+
+			return $result;
+		}
+		if ( is_array( $value ) ) {
+			return array_map( array( $this, 'callback_value' ), $value );
+		}
+
+		return $value;
 	}
 
 	/**
