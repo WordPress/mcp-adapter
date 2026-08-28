@@ -10,11 +10,11 @@ The official WordPress package for MCP integration that exposes WordPress abilit
 
 ## Overview
 
-MCP Adapter bridges WordPress's [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) with the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/), giving AI agents a standardized way to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
+MCP Adapter bridges WordPress's [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) with exact MCP [`2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/) and [`2026-07-28`](https://modelcontextprotocol.io/specification/2026-07-28/) revisions, giving AI agents a standardized way to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
 
 ## Features
 
-- **Ability-to-MCP conversion** — WordPress abilities automatically become MCP [tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools.md), [resources](https://modelcontextprotocol.io/specification/2025-06-18/server/resources.md), and [prompts](https://modelcontextprotocol.io/specification/2025-06-18/server/prompts.md)
+- **Ability-to-MCP conversion** — WordPress abilities automatically become MCP [tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools), [resources](https://modelcontextprotocol.io/specification/2026-07-28/server/resources), and [prompts](https://modelcontextprotocol.io/specification/2026-07-28/server/prompts)
 - **Multi-server management** — run multiple MCP servers, each with its own transports, abilities, and handlers
 - **HTTP and STDIO transports**, plus a `McpTransportInterface` for custom protocols — see [Custom Transports](docs/guides/custom-transports.md)
 - **Pluggable error handling and observability** — swap in your own logging or monitoring via `McpErrorHandlerInterface` and `McpObservabilityHandlerInterface` — see [Error Handling](docs/guides/error-handling.md) and [Observability](docs/guides/observability.md)
@@ -36,7 +36,7 @@ Connect via WP-CLI over STDIO, or point an HTTP client at `/wp-json/mcp/mcp-adap
 
 ## Migration
 
-- [Migration Guide: v0.5.0](docs/migration/v0.5.0.md)
+- [Dual-revision schema runtime migration](docs/migration/dual-revision-schema-runtime.md)
 - [Migration Guide: v0.3.0](docs/migration/v0.3.0.md)
 
 ## Contributing

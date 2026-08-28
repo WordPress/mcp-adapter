@@ -4,7 +4,7 @@ This guide covers how to implement custom transport layers for the MCP Adapter w
 
 ## Built-in Transports
 
-- ✅ **`HttpTransport`** - Recommended (implements MCP 2025-11-25 specification)
+- ✅ **`HttpTransport`** - Recommended (implements exact MCP 2025-11-25 and 2026-07-28 flows)
 - ✅ **`STDIO Transport`** - Available via WP-CLI commands
 
 ## When to Create Custom Transports
