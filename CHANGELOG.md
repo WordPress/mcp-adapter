@@ -55,7 +55,10 @@ No API, hook, or protocol behavior changed. Upgrading from 0.6.0 requires no mig
 - Improved observability for protocol errors and `isError` tool responses.
 
 
-Existing ability registration, `create_server()`, and WordPress hooks are unchanged. Custom handlers, transports, or code depending on internal component structures should review the [v0.5.0 migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/v0.5.0.md).
+Existing ability registration, `create_server()`, and WordPress hooks are
+unchanged. Custom handlers, transports, or code depending on internal component
+structures should review the
+[dual-revision schema runtime migration guide](docs/migration/dual-revision-schema-runtime.md).
 
 ## [0.4.1] - 2025-12-09
 

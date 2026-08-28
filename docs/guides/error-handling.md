@@ -190,29 +190,16 @@ class ExternalServiceErrorHandler implements McpErrorHandlerInterface {
 
 ## Usage in Practice
 
-### Handler Helper Trait
+### Handler boundary
 
-Most handlers use the `HandlerHelperTrait` which provides convenience methods:
+Adapter handlers receive an exact generated request record plus
+`WP\MCP\Core\McpRequestContext`. The selected schema validates the request before
+dispatch. Handlers return logical result data or an error envelope from
+`McpErrorFactory`; the selected wire profile constructs the final exact result
+and JSON-RPC response records.
 
-```php
-use WP\MCP\Handlers\HandlerHelperTrait;
-
-class MyHandler {
-    use HandlerHelperTrait;
-    
-    public function handle_request($request) {
-        // Create error responses easily
-        if (!$this->validate_params($request)) {
-            return $this->missing_parameter_error('required_param', $request['id']);
-        }
-        
-        // Handle other errors
-        if (!$this->check_permissions()) {
-            return $this->permission_denied_error('resource_access', $request['id']);
-        }
-    }
-}
-```
+`HandlerHelperTrait` is internal normalization support. Custom transports should
+enter through `McpWireOrchestrator` instead of invoking handlers with raw arrays.
 
 ### HTTP Transport Integration
 
@@ -228,13 +215,7 @@ return new WP_REST_Response($error_response, $http_status);
 
 ### JSON-RPC Message Validation
 
-The factory includes message validation for proper JSON-RPC structure:
-
-```php
-$validation_result = McpErrorFactory::validate_jsonrpc_message($request);
-if (is_array($validation_result)) {
-    // Validation failed, $validation_result contains error response
-    return new WP_REST_Response($validation_result, 400);
-}
-// Validation passed
-```
+`JsonRpcRequestDecoder` owns one identity-preserving raw decode. The selected
+wire profile then checks method availability, transport headers, and exact
+schema hydration. There is no alternate validation mode or factory-level
+envelope validator.
