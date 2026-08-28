@@ -12,10 +12,11 @@ namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\Record\Resource;
+use WP\McpSchema\Schema;
 use WP_Error;
 
 /**
@@ -39,25 +40,18 @@ use WP_Error;
  * $resource = McpResource::fromAbility($ability);
  * ```
  *
- * McpResource wraps a protocol-only ResourceDto for MCP serialization. Internal
+ * McpResource stores revision-neutral configuration for MCP projection. Internal
  * adapter metadata and execution wiring live on this class and are never
- * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ * exposed to MCP clients. Use get_protocol_record() for protocol responses.
  *
  * @since 0.5.0
  */
 final class McpResource implements McpComponentInterface {
-
+	use RevisionProjectionTrait;
 
 	// =========================================================================
 	// Runtime Properties
 	// =========================================================================
-
-	/**
-	 * Clean Resource DTO (protocol-only).
-	 *
-	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
-	 */
-	private ResourceDto $mcp_resource_dto;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed resources).
@@ -101,10 +95,10 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
+	 * @param array<string, mixed> $resource_data Revision-neutral Resource data.
 	 */
-	private function __construct( ResourceDto $resource_dto ) {
-		$this->mcp_resource_dto = $resource_dto;
+	private function __construct( array $resource_data ) {
+		$this->initialize_protocol_data( $resource_data );
 	}
 
 	// =========================================================================
@@ -175,36 +169,11 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $resource_meta;
 		}
 
-		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since Annotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
-			}
-
-			$resource = ResourceDto::fromArray( $resource_data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Resource DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
+		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$resource_data['annotations'] = $config['annotations'];
 		}
 
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpResourceValidator::validate_resource_dto( $resource );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
-		}
-
-		$instance          = new self( $resource );
+		$instance          = new self( $resource_data );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
@@ -234,13 +203,13 @@ final class McpResource implements McpComponentInterface {
 			return $resource_data;
 		}
 
-		$instance               = new self( $resource_data['resource'] );
+		$instance               = new self( $resource_data['resource_data'] );
 		$instance->adapter_meta = $resource_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'resource',
-			'resource_uri'   => $resource_data['resource']->getUri(),
+			'resource_uri'   => $resource_data['resource_data']['uri'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -253,12 +222,37 @@ final class McpResource implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol record for one revision.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
+	 * @param \WP\McpSchema\Schema $schema Selected schema.
+	 * @since n.e.x.t
 	 */
-	public function get_protocol_dto(): ResourceDto {
-		return $this->mcp_resource_dto;
+	public function get_protocol_record( Schema $schema ): Resource {
+		return $this->project_record( $schema, Resource::class, $this->protocol_data() );
+	}
+
+	/**
+	 * Get the neutral resource URI.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function get_uri(): string {
+		return (string) ( $this->protocol_data()['uri'] ?? '' );
+	}
+
+	/**
+	 * Check exact-revision projection availability.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function is_available_for( Schema $schema ): bool {
+		try {
+			$this->get_protocol_record( $schema );
+		} catch ( \Throwable $throwable ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

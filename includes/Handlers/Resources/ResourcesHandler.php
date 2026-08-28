@@ -9,15 +9,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Resources;
 
+use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult;
-use WP\McpSchema\Server\Resources\DTO\ListResourcesResult;
-use WP\McpSchema\Server\Resources\DTO\ReadResourceResult;
+use WP\McpSchema\Record\ListResourceTemplatesRequest;
+use WP\McpSchema\Record\ListResourcesRequest;
+use WP\McpSchema\Record\ReadResourceRequest;
 
 /**
  * Handles resources-related MCP methods.
@@ -45,13 +44,17 @@ class ResourcesHandler {
 	/**
 	 * Handles the resources/list request.
 	 *
-	 * Returns a ListResourcesResult DTO containing all registered resources.
-	 * Returns protocol DTOs as-is; any `_meta` fields are passed through unchanged.
+	 * Returns a selected ListResourcesResult containing registered resources.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourcesResult Response with resources list.
+	 * @param \WP\McpSchema\Record\ListResourcesRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @return array<string, mixed> Logical resources-list result.
+	 * @since n.e.x.t
 	 */
-	public function list_resources(): ListResourcesResult {
-		$resources = array_values( $this->mcp->get_resources() );
+	public function list_resources( ListResourcesRequest $request, McpRequestContext $request_context ): array {
+		unset( $request );
+		$schema    = $request_context->schema();
+		$resources = array_values( $this->mcp->get_resources( $schema ) );
 
 		/**
 		 * Filters the list of resources before returning to the client.
@@ -61,21 +64,18 @@ class ResourcesHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array<\WP\McpSchema\Server\Resources\DTO\Resource> $resources Array of Resource DTOs.
+		 * @param array<\WP\McpSchema\Record\Resource> $resources Array of Resource records.
 		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
+		 * @param \WP\McpSchema\Schema                                $schema    Selected schema.
 		 */
 		$resources = $this->validate_filtered_list(
-			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp ),
+			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp, $schema ),
 			$resources,
 			'mcp_adapter_resources_list',
 			$this->mcp->get_error_handler()
 		);
 
-		return ListResourcesResult::fromArray(
-			array(
-				'resources' => $resources,
-			)
-		);
+		return array( 'resources' => $resources );
 	}
 
 	/**
@@ -86,48 +86,55 @@ class ResourcesHandler {
 	 * the base `resources` capability (no sub-flag gates it), which the server always
 	 * advertises, so spec-compliant clients call it during resource discovery.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ListResourceTemplatesResult Empty resource-templates list.
+	 * @param \WP\McpSchema\Record\ListResourceTemplatesRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @return array<string, mixed> Logical empty resource-templates result.
+	 * @since n.e.x.t
 	 */
-	public function list_resource_templates(): ListResourceTemplatesResult {
-		return ListResourceTemplatesResult::fromArray(
-			array(
-				'resourceTemplates' => array(),
-			)
-		);
+	public function list_resource_templates( ListResourceTemplatesRequest $request, McpRequestContext $request_context ): array {
+		unset( $request, $request_context );
+		return array( 'resourceTemplates' => array() );
 	}
 
 	/**
 	 * Handles the resources/read request.
 	 *
-	 * Returns either a ReadResourceResult DTO (for success) or a JSONRPCErrorResponse DTO
+	 * Returns either a ReadResourceResult record or a protocol error array
 	 * (for protocol errors like missing parameter or resource not found).
 	 *
 	 * Unlike tools, resources don't have a concept of "execution errors" that should be
 	 * reported with isError=true. Resource reads either succeed or fail at the protocol level.
 	 *
-	 * @param array $params Request parameters.
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \WP\McpSchema\Record\ReadResourceRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\ReadResourceResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed>
+	 * @since n.e.x.t
 	 */
-	public function read_resource( array $params, $request_id = 0 ) {
-		// Extract parameters using helper method.
-		$request_params = $this->extract_params( $params );
-
-		if ( ! isset( $request_params['uri'] ) ) {
-			return McpErrorFactory::missing_parameter( $request_id, 'uri' );
+	public function read_resource( ReadResourceRequest $request, McpRequestContext $request_context ): array {
+		$params         = $request->getParams();
+		$request_id     = $request->getId();
+		$uri            = trim( $params->getUri() );
+		$request_params = array( 'uri' => $params->getUri() );
+		$meta           = $params->getMeta();
+		if ( null !== $meta ) {
+			$request_params['_meta'] = $this->callback_value( $meta );
 		}
-
-		$uri = $request_params['uri'];
-		$uri = is_string( $uri ) ? trim( $uri ) : '';
+		$input_responses = $params->getInputResponses();
+		if ( null !== $input_responses ) {
+			$request_params['inputResponses'] = $this->callback_value( $input_responses );
+		}
+		$request_state = $params->getRequestState();
+		if ( null !== $request_state ) {
+			$request_params['requestState'] = $request_state;
+		}
 
 		$mcp_resource = $this->mcp->get_mcp_resource( $uri );
-		if ( ! $mcp_resource ) {
-			return McpErrorFactory::resource_not_found( $request_id, $uri );
+		if ( ! $mcp_resource || ! $mcp_resource->is_available_for( $request_context->schema() ) ) {
+			return McpErrorFactory::resource_not_found( $request_id, $uri, $request_context->revision() );
 		}
 
-		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource */
-		$resource = $mcp_resource->get_protocol_dto();
+		$resource = $mcp_resource->get_protocol_record( $request_context->schema() );
 
 		try {
 			$has_permission = $mcp_resource->check_permission( $request_params );
@@ -194,21 +201,16 @@ class ResourcesHandler {
 				return McpErrorFactory::internal_error( $request_id, $contents->get_error_message() );
 			}
 
-			// Successful execution - convert contents to DTOs.
+			// Successful execution - normalize contents for selected-schema construction.
 			// Contents should be an array of resource content items.
-			// If it's already an array of properly formatted items, convert each to a DTO.
+			// If it is already an array of properly formatted items, normalize each item.
 			// Otherwise, wrap the result as text content.
 			//
 			// Seed the fallback content URI with the advertised URI, not the client's
 			// request URI, so contents[].uri matches resources/list even when the client
 			// lowercased the scheme (RFC 3986 3.1). For an exact-case read the two are equal.
-			$content_dtos = $this->convert_contents_to_dtos( $contents, $resource->getUri() );
-
-			return ReadResourceResult::fromArray(
-				array(
-					'contents' => $content_dtos,
-				)
-			);
+			$content_data = $this->convert_contents( $contents, $resource->getUri() );
+			return array( 'contents' => $content_data );
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error reading resource',
@@ -223,7 +225,7 @@ class ResourcesHandler {
 	}
 
 	/**
-	 * Convert ability execution results to resource content DTOs.
+	 * Convert ability execution results to resource content data.
 	 *
 	 * The MCP spec expects contents to be an array of TextResourceContents or BlobResourceContents.
 	 * This method handles various return formats from abilities and normalizes them.
@@ -231,9 +233,9 @@ class ResourcesHandler {
 	 * @param mixed $contents The contents returned by the ability.
 	 * @param string $uri The resource URI.
 	 *
-	 * @return array<\WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents>
+	 * @return array<int, array<string, mixed>>
 	 */
-	private function convert_contents_to_dtos( $contents, string $uri ): array {
+	private function convert_contents( $contents, string $uri ): array {
 		// If contents is already an array of properly structured items, convert each.
 		if ( is_array( $contents ) && ! empty( $contents ) ) {
 			// Check if this is an array of content items (has 'uri', 'text', or 'blob' in first item).
@@ -241,7 +243,7 @@ class ResourcesHandler {
 			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) || isset( $first_item['blob'] ) ) ) {
 				return array_map(
 					function ( $item ) use ( $uri ) {
-						return $this->create_content_dto( $item, $uri );
+						return $this->create_content_data( $item, $uri );
 					},
 					$contents
 				);
@@ -259,17 +261,15 @@ class ResourcesHandler {
 		}
 
 		return array(
-			TextResourceContents::fromArray(
-				array(
-					'uri'  => $uri,
-					'text' => $text,
-				)
+			array(
+				'uri'  => $uri,
+				'text' => $text,
 			),
 		);
 	}
 
 	/**
-	 * Create a content DTO from an array item.
+	 * Create content data from an array item.
 	 *
 	 * `_meta` is carried through from the item so metadata a handler attaches to its
 	 * resource contents reaches the client. MCP Apps UI resources rely on this: they
@@ -284,35 +284,37 @@ class ResourcesHandler {
 	 * @param array{uri?: mixed, mimeType?: mixed, text?: mixed, blob?: mixed, _meta?: mixed} $item The content item array.
 	 * @param string $default_uri The URI to use when the item names none.
 	 *
-	 * @return \WP\McpSchema\Common\Protocol\DTO\TextResourceContents|\WP\McpSchema\Common\Protocol\DTO\BlobResourceContents
+	 * @return array<string, mixed>
 	 */
-	private function create_content_dto( array $item, string $default_uri ) {
+	private function create_content_data( array $item, string $default_uri ): array {
 		$item_uri  = $item['uri'] ?? $default_uri;
 		$mime_type = $item['mimeType'] ?? null;
 		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
 
 		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {
-			return BlobResourceContents::fromArray(
+			return array_filter(
 				array(
 					'uri'      => $item_uri,
 					'blob'     => (string) $item['blob'],
 					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
 					'_meta'    => $meta,
-				)
+				),
+				static fn( $value ): bool => null !== $value
 			);
 		}
 
 		// Default to TextResourceContents.
 		$text = $item['text'] ?? '';
 
-		return TextResourceContents::fromArray(
+		return array_filter(
 			array(
 				'uri'      => $item_uri,
 				'text'     => (string) $text,
 				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
 				'_meta'    => $meta,
-			)
+			),
+			static fn( $value ): bool => null !== $value
 		);
 	}
 }

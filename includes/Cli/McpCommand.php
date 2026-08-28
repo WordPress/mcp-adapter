@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpAdapter;
+use WP\McpSchema\Schemas;
 use function WP_CLI\Utils\format_items;
 
 /**
@@ -132,18 +133,43 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 
 		$items = array();
 		foreach ( $servers as $server ) {
-			$items[] = array(
-				'ID'          => $server->get_server_id(),
-				'Name'        => $server->get_server_name(),
-				'Version'     => $server->get_server_version(),
-				'Tools'       => count( $server->get_tools() ),
-				'Resources'   => count( $server->get_resources() ),
-				'Prompts'     => count( $server->get_prompts() ),
-				'Description' => $server->get_server_description(),
+			$schema_2025 = $server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
+			$schema_2026 = $server->get_schema_provider()->for_revision( Schemas::V2026_07_28 );
+			$items[]     = array(
+				'ID'             => $server->get_server_id(),
+				'Name'           => $server->get_server_name(),
+				'Version'        => $server->get_server_version(),
+				'Tools'          => $server->count_tools(),
+				'Resources'      => $server->count_resources(),
+				'Prompts'        => $server->count_prompts(),
+				'2025 Tools'     => count( $server->get_tools( $schema_2025 ) ),
+				'2025 Resources' => count( $server->get_resources( $schema_2025 ) ),
+				'2025 Prompts'   => count( $server->get_prompts( $schema_2025 ) ),
+				'2026 Tools'     => count( $server->get_tools( $schema_2026 ) ),
+				'2026 Resources' => count( $server->get_resources( $schema_2026 ) ),
+				'2026 Prompts'   => count( $server->get_prompts( $schema_2026 ) ),
+				'Description'    => $server->get_server_description(),
 			);
 		}
 
 		$format = $assoc_args['format'] ?? 'table';
-		format_items( $format, $items, array( 'ID', 'Name', 'Version', 'Tools', 'Resources', 'Prompts' ) );
+		format_items(
+			$format,
+			$items,
+			array(
+				'ID',
+				'Name',
+				'Version',
+				'Tools',
+				'Resources',
+				'Prompts',
+				'2025 Tools',
+				'2025 Resources',
+				'2025 Prompts',
+				'2026 Tools',
+				'2026 Resources',
+				'2026 Prompts',
+			)
+		);
 	}
 }

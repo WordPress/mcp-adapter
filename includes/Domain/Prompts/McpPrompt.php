@@ -14,9 +14,10 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
+use WP\McpSchema\Record\Prompt;
+use WP\McpSchema\Schema;
 use WP_Error;
 
 /**
@@ -48,25 +49,18 @@ use WP_Error;
  * $prompt = McpPrompt::fromBuilder($builder);
  * ```
  *
- * McpPrompt wraps a protocol-only PromptDto for MCP serialization. Internal
+ * McpPrompt stores revision-neutral configuration for MCP projection. Internal
  * adapter metadata and execution wiring live on this class and are never
- * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ * exposed to MCP clients. Use get_protocol_record() for protocol responses.
  *
  * @since 0.5.0
  */
 final class McpPrompt implements McpComponentInterface {
-
+	use RevisionProjectionTrait;
 
 	// =========================================================================
 	// Runtime Properties
 	// =========================================================================
-
-	/**
-	 * Clean Prompt DTO (protocol-only).
-	 *
-	 * @var \WP\McpSchema\Server\Prompts\DTO\Prompt
-	 */
-	private PromptDto $prompt;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed prompts).
@@ -117,10 +111,10 @@ final class McpPrompt implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt The Prompt DTO.
+	 * @param array<string, mixed> $prompt_data Revision-neutral prompt data.
 	 */
-	private function __construct( PromptDto $prompt ) {
-		$this->prompt = $prompt;
+	private function __construct( array $prompt_data ) {
+		$this->initialize_protocol_data( $prompt_data );
 	}
 
 	// =========================================================================
@@ -152,10 +146,10 @@ final class McpPrompt implements McpComponentInterface {
 			}
 		}
 
-		$prompt_data = array(
-			'name'        => $config['name'],
-			'description' => $config['description'] ?? null,
-		);
+		$prompt_data = array( 'name' => $config['name'] );
+		if ( isset( $config['description'] ) ) {
+			$prompt_data['description'] = $config['description'];
+		}
 
 		if ( isset( $config['title'] ) ) {
 			$prompt_data['title'] = $config['title'];
@@ -170,48 +164,11 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['icons'] = $valid_icons;
 		}
 
-		// Create the Prompt DTO - wrap in try-catch since PromptArgument::fromArray() and PromptDto::fromArray() can throw.
-		try {
-			// Process arguments inside try-catch since PromptArgument::fromArray() can throw.
-			if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
-				$prompt_data['arguments'] = array_map(
-					static function ( array $arg ): PromptArgument {
-						return PromptArgument::fromArray(
-							array(
-								'name'        => $arg['name'],
-								'title'       => $arg['title'] ?? null,
-								'description' => $arg['description'] ?? null,
-								'required'    => $arg['required'] ?? null,
-							)
-						);
-					},
-					$config['arguments']
-				);
-			}
-
-			$prompt = PromptDto::fromArray( $prompt_data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_prompt_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Prompt DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
+		if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
+			$prompt_data['arguments'] = array_values( $config['arguments'] );
 		}
 
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpPromptValidator::validate_prompt_dto( $prompt );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
-		}
-
-		$instance          = new self( $prompt );
+		$instance          = new self( $prompt_data );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
@@ -240,13 +197,13 @@ final class McpPrompt implements McpComponentInterface {
 			return $prompt_data;
 		}
 
-		$instance               = new self( $prompt_data['prompt'] );
+		$instance               = new self( $prompt_data['prompt_data'] );
 		$instance->adapter_meta = $prompt_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'prompt',
-			'prompt_name'    => $prompt_data['prompt']->getName(),
+			'prompt_name'    => $prompt_data['prompt_data']['name'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -272,15 +229,6 @@ final class McpPrompt implements McpComponentInterface {
 			);
 		}
 
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpPromptValidator::validate_prompt_dto( $prompt );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
-		}
-
 		$instance          = new self( $prompt );
 		$instance->builder = $builder;
 
@@ -291,7 +239,7 @@ final class McpPrompt implements McpComponentInterface {
 
 		$instance->observability_context = array(
 			'component_type' => 'prompt',
-			'prompt_name'    => $prompt->getName(),
+			'prompt_name'    => (string) ( $prompt['name'] ?? '' ),
 			'source'         => 'builder',
 		);
 
@@ -303,12 +251,37 @@ final class McpPrompt implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol record for one revision.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt
+	 * @param \WP\McpSchema\Schema $schema Selected schema.
+	 * @since n.e.x.t
 	 */
-	public function get_protocol_dto(): PromptDto {
-		return $this->prompt;
+	public function get_protocol_record( Schema $schema ): Prompt {
+		return $this->project_record( $schema, Prompt::class, $this->protocol_data() );
+	}
+
+	/**
+	 * Get the neutral prompt name.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function get_name(): string {
+		return (string) ( $this->protocol_data()['name'] ?? '' );
+	}
+
+	/**
+	 * Check exact-revision projection availability.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function is_available_for( Schema $schema ): bool {
+		try {
+			$this->get_protocol_record( $schema );
+		} catch ( \Throwable $throwable ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

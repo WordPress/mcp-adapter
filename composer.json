@@ -24,6 +24,12 @@
 		"issues": "https://github.com/wordpress/mcp-adapter/issues",
 		"source": "https://github.com/wordpress/mcp-adapter"
 	},
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "https://github.com/WordPress/php-mcp-schema"
+		}
+	],
 	"minimum-stability": "dev",
 	"prefer-stable": true,
 	"config": {
@@ -57,7 +63,7 @@
 	"require": {
 		"php": "^7.4 || ^8.0",
 		"automattic/jetpack-autoloader": "^5.0",
-		"wordpress/php-mcp-schema": "^0.1.0",
+		"wordpress/php-mcp-schema": "dev-feature/dual-revision-schema-runtime#a0fb1ee",
 		"ext-json": "*"
 	},
 	"require-dev": {
