@@ -63,7 +63,7 @@
 	"require": {
 		"php": "^7.4 || ^8.0",
 		"automattic/jetpack-autoloader": "^5.0",
-		"wordpress/php-mcp-schema": "dev-feature/dual-revision-schema-runtime#a0fb1ee",
+		"wordpress/php-mcp-schema": "dev-feature/dual-revision-schema-runtime#3a8f4aef1fefc9e0d1fb422e59411c78ce32edd3",
 		"ext-json": "*"
 	},
 	"require-dev": {
