@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
+### Fixed
+- The STDIO bridge no longer exits after 60 seconds without input when its standard input is a socket. PHP applies `default_socket_timeout` to blocking socket reads, and the bridge treated the resulting `false` from `fgets()` as end of input. Clients that connect STDIO servers over a socket pair, such as Claude Code, saw the server drop a minute into every idle period.
+
 ## [0.6.1] - 2026-08-13
 
 ### Fixed

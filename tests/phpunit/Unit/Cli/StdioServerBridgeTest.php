@@ -696,4 +696,97 @@ final class StdioServerBridgeTest extends TestCase {
 		// Should succeed since ping doesn't need params
 		$this->assertArrayHasKey( 'result', $response );
 	}
+
+	public function test_wait_for_input_indefinitely_outlasts_the_socket_read_timeout(): void {
+		if ( ! function_exists( 'proc_open' ) ) {
+			$this->markTestSkipped( 'proc_open() is not available.' );
+		}
+
+		$pair = $this->socket_pair_or_skip();
+		$this->assertTrue( stream_set_timeout( $pair[0], 0, 200000 ) );
+
+		// With the short timeout in place an idle read gives up, which is the bug being guarded against.
+		$this->assertFalse( fgets( $pair[0] ) );
+		$this->assertTrue( stream_get_meta_data( $pair[0] )['timed_out'] );
+
+		$this->wait_for_input_indefinitely( $pair[0] );
+
+		$writer = null;
+
+		try {
+			// The writer only speaks after the old timeout would have expired.
+			// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_proc_open -- A separate process is the only way to write after a delay while this one blocks in fgets().
+			$writer = proc_open(
+				array( PHP_BINARY, '-r', 'usleep( 500000 ); echo "late\n";' ),
+				array( 1 => $pair[1] ),
+				$pipes
+			);
+			$this->assertIsResource( $writer );
+
+			// The child has its own copy of the writing end. Closing ours means a writer that
+			// exits without writing produces EOF, so the read below fails instead of hanging.
+			// A stream_select() bound would defeat the test: it waits regardless of the read
+			// timeout, and fgets() then finds the data already there.
+			fclose( $pair[1] );
+
+			$this->assertSame( "late\n", fgets( $pair[0] ) );
+			$this->assertFalse( stream_get_meta_data( $pair[0] )['timed_out'] );
+		} finally {
+			if ( is_resource( $writer ) ) {
+				proc_close( $writer );
+			}
+			if ( is_resource( $pair[1] ) ) {
+				fclose( $pair[1] );
+			}
+			fclose( $pair[0] );
+		}
+	}
+
+	public function test_wait_for_input_indefinitely_leaves_non_socket_streams_alone(): void {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Opens an in-memory stream, not a file.
+		$stream = fopen( 'php://memory', 'r+' );
+		$this->assertIsResource( $stream );
+
+		// stream_set_timeout() reports false for streams without a timeout; that must not surface as a warning.
+		$this->wait_for_input_indefinitely( $stream );
+
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- Writes to an in-memory test stream, not the file system.
+		fwrite( $stream, "only\n" );
+		rewind( $stream );
+
+		$this->assertSame( "only\n", fgets( $stream ) );
+		$this->assertFalse( fgets( $stream ) );
+
+		fclose( $stream );
+	}
+
+	/**
+	 * Create a connected socket pair, or skip the test where that is not supported.
+	 *
+	 * @return array{0: resource, 1: resource}
+	 */
+	private function socket_pair_or_skip(): array {
+		if ( ! defined( 'STREAM_PF_UNIX' ) ) {
+			$this->markTestSkipped( 'Unix socket pairs are not available on this platform.' );
+		}
+
+		$pair = stream_socket_pair( STREAM_PF_UNIX, STREAM_SOCK_STREAM, 0 );
+
+		if ( false === $pair ) {
+			$this->markTestSkipped( 'stream_socket_pair() is not supported here.' );
+		}
+
+		return $pair;
+	}
+
+	/**
+	 * Call the private wait_for_input_indefinitely() method on the bridge.
+	 *
+	 * @param resource $stream Stream to prepare.
+	 */
+	private function wait_for_input_indefinitely( $stream ): void {
+		$method = new \ReflectionMethod( $this->bridge, 'wait_for_input_indefinitely' );
+		$method->setAccessible( true );
+		$method->invoke( $this->bridge, $stream );
+	}
 }

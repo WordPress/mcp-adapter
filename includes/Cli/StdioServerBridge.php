@@ -100,6 +100,8 @@ class StdioServerBridge {
 
 		$this->is_running = true;
 
+		$this->wait_for_input_indefinitely( STDIN );
+
 		// Log to stderr to keep stdout clean for MCP messages
 		$this->log_to_stderr( sprintf( 'MCP STDIO Bridge started for server: %s', $this->server->get_server_id() ) );
 
@@ -329,6 +331,25 @@ class StdioServerBridge {
 		}
 
 		return $this->encode_response( JsonRpcResponseBuilder::create_success_response( $id, $result ) );
+	}
+
+	/**
+	 * Make blocking reads on the input stream wait until data arrives.
+	 *
+	 * When standard input is a socket rather than a pipe (Claude Code connects
+	 * STDIO servers over a socket pair), PHP applies default_socket_timeout,
+	 * 60 seconds by default, to each blocking read. Once that passes with no
+	 * input, fgets() returns false and the serve loop takes it as end of input,
+	 * so the server exited after a minute of idle time. A timeout of -1 means
+	 * wait indefinitely, the same value the ini setting uses. Pipes and files
+	 * have no read timeout; stream_set_timeout() returns false for them and
+	 * nothing changes.
+	 *
+	 * @param resource $stream The input stream.
+	 * @return void
+	 */
+	private function wait_for_input_indefinitely( $stream ): void {
+		stream_set_timeout( $stream, -1 );
 	}
 
 	/**
