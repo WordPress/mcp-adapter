@@ -61,7 +61,7 @@ final class DualRevisionArchitectureTest extends TestCase {
 		}
 
 		$this->assertIsArray( $package );
-		$this->assertSame( 'a0fb1ee', $package['source']['reference'] );
+		$this->assertSame( '3a8f4aef1fefc9e0d1fb422e59411c78ce32edd3', $package['source']['reference'] );
 	}
 
 	/** Every exact profile policy slot is a function, never a parallel data map. */
