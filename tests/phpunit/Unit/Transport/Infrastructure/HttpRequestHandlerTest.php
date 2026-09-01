@@ -33,8 +33,8 @@ final class HttpRequestHandlerTest extends TestCase {
 	private HttpRequestHandler $handler;
 	private McpTransportContext $context;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		// Set current user for session management
 		wp_set_current_user( 1 );

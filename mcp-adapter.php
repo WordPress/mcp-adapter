@@ -13,7 +13,7 @@
  * Description:       Adapter for Abilities API, letting the abilities to be used as MCP tools, resources or prompts.
  * Version:           0.6.1
  * Requires at least: 6.9
- * Tested up to:      7.0
+ * Tested up to:      7.1
  * Requires PHP:      7.4
  * Author:            WordPress.org Contributors
  * Author URI:        https://github.com/WordPress/mcp-adapter/graphs/contributors
@@ -29,22 +29,6 @@ namespace WP\MCP;
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit();
 
-/**
- * Define the plugin constants.
- */
-function constants(): void {
-	/**
-	 * Shortcut constant to the path of this file.
-	 */
-	define( 'WP_MCP_DIR', plugin_dir_path( __FILE__ ) );
-
-	/**
-	 * Version of the plugin.
-	 */
-	define( 'WP_MCP_VERSION', '0.6.1' );
-}
-
-constants();
 require_once __DIR__ . '/includes/Autoloader.php';
 
 // If autoloader failed, we cannot proceed.

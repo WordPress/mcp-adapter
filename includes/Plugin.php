@@ -23,9 +23,9 @@ final class Plugin {
 	/**
 	 * The one true plugin.
 	 *
-	 * @var static
+	 * @var ?static
 	 */
-	private static self $instance;
+	private static ?self $instance = null;
 
 	/**
 	 * Gets the singleton instance of the plugin.
@@ -51,44 +51,31 @@ final class Plugin {
 	}
 
 	/**
-	 * Sets up the plugin.
+	 * Plugin constants.
 	 */
-	private function setup(): void {
-		// Bail if dependencies are not met.
-		if ( ! $this->has_dependencies() ) {
-			return;
+	private function constants(): void {
+		// This is locally defined in Autoloader::autoload() but is redefined here in case.
+		if ( ! defined( 'WP_MCP_DIR' ) ) {
+			/**
+			 * Plugin directory path.
+			 */
+			define( 'WP_MCP_DIR', plugin_dir_path( __DIR__ ) );
 		}
 
-		McpAdapter::instance();
+		/**
+		 * Plugin version.
+		 */
+		define( 'WP_MCP_VERSION', McpAdapter::VERSION );
 	}
 
 	/**
-	 * Checks if all required dependencies are available.
-	 *
-	 * Will log an admin notice if dependencies are missing.
-	 *
-	 * @return bool True if all dependencies are met, false otherwise.
+	 * Sets up the plugin.
 	 */
-	private function has_dependencies(): bool {
-		// Check if Abilities API is available.
-		if ( ! function_exists( 'wp_register_ability' ) ) {
-			add_action(
-				'admin_notices',
-				static function () {
-					wp_admin_notice(
-						__( 'MCP Adapter requires WordPress 6.9 or newer. The Abilities API is included in WordPress core.', 'mcp-adapter' ),
-						array(
-							'type'    => 'error',
-							'dismiss' => false,
-						),
-					);
-				}
-			);
+	private function setup(): void {
+		// Define the plugin constants.
+		$this->constants();
 
-			return false;
-		}
-
-		return true;
+		McpAdapter::instance();
 	}
 
 	/**

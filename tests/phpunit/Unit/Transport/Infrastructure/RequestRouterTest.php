@@ -35,11 +35,16 @@ final class RequestRouterTest extends TestCase {
 	private McpTransportContext $context;
 	private int $test_user_id;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
-		// Create a test user
-		$this->test_user_id = wp_create_user( 'router_test_user', 'test_password', 'router_test@example.com' );
+		$this->test_user_id = $this->factory()->user->create(
+			array(
+				'user_login' => 'router_test_user',
+				'user_pass'  => 'test_password',
+				'user_email' => 'router_test@example.com',
+			)
+		);
 		wp_set_current_user( $this->test_user_id );
 
 		// Create MCP server
@@ -63,14 +68,14 @@ final class RequestRouterTest extends TestCase {
 		$this->router  = new RequestRouter( $this->context );
 	}
 
-	public function tear_down(): void {
+	public function tearDown(): void {
 		// Clean up test user
 		if ( $this->test_user_id ) {
 			delete_user_meta( $this->test_user_id, self::session_meta_key() );
 			wp_delete_user( $this->test_user_id );
 		}
 
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	public function test_route_request_initialize(): void {
