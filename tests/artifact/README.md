@@ -6,7 +6,7 @@ classmap, creates `mcp-adapter.zip`, extracts it, and runs both exact MCP
 revisions through that extracted runtime.
 
 The verifier rejects development packages, Composer source files, removed DTO
-symbols, compatibility aliases, and any schema source ref other than `3a8f4aef1fefc9e0d1fb422e59411c78ce32edd3`.
+symbols, compatibility aliases, and any schema source ref other than `db47f7b71223ac4986153ad2b1495ef94a19e08c`.
 The extracted smoke covers:
 
 - 2025 initialize, initialized notification, ping, tool/resource/prompt

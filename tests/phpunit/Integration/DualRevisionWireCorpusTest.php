@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Integration;
 
 use WP\MCP\Cli\StdioServerBridge;
+use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
@@ -245,6 +246,46 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		);
 		$this->assertSame( 'hi', $prompt['data']['result']['messages'][0]['content']['text'] );
 		$this->assertSame( 'complete', $prompt['data']['result']['resultType'] );
+	}
+
+	/** Fractional elicitation answers survive schema hydration into resource callbacks. */
+	public function test_http_2026_preserves_fractional_input_responses(): void {
+		$received = null;
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'test://fractional-input',
+				'handler'    => static function ( array $params ) use ( &$received ): string {
+					$received = $params;
+					return 'content';
+				},
+				'permission' => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpResource::class, $resource );
+		$server     = $this->makeServer( array(), array( $resource ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+		$response = $this->http_request_2026_07_28(
+			'resources/read',
+			191,
+			array(
+				'uri'            => 'test://fractional-input',
+				'inputResponses' => array(
+					'quantity' => array(
+						'action'  => 'accept',
+						'content' => array(
+							'amount' => 1.5,
+							'count'  => 2,
+						),
+					),
+				),
+			)
+		);
+
+		$this->assertSame( 200, $response['status'] );
+		$this->assertIsArray( $received );
+		$this->assertSame( 1.5, $received['inputResponses']['quantity']['content']['amount'] );
+		$this->assertSame( 2, $received['inputResponses']['quantity']['content']['count'] );
 	}
 
 	/** Prove ordinary Ability execution needs no revision branch. */

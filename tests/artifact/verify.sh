@@ -53,7 +53,7 @@ reference="$(
 		}
 	' "$extracted/mcp-adapter/vendor/composer/installed.json"
 )"
-if [[ "$reference" != "3a8f4aef1fefc9e0d1fb422e59411c78ce32edd3" ]]; then
+if [[ "$reference" != "db47f7b71223ac4986153ad2b1495ef94a19e08c" ]]; then
 	printf 'Unexpected php-mcp-schema artifact ref: %s\n' "$reference" >&2
 	exit 1
 fi
