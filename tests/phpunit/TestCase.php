@@ -37,8 +37,8 @@ abstract class TestCase extends WP_UnitTestCase {
 	 * This follows Option 2 from our analysis: Global registration with no cleanup,
 	 * using DummyAbility methods for centralized test fixture management.
 	 */
-	public static function set_up_before_class(): void {
-		parent::set_up_before_class();
+	public static function setUpBeforeClass(): void {
+		parent::setUpBeforeClass();
 
 		// Register plugin's default category and abilities via the same methods
 		// the production code uses. We hook them the same way McpAdapter::maybe_create_default_server()
@@ -57,10 +57,10 @@ abstract class TestCase extends WP_UnitTestCase {
 	 *
 	 * Resets DummyErrorHandler and DummyObservabilityHandler between tests.
 	 */
-	public function tear_down(): void {
+	public function tearDown(): void {
 		DummyErrorHandler::reset();
 		DummyObservabilityHandler::reset();
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	/**
@@ -119,7 +119,9 @@ abstract class TestCase extends WP_UnitTestCase {
 	 */
 	protected static function session_meta_key(): string {
 		$method = new \ReflectionMethod( \WP\MCP\Transport\Infrastructure\SessionManager::class, 'session_meta_key' );
-		$method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
 
 		return (string) $method->invoke( null );
 	}

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
+### Changed
+- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
+
 ## [0.6.1] - 2026-08-13
 
 ### Fixed

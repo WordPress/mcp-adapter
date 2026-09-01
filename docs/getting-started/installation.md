@@ -49,7 +49,10 @@ The best way to ensure that MCP Adapter is installed and activated is to include
 
 ### As a Composer Library
 
-While not recommended, there are some situations where you may want to bundle a copy of MCP Adapter with your plugin. In that case, you can add it as a Composer dependency:
+> [!NOTE]
+> Bundling MCP Adapter as a Composer library is not recommended, as it can lead to conflicts with the MCP Adapter plugin or other plugins that may be bundling their own copy of MCP Adapter. It is strongly recommended to use the plugin dependency method above instead.
+>
+> If you currently bundle MCP Adapter in your plugin's `vendor/` directory, see the [vx.y.z migration guide](../migration/vx.y.z.md) for instructions on how to migrate to the canonical plugin.
 
 ```bash
 composer require wordpress/mcp-adapter

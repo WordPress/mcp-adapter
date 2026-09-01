@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "325518dbe23b91df39512a68cc1f000a",
+    "content-hash": "445c92c8dd5ef1b894b3d46fdebea2a4",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -597,16 +597,16 @@
         },
         {
             "name": "php-stubs/wordpress-stubs",
-            "version": "v6.9.1",
+            "version": "v7.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/php-stubs/wordpress-stubs.git",
-                "reference": "f12220f303e0d7c0844c0e5e957b0c3cee48d2f7"
+                "reference": "4d0cc9d5c4efd2a46f8c53a40c38f1679a4194b6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/php-stubs/wordpress-stubs/zipball/f12220f303e0d7c0844c0e5e957b0c3cee48d2f7",
-                "reference": "f12220f303e0d7c0844c0e5e957b0c3cee48d2f7",
+                "url": "https://api.github.com/repos/php-stubs/wordpress-stubs/zipball/4d0cc9d5c4efd2a46f8c53a40c38f1679a4194b6",
+                "reference": "4d0cc9d5c4efd2a46f8c53a40c38f1679a4194b6",
                 "shasum": ""
             },
             "conflict": {
@@ -616,7 +616,7 @@
                 "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
                 "nikic/php-parser": "^5.5",
                 "php": "^7.4 || ^8.0",
-                "php-stubs/generator": "^0.8.3",
+                "php-stubs/generator": "^0.9",
                 "phpdocumentor/reflection-docblock": "^6.0",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^9.5",
@@ -643,9 +643,9 @@
             ],
             "support": {
                 "issues": "https://github.com/php-stubs/wordpress-stubs/issues",
-                "source": "https://github.com/php-stubs/wordpress-stubs/tree/v6.9.1"
+                "source": "https://github.com/php-stubs/wordpress-stubs/tree/v7.0.1"
             },
-            "time": "2026-02-03T19:29:21+00:00"
+            "time": "2026-07-10T10:10:02+00:00"
         },
         {
             "name": "php-stubs/wp-cli-stubs",
@@ -3268,7 +3268,14 @@
             "time": "2025-02-09T18:58:54+00:00"
         }
     ],
-    "aliases": [],
+    "aliases": [
+        {
+            "package": "php-stubs/wordpress-stubs",
+            "version": "7.0.1.0",
+            "alias": "6.999.999",
+            "alias_normalized": "6.999.999.0"
+        }
+    ],
     "minimum-stability": "dev",
     "stability-flags": {
         "wordpress/php-mcp-schema": 20

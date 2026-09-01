@@ -21,7 +21,9 @@ final class DefaultServerFactoryTest extends TestCase {
 		// Clear any existing servers
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 	}
 
@@ -35,12 +37,16 @@ final class DefaultServerFactoryTest extends TestCase {
 		// Clean up servers
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 
 		// Reset initialized flag
 		$initialized_property = $reflection->getProperty( 'initialized' );
-		$initialized_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$initialized_property->setAccessible( true );
+		}
 		$initialized_property->setValue( null, false );
 	}
 

@@ -24,7 +24,9 @@ final class McpTransportTest extends TestCase {
 
 		$ref    = new \ReflectionClass( $transport );
 		$method = $ref->getMethod( 'get_transport_name' );
-		$method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
 		$name = $method->invoke( $transport );
 
 		$this->assertIsString( $name );

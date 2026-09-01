@@ -110,6 +110,11 @@ For older releases, see [CHANGELOG.md](https://github.com/WordPress/mcp-adapter/
 
 == Upgrade Notice ==
 
+= x.y.z =
+Using MCP Adapter as a bundled library is deprecated and not recommended, as it may conflict with the MCP Adapter plugin or other bundled copies.
+
+See the [vx.y.z migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/vx.y.z.md) for how to migrate.
+
 = 0.6.1 =
 Repairs the release ZIP so that class_exists( 'WP_CLI' ) no longer risks a fatal error on normal web requests. Anyone running 0.6.0 from the release asset should upgrade.
 

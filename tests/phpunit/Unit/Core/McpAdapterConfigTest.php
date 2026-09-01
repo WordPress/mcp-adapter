@@ -14,19 +14,21 @@ final class McpAdapterConfigTest extends TestCase {
 
 	private McpAdapter $adapter;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 		$this->adapter = McpAdapter::instance();
 
 		// Clear any existing servers to ensure clean state
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 	}
 
-	public function tear_down(): void {
-		parent::tear_down();
+	public function tearDown(): void {
+		parent::tearDown();
 
 		// Clean up filters first
 		remove_all_filters( 'mcp_adapter_default_server_config' );
@@ -38,12 +40,16 @@ final class McpAdapterConfigTest extends TestCase {
 		// Clean up any registered servers
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 
 		// Reset the initialized flag to allow re-initialization
 		$initialized_property = $reflection->getProperty( 'initialized' );
-		$initialized_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$initialized_property->setAccessible( true );
+		}
 		$initialized_property->setValue( null, false );
 	}
 
@@ -59,12 +65,12 @@ final class McpAdapterConfigTest extends TestCase {
 			}
 		);
 
-		// Ensure abilities API is initialized first (already done in TestCase::set_up_before_class)
-
 		// Reset the initialized flag to allow re-initialization
 		$reflection           = new \ReflectionClass( $this->adapter );
 		$initialized_property = $reflection->getProperty( 'initialized' );
-		$initialized_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$initialized_property->setAccessible( true );
+		}
 		$initialized_property->setValue( null, false );
 
 		// Mock being inside mcp_adapter_init
