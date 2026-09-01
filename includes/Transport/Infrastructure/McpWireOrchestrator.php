@@ -618,6 +618,7 @@ final class McpWireOrchestrator {
 			case 'prompts/get':
 				return $schema->fromArray( GetPromptResult::class, $data );
 			default:
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is internal protocol diagnostics, not HTML output.
 				throw new \LogicException( sprintf( 'No result projector for %s under %s.', $method, $schema->version() ) );
 		}
 	}
@@ -663,6 +664,7 @@ final class McpWireOrchestrator {
 			case 'prompts/get':
 				return $schema->fromArray( GetPromptResultResponse::class, $data );
 			default:
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is internal protocol diagnostics, not HTML output.
 				throw new \LogicException( sprintf( 'No response encoder for %s under %s.', $method, $schema->version() ) );
 		}
 	}
@@ -695,6 +697,7 @@ final class McpWireOrchestrator {
 			case 'prompts/get':
 				return $schema->fromValue( GetPromptRequest::class, $message );
 			default:
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is internal protocol diagnostics, not HTML output.
 				throw new \LogicException( sprintf( 'No inbound root for %s under %s.', $method, $schema->version() ) );
 		}
 	}

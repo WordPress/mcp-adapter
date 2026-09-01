@@ -31,6 +31,7 @@ final class JsonRpcRequestDecoder {
 		try {
 			$value = json_decode( $json, false, self::MAX_DEPTH, JSON_THROW_ON_ERROR );
 		} catch ( \JsonException $exception ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is protocol validation data, not HTML output.
 			throw new \InvalidArgumentException( 'Invalid JSON: ' . $exception->getMessage(), 0, $exception );
 		}
 
@@ -137,6 +138,7 @@ final class JsonRpcRequestDecoder {
 
 			$token = substr( $json, $start, $cursor - $start );
 			if ( ! $this->is_native_integer( $token ) ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is protocol validation data, not HTML output.
 				throw new \RangeException( sprintf( 'JSON integer %s exceeds the native PHP integer range.', $token ) );
 			}
 		}
