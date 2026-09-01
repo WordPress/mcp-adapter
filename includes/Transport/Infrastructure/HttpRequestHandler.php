@@ -253,7 +253,11 @@ class HttpRequestHandler {
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
 	 *
-	 * @return array|null Null when the header is absent or valid, error payload otherwise.
+	 * @return array{
+	 *   code: int,
+	 *   message: string,
+	 *   data: mixed|null
+	 * }|null Null when the header is absent or valid, error payload otherwise.
 	 */
 	private function validate_protocol_version_header( HttpRequestContext $context ): ?array {
 		if ( null === $context->protocol_version ) {
@@ -264,7 +268,16 @@ class HttpRequestHandler {
 			return null;
 		}
 
-		return McpErrorFactory::create_error(
+		/**
+		 * Necessary because the McpSchema's `Error` class doesn't allow for type-hinted array shapes.
+		 *
+		 * @var array{
+		 *   code: int,
+		 *   message: string,
+		 *   data: mixed|null
+		 * } $error
+		 */
+		$error = McpErrorFactory::create_error( // phpcs:ignore SlevomatCodingStandard.Variables.UselessVariable.UselessVariable
 			McpErrorFactory::INVALID_REQUEST,
 			sprintf(
 				'Bad Request: Unsupported protocol version: %s (supported versions: %s)',
@@ -272,6 +285,7 @@ class HttpRequestHandler {
 				implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
 			)
 		)->toArray();
+		return $error;
 	}
 
 	/**

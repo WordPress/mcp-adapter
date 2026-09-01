@@ -18,7 +18,7 @@ use function WP_CLI\Utils\format_items;
  * Provides commands to serve MCP servers over STDIO transport for
  * communication with MCP clients via subprocess.
  */
-class McpCommand extends \WP_CLI_Command { // phpcs:ignore
+final class McpCommand extends \WP_CLI_Command {
 
 	/**
 	 * Serve an MCP server via STDIO transport.
