@@ -52,9 +52,8 @@ class DummyTransport implements McpRestTransportInterface {
 			throw new \InvalidArgumentException( 'Dummy transport only supports tools/list.' );
 		}
 
-		$schema          = $this->context->mcp_server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
+		$schema          = $this->context->mcp_server->get_schemas()->forVersion( Schemas::V2025_11_25 );
 		$request_context = new McpRequestContext(
-			Schemas::V2025_11_25,
 			$schema,
 			new \stdClass(),
 			null,

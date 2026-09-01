@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Tests\Integration;
 
 use WP\MCP\Cli\StdioServerBridge;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
@@ -195,7 +196,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 'complete', $discover['data']['result']['resultType'] );
 		$this->assertSame( 0, $discover['data']['result']['ttlMs'] );
 		$this->assertSame( 'private', $discover['data']['result']['cacheScope'] );
-		$this->assertContains( Schemas::V2026_07_28, $discover['data']['result']['supportedVersions'] );
+		$this->assertSame( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, $discover['data']['result']['supportedVersions'] );
 
 		$list = $this->http_request_2026_07_28( 'tools/list', 11, array() );
 		$this->assertSame( 200, $list['status'] );
@@ -246,6 +247,36 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		);
 		$this->assertSame( 'hi', $prompt['data']['result']['messages'][0]['content']['text'] );
 		$this->assertSame( 'complete', $prompt['data']['result']['resultType'] );
+	}
+
+	/** Missing tools and prompts use the standard Invalid Params error in both revisions. */
+	public function test_http_missing_tools_and_prompts_use_invalid_params(): void {
+		$session_id = $this->initialize_http_session();
+		foreach (
+			array(
+				'tools/call' => array( 'name' => 'missing-tool' ),
+				'prompts/get' => array( 'name' => 'missing-prompt' ),
+			) as $method => $params
+		) {
+			$response_2025 = $this->http_post(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 190,
+					'method'  => $method,
+					'params'  => $params,
+				),
+				array(
+					'Mcp-Session-Id'       => $session_id,
+					'MCP-Protocol-Version' => Schemas::V2025_11_25,
+				)
+			);
+			$this->assertSame( 200, $response_2025['status'] );
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response_2025['data']['error']['code'] );
+
+			$response_2026 = $this->http_request_2026_07_28( $method, 191, $params );
+			$this->assertSame( 400, $response_2026['status'] );
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response_2026['data']['error']['code'] );
+		}
 	}
 
 	/** Fractional elicitation answers survive schema hydration into resource callbacks. */

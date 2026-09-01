@@ -106,7 +106,7 @@ class McpErrorFactory {
 	/** @param string|int|float|null $id Request ID. @return array<string, mixed> */
 	public static function tool_not_found( $id, string $tool ): array {
 		/* translators: %s: tool name. */
-		return self::create_error_response( $id, self::TOOL_NOT_FOUND, sprintf( __( 'Tool not found: %s', 'mcp-adapter' ), $tool ) );
+		return self::create_error_response( $id, self::INVALID_PARAMS, sprintf( __( 'Tool not found: %s', 'mcp-adapter' ), $tool ) );
 	}
 
 	/** @param string|int|float|null $id Request ID. @return array<string, mixed> */
@@ -118,7 +118,7 @@ class McpErrorFactory {
 	/** @param string|int|float|null $id Request ID. @return array<string, mixed> */
 	public static function prompt_not_found( $id, string $prompt ): array {
 		/* translators: %s: prompt name. */
-		return self::create_error_response( $id, self::PROMPT_NOT_FOUND, sprintf( __( 'Prompt not found: %s', 'mcp-adapter' ), $prompt ) );
+		return self::create_error_response( $id, self::INVALID_PARAMS, sprintf( __( 'Prompt not found: %s', 'mcp-adapter' ), $prompt ) );
 	}
 
 	/** @param string|int|float|null $id Request ID. @return array<string, mixed> */

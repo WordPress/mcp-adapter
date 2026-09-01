@@ -39,7 +39,7 @@ final class RequestRouterObservabilityTest extends TestCase {
 		$this->assertInstanceOf( McpTool::class, $tool );
 		$server            = $this->makeServer( array( $tool ) );
 		$transport_context = $server->create_transport_context();
-		$schema            = $server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
+		$schema            = $server->get_schemas()->forVersion( Schemas::V2025_11_25 );
 		$request            = $schema->fromArray(
 			CallToolRequest::class,
 			array(
@@ -56,7 +56,6 @@ final class RequestRouterObservabilityTest extends TestCase {
 			)
 		);
 		$context            = new McpRequestContext(
-			Schemas::V2025_11_25,
 			$schema,
 			new \stdClass(),
 			null,
@@ -87,8 +86,8 @@ final class RequestRouterObservabilityTest extends TestCase {
 	public function test_error_metrics_distinguish_execution_and_protocol_failures(): void {
 		$server            = $this->makeServer( array( 'test/permission-denied' ) );
 		$transport_context = $server->create_transport_context();
-		$schema            = $server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
-		$context           = new McpRequestContext( Schemas::V2025_11_25, $schema, new \stdClass(), null, 'STDIO' );
+		$schema            = $server->get_schemas()->forVersion( Schemas::V2025_11_25 );
+		$context           = new McpRequestContext( $schema, new \stdClass(), null, 'STDIO' );
 		$denied            = $schema->fromArray(
 			CallToolRequest::class,
 			array(
@@ -112,11 +111,11 @@ final class RequestRouterObservabilityTest extends TestCase {
 		$missing_result = $transport_context->request_router->route_request( $missing, $context, 'STDIO' );
 
 		$this->assertTrue( $denied_result['isError'] );
-		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $missing_result['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $missing_result['error']['code'] );
 		$this->assertCount( 2, DummyObservabilityHandler::$events );
 		$this->assertSame( 'error', DummyObservabilityHandler::$events[0]['tags']['status'] );
 		$this->assertNotEmpty( DummyObservabilityHandler::$events[0]['tags']['failure_reason'] );
 		$this->assertSame( 'error', DummyObservabilityHandler::$events[1]['tags']['status'] );
-		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, DummyObservabilityHandler::$events[1]['tags']['error_code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, DummyObservabilityHandler::$events[1]['tags']['error_code'] );
 	}
 }

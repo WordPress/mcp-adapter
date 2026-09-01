@@ -98,8 +98,7 @@ abstract class TestCase extends WP_UnitTestCase {
 	/** Build a minimal exact request context. */
 	protected function request_context( McpServer $server, string $revision = Schemas::V2025_11_25, string $transport = 'test' ): McpRequestContext {
 		return new McpRequestContext(
-			$revision,
-			$server->get_schema_provider()->for_revision( $revision ),
+			$server->get_schemas()->forVersion( $revision ),
 			new \stdClass(),
 			null,
 			$transport

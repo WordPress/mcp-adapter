@@ -35,39 +35,40 @@ objects as `stdClass` and lists as arrays.
 1. extracts only the envelope fields needed to select a revision;
 2. constructs one immutable `McpRequestContext` containing the exact revision,
    selected `Schema`, client identity/capabilities, and transport metadata;
-3. applies the function-only profile keyed by that exact revision;
+3. applies the Adapter policy for that exact revision;
 4. verifies canonical method availability and the Adapter handler intersection;
 5. hydrates the exact request record before dispatch;
-6. routes the validated request record to a typed handler and derives legacy
-   associative arguments only at the Ability callback boundary; and
-7. projects logical handler output through the selected profile into exact
+6. routes the validated request record to a typed handler and derives
+   Ability-facing associative arguments only at the Ability callback boundary;
+   and
+7. projects logical handler output through the selected revision into exact
    result and response records before serialization.
 
 Invalid requests do not reach handlers. Invalid handler output does not reach
 the wire.
 
-## Exact lifecycle profiles
+## Exact lifecycle behavior
 
 ### `2025-11-25`
 
-The legacy profile implements `initialize`,
+MCP `2025-11-25` implements `initialize`,
 `notifications/initialized`, and `ping`. HTTP initialization may create a
 WordPress-user-bound `Mcp-Session-Id`; subsequent HTTP requests require that
 session and exact `MCP-Protocol-Version: 2025-11-25`. STDIO retains the
 initialization context in the bridge process.
 
 An unsupported initialization proposal receives exact `2025-11-25` as the
-counter-proposal. The profile never negotiates `2026-07-28` through
+counter-proposal. Initialization never negotiates `2026-07-28` through
 `initialize`.
 
 ### `2026-07-28`
 
-The modern profile is sessionless. Every request supplies exact protocol
+MCP `2026-07-28` is sessionless. Every request supplies exact protocol
 version and client capabilities in `params._meta`; `clientInfo` is retained when
 present. `server/discover` is implemented and `initialize` and `ping` are not
 available.
 
-Modern HTTP validates `MCP-Protocol-Version`, `Mcp-Method`, applicable
+MCP 2026 HTTP validates `MCP-Protocol-Version`, `Mcp-Method`, applicable
 `Mcp-Name`, and declared `Mcp-Param-*` values against the body. Missing or
 mismatched headers return HTTP 400 with `-32020`. Unsupported per-request
 versions return `-32022` with `requested` and `supported`. Removed or
@@ -99,14 +100,14 @@ an invalid annotation can therefore make a tool unavailable only in 2026.
 
 Handlers receive validated request records and preserve existing execution,
 permission, and hook behavior. Existing Ability callbacks still receive and
-return the same logical WordPress values. The selected wire profile constructs
-the final generated result record and supplies fields the modern schema
+return the same logical WordPress values. The selected revision boundary
+constructs the final generated result record and supplies fields the 2026 schema
 requires:
 
 - `resultType: "complete"` on every successful result;
 - `ttlMs: 0` and `cacheScope: "private"` on discovery, list, and resource-read
   results.
-- `io.modelcontextprotocol/serverInfo` metadata on successful modern results.
+- `io.modelcontextprotocol/serverInfo` metadata on successful 2026 results.
 
 The Adapter does not emit `input_required` because it does not implement that
 optional capability.

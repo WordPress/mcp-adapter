@@ -12,6 +12,7 @@ declare(strict_types=1);
 // phpcs:disable WordPress.PHP.YodaConditions.NotYoda
 
 use WP\MCP\Core\McpServer;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
@@ -281,7 +282,7 @@ $discover        = $run(
 	)
 );
 artifact_expect(
-	( $discover['result']['supportedVersions'] ?? array() ) === Schemas::supportedVersions(),
+	( $discover['result']['supportedVersions'] ?? array() ) === McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
 	'2026 discovery did not advertise the exact revision set'
 );
 $result_2026_07_28_list = $run(
@@ -344,7 +345,7 @@ artifact_expect( ( $result_2026_07_28_prompt['result']['messages'][0]['content']
 echo json_encode(
 	array(
 		'authoritative' => true,
-		'versions'      => Schemas::supportedVersions(),
+		'versions'      => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
 		'flows'         => array(
 			'2025' => array( 'initialize', 'notifications/initialized', 'ping', 'tools/list', 'tools/call', 'resources/list', 'resources/read', 'prompts/list', 'prompts/get' ),
 			'2026' => array( 'server/discover', 'tools/list', 'tools/call', 'resources/read', 'prompts/get' ),

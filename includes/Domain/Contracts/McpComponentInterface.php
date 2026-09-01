@@ -103,8 +103,6 @@ interface McpComponentInterface {
 	/**
 	 * Get observability context tags for logging/metrics.
 	 *
-	 * This replaces legacy approaches that derived observability tags from protocol `_meta`.
-	 *
 	 * @return array<string, mixed> Observability tags (component_type, source, etc.).
 	 * @since 0.5.0
 	 *

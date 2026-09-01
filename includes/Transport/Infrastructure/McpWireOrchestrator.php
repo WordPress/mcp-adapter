@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Core\McpRequestContext;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Record;
 use WP\McpSchema\Record\CallToolRequest;
@@ -49,25 +50,7 @@ use WP\McpSchema\Schema;
 use WP\McpSchema\Schemas;
 
 /**
- * Selects one exact profile before schema hydration and dispatch.
- *
- * Profiles are arrays of functions keyed by exact revision. There are no
- * behavioral labels or inheritance-based encoders.
- *
- * @phpstan-type WireProfile array{
- *   context: \Closure(array<string, mixed>, string, array<string, mixed>, array<string, mixed>|null): McpRequestContext,
- *   allows_request: \Closure(string, Schema): bool,
- *   allows_notification: \Closure(string, Schema): bool,
- *   hydrate: \Closure(string, bool, Schema, \stdClass): Record,
- *   pre_headers: \Closure(array<string, mixed>, string, array<string, mixed>): (array<string, mixed>|null),
- *   headers: \Closure(array<string, mixed>, McpRequestContext, array<string, mixed>): (array<string, mixed>|null),
- *   project_result: \Closure(string, mixed, Schema): Record,
- *   encode: \Closure(string, string|int, Record, Schema): Record,
- *   session_params: \Closure(string, Record): (array<string, mixed>|null),
- *   http_method: \Closure(string): string,
- *   requires_http_session: \Closure(string): bool,
- *   http_status: \Closure(int): int
- * }
+ * Selects one exact revision before schema hydration and dispatch.
  *
  * @since n.e.x.t
  */
@@ -79,9 +62,6 @@ final class McpWireOrchestrator {
 	/** @var \WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder */
 	private JsonRpcRequestDecoder $decoder;
 
-	/** @var array<string, WireProfile> */
-	private array $profiles;
-
 	/**
 	 * Constructor.
 	 *
@@ -90,7 +70,6 @@ final class McpWireOrchestrator {
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->transport_context = $transport_context;
 		$this->decoder           = new JsonRpcRequestDecoder();
-		$this->profiles          = $this->build_profiles();
 	}
 
 	/**
@@ -103,21 +82,21 @@ final class McpWireOrchestrator {
 	}
 
 	/**
-	 * Return the profile-owned action for one HTTP method.
+	 * Return the revision-owned action for one HTTP method.
 	 *
 	 * @since n.e.x.t
 	 */
 	public function http_method_action( string $method, ?string $header_revision ): string {
-		$revision = Schemas::V2025_11_25 === $header_revision || null === $header_revision
-			? Schemas::V2025_11_25
-			: Schemas::V2026_07_28;
-		$policy   = $this->profiles[ $revision ]['http_method'];
+		if ( 'POST' === $method ) {
+			return 'process';
+		}
 
-		return $policy( $method );
+		$is_2025 = Schemas::V2025_11_25 === $header_revision || null === $header_revision;
+		return $is_2025 && 'DELETE' === $method ? 'terminate-session' : 'reject';
 	}
 
 	/**
-	 * Whether the 2025-11-25 profile requires an established HTTP session.
+	 * Whether MCP 2025-11-25 requires an established HTTP session.
 	 *
 	 * @since n.e.x.t
 	 */
@@ -127,7 +106,7 @@ final class McpWireOrchestrator {
 			return false;
 		}
 
-		$selection = $this->select_profile_revision(
+		$selection = $this->select_revision(
 			$generic,
 			array( 'protocol_version' => $header_revision ),
 			null,
@@ -137,20 +116,17 @@ final class McpWireOrchestrator {
 			return false;
 		}
 
-		$policy = $this->profiles[ $selection ]['requires_http_session'];
-
-		return $policy( $generic['method'] );
+		return Schemas::V2025_11_25 === $selection && 'initialize' !== $generic['method'];
 	}
 
 	/**
-	 * Map a processed response through the selected profile's HTTP policy.
+	 * Map a processed response through the selected revision's HTTP policy.
 	 *
 	 * @param \WP\McpSchema\Record|array<string, mixed> $response Processed response.
 	 * @since n.e.x.t
 	 */
 	public function http_response_status( $response, ?McpRequestContext $context, \stdClass $message, ?string $header_revision ): int {
-		$wire = is_array( $response ) ? $response : json_decode( (string) wp_json_encode( $response ), true );
-		$code = is_array( $wire ) && isset( $wire['error']['code'] ) ? (int) $wire['error']['code'] : 0;
+		$code = $this->response_error_code( $response );
 		if ( 0 === $code ) {
 			return 200;
 		}
@@ -159,7 +135,7 @@ final class McpWireOrchestrator {
 		if ( null === $revision ) {
 			$generic   = $this->decoder->to_associative( $message );
 			$selection = is_array( $generic )
-				? $this->select_profile_revision( $generic, array( 'protocol_version' => $header_revision ), null, false )
+				? $this->select_revision( $generic, array( 'protocol_version' => $header_revision ), null, false )
 				: null;
 			$revision  = is_string( $selection ) ? $selection : null;
 		}
@@ -167,9 +143,9 @@ final class McpWireOrchestrator {
 			return McpErrorFactory::mcp_error_to_http_status( $code );
 		}
 
-		$policy = $this->profiles[ $revision ]['http_status'];
-
-		return $policy( $code );
+		return Schemas::V2026_07_28 === $revision && McpErrorFactory::INVALID_PARAMS === $code
+			? 400
+			: McpErrorFactory::mcp_error_to_http_status( $code );
 	}
 
 	/**
@@ -206,35 +182,37 @@ final class McpWireOrchestrator {
 			return $this->failure( McpErrorFactory::invalid_request( null, 'Request id must be a string or integer' ), $method, null, false );
 		}
 
-		$selection = $this->select_profile_revision( $generic, $transport_metadata, $client_params_2025_11_25 );
+		$selection = $this->select_revision( $generic, $transport_metadata, $client_params_2025_11_25 );
 		if ( is_array( $selection ) ) {
 			$schema   = McpErrorFactory::UNSUPPORTED_VERSION === ( $selection['error']['code'] ?? null )
-				? $this->transport_context->mcp_server->get_schema_provider()->for_revision( Schemas::V2026_07_28 )
+				? $this->transport_context->mcp_server->get_schemas()->forVersion( Schemas::V2026_07_28 )
 				: null;
 			$response = null === $schema ? $selection : $this->hydrate_error( $selection, $schema );
 
 			return $this->failure( $response, $method, $id, $notification );
 		}
 
-		$profile      = $this->profiles[ $selection ];
-		$schema       = $this->transport_context->mcp_server->get_schema_provider()->for_revision( $selection );
-		$pre_headers  = $profile['pre_headers'];
-		$header_error = $pre_headers( $generic, $transport, $transport_metadata );
+		$schema       = $this->transport_context->mcp_server->get_schemas()->forVersion( $selection );
+		$header_error = Schemas::V2026_07_28 === $selection
+			? $this->validate_2026_07_28_envelope_headers( $generic, $transport, $transport_metadata )
+			: null;
 		if ( null !== $header_error ) {
 			return $this->failure( $this->hydrate_error( $header_error, $schema ), $method, $id, $notification );
 		}
 
 		try {
-			$context_factory = $profile['context'];
-			$request_context = $context_factory( $generic, $transport, $transport_metadata, $client_params_2025_11_25 );
+			$request_context = Schemas::V2026_07_28 === $selection
+				? $this->context_2026_07_28( $generic, $transport, $transport_metadata )
+				: $this->context_2025_11_25( $generic, $transport, $transport_metadata, $client_params_2025_11_25 );
 		} catch ( \Throwable $throwable ) {
 			$error = McpErrorFactory::invalid_params( $id, $throwable->getMessage() );
 
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, $notification );
 		}
 
-		$post_headers = $profile['headers'];
-		$header_error = $post_headers( $generic, $request_context, $transport_metadata );
+		$header_error = Schemas::V2026_07_28 === $selection
+			? $this->validate_2026_07_28_parameter_headers( $generic, $request_context, $transport_metadata )
+			: null;
 		if ( null !== $header_error ) {
 			return $this->failure(
 				$this->hydrate_error( $header_error, $schema ),
@@ -246,8 +224,7 @@ final class McpWireOrchestrator {
 		}
 
 		if ( $notification ) {
-			$allows_notification = $profile['allows_notification'];
-			if ( ! $allows_notification( $method, $schema ) ) {
+			if ( ! $this->allows_notification( $selection, $method, $schema ) ) {
 				return array(
 					'context'          => $request_context,
 					'method'           => $method,
@@ -259,8 +236,7 @@ final class McpWireOrchestrator {
 			}
 
 			try {
-				$hydrate = $profile['hydrate'];
-				$hydrate( $method, true, $schema, $message );
+				$this->hydrate_inbound( $method, true, $schema, $message );
 			} catch ( \Throwable $throwable ) {
 				return array(
 					'context'          => $request_context,
@@ -282,15 +258,13 @@ final class McpWireOrchestrator {
 			);
 		}
 
-		$allows_request = $profile['allows_request'];
-		if ( ! $allows_request( $method, $schema ) ) {
+		if ( ! $this->allows_request( $selection, $method, $schema ) ) {
 			$error = McpErrorFactory::method_not_found( $id, $method );
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
 		}
 
 		try {
-			$hydrate = $profile['hydrate'];
-			$request = $hydrate( $method, false, $schema, $message );
+			$request = $this->hydrate_inbound( $method, false, $schema, $message );
 		} catch ( \Throwable $throwable ) {
 			$error = McpErrorFactory::invalid_params( $id, $throwable->getMessage() );
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
@@ -306,20 +280,20 @@ final class McpWireOrchestrator {
 			$response = $this->hydrate_error( $result, $schema );
 		} else {
 			try {
-				$project_result = $profile['project_result'];
-				$projected      = $project_result( $method, $result, $schema );
-				$encode         = $profile['encode'];
-				$response       = $encode( $method, $id, $projected, $schema );
+				$projected = Schemas::V2026_07_28 === $selection
+					? $this->project_2026_07_28_result( $method, $result, $schema )
+					: $this->project_2025_11_25_result( $method, $result, $schema );
+				$response  = Schemas::V2026_07_28 === $selection
+					? $this->hydrate_2026_07_28_success( $method, $id, $projected, $schema )
+					: $this->hydrate_2025_11_25_success( $id, $projected, $schema );
 			} catch ( \Throwable $throwable ) {
 				$response = $this->hydrate_error( McpErrorFactory::internal_error( $id, 'Invalid handler result' ), $schema );
 			}
 		}
 
-		$session_params    = $profile['session_params'];
-		$initialize_params = null;
-		if ( $this->is_success_response( $response ) ) {
-			$initialize_params = $session_params( $method, $request );
-		}
+		$initialize_params = Schemas::V2025_11_25 === $selection && $this->is_success_response( $response )
+			? $this->initialize_params( $method, $request )
+			: null;
 
 		return array(
 			'context'          => $request_context,
@@ -331,13 +305,9 @@ final class McpWireOrchestrator {
 		);
 	}
 
-	/**
-	 * Build the exact function-only profiles.
-	 *
-	 * @return array<string, WireProfile>
-	 */
-	private function build_profiles(): array {
-		$shared_requests     = array(
+	/** Whether one implemented request is available in the selected schema. */
+	private function allows_request( string $revision, string $method, Schema $schema ): bool {
+		$shared = array(
 			'tools/list',
 			'tools/call',
 			'resources/list',
@@ -346,112 +316,30 @@ final class McpWireOrchestrator {
 			'prompts/list',
 			'prompts/get',
 		);
-		$requests_2025_11_25 = array_merge( array( 'initialize', 'ping' ), $shared_requests );
-		$requests_2026_07_28 = array_merge( array( 'server/discover' ), $shared_requests );
+		if ( in_array( $method, $shared, true ) ) {
+			return $schema->allowsClientRequest( $method );
+		}
 
-		return array(
-			Schemas::V2025_11_25 => array(
-				'context'               => function ( array $generic, string $transport, array $metadata, ?array $client_params_2025_11_25 ): McpRequestContext {
-					return $this->context_2025_11_25( $generic, $transport, $metadata, $client_params_2025_11_25 );
-				},
-				'allows_request'        => static function ( string $method, Schema $schema ) use ( $requests_2025_11_25 ): bool {
-					return in_array( $method, $requests_2025_11_25, true ) && $schema->allowsClientRequest( $method );
-				},
-				'allows_notification'   => static function ( string $method, Schema $schema ): bool {
-					return 'notifications/initialized' === $method && $schema->allowsClientNotification( $method );
-				},
-				'hydrate'               => function ( string $method, bool $notification, Schema $schema, \stdClass $message ): Record {
-					return $this->hydrate_inbound( $method, $notification, $schema, $message );
-				},
-				'pre_headers'           => static function ( array $_generic, string $_transport, array $_metadata ): ?array {
-					unset( $_generic, $_transport, $_metadata );
-					return null;
-				},
-				'headers'               => static function ( array $_generic, McpRequestContext $_context, array $_metadata ): ?array {
-					unset( $_generic, $_context, $_metadata );
-					return null;
-				},
-				'project_result'        => function ( string $method, $result, Schema $schema ): Record {
-					return $this->project_2025_11_25_result( $method, $result, $schema );
-				},
-				'encode'                => static function ( string $_method, $id, Record $result, Schema $schema ): Record {
-					unset( $_method );
-					return $schema->fromArray(
-						JSONRPCResultResponse::class,
-						array(
-							'jsonrpc' => '2.0',
-							'id'      => $id,
-							'result'  => $result,
-						)
-					);
-				},
-				'session_params'        => function ( string $method, Record $request ): ?array {
-					return $this->initialize_params( $method, $request );
-				},
-				'http_method'           => static function ( string $method ): string {
-					if ( 'POST' === $method ) {
-						return 'process';
-					}
-					return 'DELETE' === $method ? 'terminate-session' : 'reject';
-				},
-				'requires_http_session' => static function ( string $method ): bool {
-					return 'initialize' !== $method;
-				},
-				'http_status'           => static function ( int $code ): int {
-					return McpErrorFactory::mcp_error_to_http_status( $code );
-				},
-			),
-			Schemas::V2026_07_28 => array(
-				'context'               => function ( array $generic, string $transport, array $metadata, ?array $_client_params_2025_11_25 ): McpRequestContext {
-					unset( $_client_params_2025_11_25 );
-					return $this->context_2026_07_28( $generic, $transport, $metadata );
-				},
-				'allows_request'        => static function ( string $method, Schema $schema ) use ( $requests_2026_07_28 ): bool {
-					return in_array( $method, $requests_2026_07_28, true ) && $schema->allowsClientRequest( $method );
-				},
-				'allows_notification'   => static function ( string $_method, Schema $_schema ): bool {
-					unset( $_method, $_schema );
-					return false;
-				},
-				'hydrate'               => function ( string $method, bool $notification, Schema $schema, \stdClass $message ): Record {
-					return $this->hydrate_inbound( $method, $notification, $schema, $message );
-				},
-				'pre_headers'           => function ( array $generic, string $transport, array $metadata ): ?array {
-					return $this->validate_2026_07_28_envelope_headers( $generic, $transport, $metadata );
-				},
-				'headers'               => function ( array $generic, McpRequestContext $context, array $metadata ): ?array {
-					return $this->validate_2026_07_28_parameter_headers( $generic, $context, $metadata );
-				},
-				'project_result'        => function ( string $method, $result, Schema $schema ): Record {
-					return $this->project_2026_07_28_result( $method, $result, $schema );
-				},
-				'encode'                => function ( string $method, $id, Record $result, Schema $schema ): Record {
-					return $this->hydrate_2026_07_28_success( $method, $id, $result, $schema );
-				},
-				'session_params'        => static function ( string $_method, Record $_request ): ?array {
-					unset( $_method, $_request );
-					return null;
-				},
-				'http_method'           => static function ( string $method ): string {
-					return 'POST' === $method ? 'process' : 'reject';
-				},
-				'requires_http_session' => static function ( string $_method ): bool {
-					unset( $_method );
-					return false;
-				},
-				'http_status'           => static function ( int $code ): int {
-					return McpErrorFactory::INVALID_PARAMS === $code ? 400 : McpErrorFactory::mcp_error_to_http_status( $code );
-				},
-			),
-		);
+		$implemented = Schemas::V2026_07_28 === $revision
+			? 'server/discover' === $method
+			: in_array( $method, array( 'initialize', 'ping' ), true );
+
+		return $implemented && $schema->allowsClientRequest( $method );
+	}
+
+	/** Whether one implemented notification is available in the selected schema. */
+	private function allows_notification( string $revision, string $method, Schema $schema ): bool {
+		return Schemas::V2025_11_25 === $revision
+			&& 'notifications/initialized' === $method
+			&& $schema->allowsClientNotification( $method );
 	}
 
 	/**
-	 * Select one exact profile before context construction or hydration.
+	 * Select one exact revision before context construction or hydration.
 	 *
 	 * @return string|array<string, mixed>
 	 */
-	private function select_profile_revision( array $generic, array $metadata, ?array $client_params_2025_11_25, bool $enforce_lifecycle = true ) {
+	private function select_revision( array $generic, array $metadata, ?array $client_params_2025_11_25, bool $enforce_lifecycle = true ) {
 		$method          = $generic['method'];
 		$params          = is_array( $generic['params'] ?? null ) ? $generic['params'] : array();
 		$meta            = is_array( $params['_meta'] ?? null ) ? $params['_meta'] : array();
@@ -467,8 +355,8 @@ final class McpWireOrchestrator {
 		}
 
 		$requested = is_string( $body_revision ) ? $body_revision : $header_revision;
-		if ( null !== $requested && ! in_array( $requested, Schemas::supportedVersions(), true ) ) {
-			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, Schemas::supportedVersions() );
+		if ( null !== $requested && ! McpVersionNegotiator::is_supported( $requested ) ) {
+			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS );
 		}
 
 		if ( 'initialize' === $method ) {
@@ -488,8 +376,8 @@ final class McpWireOrchestrator {
 		$capabilities = $this->to_object( $params['capabilities'] ?? array() );
 		$client_info  = isset( $params['clientInfo'] ) ? $this->to_object( $params['clientInfo'] ) : null;
 
-		$schema = $this->transport_context->mcp_server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
-		return new McpRequestContext( Schemas::V2025_11_25, $schema, $capabilities, $client_info, $transport, $metadata );
+		$schema = $this->transport_context->mcp_server->get_schemas()->forVersion( Schemas::V2025_11_25 );
+		return new McpRequestContext( $schema, $capabilities, $client_info, $transport, $metadata );
 	}
 
 	/** Construct the 2026 per-request context. */
@@ -505,10 +393,9 @@ final class McpWireOrchestrator {
 		$client_info = isset( $meta['io.modelcontextprotocol/clientInfo'] ) && is_array( $meta['io.modelcontextprotocol/clientInfo'] )
 			? $this->to_object( $meta['io.modelcontextprotocol/clientInfo'] )
 			: null;
-		$schema      = $this->transport_context->mcp_server->get_schema_provider()->for_revision( Schemas::V2026_07_28 );
+		$schema      = $this->transport_context->mcp_server->get_schemas()->forVersion( Schemas::V2026_07_28 );
 
 		return new McpRequestContext(
-			Schemas::V2026_07_28,
 			$schema,
 			$this->to_object( $capabilities ),
 			$client_info,
@@ -520,7 +407,7 @@ final class McpWireOrchestrator {
 	/** @return array<string, mixed> Logical server/discover result data. */
 	private function create_discover_data(): array {
 		return array(
-			'supportedVersions' => $this->transport_context->mcp_server->get_schema_provider()->supported_revisions(),
+			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
 			'capabilities'      => array(
 				'prompts'   => array( 'listChanged' => false ),
 				'resources' => array( 'listChanged' => false ),
@@ -632,6 +519,22 @@ final class McpWireOrchestrator {
 		$params = $this->decoder->to_associative( $request->getParams()->jsonSerialize() );
 
 		return is_array( $params ) ? $params : null;
+	}
+
+	/**
+	 * Hydrate one exact 2025-11-25 success envelope.
+	 *
+	 * @param string|int $id Request ID.
+	 */
+	private function hydrate_2025_11_25_success( $id, Record $result, Schema $schema ): Record {
+		return $schema->fromArray(
+			JSONRPCResultResponse::class,
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => $id,
+				'result'  => $result,
+			)
+		);
 	}
 
 	/**
@@ -782,10 +685,8 @@ final class McpWireOrchestrator {
 			return null;
 		}
 
-		$tool_record = $tool->get_protocol_record( $context->schema() );
-		$schema      = $tool_record->getInputSchema();
-		$arguments   = is_array( $params['arguments'] ?? null ) ? $params['arguments'] : array();
-		foreach ( $this->header_annotations( $schema ) as $annotation ) {
+		$arguments = is_array( $params['arguments'] ?? null ) ? $params['arguments'] : array();
+		foreach ( $tool->get_header_annotations( $context->schema() ) as $annotation ) {
 			$present    = false;
 			$value      = $this->value_at_path( $arguments, $annotation['path'], $present );
 			$header_key = strtolower( 'mcp-param-' . $annotation['name'] );
@@ -801,36 +702,6 @@ final class McpWireOrchestrator {
 		}
 
 		return null;
-	}
-
-	/**
-	 * @param list<string> $path Property path.
-	 * @return array<int, array{name: string, path: list<string>}>
-	 */
-	private function header_annotations( \stdClass $schema, array $path = array() ): array {
-		$annotations = array();
-		$properties  = $schema->properties ?? null;
-		if ( ! $properties instanceof \stdClass ) {
-			return $annotations;
-		}
-
-		foreach ( get_object_vars( $properties ) as $property_name => $property_schema ) {
-			if ( ! $property_schema instanceof \stdClass ) {
-				continue;
-			}
-			$property_path   = $path;
-			$property_path[] = $property_name;
-			$header_name     = $property_schema->{'x-mcp-header'} ?? null;
-			if ( is_string( $header_name ) && '' !== $header_name ) {
-				$annotations[] = array(
-					'name' => $header_name,
-					'path' => $property_path,
-				);
-			}
-			$annotations = array_merge( $annotations, $this->header_annotations( $property_schema, $property_path ) );
-		}
-
-		return $annotations;
 	}
 
 	/**
@@ -919,9 +790,29 @@ final class McpWireOrchestrator {
 
 	/** Whether an encoded record is a successful JSON-RPC result response. */
 	private function is_success_response( Record $response ): bool {
-		$value = $response->jsonSerialize();
+		return $response->has( 'result' ) && ! $response->has( 'error' );
+	}
 
-		return property_exists( $value, 'result' ) && ! property_exists( $value, 'error' );
+	/** @param \WP\McpSchema\Record|array<string, mixed> $response Processed response. */
+	private function response_error_code( $response ): int {
+		$error = null;
+		if ( is_array( $response ) ) {
+			$error = $response['error'] ?? null;
+		} elseif ( $response instanceof Record && $response->has( 'error' ) ) {
+			$error = $response->get( 'error' );
+		}
+
+		if ( $error instanceof Record && $error->has( 'code' ) ) {
+			$code = $error->get( 'code' );
+		} elseif ( $error instanceof \stdClass ) {
+			$code = $error->code ?? null;
+		} elseif ( is_array( $error ) ) {
+			$code = $error['code'] ?? null;
+		} else {
+			$code = null;
+		}
+
+		return is_int( $code ) ? $code : 0;
 	}
 
 	/** PHP 7.4-compatible list detection. */

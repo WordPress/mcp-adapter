@@ -20,6 +20,7 @@ use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\McpSchema\Record\Prompt;
 use WP\McpSchema\Schema;
+use WP\McpSchema\Schemas;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -95,8 +96,8 @@ class McpServer {
 	 */
 	private McpTransportFactory $transport_factory;
 
-	/** @var \WP\MCP\Core\McpSchemaProvider */
-	private McpSchemaProvider $schema_provider;
+	/** @var \WP\McpSchema\Schemas */
+	private Schemas $schemas;
 
 	/**
 	 * Transport permission callback.
@@ -149,7 +150,7 @@ class McpServer {
 		$this->server_version                = $server_version;
 		$this->transport_permission_callback = $transport_permission_callback;
 
-		$this->schema_provider = new McpSchemaProvider();
+		$this->schemas = Schemas::create();
 
 		// Setup handlers and components
 		$this->setup_handlers( $error_handler, $observability_handler );
@@ -198,7 +199,7 @@ class McpServer {
 			$this,
 			$this->error_handler,
 			$this->observability_handler,
-			$this->schema_provider
+			$this->schemas
 		);
 
 		// Initialize transport factory
@@ -458,11 +459,11 @@ class McpServer {
 	}
 
 	/**
-	 * Get the server-owned exact schema provider.
+	 * Get the server-owned exact schemas.
 	 *
 	 * @since n.e.x.t
 	 */
-	public function get_schema_provider(): McpSchemaProvider {
-		return $this->schema_provider;
+	public function get_schemas(): Schemas {
+		return $this->schemas;
 	}
 }

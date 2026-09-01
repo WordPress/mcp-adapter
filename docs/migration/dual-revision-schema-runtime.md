@@ -19,12 +19,13 @@ fields.
 
 ## Select an exact schema
 
-Protocol-facing server getters now require a selected schema:
+Protocol-facing server getters now require a selected schema. Reuse the
+server-owned schema cache:
 
 ```php
 use WP\McpSchema\Schemas;
 
-$schema = Schemas::create()->forVersion( Schemas::V2026_07_28 );
+$schema = $server->get_schemas()->forVersion( Schemas::V2026_07_28 );
 $tools  = $server->get_tools( $schema );
 ```
 
@@ -71,6 +72,24 @@ revision and absent from another.
 The CLI reports neutral registration counts plus per-revision availability. Wire
 discovery returns only records valid for the selected revision.
 
+## Direct Adapter integrations
+
+Protocol-facing Adapter internals now receive validated records and an exact
+request context:
+
+| Surface                              | Current contract                                                                                                            |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Custom HTTP transports               | Delegate raw `WP_REST_Request` objects through `HttpRequestHandler` and `HttpRequestContext`.                               |
+| Other custom transports              | Decode and process raw JSON through `McpWireOrchestrator`.                                                                  |
+| `RequestRouter::route_request()`     | Accepts a generated request `Record`, `McpRequestContext`, and transport name. Do not pass raw method and parameter arrays. |
+| Method handlers                      | Accept the exact generated request record and `McpRequestContext`; return logical arrays for final schema projection.       |
+| `McpErrorFactory`                    | Returns logical JSON-RPC error arrays. Pass the selected revision to `resource_not_found()`.                                |
+| `ContentBlockHelper`                 | Returns revision-neutral content arrays for final schema hydration.                                                         |
+| `McpPromptBuilderInterface::build()` | Returns the revision-neutral prompt configuration array.                                                                    |
+
+See [Custom transports](../guides/custom-transports.md) and
+[Error handling](../guides/error-handling.md) for complete examples.
+
 ## Filters
 
 Tool, resource, and prompt list filters keep their existing first two arguments
@@ -102,6 +121,8 @@ final list-result record is constructed.
   `cacheScope: "private"`.
 - 2026 resource misses use `-32602`; unsupported per-request versions use
   `-32022`.
+- Missing tools and prompts use standard Invalid Params (`-32602`) in both
+  revisions.
 
 ## Transport changes
 

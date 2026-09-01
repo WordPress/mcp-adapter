@@ -133,8 +133,8 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 
 		$items = array();
 		foreach ( $servers as $server ) {
-			$schema_2025 = $server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
-			$schema_2026 = $server->get_schema_provider()->for_revision( Schemas::V2026_07_28 );
+			$schema_2025 = $server->get_schemas()->forVersion( Schemas::V2025_11_25 );
+			$schema_2026 = $server->get_schemas()->forVersion( Schemas::V2026_07_28 );
 			$items[]     = array(
 				'ID'             => $server->get_server_id(),
 				'Name'           => $server->get_server_name(),

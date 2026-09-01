@@ -131,7 +131,7 @@ class PromptsHandler {
 			}
 
 			$result = is_array( $result ) ? $result : array( 'result' => $result );
-			return $this->create_result( $this->normalize_result( $result, $prompt, $prompt_name ) );
+			return $this->normalize_result( $result, $prompt, $prompt_name );
 		} catch ( \Throwable $throwable ) {
 			$this->mcp->get_error_handler()->log(
 				'Prompt execution failed',
@@ -315,10 +315,5 @@ class PromptsHandler {
 		);
 
 		return self::$default_role;
-	}
-
-	/** Return one logical prompt result for profile projection. */
-	private function create_result( array $data ): array {
-		return $data;
 	}
 }

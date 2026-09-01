@@ -37,6 +37,7 @@ Connect via WP-CLI over STDIO, or point an HTTP client at `/wp-json/mcp/mcp-adap
 ## Migration
 
 - [Dual-revision schema runtime migration](docs/migration/dual-revision-schema-runtime.md)
+- [Migration Guide: v0.5.0](docs/migration/v0.5.0.md)
 - [Migration Guide: v0.3.0](docs/migration/v0.3.0.md)
 
 ## Contributing

@@ -64,7 +64,7 @@ class RequestRouter {
 			return McpErrorFactory::invalid_request( $request_id, 'Validated request has no method.' );
 		}
 		$method = $method_value;
-		$params = $this->request_params( $request );
+		$params = $this->observability_params( $request );
 
 		// Track request start time.
 		$start_time = microtime( true );
@@ -181,23 +181,58 @@ class RequestRouter {
 		}
 	}
 
-	/** @return array<string, mixed> */
-	private function request_params( Record $request ): array {
+	/** @return array<string, mixed> Safe request fields used for observability. */
+	private function observability_params( Record $request ): array {
 		$params = $request->get( 'params' );
-		if ( $params instanceof Record ) {
-			$params = $params->jsonSerialize();
-		}
-		if ( $params instanceof \stdClass ) {
-			$params = json_decode( (string) wp_json_encode( $params ), true );
+		if ( ! $params instanceof Record && ! $params instanceof \stdClass ) {
+			return array();
 		}
 
-		return is_array( $params ) ? $params : array();
+		$result = array();
+		foreach ( array( 'name', 'protocolVersion', 'uri' ) as $field ) {
+			$value = $this->record_field( $params, $field );
+			if ( ! is_scalar( $value ) ) {
+				continue;
+			}
+
+			$result[ $field ] = $value;
+		}
+
+		$client_info = $this->record_field( $params, 'clientInfo' );
+		$client_name = $client_info instanceof Record || $client_info instanceof \stdClass
+			? $this->record_field( $client_info, 'name' )
+			: null;
+		if ( is_string( $client_name ) ) {
+			$result['clientInfo'] = array( 'name' => $client_name );
+		}
+
+		$arguments = $this->record_field( $params, 'arguments' );
+		if ( $arguments instanceof \stdClass ) {
+			$arguments = get_object_vars( $arguments );
+		}
+		if ( is_array( $arguments ) ) {
+			$result['arguments'] = array_fill_keys( array_keys( $arguments ), null );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Read one field from a generated record or JSON object.
+	 *
+	 * @param \WP\McpSchema\Record|\stdClass $record Record-like value.
+	 * @return mixed
+	 */
+	private function record_field( $record, string $field ) {
+		if ( $record instanceof Record ) {
+			return $record->has( $field ) ? $record->get( $field ) : null;
+		}
+
+		return property_exists( $record, $field ) ? $record->{$field} : null;
 	}
 
 	/**
 	 * Resolve per-component observability tags for a request.
-	 *
-	 * This replaces legacy approaches that derived tags from protocol `_meta`.
 	 *
 	 * @param string $method MCP method name.
 	 * @param array $params Request parameters (root or nested under `params`).
@@ -205,15 +240,9 @@ class RequestRouter {
 	 * @return array<string, mixed>
 	 */
 	private function resolve_component_observability_context( string $method, array $params ): array {
-		$request_params = $params['params'] ?? $params;
-
-		if ( ! is_array( $request_params ) ) {
-			$request_params = array();
-		}
-
 		switch ( $method ) {
 			case 'tools/call':
-				$tool_name = $request_params['name'] ?? null;
+				$tool_name = $params['name'] ?? null;
 				$tool_name = is_string( $tool_name ) ? trim( $tool_name ) : null;
 
 				if ( null === $tool_name || '' === $tool_name ) {
@@ -231,7 +260,7 @@ class RequestRouter {
 				);
 
 			case 'prompts/get':
-				$prompt_name = $request_params['name'] ?? null;
+				$prompt_name = $params['name'] ?? null;
 				$prompt_name = is_string( $prompt_name ) ? trim( $prompt_name ) : null;
 
 				if ( null === $prompt_name || '' === $prompt_name ) {
@@ -249,7 +278,7 @@ class RequestRouter {
 				);
 
 			case 'resources/read':
-				$resource_uri = $request_params['uri'] ?? null;
+				$resource_uri = $params['uri'] ?? null;
 				$resource_uri = is_string( $resource_uri ) ? trim( $resource_uri ) : null;
 
 				if ( null === $resource_uri || '' === $resource_uri ) {
