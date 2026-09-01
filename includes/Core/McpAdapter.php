@@ -80,6 +80,8 @@ final class McpAdapter {
 			return;
 		}
 
+		$this->check_plugin_loaded();
+
 		$this->maybe_create_default_server();
 
 		/**
@@ -96,6 +98,33 @@ final class McpAdapter {
 		do_action( 'mcp_adapter_init', $this );
 		$this->register_wp_cli_commands();
 		self::$initialized = true;
+	}
+
+	/**
+	 * Checks whether the MCP Adapter plugin is loaded and logs a deprecation notice if not.
+	 *
+	 * @internal
+	 */
+	private function check_plugin_loaded(): void {
+		// The constant is defined in Plugin::constants() and will not exist if McpAdapter is only loaded as a library.
+		if ( defined( 'WP_MCP_VERSION' ) ) {
+			return;
+		}
+
+		_deprecated_function(
+			self::class,
+			'x.y.z',
+			sprintf(
+				// translators: %s: class name
+				esc_html__( '%s is currently loaded as a bundled dependency instead of via the canonical MCP Adapter plugin. This is not recommended and may not be supported in future versions. Please install the MCP Adapter plugin and migrate accordingly.', 'mcp-adapter' ),
+				self::class
+			)
+		);
+
+		// @todo Add an admin notice with an installation link once the plugin is on w.org.
+
+		// Redefine the version constant so bad plugins don't break those that follow best practices.
+		define( 'WP_MCP_VERSION', self::VERSION );
 	}
 
 	/**
