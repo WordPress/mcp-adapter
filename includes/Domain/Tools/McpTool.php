@@ -90,6 +90,9 @@ final class McpTool implements McpComponentInterface {
 	 */
 	private array $observability_context = array();
 
+	/** @var array<int, array{name: string, path: list<string>}>|null */
+	private ?array $header_annotations = null;
+
 	// =========================================================================
 	// Constructor
 	// =========================================================================
@@ -227,11 +230,17 @@ final class McpTool implements McpComponentInterface {
 		$data = $this->protocol_data();
 		if ( '2026-07-28' === $schema->version() ) {
 			unset( $data['execution'] );
-			try {
-				$this->assert_valid_header_annotations( $data['inputSchema'] ?? array() );
-			} catch ( \Throwable $throwable ) {
-				$this->remember_projection_error( $schema->version(), $throwable );
-				throw $throwable;
+			$projection_error = $this->get_projection_error( $schema->version() );
+			if ( $projection_error instanceof \Throwable ) {
+				throw $projection_error;
+			}
+			if ( null === $this->header_annotations ) {
+				try {
+					$this->header_annotations = $this->collect_header_annotations( $data['inputSchema'] ?? array() );
+				} catch ( \Throwable $throwable ) {
+					$this->remember_projection_error( $schema->version(), $throwable );
+					throw $throwable;
+				}
 			}
 		}
 
@@ -260,6 +269,22 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Return validated modern HTTP header annotations.
+	 *
+	 * @return array<int, array{name: string, path: list<string>}>
+	 * @since n.e.x.t
+	 */
+	public function get_header_annotations( Schema $schema ): array {
+		if ( '2026-07-28' !== $schema->version() ) {
+			return array();
+		}
+
+		$this->get_protocol_record( $schema );
+
+		return $this->header_annotations ?? array();
 	}
 
 	/**
@@ -425,17 +450,21 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	/**
-	 * Enforce the 2026 x-mcp-header definition constraints.
+	 * Collect and validate the 2026 x-mcp-header definitions.
 	 *
 	 * @param mixed $schema Tool input schema.
+	 * @return array<int, array{name: string, path: list<string>}>
 	 */
-	private function assert_valid_header_annotations( $schema ): void {
+	private function collect_header_annotations( $schema ): array {
 		if ( ! is_array( $schema ) ) {
-			return;
+			return array();
 		}
 
-		$names = array();
-		$this->scan_header_annotations( $schema, false, true, $names );
+		$names       = array();
+		$annotations = array();
+		$this->scan_header_annotations( $schema, false, true, array(), $names, $annotations );
+
+		return $annotations;
 	}
 
 	/**
@@ -444,9 +473,11 @@ final class McpTool implements McpComponentInterface {
 	 * @param mixed $node Schema node.
 	 * @param bool $property_schema Whether this node is a property schema.
 	 * @param bool $reachable Whether its path contains only properties keys.
+	 * @param list<string> $path Property path.
 	 * @param array<string, true> $names Case-insensitive header names.
+	 * @param array<int, array{name: string, path: list<string>}> $annotations Valid annotations.
 	 */
-	private function scan_header_annotations( $node, bool $property_schema, bool $reachable, array &$names ): void {
+	private function scan_header_annotations( $node, bool $property_schema, bool $reachable, array $path, array &$names, array &$annotations ): void {
 		if ( ! is_array( $node ) ) {
 			return;
 		}
@@ -466,12 +497,18 @@ final class McpTool implements McpComponentInterface {
 				throw new \InvalidArgumentException( 'x-mcp-header names must be case-insensitively unique.' );
 			}
 			$names[ $folded ] = true;
+			$annotations[]    = array(
+				'name' => $name,
+				'path' => $path,
+			);
 		}
 
 		foreach ( $node as $keyword => $value ) {
 			if ( 'properties' === $keyword && is_array( $value ) ) {
-				foreach ( $value as $property ) {
-					$this->scan_header_annotations( $property, true, $reachable, $names );
+				foreach ( $value as $property_name => $property ) {
+					$property_path   = $path;
+					$property_path[] = (string) $property_name;
+					$this->scan_header_annotations( $property, true, $reachable, $property_path, $names, $annotations );
 				}
 				continue;
 			}
@@ -480,7 +517,7 @@ final class McpTool implements McpComponentInterface {
 				continue;
 			}
 
-			$this->scan_header_annotations( $value, false, false, $names );
+			$this->scan_header_annotations( $value, false, false, $path, $names, $annotations );
 		}
 	}
 }

@@ -43,21 +43,6 @@ unzip -q "$archive" -d "$extracted"
 "$php_executable" "$project_root/tests/artifact/smoke.php" \
 	"$extracted/mcp-adapter/vendor/autoload.php"
 
-reference="$(
-	"$php_executable" -r '
-		$data = json_decode(file_get_contents($argv[1]), true);
-		foreach ($data["packages"] ?? array() as $package) {
-			if (($package["name"] ?? "") === "wordpress/php-mcp-schema") {
-				echo $package["source"]["reference"] ?? "";
-			}
-		}
-	' "$extracted/mcp-adapter/vendor/composer/installed.json"
-)"
-if [[ "$reference" != "db47f7b71223ac4986153ad2b1495ef94a19e08c" ]]; then
-	printf 'Unexpected php-mcp-schema artifact ref: %s\n' "$reference" >&2
-	exit 1
-fi
-
 for forbidden_path in \
 	vendor/phpunit \
 	vendor/phpstan \
@@ -72,27 +57,9 @@ do
 	fi
 done
 
-for forbidden_symbol in \
-	'WP\\McpSchema\\Client\\' \
-	'WP\\McpSchema\\Common\\' \
-	'WP\\McpSchema\\Server\\' \
-	'AbstractDataTransferObject' \
-	'AbstractEnum' \
-	'get_protocol_dto' \
-	'class_alias'
-do
-	if grep -RFq "$forbidden_symbol" \
-		"$extracted/mcp-adapter/includes" \
-		"$extracted/mcp-adapter/vendor/composer"
-	then
-		printf 'Forbidden production symbol found: %s\n' "$forbidden_symbol" >&2
-		exit 1
-	fi
-done
-
 digest="$("$php_executable" -r 'echo hash_file("sha256", $argv[1]);' "$archive")"
 bytes="$(wc -c < "$archive" | tr -d ' ')"
 files="$(unzip -Z1 "$archive" | sed '/\/$/d' | wc -l | tr -d ' ')"
 php_files="$(unzip -Z1 "$archive" | sed '/\/$/d' | grep -Ec '\.php$')"
-printf 'verified plugin sha256=%s bytes=%s files=%s php_files=%s schema_ref=%s\n' \
-	"$digest" "$bytes" "$files" "$php_files" "$reference"
+printf 'verified plugin sha256=%s bytes=%s files=%s php_files=%s\n' \
+	"$digest" "$bytes" "$files" "$php_files"

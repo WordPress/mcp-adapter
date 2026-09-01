@@ -18,9 +18,6 @@ use WP\McpSchema\Schema;
  */
 final class McpRequestContext {
 
-	/** @var string */
-	private string $revision;
-
 	/** @var \WP\McpSchema\Schema */
 	private Schema $schema;
 
@@ -39,7 +36,6 @@ final class McpRequestContext {
 	/**
 	 * Constructor.
 	 *
-	 * @param string               $revision           Exact MCP revision.
 	 * @param \WP\McpSchema\Schema $schema             Selected schema.
 	 * @param \stdClass            $client_capabilities Client capabilities.
 	 * @param \stdClass|null       $client_info         Client identity when supplied.
@@ -48,18 +44,12 @@ final class McpRequestContext {
 	 * @since n.e.x.t
 	 */
 	public function __construct(
-		string $revision,
 		Schema $schema,
 		\stdClass $client_capabilities,
 		?\stdClass $client_info,
 		string $transport,
 		array $transport_metadata = array()
 	) {
-		if ( $revision !== $schema->version() ) {
-			throw new \InvalidArgumentException( 'Request revision must match the selected schema.' );
-		}
-
-		$this->revision            = $revision;
 		$this->schema              = $schema;
 		$this->client_capabilities = self::copy_object( $client_capabilities );
 		$this->client_info         = null === $client_info ? null : self::copy_object( $client_info );
@@ -73,7 +63,7 @@ final class McpRequestContext {
 	 * @since n.e.x.t
 	 */
 	public function revision(): string {
-		return $this->revision;
+		return $this->schema->version();
 	}
 
 	/**

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Infrastructure\ErrorHandling;
 
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
 use WP\McpSchema\Schemas;
@@ -34,7 +35,7 @@ final class McpErrorFactoryTest extends TestCase {
 	/** Named errors retain their codes, messages, and contextual data. */
 	public function test_named_errors_retain_contract_fields(): void {
 		$missing_tool = McpErrorFactory::tool_not_found( 1, 'missing-tool' );
-		$this->assertSame( McpErrorFactory::TOOL_NOT_FOUND, $missing_tool['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $missing_tool['error']['code'] );
 		$this->assertStringContainsString( 'missing-tool', $missing_tool['error']['message'] );
 
 		$legacy_resource = McpErrorFactory::resource_not_found( 2, 'file:///missing', Schemas::V2025_11_25 );
@@ -43,10 +44,10 @@ final class McpErrorFactoryTest extends TestCase {
 		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $modern_resource['error']['code'] );
 		$this->assertSame( array( 'uri' => 'file:///missing' ), $modern_resource['error']['data'] );
 
-		$unsupported = McpErrorFactory::unsupported_protocol_version( 3, '2099-01-01', Schemas::supportedVersions() );
+		$unsupported = McpErrorFactory::unsupported_protocol_version( 3, '2099-01-01', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS );
 		$this->assertSame( McpErrorFactory::UNSUPPORTED_VERSION, $unsupported['error']['code'] );
 		$this->assertSame( '2099-01-01', $unsupported['error']['data']['requested'] );
-		$this->assertSame( Schemas::supportedVersions(), $unsupported['error']['data']['supported'] );
+		$this->assertSame( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, $unsupported['error']['data']['supported'] );
 	}
 
 	/**

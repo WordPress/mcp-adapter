@@ -20,6 +20,7 @@ use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Schema;
+use WP\McpSchema\Schemas;
 use WP_Error;
 
 /**
@@ -69,8 +70,8 @@ class McpComponentRegistry {
 	 */
 	private McpObservabilityHandlerInterface $observability_handler;
 
-	/** @var \WP\MCP\Core\McpSchemaProvider */
-	private McpSchemaProvider $schema_provider;
+	/** @var \WP\McpSchema\Schemas */
+	private Schemas $schemas;
 
 	/**
 	 * Whether to record component registration.
@@ -85,18 +86,18 @@ class McpComponentRegistry {
 	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler Error handler instance.
 	 * @param \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface $observability_handler Observability handler instance.
-	 * @param \WP\MCP\Core\McpSchemaProvider $schema_provider Exact schema provider.
+	 * @param \WP\McpSchema\Schemas $schemas Server-owned exact schemas.
 	 */
 	public function __construct(
 		McpServer $mcp_server,
 		McpErrorHandlerInterface $error_handler,
 		McpObservabilityHandlerInterface $observability_handler,
-		McpSchemaProvider $schema_provider
+		Schemas $schemas
 	) {
 		$this->mcp_server            = $mcp_server;
 		$this->error_handler         = $error_handler;
 		$this->observability_handler = $observability_handler;
-		$this->schema_provider       = $schema_provider;
+		$this->schemas               = $schemas;
 
 		/**
 		 * Filters whether component registration events should be recorded for observability.
@@ -667,8 +668,8 @@ class McpComponentRegistry {
 	 */
 	private function has_any_projection( McpComponentInterface $component, string $type, string $name ): bool {
 		$available = false;
-		foreach ( $this->schema_provider->supported_revisions() as $revision ) {
-			$schema = $this->schema_provider->for_revision( $revision );
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
+			$schema = $this->schemas->forVersion( $revision );
 			if ( $component->is_available_for( $schema ) ) {
 				$available = true;
 				continue;

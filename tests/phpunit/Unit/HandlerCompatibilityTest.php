@@ -416,7 +416,7 @@ final class HandlerCompatibilityTest extends TestCase {
 		);
 		$response = ( new PromptsHandler( $server ) )->get_prompt( $request, $this->request_context( $server ) );
 
-		$this->assertSame( McpErrorFactory::PROMPT_NOT_FOUND, $response['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['error']['code'] );
 	}
 
 	/** Resource hooks mutate callback input and fail closed on WP_Error or exceptions. */

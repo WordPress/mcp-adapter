@@ -161,7 +161,7 @@ final class DualRevisionProjectionTest extends TestCase {
 		);
 		$this->assertInstanceOf( McpPrompt::class, $prompt );
 		$server = $this->makeServer( array(), array(), array( $prompt ) );
-		foreach ( Schemas::supportedVersions() as $revision ) {
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
 			$record = $server->get_prompt( 'minimal-prompt', $this->schema( $revision ) );
 			$this->assertNotNull( $record );
 			$this->assertFalse( $record->has( 'description' ) );
@@ -208,8 +208,8 @@ final class DualRevisionProjectionTest extends TestCase {
 		};
 		add_filter( 'mcp_adapter_tools_list', $callback, 10, 3 );
 
-		$schema_2025  = $server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
-		$schema_2026  = $server->get_schema_provider()->for_revision( Schemas::V2026_07_28 );
+		$schema_2025  = $server->get_schemas()->forVersion( Schemas::V2025_11_25 );
+		$schema_2026  = $server->get_schemas()->forVersion( Schemas::V2026_07_28 );
 		$request_2025 = $schema_2025->fromArray(
 			ListToolsRequest::class,
 			array(
@@ -243,7 +243,7 @@ final class DualRevisionProjectionTest extends TestCase {
 	/** Initialize/resource/prompt filters preserve leading arguments and selected schema. */
 	public function test_other_result_filters_receive_selected_schema(): void {
 		$server  = $this->makeServer( array(), array( 'test/resource' ), array( 'test/prompt' ) );
-		$schema  = $server->get_schema_provider()->for_revision( Schemas::V2025_11_25 );
+		$schema  = $server->get_schemas()->forVersion( Schemas::V2025_11_25 );
 		$context = $this->request_context( $server );
 		$seen    = array();
 		$filter  = static function ( $value, $filtered_server, $filtered_schema ) use ( &$seen ) {
@@ -360,14 +360,13 @@ final class DualRevisionProjectionTest extends TestCase {
 		$this->assertSame( $hooks, $seen );
 	}
 
-	/** Context copies nested objects/lists and rejects mismatched schema provenance. */
+	/** Context copies nested objects/lists and derives its exact revision from the schema. */
 	public function test_request_context_is_deeply_immutable_and_exact(): void {
 		$capabilities         = new \stdClass();
 		$capabilities->custom = (object) array( 'values' => array( 1, 2 ) );
 		$metadata             = array( 'nested' => (object) array( 'value' => 'original' ) );
 		$schema               = $this->schema( Schemas::V2026_07_28 );
 		$context              = new McpRequestContext(
-			Schemas::V2026_07_28,
 			$schema,
 			$capabilities,
 			null,
@@ -381,20 +380,12 @@ final class DualRevisionProjectionTest extends TestCase {
 		$metadata_copy['nested']->value = 'changed';
 		$this->assertSame( 1, $context->client_capabilities()->custom->values[0] );
 		$this->assertSame( 'original', $context->transport_metadata()['nested']->value );
-
-		$this->expectException( \InvalidArgumentException::class );
-		new McpRequestContext(
-			Schemas::V2025_11_25,
-			$schema,
-			new \stdClass(),
-			null,
-			'test'
-		);
+		$this->assertSame( Schemas::V2026_07_28, $context->revision() );
 	}
 
 	/** Error factory emits canonical inner shapes and modern resource mapping. */
 	public function test_error_factory_outputs_revision_aware_arrays(): void {
-		$unsupported = McpErrorFactory::unsupported_protocol_version( 1, 'unknown', Schemas::supportedVersions() );
+		$unsupported = McpErrorFactory::unsupported_protocol_version( 1, 'unknown', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS );
 		$this->assertSame( McpErrorFactory::UNSUPPORTED_VERSION, $unsupported['error']['code'] );
 		$this->assertSame( 'unknown', $unsupported['error']['data']['requested'] );
 

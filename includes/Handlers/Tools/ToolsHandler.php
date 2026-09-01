@@ -51,7 +51,7 @@ class ToolsHandler {
 	/**
 	 * Handles the tools/list request.
 	 *
-	 * Returns logical data for exact profile projection.
+	 * Returns logical data for exact revision projection.
 	 * Tool records are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
@@ -257,38 +257,34 @@ class ToolsHandler {
 					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
-						return $this->create_result(
-							array(
-								'content' => array(
-									ContentBlockHelper::embedded_text_resource(
-										$uri,
-										$resource_item['text'],
-										is_string( $mime_type ) ? $mime_type : null,
-										null,
-										$block_meta,
-										$resource_meta
-									),
+						return array(
+							'content' => array(
+								ContentBlockHelper::embedded_text_resource(
+									$uri,
+									$resource_item['text'],
+									is_string( $mime_type ) ? $mime_type : null,
+									null,
+									$block_meta,
+									$resource_meta
 								),
-								'isError' => false,
-							)
+							),
+							'isError' => false,
 						);
 					}
 
 					if ( $has_blob ) {
-						return $this->create_result(
-							array(
-								'content' => array(
-									ContentBlockHelper::embedded_blob_resource(
-										$uri,
-										$resource_item['blob'],
-										is_string( $mime_type ) ? $mime_type : null,
-										null,
-										$block_meta,
-										$resource_meta
-									),
+						return array(
+							'content' => array(
+								ContentBlockHelper::embedded_blob_resource(
+									$uri,
+									$resource_item['blob'],
+									is_string( $mime_type ) ? $mime_type : null,
+									null,
+									$block_meta,
+									$resource_meta
 								),
-								'isError' => false,
-							)
+							),
+							'isError' => false,
 						);
 					}
 				}
@@ -303,18 +299,16 @@ class ToolsHandler {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
-				return $this->create_result(
-					array(
-						'content' => array(
-							ContentBlockHelper::image(
-								$image_data,
-								$mime_type,
-								null,
-								McpValidator::normalize_meta( $result['_meta'] ?? null )
-							),
+				return array(
+					'content' => array(
+						ContentBlockHelper::image(
+							$image_data,
+							$mime_type,
+							null,
+							McpValidator::normalize_meta( $result['_meta'] ?? null )
 						),
-						'isError' => false,
-					)
+					),
+					'isError' => false,
 				);
 			}
 
@@ -335,7 +329,7 @@ class ToolsHandler {
 			);
 			$result_data['structuredContent'] = $result;
 
-			return $this->create_result( $result_data );
+			return $result_data;
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -359,16 +353,9 @@ class ToolsHandler {
 	 * @return array<string, mixed>
 	 */
 	private function create_error_result( string $message ): array {
-		return $this->create_result(
-			array(
-				'content' => array( ContentBlockHelper::text( $message ) ),
-				'isError' => true,
-			)
+		return array(
+			'content' => array( ContentBlockHelper::text( $message ) ),
+			'isError' => true,
 		);
-	}
-
-	/** Return one logical tool result for profile projection. */
-	private function create_result( array $data ): array {
-		return $data;
 	}
 }
