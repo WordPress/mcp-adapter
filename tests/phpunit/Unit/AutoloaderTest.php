@@ -103,7 +103,9 @@ final class AutoloaderTest extends TestCase {
 	 */
 	private static function require_autoloader( string $autoloader_file ): bool {
 		$method = new \ReflectionMethod( Autoloader::class, 'require_autoloader' );
-		$method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
 
 		return (bool) $method->invoke( null, $autoloader_file );
 	}
@@ -114,7 +116,9 @@ final class AutoloaderTest extends TestCase {
 	 */
 	private static function reset_is_loaded(): void {
 		$property = new \ReflectionProperty( Autoloader::class, 'is_loaded' );
-		$property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$property->setAccessible( true );
+		}
 		$property->setValue( null, false );
 	}
 

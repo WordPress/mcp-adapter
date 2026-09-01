@@ -29,31 +29,34 @@ final class McpSessionManagerTest extends TestCase {
 	 *
 	 * @var int
 	 */
-	private int $test_user_id;
+	private int $test_user_id = 0;
 
 	/**
 	 * Set up test user before each test
 	 */
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
-		// Create a test user
-		$this->test_user_id = wp_create_user( 'mcp_test_user', 'test_password', 'mcp_test@example.com' );
-		$this->assertIsInt( $this->test_user_id );
-		$this->assertGreaterThan( 0, $this->test_user_id );
+		$this->test_user_id = $this->factory()->user->create(
+			array(
+				'user_login' => 'mcp_test_user',
+				'user_pass'  => 'test_password',
+				'user_email' => 'mcp_test@example.com',
+			)
+		);
 	}
 
 	/**
 	 * Clean up test user after each test
 	 */
-	public function tear_down(): void {
+	public function tearDown(): void {
 		// Clean up all sessions for test user
 		if ( $this->test_user_id ) {
 			delete_user_meta( $this->test_user_id, self::session_meta_key() );
 			wp_delete_user( $this->test_user_id );
 		}
 
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	/**
@@ -146,7 +149,9 @@ final class McpSessionManagerTest extends TestCase {
 	 */
 	public function test_session_meta_key_falls_back_to_unsuffixed_when_blog_id_invalid(): void {
 		$method = new \ReflectionMethod( SessionManager::class, 'session_meta_key_for_blog' );
-		$method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
 
 		$this->assertSame( 'mcp_adapter_sessions', $method->invoke( null, 0 ) );
 		$this->assertSame( 'mcp_adapter_sessions', $method->invoke( null, -1 ) );

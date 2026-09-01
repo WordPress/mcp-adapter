@@ -25,8 +25,8 @@ final class McpCommandTest extends TestCase {
 
 	private McpAdapter $adapter;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		// Skip if WP-CLI classes aren't available
 		if ( ! class_exists( 'WP_CLI_Command' ) ) {
@@ -38,7 +38,9 @@ final class McpCommandTest extends TestCase {
 		// Clear any existing servers for clean testing
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 	}
 
@@ -73,17 +75,17 @@ final class McpCommandTest extends TestCase {
 					public static $error_called = false;
 					public static $error_message = "";
 					public static $debug_called = false;
-					
+
 					public static function error( $message ) {
 						self::$error_called = true;
 						self::$error_message = $message;
 						throw new Exception( "WP_CLI::error called: " . $message );
 					}
-					
+
 					public static function debug( $message ) {
 						self::$debug_called = true;
 					}
-					
+
 					public static function line( $message ) {
 						// Mock implementation
 					}
@@ -116,7 +118,7 @@ final class McpCommandTest extends TestCase {
 				class WP_CLI {
 					public static $line_called = false;
 					public static $line_message = "";
-					
+
 					public static function line( $message ) {
 						self::$line_called = true;
 						self::$line_message = $message;

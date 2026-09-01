@@ -92,13 +92,19 @@ final class ErrorResponseConsistencyTest extends TestCase {
 		$resources_reflection = new \ReflectionClass( $resources_handler );
 
 		$tools_extract = $tools_reflection->getMethod( 'extract_params' );
-		$tools_extract->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$tools_extract->setAccessible( true );
+		}
 
 		$prompts_extract = $prompts_reflection->getMethod( 'extract_params' );
-		$prompts_extract->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$prompts_extract->setAccessible( true );
+		}
 
 		$resources_extract = $resources_reflection->getMethod( 'extract_params' );
-		$resources_extract->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$resources_extract->setAccessible( true );
+		}
 
 		// Test both nested and direct parameter formats
 		$nested_params = array(

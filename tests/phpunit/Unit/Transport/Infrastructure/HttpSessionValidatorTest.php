@@ -21,25 +21,29 @@ use WP_REST_Request;
  */
 final class HttpSessionValidatorTest extends TestCase {
 
-	private int $test_user_id;
+	private int $test_user_id = 0;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
-		// Create a test user
-		$this->test_user_id = wp_create_user( 'mcp_session_test_user', 'test_password', 'session_test@example.com' );
-		$this->assertIsInt( $this->test_user_id );
-		$this->assertGreaterThan( 0, $this->test_user_id );
+		// Create a test user.
+		$this->test_user_id = $this->factory()->user->create(
+			array(
+				'user_login' => 'mcp_session_test_user',
+				'user_pass'  => 'test_password',
+				'user_email' => 'session_test@example.com',
+			)
+		);
 	}
 
-	public function tear_down(): void {
+	public function tearDown(): void {
 		// Clean up all sessions for test user
 		if ( $this->test_user_id ) {
 			delete_user_meta( $this->test_user_id, self::session_meta_key() );
 			wp_delete_user( $this->test_user_id );
 		}
 
-		parent::tear_down();
+		parent::tearDown();
 	}
 
 	public function test_validate_session_header_with_valid_session(): void {
