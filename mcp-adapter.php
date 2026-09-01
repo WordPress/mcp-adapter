@@ -29,22 +29,6 @@ namespace WP\MCP;
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit();
 
-/**
- * Define the plugin constants.
- */
-function constants(): void {
-	/**
-	 * Shortcut constant to the path of this file.
-	 */
-	define( 'WP_MCP_DIR', plugin_dir_path( __FILE__ ) );
-
-	/**
-	 * Version of the plugin.
-	 */
-	define( 'WP_MCP_VERSION', '0.6.1' );
-}
-
-constants();
 require_once __DIR__ . '/includes/Autoloader.php';
 
 // If autoloader failed, we cannot proceed.
