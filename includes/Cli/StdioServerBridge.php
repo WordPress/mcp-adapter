@@ -71,7 +71,7 @@ class StdioServerBridge {
 				continue;
 			}
 
-			fwrite( STDOUT, $response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- STDIO is the protocol transport.
+			fwrite( STDOUT, $response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- STDIO is the protocol transport.
 			fflush( STDOUT );
 		}
 
@@ -80,7 +80,7 @@ class StdioServerBridge {
 
 	/** Log to stderr without contaminating the wire stream. */
 	private function log_to_stderr( string $message ): void {
-		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite -- STDERR is the diagnostic channel.
+		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- STDERR is the diagnostic channel.
 	}
 
 	/** Process one raw STDIO line. */
