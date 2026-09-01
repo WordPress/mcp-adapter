@@ -471,25 +471,97 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( '2099-01-01', $unsupported['data']['error']['data']['requested'] );
 	}
 
-	/** Batches are rejected as invalid requests before any handler executes. */
-	public function test_http_rejects_batches(): void {
-		$response = $this->http_post(
+	/** Batches are rejected on both transports before any handler executes. */
+	public function test_http_and_stdio_reject_batches(): void {
+		$batch = array(
 			array(
-				array(
-					'jsonrpc' => '2.0',
-					'id'      => 1,
-					'method'  => 'tools/list',
-				),
-				array(
-					'jsonrpc' => '2.0',
-					'id'      => 2,
-					'method'  => 'resources/list',
-				),
-			)
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'tools/list',
+			),
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'resources/list',
+			),
 		);
+		$response = $this->http_post( $batch );
+		$stdio    = $this->stdio_request( $batch );
 
 		$this->assertSame( 400, $response['status'] );
 		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $response['data']['error']['code'] );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $stdio['error']['code'] );
+	}
+
+	/** Malformed JSON and non-object top-level values fail identically on HTTP and STDIO. */
+	public function test_http_and_stdio_reject_malformed_envelopes(): void {
+		foreach (
+			array(
+				'{'    => McpErrorFactory::PARSE_ERROR,
+				'[]'   => McpErrorFactory::INVALID_REQUEST,
+				'null' => McpErrorFactory::INVALID_REQUEST,
+			) as $raw => $expected_code
+		) {
+			$http  = $this->http_post_raw( $raw );
+			$stdio = $this->stdio_raw( $raw );
+
+			$this->assertSame( 400, $http['status'] );
+			$this->assertSame( $expected_code, $http['data']['error']['code'] );
+			$this->assertNull( $http['data']['id'] );
+			$this->assertSame( $expected_code, $stdio['error']['code'] );
+			$this->assertNull( $stdio['id'] );
+		}
+	}
+
+	/** Schema-invalid JSON-RPC version and request IDs map to invalid request on both transports. */
+	public function test_http_and_stdio_reject_invalid_jsonrpc_records(): void {
+		foreach (
+			array(
+				array(
+					'jsonrpc' => '1.0',
+					'id'      => 34,
+					'method'  => 'tools/list',
+					'params'  => array( '_meta' => $this->meta_2026_07_28() ),
+				),
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 1.5,
+					'method'  => 'tools/list',
+					'params'  => array( '_meta' => $this->meta_2026_07_28() ),
+				),
+			) as $payload
+		) {
+			$raw     = (string) wp_json_encode( $payload );
+			$headers = array(
+				'MCP-Protocol-Version' => Schemas::V2026_07_28,
+				'Mcp-Method'           => 'tools/list',
+			);
+			$http    = $this->http_post_raw( $raw, $headers );
+			$stdio   = $this->stdio_raw( $raw );
+
+			$this->assertSame( 400, $http['status'] );
+			$this->assertSame( McpErrorFactory::INVALID_REQUEST, $http['data']['error']['code'] );
+			$this->assertSame( McpErrorFactory::INVALID_REQUEST, $stdio['error']['code'] );
+		}
+	}
+
+	/** Noncanonical tools/list/all is unavailable in the retained 2025 lifecycle too. */
+	public function test_http_2025_rejects_tools_list_all(): void {
+		$session_id = $this->initialize_http_session();
+		$response   = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 33,
+				'method'  => 'tools/list/all',
+			),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+
+		$this->assertSame( 404, $response['status'] );
+		$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $response['data']['error']['code'] );
 	}
 
 	/** Native overflow is valid JSON but an invalid JSON-RPC request, not parse error. */
@@ -573,6 +645,37 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 403, $invalid['status'] );
 	}
 
+	/** The Origin allowlist filter accepts exact origins and invalid filter values fail closed. */
+	public function test_http_origin_allowlist_filter_is_enforced_fail_closed(): void {
+		$allow = static fn(): array => array( 'https://trusted.example' );
+		add_filter( 'mcp_adapter_allowed_http_origins', $allow );
+		try {
+			$trusted = $this->http_request_2026_07_28(
+				'tools/list',
+				84,
+				array(),
+				array( 'Origin' => 'https://trusted.example' )
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_allowed_http_origins', $allow );
+		}
+		$this->assertSame( 200, $trusted['status'] );
+
+		$invalid = static fn(): string => 'https://trusted.example';
+		add_filter( 'mcp_adapter_allowed_http_origins', $invalid );
+		try {
+			$rejected = $this->http_request_2026_07_28(
+				'tools/list',
+				85,
+				array(),
+				array( 'Origin' => 'https://trusted.example' )
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_allowed_http_origins', $invalid );
+		}
+		$this->assertSame( 403, $rejected['status'] );
+	}
+
 	/** GET and DELETE are unavailable for the sessionless 2026 transport. */
 	public function test_http_2026_get_and_delete_are_method_not_allowed(): void {
 		foreach ( array( 'GET', 'DELETE' ) as $method ) {
@@ -580,6 +683,97 @@ final class DualRevisionWireCorpusTest extends TestCase {
 			$request->set_header( 'MCP-Protocol-Version', Schemas::V2026_07_28 );
 			$response = $this->http->handle_request( new HttpRequestContext( $request ) );
 			$this->assertSame( 405, $response->get_status() );
+		}
+	}
+
+	/** Legacy GET is rejected while DELETE terminates the exact 2025 session. */
+	public function test_http_2025_get_rejected_and_delete_terminates_session(): void {
+		$session_id  = $this->initialize_http_session();
+		$get         = new WP_REST_Request( 'GET', '/mcp' );
+		$get->set_header( 'MCP-Protocol-Version', Schemas::V2025_11_25 );
+		$get_response = $this->http->handle_request( new HttpRequestContext( $get ) );
+		$this->assertSame( 405, $get_response->get_status() );
+		$this->assertNull( $get_response->get_data() );
+
+		$delete = new WP_REST_Request( 'DELETE', '/mcp' );
+		$delete->set_header( 'MCP-Protocol-Version', Schemas::V2025_11_25 );
+		$delete->set_header( 'Mcp-Session-Id', $session_id );
+		$delete_response = $this->http->handle_request( new HttpRequestContext( $delete ) );
+		$this->assertSame( 200, $delete_response->get_status() );
+		$this->assertNull( $delete_response->get_data() );
+
+		$after_delete = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 81,
+				'method'  => 'tools/list',
+			),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+		$this->assertSame( 404, $after_delete['status'] );
+		$this->assertSame( McpErrorFactory::SESSION_NOT_FOUND, $after_delete['data']['error']['code'] );
+	}
+
+	/** Embedded-resource records retain both metadata levels in final JSON for each revision. */
+	public function test_wire_serializes_embedded_resource_without_placeholder_objects(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'embedded-resource-tool',
+				'inputSchema' => array( 'type' => 'object' ),
+				'handler'     => static fn(): array => array(
+					'type'      => 'resource',
+					'_meta'     => array( 'block' => true ),
+					'resource'  => array(
+						'uri'      => 'fixture://nested',
+						'text'     => 'nested content',
+						'mimeType' => 'text/plain',
+						'_meta'    => array( 'resource' => true ),
+					),
+				),
+				'permission'  => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+		$session_id = $this->initialize_http_session();
+		$legacy     = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 82,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'name'      => 'embedded-resource-tool',
+					'arguments' => new \stdClass(),
+				),
+			),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+		$modern = $this->http_request_2026_07_28(
+			'tools/call',
+			83,
+			array(
+				'name'      => 'embedded-resource-tool',
+				'arguments' => new \stdClass(),
+			)
+		);
+
+		foreach ( array( $legacy, $modern ) as $response ) {
+			$block = $response['data']['result']['content'][0];
+			$this->assertSame( 'resource', $block['type'] );
+			$this->assertTrue( $block['_meta']['block'] );
+			$this->assertSame( 'fixture://nested', $block['resource']['uri'] );
+			$this->assertSame( 'nested content', $block['resource']['text'] );
+			$this->assertSame( 'text/plain', $block['resource']['mimeType'] );
+			$this->assertTrue( $block['resource']['_meta']['resource'] );
+			$this->assertStringNotContainsString( '"resource":{}', (string) wp_json_encode( $response['data'] ) );
 		}
 	}
 
@@ -676,6 +870,23 @@ final class DualRevisionWireCorpusTest extends TestCase {
 			)
 		);
 		$this->assertSame( McpErrorFactory::UNSUPPORTED_VERSION, $unsupported['error']['code'] );
+	}
+
+	/** The retained bridge control surface and enable filter remain source-compatible. */
+	public function test_stdio_control_surface_and_enable_filter(): void {
+		$this->assertSame( 'srv', $this->stdio->get_server()->get_server_id() );
+		$this->stdio->stop();
+
+		$disable = '__return_false';
+		add_filter( 'mcp_adapter_enable_stdio_transport', $disable );
+		try {
+			$this->stdio->serve();
+			$this->fail( 'Disabled STDIO transport unexpectedly started.' );
+		} catch ( \RuntimeException $exception ) {
+			$this->assertStringContainsString( 'STDIO transport is disabled', $exception->getMessage() );
+		} finally {
+			remove_filter( 'mcp_adapter_enable_stdio_transport', $disable );
+		}
 	}
 
 	/** @return array<string, mixed> */
