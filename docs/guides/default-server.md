@@ -109,7 +109,7 @@ Every HTTP client must complete an initialization handshake before sending any o
 
 1. **Initialize** — Send a `POST` request with the `initialize` JSON-RPC method. No `Mcp-Session-Id` header is needed for this first request.
 2. **Capture the session ID** — The response includes an `Mcp-Session-Id` header containing a UUID. Store this value.
-3. **Include the header on every subsequent request** — All following `POST` and `DELETE` requests must include the `Mcp-Session-Id` header with the stored value. (The MCP specification also requires the header on `GET` requests for SSE streaming, but SSE is not yet implemented — `GET` currently returns `405 Method Not Allowed`.)
+3. **Include the header on every subsequent request** — All following `POST`, `GET`, and `DELETE` requests must include the `Mcp-Session-Id` header with the stored value. `GET` opens an SSE stream for server-initiated messages on that session; see [CLI Usage](cli-usage.md#connecting-directly-over-http-remote-clients) for details and the filters that control it.
 4. **Terminate when done** — Send a `DELETE` request with the `Mcp-Session-Id` header to clean up the session.
 
 ### Curl example

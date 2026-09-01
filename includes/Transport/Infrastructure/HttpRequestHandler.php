@@ -65,9 +65,9 @@ class HttpRequestHandler {
 			return $this->handle_mcp_request( $context );
 		}
 
-		// Handle GET requests (reserved for SSE streaming; currently not implemented).
+		// Handle GET requests (SSE streaming).
 		if ( 'GET' === $context->method ) {
-			return $this->handle_sse_request();
+			return $this->handle_sse_request( $context );
 		}
 
 		// Handle DELETE requests (session termination)
@@ -310,11 +310,77 @@ class HttpRequestHandler {
 	/**
 	 * Handle GET requests (SSE streaming).
 	 *
+	 * Validates the session and protocol version exactly like a POST request
+	 * would, then hands the request off to {@see SseStream} for the actual
+	 * streaming. Streaming only happens when this response is served through
+	 * the normal WordPress REST dispatch (via the `rest_pre_serve_request`
+	 * filter registered below) — calling this method directly, as tests do,
+	 * never blocks.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
+	 *
 	 * @return \WP_REST_Response SSE response.
 	 */
-	private function handle_sse_request(): \WP_REST_Response {
-		// SSE streaming not yet implemented - return HTTP 405 with no body
-		return new \WP_REST_Response( null, 405 );
+	private function handle_sse_request( HttpRequestContext $context ): \WP_REST_Response {
+		/**
+		 * Filters whether the SSE (GET) stream of the MCP HTTP transport is enabled.
+		 *
+		 * Return false to keep GET requests responding with HTTP 405, e.g. on
+		 * hosting environments where holding a request open is undesirable.
+		 * The MCP Streamable HTTP specification allows a server to omit SSE
+		 * support entirely, so disabling this does not break the transport.
+		 *
+		 * @since 0.7.0
+		 *
+		 * @param bool $enabled Whether the SSE stream is enabled. Default true.
+		 */
+		if ( ! apply_filters( 'mcp_adapter_enable_http_sse_stream', true ) ) {
+			return new \WP_REST_Response( null, 405 );
+		}
+
+		$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
+		if ( true !== $session_validation ) {
+			return new \WP_REST_Response( $session_validation, McpErrorFactory::get_http_status_for_error( $session_validation ) );
+		}
+
+		$protocol_version_error = $this->validate_protocol_version_header( $context );
+		if ( null !== $protocol_version_error ) {
+			$response_body = JsonRpcResponseBuilder::create_error_response( null, $protocol_version_error );
+
+			return new \WP_REST_Response( $response_body, McpErrorFactory::get_http_status_for_error( $response_body ) );
+		}
+
+		$this->register_sse_stream( $context->request );
+
+		return new \WP_REST_Response( null, 200 );
+	}
+
+	/**
+	 * Register the raw SSE stream to run when this request is actually served.
+	 *
+	 * WordPress's REST server JSON-encodes whatever a route callback returns.
+	 * To send a raw `text/event-stream` body instead, this hooks
+	 * `rest_pre_serve_request` — the point at which WP_REST_Server would
+	 * otherwise encode and echo the response — and takes over output for the
+	 * matching request only.
+	 *
+	 * @param \WP_REST_Request<array<string, mixed>> $request The originating GET request.
+	 *
+	 * @return void
+	 */
+	private function register_sse_stream( \WP_REST_Request $request ): void {
+		$callback = static function ( $served, $result, $served_request ) use ( $request, &$callback ) {
+			if ( $served_request !== $request ) {
+				return $served;
+			}
+
+			remove_filter( 'rest_pre_serve_request', $callback );
+			( new SseStream() )->stream();
+
+			return true;
+		};
+
+		add_filter( 'rest_pre_serve_request', $callback, 10, 3 );
 	}
 
 	/**

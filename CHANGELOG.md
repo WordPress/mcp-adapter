@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
+### Added
+- The HTTP transport's `GET` endpoint now opens a real SSE stream (per the MCP Streamable HTTP transport) instead of returning `405`, so clients that can only reach a WordPress site over HTTPS — including remote/cloud MCP clients that cannot spawn a local STDIO process — can connect directly using an [Application Password](https://make.wordpress.org/core/2020/11/05/application-passwords-integration-guide/), with no local proxy required. The stream is held open for a bounded duration (30 seconds by default) before closing so a single connection can't tie up a PHP-FPM worker indefinitely; compliant clients reconnect automatically. New filters: `mcp_adapter_enable_http_sse_stream`, `mcp_adapter_sse_stream_duration`, `mcp_adapter_sse_ping_interval`. See the [CLI Usage guide](docs/guides/cli-usage.md#connecting-directly-over-http-remote-clients).
+
 ## [0.6.1] - 2026-08-13
 
 ### Fixed
