@@ -415,8 +415,13 @@ final class ComponentCompatibilityTest extends TestCase {
 		$permission_tool = McpTool::fromAbility( $permission_ability );
 		$this->assertInstanceOf( McpTool::class, $execute_tool );
 		$this->assertInstanceOf( McpTool::class, $permission_tool );
-		$this->assertSame( 'ability_callback_exception', $execute_tool->execute( array() )->get_error_code() );
-		$this->assertSame( 'ability_callback_exception', $permission_tool->check_permission( array() )->get_error_code() );
+
+		$execution_error  = $execute_tool->execute( array() );
+		$permission_error = $permission_tool->check_permission( array() );
+		$this->assertInstanceOf( WP_Error::class, $execution_error );
+		$this->assertInstanceOf( WP_Error::class, $permission_error );
+		$this->assertStringContainsString( 'boom', $execution_error->get_error_message() );
+		$this->assertStringContainsString( 'nope', $permission_error->get_error_message() );
 		$this->assertSame( 'test/execute-exception', $execute_tool->get_adapter_meta()['ability'] );
 	}
 }
