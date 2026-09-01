@@ -152,12 +152,7 @@ npm run wp-env:test start
 
 ## Continuous Integration
 
-The repository has comprehensive CI testing via GitHub Actions (`.github/workflows/test.yml`):
-
-**Test Matrix:**
-- PHP versions: 8.4, 8.3, 8.2, 8.1, 8.0, 7.4
-- WordPress versions: latest, trunk
-- Coverage: Enabled for PHP 8.4 + WordPress latest (uploaded to Codecov)
+The repository has comprehensive CI testing via GitHub Actions ([`.github/workflows/test.yml`](../../.github/workflows/test.yml)):
 
 **Automated Checks:**
 - PHPUnit tests via `npm run test:php`

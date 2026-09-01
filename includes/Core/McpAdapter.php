@@ -183,8 +183,8 @@ final class McpAdapter {
 	 * Create and register a new MCP server.
 	 *
 	 * @param string $server_id Unique identifier for the server.
-	 * @param string $server_route_namespace Server route namespace.
-	 * @param string $server_route Server route.
+	 * @param non-falsy-string $server_route_namespace Server route namespace.
+	 * @param non-falsy-string $server_route Server route.
 	 * @param string $server_name Server name.
 	 * @param string $server_description Server description.
 	 * @param string $server_version Server version.
