@@ -1053,7 +1053,9 @@ final class DualRevisionWireCorpusTest extends TestCase {
 	/** @return array<string, mixed> */
 	private function stdio_raw( string $raw_request ): array {
 		$method = new \ReflectionMethod( $this->stdio, 'handle_request' );
-		$method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
 		$raw  = $method->invoke( $this->stdio, $raw_request );
 		$data = json_decode( (string) $raw, true );
 
@@ -1063,7 +1065,9 @@ final class DualRevisionWireCorpusTest extends TestCase {
 	/** Return the raw bridge output for one notification. */
 	private function stdio_notification( array $payload ): string {
 		$method = new \ReflectionMethod( $this->stdio, 'handle_request' );
-		$method->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
 		$result = $method->invoke( $this->stdio, (string) wp_json_encode( $payload ) );
 
 		return is_string( $result ) ? $result : '';
