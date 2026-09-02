@@ -574,6 +574,18 @@ final class McpWireOrchestrator {
 
 	/** Hydrate one implemented inbound root without dynamic class strings. */
 	private function hydrate_inbound( string $method, bool $notification, Schema $schema, \stdClass $message ): Record {
+		if (
+			in_array( $method, array( 'initialize', 'ping', 'notifications/initialized' ), true )
+			&& Schemas::V2025_11_25 !== $schema->version()
+		) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is internal protocol diagnostics, not HTML output.
+			throw new \LogicException( sprintf( '%s is not available under %s.', $method, $schema->version() ) );
+		}
+		if ( 'server/discover' === $method && Schemas::V2026_07_28 !== $schema->version() ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is internal protocol diagnostics, not HTML output.
+			throw new \LogicException( sprintf( '%s is not available under %s.', $method, $schema->version() ) );
+		}
+
 		if ( $notification && 'notifications/initialized' === $method ) {
 			return $schema->fromValue( InitializedNotification::class, $message );
 		}
@@ -812,7 +824,20 @@ final class McpWireOrchestrator {
 			$code = null;
 		}
 
-		return is_int( $code ) ? $code : 0;
+		if ( is_int( $code ) ) {
+			return $code;
+		}
+		if (
+			is_float( $code )
+			&& is_finite( $code )
+			&& floor( $code ) === $code
+			&& $code >= (float) PHP_INT_MIN
+			&& $code < -( (float) PHP_INT_MIN )
+		) {
+			return (int) $code;
+		}
+
+		return 0;
 	}
 
 	/** PHP 7.4-compatible list detection. */

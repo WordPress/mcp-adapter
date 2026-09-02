@@ -535,7 +535,14 @@ final class HandlerCompatibilityTest extends TestCase {
 
 			$shape  = (object) array( 'objectValue' => true );
 			$object = $handler->call_tool( $request, $this->request_context( $server ) );
-			$this->assertTrue( $object['structuredContent']['objectValue'] );
+			$this->assertInstanceOf( \stdClass::class, $object['structuredContent'] );
+			$this->assertTrue( $object['structuredContent']->objectValue );
+
+			$shape        = new \stdClass();
+			$empty_object = $handler->call_tool( $request, $this->request_context( $server ) );
+			$this->assertInstanceOf( \stdClass::class, $empty_object['structuredContent'] );
+			$this->assertSame( '{}', $empty_object['content'][0]['text'] );
+			$this->assertSame( '{}', wp_json_encode( $empty_object['structuredContent'] ) );
 
 			$shape  = 'scalar value';
 			$scalar = $handler->call_tool( $request, $this->request_context( $server ) );

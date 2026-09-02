@@ -199,13 +199,16 @@ class ToolsHandler {
 				return $this->create_error_result( $result->get_error_message() );
 			}
 
+			$structured_content = $result;
 			if ( $result instanceof \JsonSerializable ) {
-				$decoded = json_decode( (string) wp_json_encode( $result ), true );
-				$result  = is_array( $decoded ) ? $decoded : array( 'result' => $decoded );
+				$decoded            = json_decode( (string) wp_json_encode( $result ), true );
+				$result             = is_array( $decoded ) ? $decoded : array( 'result' => $decoded );
+				$structured_content = $result;
 			} elseif ( $result instanceof \stdClass ) {
 				$result = (array) $result;
 			} elseif ( ! is_array( $result ) ) {
-				$result = array( 'result' => $result );
+				$result             = array( 'result' => $result );
+				$structured_content = $result;
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
@@ -318,7 +321,7 @@ class ToolsHandler {
 			// with nothing to tell metadata from a domain field.
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
-			$json_text = wp_json_encode( $result );
+			$json_text = wp_json_encode( $structured_content );
 			if ( false === $json_text ) {
 				$json_text = '{}';
 			}
@@ -327,7 +330,7 @@ class ToolsHandler {
 				'content' => array( ContentBlockHelper::text( $json_text ) ),
 				'isError' => false,
 			);
-			$result_data['structuredContent'] = $result;
+			$result_data['structuredContent'] = $structured_content;
 
 			return $result_data;
 		} catch ( \Throwable $exception ) {
