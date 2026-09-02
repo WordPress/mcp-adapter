@@ -143,13 +143,68 @@ class McpServer {
 		array $prompts = array(),
 		?callable $transport_permission_callback = null
 	) {
-		// Store server configuration
-		$this->server_id                     = $server_id;
-		$this->server_route_namespace        = $server_route_namespace;
-		$this->server_route                  = $server_route;
-		$this->server_name                   = $server_name;
-		$this->server_description            = $server_description;
-		$this->server_version                = $server_version;
+		// Pack the host-facing configuration so plugins can shape any
+		// server (not just the default) before properties are assigned.
+		$config = array(
+			'server_id'              => $server_id,
+			'server_route_namespace' => $server_route_namespace,
+			'server_route'           => $server_route,
+			'server_name'            => $server_name,
+			'server_description'     => $server_description,
+			'server_version'         => $server_version,
+			'tools'                  => $tools,
+			'resources'              => $resources,
+			'prompts'                => $prompts,
+		);
+
+		/**
+		 * Filters the configuration of an MCP server before properties are assigned.
+		 *
+		 * Fires for every server during construction, allowing site-wide customization
+		 * across the default server and any plugin-created servers. Use the
+		 * `$server_id` parameter to target a specific server, or apply changes
+		 * uniformly across all servers.
+		 *
+		 * Runtime-critical wiring is intentionally outside this filter:
+		 * transport classes, error/observability handlers, and the transport
+		 * permission callback are not exposed here.
+		 *
+		 * @since 0.6.0
+		 *
+		 * @param array  $config {
+		 *     Server configuration array.
+		 *
+		 *     @type string   $server_id              Server identifier.
+		 *     @type string   $server_route_namespace REST API namespace.
+		 *     @type string   $server_route           REST API route.
+		 *     @type string   $server_name            Human-readable server name.
+		 *     @type string   $server_description     Server description.
+		 *     @type string   $server_version         Server version.
+		 *     @type string[] $tools                  Ability names to expose as tools.
+		 *     @type string[] $resources              Ability names to expose as resources.
+		 *     @type string[] $prompts                Ability names to expose as prompts.
+		 * }
+		 * @param string $server_id The server identifier (matches `$config['server_id']`).
+		 */
+		$filtered = apply_filters( 'mcp_adapter_server_config', $config, $server_id );
+
+		// Tolerate filters that drop keys or return a non-array by falling
+		// back to the constructor-supplied defaults.
+		if ( ! is_array( $filtered ) ) {
+			$filtered = $config;
+		}
+		$filtered = wp_parse_args( $filtered, $config );
+
+		// Store server configuration from the (possibly filtered) config.
+		$this->server_id                     = (string) $filtered['server_id'];
+		$this->server_route_namespace        = (string) $filtered['server_route_namespace'];
+		$this->server_route                  = (string) $filtered['server_route'];
+		$this->server_name                   = (string) $filtered['server_name'];
+		$this->server_description            = (string) $filtered['server_description'];
+		$this->server_version                = (string) $filtered['server_version'];
+		$tools                               = array_values( (array) $filtered['tools'] );
+		$resources                           = array_values( (array) $filtered['resources'] );
+		$prompts                             = array_values( (array) $filtered['prompts'] );
 		$this->transport_permission_callback = $transport_permission_callback;
 
 		/**
