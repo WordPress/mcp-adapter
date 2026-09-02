@@ -13,9 +13,10 @@ namespace WP\MCP\Domain\Tools;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
-use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
+use WP\McpSchema\Record\Tool;
+use WP\McpSchema\Schema;
 use WP_Error;
 
 /**
@@ -41,25 +42,18 @@ use WP_Error;
  * $tool = McpTool::fromAbility($ability);
  * ```
  *
- * McpTool wraps a protocol-only ToolDto for MCP serialization. Internal
+ * McpTool stores revision-neutral configuration for MCP projection. Internal
  * adapter metadata and execution wiring live on this class and are never
- * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ * exposed to MCP clients. Use get_protocol_record() for protocol responses.
  *
  * @since 0.5.0
  */
 final class McpTool implements McpComponentInterface {
-
+	use RevisionProjectionTrait;
 
 	// =========================================================================
 	// Runtime Properties
 	// =========================================================================
-
-	/**
-	 * Clean Tool DTO (protocol-only).
-	 *
-	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
-	 */
-	private ToolDto $tool;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed tools).
@@ -96,6 +90,9 @@ final class McpTool implements McpComponentInterface {
 	 */
 	private array $observability_context = array();
 
+	/** @var array<int, array{name: string, path: list<string>}>|null */
+	private ?array $header_annotations = null;
+
 	// =========================================================================
 	// Constructor
 	// =========================================================================
@@ -103,10 +100,10 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
+	 * @param array<string, mixed> $tool_data Revision-neutral tool data.
 	 */
-	private function __construct( ToolDto $tool ) {
-		$this->tool = $tool;
+	private function __construct( array $tool_data ) {
+		$this->initialize_protocol_data( $tool_data );
 	}
 
 	// =========================================================================
@@ -168,36 +165,15 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $tool_meta;
 		}
 
-		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
-			}
-
-			$tool = ToolDto::fromArray( $tool_data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_tool_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
+		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$tool_data['annotations'] = $config['annotations'];
 		}
 
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpToolValidator::validate_tool_dto( $tool );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
+		if ( isset( $config['execution'] ) && is_array( $config['execution'] ) ) {
+			$tool_data['execution'] = $config['execution'];
 		}
 
-		$instance          = new self( $tool );
+		$instance          = new self( $tool_data );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
@@ -226,13 +202,13 @@ final class McpTool implements McpComponentInterface {
 			return $tool_data;
 		}
 
-		$instance               = new self( $tool_data['tool'] );
+		$instance               = new self( $tool_data['tool_data'] );
 		$instance->adapter_meta = $tool_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'tool',
-			'tool_name'      => $tool_data['tool']->getName(),
+			'tool_name'      => $tool_data['tool_data']['name'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -245,12 +221,70 @@ final class McpTool implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol record for one revision.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @param \WP\McpSchema\Schema $schema Selected schema.
+	 * @since n.e.x.t
 	 */
-	public function get_protocol_dto(): ToolDto {
-		return $this->tool;
+	public function get_protocol_record( Schema $schema ): Tool {
+		$data = $this->protocol_data();
+		if ( '2026-07-28' === $schema->version() ) {
+			unset( $data['execution'] );
+			$projection_error = $this->get_projection_error( $schema->version() );
+			if ( $projection_error instanceof \Throwable ) {
+				throw $projection_error;
+			}
+			if ( null === $this->header_annotations ) {
+				try {
+					$this->header_annotations = $this->collect_header_annotations( $data['inputSchema'] ?? array() );
+				} catch ( \Throwable $throwable ) {
+					$this->remember_projection_error( $schema->version(), $throwable );
+					throw $throwable;
+				}
+			}
+		}
+
+		return $this->project_record( $schema, Tool::class, $data );
+	}
+
+	/**
+	 * Get the neutral tool name.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function get_name(): string {
+		return (string) ( $this->protocol_data()['name'] ?? '' );
+	}
+
+	/**
+	 * Check exact-revision projection availability.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function is_available_for( Schema $schema ): bool {
+		try {
+			$this->get_protocol_record( $schema );
+		} catch ( \Throwable $throwable ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Return validated modern HTTP header annotations.
+	 *
+	 * @return array<int, array{name: string, path: list<string>}>
+	 * @since n.e.x.t
+	 */
+	public function get_header_annotations( Schema $schema ): array {
+		if ( '2026-07-28' !== $schema->version() ) {
+			return array();
+		}
+
+		$this->get_protocol_record( $schema );
+
+		return $this->header_annotations ?? array();
 	}
 
 	/**
@@ -388,7 +422,7 @@ final class McpTool implements McpComponentInterface {
 			'Access denied.',
 			array(
 				'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY,
-				'tool_name'      => $this->tool->getName(),
+				'tool_name'      => $this->get_name(),
 			)
 		);
 	}
@@ -413,5 +447,77 @@ final class McpTool implements McpComponentInterface {
 	 */
 	public function get_observability_context(): array {
 		return $this->observability_context;
+	}
+
+	/**
+	 * Collect and validate the 2026 x-mcp-header definitions.
+	 *
+	 * @param mixed $schema Tool input schema.
+	 * @return array<int, array{name: string, path: list<string>}>
+	 */
+	private function collect_header_annotations( $schema ): array {
+		if ( ! is_array( $schema ) ) {
+			return array();
+		}
+
+		$names       = array();
+		$annotations = array();
+		$this->scan_header_annotations( $schema, false, true, array(), $names, $annotations );
+
+		return $annotations;
+	}
+
+	/**
+	 * Scan header annotations and fail a revision projection on invalid placement.
+	 *
+	 * @param mixed $node Schema node.
+	 * @param bool $property_schema Whether this node is a property schema.
+	 * @param bool $reachable Whether its path contains only properties keys.
+	 * @param list<string> $path Property path.
+	 * @param array<string, true> $names Case-insensitive header names.
+	 * @param array<int, array{name: string, path: list<string>}> $annotations Valid annotations.
+	 */
+	private function scan_header_annotations( $node, bool $property_schema, bool $reachable, array $path, array &$names, array &$annotations ): void {
+		if ( ! is_array( $node ) ) {
+			return;
+		}
+
+		if ( array_key_exists( 'x-mcp-header', $node ) ) {
+			$name = $node['x-mcp-header'];
+			$type = $node['type'] ?? null;
+			if ( ! $property_schema || ! $reachable || ! is_string( $name ) || ! preg_match( "/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/", $name ) ) {
+				throw new \InvalidArgumentException( 'Invalid x-mcp-header annotation placement or name.' );
+			}
+			if ( ! in_array( $type, array( 'string', 'integer', 'boolean' ), true ) ) {
+				throw new \InvalidArgumentException( 'x-mcp-header annotations require string, integer, or boolean properties.' );
+			}
+
+			$folded = strtolower( $name );
+			if ( isset( $names[ $folded ] ) ) {
+				throw new \InvalidArgumentException( 'x-mcp-header names must be case-insensitively unique.' );
+			}
+			$names[ $folded ] = true;
+			$annotations[]    = array(
+				'name' => $name,
+				'path' => $path,
+			);
+		}
+
+		foreach ( $node as $keyword => $value ) {
+			if ( 'properties' === $keyword && is_array( $value ) ) {
+				foreach ( $value as $property_name => $property ) {
+					$property_path   = $path;
+					$property_path[] = (string) $property_name;
+					$this->scan_header_annotations( $property, true, $reachable, $property_path, $names, $annotations );
+				}
+				continue;
+			}
+
+			if ( ! is_array( $value ) ) {
+				continue;
+			}
+
+			$this->scan_header_annotations( $value, false, false, $path, $names, $annotations );
+		}
 	}
 }

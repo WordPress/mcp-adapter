@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace WP\MCP\Tests\Fixtures;
 
+use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
 use WP\MCP\Transport\Infrastructure\McpTransportHelperTrait;
+use WP\McpSchema\Record;
+use WP\McpSchema\Record\ListToolsRequest;
+use WP\McpSchema\Schemas;
 
 class DummyTransport implements McpRestTransportInterface {
 
@@ -44,11 +48,38 @@ class DummyTransport implements McpRestTransportInterface {
 
 	// Expose route_request for testing (no more reflection needed!)
 	public function test_route_request( string $method, array $params, int $request_id = 0 ): array {
-		return $this->context->request_router->route_request(
-			$method,
-			$params,
-			$request_id,
+		if ( 'tools/list' !== $method ) {
+			throw new \InvalidArgumentException( 'Dummy transport only supports tools/list.' );
+		}
+
+		$schema          = $this->context->mcp_server->get_schemas()->forVersion( Schemas::V2025_11_25 );
+		$request_context = new McpRequestContext(
+			$schema,
+			new \stdClass(),
+			null,
+			'test'
+		);
+		$request_record  = $schema->fromArray(
+			ListToolsRequest::class,
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => $request_id,
+				'method'  => $method,
+				'params'  => $params,
+			)
+		);
+		$result          = $this->context->request_router->route_request(
+			$request_record,
+			$request_context,
 			$this->get_transport_name()
 		);
+
+		if ( $result instanceof Record ) {
+			$data = json_decode( (string) wp_json_encode( $result ), true );
+
+			return is_array( $data ) ? $data : array();
+		}
+
+		return $result;
 	}
 }

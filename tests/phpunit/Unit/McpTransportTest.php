@@ -59,29 +59,6 @@ final class McpTransportTest extends TestCase {
 		$this->assertNotNull( $first_success['duration_ms'] );
 	}
 
-	public function test_transport_handles_unknown_methods_with_error_metrics(): void {
-		$server    = $this->makeServer();
-		$context   = $this->createTransportContext( $server );
-		$transport = new DummyTransport( $context );
-
-		$res = $transport->test_route_request( 'unknown/method', array() );
-		$this->assertArrayHasKey( 'error', $res );
-
-		// Verify error event was recorded with duration and status tag
-		$this->assertNotEmpty( DummyObservabilityHandler::$events );
-		$event_metrics = array_column( DummyObservabilityHandler::$events, 'event' );
-		$this->assertContains( 'mcp.request', $event_metrics );
-
-		// Verify status is 'error'
-		$error_event = array_filter(
-			DummyObservabilityHandler::$events,
-			static function ( $event ) {
-				return 'mcp.request' === $event['event'] && isset( $event['tags']['status'] ) && 'error' === $event['tags']['status'];
-			}
-		);
-		$this->assertNotEmpty( $error_event );
-	}
-
 	private function createTransportContext( McpServer $server ): McpTransportContext {
 		// Create handlers
 		$initialize_handler = new InitializeHandler( $server );

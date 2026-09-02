@@ -51,7 +51,7 @@ That means you also need abilities on the site for this to be useful, from core 
 
 = How do AI agents connect to my site? =
 
-The adapter registers MCP endpoints over the built-in HTTP transport. Point an MCP-compatible client at the endpoint and authenticate as a WordPress user. The adapter negotiates MCP protocol versions `2025-11-25`, `2025-06-18` and `2024-11-05`. See the [getting started guide](https://github.com/WordPress/mcp-adapter/tree/trunk/docs/getting-started) for endpoint details.
+The adapter registers MCP endpoints over the built-in HTTP transport. Point an MCP-compatible client at the endpoint and authenticate as a WordPress user. The adapter supports exact MCP revisions `2025-11-25` and `2026-07-28`. See the [getting started guide](https://github.com/WordPress/mcp-adapter/tree/trunk/docs/getting-started) for endpoint details.
 
 = Does every registered ability get exposed automatically? =
 
@@ -120,4 +120,3 @@ Repairs the release ZIP so that class_exists( 'WP_CLI' ) no longer risks a fatal
 
 = 0.6.0 =
 This version includes breaking changes. WordPress 6.9 is now required, abilities marked meta.public are exposed through the default server unless they opt out, multisite sessions must reconnect once, and the McpValidator MIME helpers have been removed.
-

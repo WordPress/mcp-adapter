@@ -1,240 +1,85 @@
-# Error Handling
+# Error handling
 
-The MCP Adapter uses a two-part error handling system that separates error logging from error response creation.
+MCP Adapter separates error logging from protocol error creation.
 
-## System Overview
+- `McpErrorHandlerInterface` receives diagnostic events.
+- `McpErrorFactory` creates revision-neutral JSON-RPC error arrays.
+- `McpWireOrchestrator` validates those arrays against the selected revision and
+  applies revision-specific HTTP status policy.
 
-The error handling system has two main components:
+## Error handlers
 
-- **Error Logging**: `McpErrorHandlerInterface` implementations log errors for monitoring
-- **Error Response Creation**: `McpErrorFactory` creates standardized JSON-RPC error responses
-
-```php
-use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
-use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
-
-// Error logging
-interface McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void;
-}
-
-// Error response creation
-class McpErrorFactory {
-    public static function tool_not_found(int $id, string $tool): array;
-    public static function missing_parameter(int $id, string $parameter): array;
-    // ... other error types
-}
-```
-
-## Error Handler Interface
-
-Error handlers implement `McpErrorHandlerInterface`:
-
-```php
-interface McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void;
-}
-```
-
-The `log()` method receives:
-- `$message`: Error description
-- `$context`: Additional data (tool name, user ID, etc.)
-- `$type`: Log level ('error', 'info', 'debug')
-
-## Error Factory
-
-`McpErrorFactory` creates standardized JSON-RPC error responses:
-
-### Common Error Methods
-
-```php
-// Standard JSON-RPC errors
-McpErrorFactory::parse_error(int $id, string $details = ''): array
-McpErrorFactory::invalid_request(int $id, string $details = ''): array
-McpErrorFactory::method_not_found(int $id, string $method): array
-McpErrorFactory::invalid_params(int $id, string $details = ''): array
-McpErrorFactory::internal_error(int $id, string $details = ''): array
-
-// MCP-specific errors
-McpErrorFactory::missing_parameter(int $id, string $parameter): array
-McpErrorFactory::tool_not_found(int $id, string $tool): array
-McpErrorFactory::ability_not_found(int $id, string $ability): array
-McpErrorFactory::resource_not_found(int $id, string $resource_uri): array
-McpErrorFactory::prompt_not_found(int $id, string $prompt): array
-McpErrorFactory::permission_denied(int $id, string $details = ''): array
-McpErrorFactory::unauthorized(int $id, string $details = ''): array
-McpErrorFactory::mcp_disabled(int $id): array
-McpErrorFactory::validation_error(int $id, string $details): array
-```
-
-### Error Response Format
-
-All methods return JSON-RPC 2.0 error responses:
-
-```php
-$error = McpErrorFactory::tool_not_found(123, 'missing-tool');
-// Returns:
-[
-    'jsonrpc' => '2.0',
-    'id' => 123,
-    'error' => [
-        'code' => -32003,
-        'message' => 'Tool not found: missing-tool'
-    ]
-]
-```
-
-### Error Codes
-
-Standard JSON-RPC and MCP-specific error codes:
-
-```php
-// Standard JSON-RPC codes
-const PARSE_ERROR      = -32700;
-const INVALID_REQUEST  = -32600;
-const METHOD_NOT_FOUND = -32601;
-const INVALID_PARAMS   = -32602;
-const INTERNAL_ERROR   = -32603;
-
-// MCP-specific codes (-32000 to -32099)
-const SERVER_ERROR       = -32000; // Generic server error (includes MCP disabled)
-const TIMEOUT_ERROR      = -32001; // Request timeout
-const RESOURCE_NOT_FOUND = -32002; // Resource not found
-const TOOL_NOT_FOUND     = -32003; // Tool not found
-const PROMPT_NOT_FOUND   = -32004; // Prompt not found
-const PERMISSION_DENIED  = -32008; // Access denied
-const UNAUTHORIZED       = -32010; // Authentication required
-```
-
-### HTTP Status Mapping
-
-The factory includes methods to map JSON-RPC error codes to HTTP status codes:
-
-```php
-// Get HTTP status for error response
-$http_status = McpErrorFactory::get_http_status_for_error($error_response);
-
-// Direct mapping
-$http_status = McpErrorFactory::mcp_error_to_http_status(-32003); // Returns 404
-```
-
-## Built-in Error Handlers
-
-### ErrorLogMcpErrorHandler
-
-Logs errors to PHP error log with structured context and user information:
-
-```php
-$handler = new ErrorLogMcpErrorHandler();
-$handler->log('Tool execution failed', ['tool_name' => 'my-tool'], 'error');
-// Logs: [ERROR] Tool execution failed | Context: {"tool_name":"my-tool"} | User ID: 123
-```
-
-### NullMcpErrorHandler
-
-No-op handler that ignores all errors (useful for testing or when logging is disabled):
-
-```php
-$handler = new NullMcpErrorHandler();
-$handler->log('This will not be logged', [], 'error'); // Does nothing
-```
-
-## Creating Custom Error Handlers
-
-Implement the `McpErrorHandlerInterface` to create custom error handlers:
-
-### File-based Handler
+Implement `McpErrorHandlerInterface` to send diagnostics to your logging system:
 
 ```php
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 
-class FileErrorHandler implements McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void {
-        $log_entry = sprintf(
-            '[%s] %s | Context: %s',
-            strtoupper($type),
-            $message,
-            wp_json_encode($context)
-        );
-        
-        file_put_contents(
-            WP_CONTENT_DIR . '/mcp-errors.log',
-            $log_entry . "\n",
-            FILE_APPEND | LOCK_EX
-        );
-    }
+final class CustomErrorHandler implements McpErrorHandlerInterface {
+	public function log( string $message, array $context = array(), string $type = 'error' ): void {
+		error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			sprintf( '[%s] %s %s', strtoupper( $type ), $message, wp_json_encode( $context ) )
+		);
+	}
 }
 ```
 
-### External Service Handler
+The built-in handlers are:
+
+- `ErrorLogMcpErrorHandler`, which writes structured context to the PHP error
+  log; and
+- `NullMcpErrorHandler`, which intentionally discards log events.
+
+## Protocol errors
+
+Factory methods return a complete JSON-RPC error array:
 
 ```php
-class ExternalServiceErrorHandler implements McpErrorHandlerInterface {
-    public function log(string $message, array $context = [], string $type = 'error'): void {
-        wp_remote_post('https://your-monitoring-service.com/api/errors', [
-            'body' => wp_json_encode([
-                'message' => $message,
-                'context' => $context,
-                'level' => $type,
-                'site' => get_site_url()
-            ]),
-            'headers' => ['Content-Type' => 'application/json'],
-            'timeout' => 5
-        ]);
-        
-        // Fallback to local logging
-        error_log("[MCP {$type}] {$message}");
-    }
-}
+$error = McpErrorFactory::tool_not_found( 123, 'missing-tool' );
 ```
 
-## Usage in Practice
-
-### Handler Helper Trait
-
-Most handlers use the `HandlerHelperTrait` which provides convenience methods:
+Common methods include:
 
 ```php
-use WP\MCP\Handlers\HandlerHelperTrait;
-
-class MyHandler {
-    use HandlerHelperTrait;
-    
-    public function handle_request($request) {
-        // Create error responses easily
-        if (!$this->validate_params($request)) {
-            return $this->missing_parameter_error('required_param', $request['id']);
-        }
-        
-        // Handle other errors
-        if (!$this->check_permissions()) {
-            return $this->permission_denied_error('resource_access', $request['id']);
-        }
-    }
-}
+McpErrorFactory::parse_error( $id, $details );
+McpErrorFactory::invalid_request( $id, $details );
+McpErrorFactory::method_not_found( $id, $method );
+McpErrorFactory::invalid_params( $id, $details );
+McpErrorFactory::internal_error( $id, $details );
+McpErrorFactory::missing_parameter( $id, $parameter );
+McpErrorFactory::tool_not_found( $id, $tool );
+McpErrorFactory::prompt_not_found( $id, $prompt );
+McpErrorFactory::resource_not_found( $id, $resource_uri, $revision );
+McpErrorFactory::permission_denied( $id, $details );
+McpErrorFactory::unauthorized( $id, $details );
+McpErrorFactory::unsupported_protocol_version( $id, $requested, $supported );
 ```
 
-### HTTP Transport Integration
+Request IDs may be strings, integers, or `null`. Protocol-facing code must pass
+the selected revision to `resource_not_found()` because MCP 2025 uses `-32002`
+and MCP 2026 uses `-32602`. Missing tools and prompts use standard Invalid Params
+(`-32602`) in both supported revisions.
 
-The HTTP transport automatically maps error codes to HTTP status codes:
+## Handler boundary
 
-```php
-// In transport handlers
-$error_response = McpErrorFactory::tool_not_found(123, 'missing-tool');
-$http_status = McpErrorFactory::get_http_status_for_error($error_response); // Returns 404
+Handlers receive a validated generated request record and
+`WP\MCP\Core\McpRequestContext`. They return logical result data or an error
+array. The selected schema constructs the final result and JSON-RPC response
+records.
 
-return new WP_REST_Response($error_response, $http_status);
-```
+Custom HTTP transports should delegate to `HttpRequestHandler`. Other transports
+should call `McpWireOrchestrator::decode()` and `process()` before serializing the
+returned record. Do not route unvalidated method and parameter arrays directly.
 
-### JSON-RPC Message Validation
+## HTTP status
 
-The factory includes message validation for proper JSON-RPC structure:
+The built-in HTTP path uses the selected revision when mapping protocol errors.
+For example, Invalid Params remains a JSON-RPC response with HTTP 200 in the 2025
+revision and uses HTTP 400 in the 2026 revision. Custom HTTP transports that
+delegate to `HttpRequestHandler` inherit the same behavior.
 
-```php
-$validation_result = McpErrorFactory::validate_jsonrpc_message($request);
-if (is_array($validation_result)) {
-    // Validation failed, $validation_result contains error response
-    return new WP_REST_Response($validation_result, 400);
-}
-// Validation passed
-```
+## JSON-RPC validation
+
+`JsonRpcRequestDecoder` performs one identity-preserving JSON decode and rejects
+malformed JSON, batches, excessive depth, integers outside PHP's native range,
+and non-finite numbers. `McpWireOrchestrator` then checks method availability,
+revision metadata, transport headers, schema hydration, and response encoding.

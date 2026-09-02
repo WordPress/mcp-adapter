@@ -112,7 +112,7 @@ final class GetAbilityInfoAbility {
 			'name'         => $ability->get_name(),
 			'label'        => $ability->get_label(),
 			'description'  => $ability->get_description(),
-			'input_schema' => $ability->get_input_schema(),
+			'input_schema' => $ability->get_input_schema() ?: new \stdClass(),
 		);
 
 		// Add output schema if available

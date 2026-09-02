@@ -19,8 +19,8 @@ composer remove wordpress/mcp-adapter
 If you are not using Composer and instead are manually including a copy of MCP Adapter (e.g. in a `./lib/mcp-adapter` folder or via a git submodule), remove it manually and remove any `require` or `include` statements that load it.
 
 ### 2. Remove Jetpack Autoloader if you no longer need it
-If you are using [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) and do not need it for other packages, you should remove it as well:
 
+If you are using [Jetpack Autoloader](https://github.com/Automattic/jetpack-autoloader) and do not need it for other packages, you should remove it as well:
 
 ```bash
 composer remove automattic/jetpack-autoloader

@@ -25,6 +25,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 ## Migration guides
 
 - **[Migrating to vx.y.z](migration/vx.y.z.md)**
+- **[Dual-revision schema runtime](migration/dual-revision-schema-runtime.md)**
 - **[Migrating to v0.5.0](migration/v0.5.0.md)**
 - **[Migrating to v0.3.0](migration/v0.3.0.md)**
 

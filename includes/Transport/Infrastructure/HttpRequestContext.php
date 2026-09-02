@@ -1,6 +1,6 @@
 <?php
 /**
- * MCP HTTP Transport for WordPress - MCP 2025-11-25 Compliant
+ * Exact-revision MCP HTTP request context for WordPress.
  *
  * @package McpAdapter
  */
@@ -37,11 +37,14 @@ class HttpRequestContext {
 	public ?string $session_id;
 
 	/**
-	 * The JSON-decoded body of the request.
+	 * The undecoded request body.
 	 *
-	 * @var array|null
+	 * @var string
 	 */
-	public ?array $body;
+	public string $raw_body;
+
+	/** @var array<string, string> */
+	public array $headers;
 
 	/**
 	 * The MCP-Protocol-Version header from the request.
@@ -59,6 +62,9 @@ class HttpRequestContext {
 	 */
 	public ?string $accept_header;
 
+	/** @var string|null Origin header used only for DNS-rebinding protection. */
+	public ?string $origin_header;
+
 	/**
 	 * Constructor.
 	 *
@@ -70,6 +76,24 @@ class HttpRequestContext {
 		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
-		$this->body             = 'POST' === $this->method ? $request->get_json_params() : null;
+		$this->origin_header    = $request->get_header( 'origin' );
+		$this->raw_body         = 'POST' === $this->method ? ( $request->get_body() ?? '' ) : '';
+		$this->headers          = array();
+		foreach ( $request->get_headers() as $name => $values ) {
+			$key = str_replace( '_', '-', strtolower( (string) $name ) );
+			if (
+				! in_array( $key, array( 'mcp-protocol-version', 'mcp-method', 'mcp-name', 'mcp-session-id' ), true )
+				&& 0 !== strpos( $key, 'mcp-param-' )
+			) {
+				continue;
+			}
+
+			$value = is_array( $values ) ? reset( $values ) : $values;
+			if ( ! is_string( $value ) ) {
+				continue;
+			}
+
+			$this->headers[ $key ] = $value;
+		}
 	}
 }

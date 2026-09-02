@@ -15,7 +15,7 @@ use WP\MCP\Autoloader;
 use WP\MCP\Core\McpAdapter;
 use WP\MCP\Plugin;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\McpConstants;
+use WP\McpSchema\Schemas;
 
 /**
  * Class - AutoloaderTest
@@ -36,7 +36,7 @@ final class AutoloaderTest extends TestCase {
 
 		$this->assertTrue( class_exists( Plugin::class ), 'The plugin classes should be registered.' );
 		$this->assertTrue( class_exists( McpAdapter::class ), 'The plugin core classes should be registered.' );
-		$this->assertTrue( class_exists( McpConstants::class ), 'The Composer dependencies should be registered.' );
+		$this->assertTrue( class_exists( Schemas::class ), 'The Composer dependencies should be registered.' );
 
 		$this->assertTrue( Autoloader::autoload(), 'Repeated calls to autoload() should succeed.' );
 	}

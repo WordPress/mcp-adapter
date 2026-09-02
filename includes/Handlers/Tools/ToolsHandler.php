@@ -9,14 +9,15 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\Tools;
 
+use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\CallToolResult;
-use WP\McpSchema\Server\Tools\DTO\ListToolsResult;
+use WP\McpSchema\Record\CallToolRequest;
+use WP\McpSchema\Record\ListToolsRequest;
 
 /**
  * Handles tools-related MCP methods.
@@ -48,31 +49,21 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Handles the tools/list/all request.
-	 *
-	 * This is a custom extension to the MCP spec that includes availability status.
-	 * Returns a ListToolsResult DTO containing all registered tools.
-	 *
-	 * Note: The 'available' flag is a non-standard extension and is not currently implemented.
-	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with all tools.
-	 */
-	public function list_all_tools(): ListToolsResult {
-		// Return the standard tools list.
-		return $this->list_tools();
-	}
-
-	/**
 	 * Handles the tools/list request.
 	 *
-	 * Returns a ListToolsResult DTO containing all registered tools.
-	 * Tool DTOs are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
+	 * Returns logical data for exact revision projection.
+	 * Tool records are protocol-only; internal adapter metadata is stored in McpTool instances and is never exposed
 	 * to MCP clients.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\ListToolsResult Response with tools list.
+	 * @param \WP\McpSchema\Record\ListToolsRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @return array<string, mixed> Logical tools-list result.
+	 * @since n.e.x.t
 	 */
-	public function list_tools(): ListToolsResult {
-		$tools = array_values( $this->mcp->get_tools() );
+	public function list_tools( ListToolsRequest $request, McpRequestContext $request_context ): array {
+		unset( $request );
+		$schema = $request_context->schema();
+		$tools  = array_values( $this->mcp->get_tools( $schema ) );
 
 		/**
 		 * Filters the list of tools before returning to the client.
@@ -82,28 +73,24 @@ class ToolsHandler {
 		 *
 		 * @since 0.5.0
 		 *
-		 * @param array<\WP\McpSchema\Server\Tools\DTO\Tool> $tools  Array of Tool DTOs.
+		 * @param array<\WP\McpSchema\Record\Tool> $tools  Array of Tool records.
 		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
+		 * @param \WP\McpSchema\Schema                        $schema Selected schema.
 		 */
 		$tools = $this->validate_filtered_list(
-			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp ),
+			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp, $schema ),
 			$tools,
 			'mcp_adapter_tools_list',
 			$this->mcp->get_error_handler()
 		);
 
-		return ListToolsResult::fromArray(
-			array(
-				'tools' => $tools,
-			)
-		);
+		return array( 'tools' => $tools );
 	}
 
 	/**
 	 * Handles the tools/call request.
 	 *
-	 * Returns either a CallToolResult DTO (for success or tool execution errors)
-	 * or a JSONRPCErrorResponse DTO (for protocol errors like tool not found).
+	 * Returns either logical tool-result data or a protocol error array.
 	 *
 	 * The MCP spec distinguishes between:
 	 * 1. **Protocol errors** (tool not found, server error) → JSONRPCErrorResponse
@@ -112,29 +99,22 @@ class ToolsHandler {
 	 * This distinction is critical for LLM self-correction - execution errors are
 	 * visible to the LLM, while protocol errors indicate infrastructure issues.
 	 *
-	 * @param array $params Request params.
-	 * @param string|int|null $request_id Optional. The request ID for JSON-RPC. Default 0.
+	 * @param \WP\McpSchema\Record\CallToolRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult|\WP\McpSchema\Common\JsonRpc\DTO\JSONRPCErrorResponse
+	 * @return array<string, mixed>
+	 * @since n.e.x.t
 	 */
-	public function call_tool( array $params, $request_id = 0 ) {
-		// Extract parameters using helper method.
-		$request_params = $this->extract_params( $params );
-
-		if ( ! isset( $request_params['name'] ) ) {
-			return McpErrorFactory::missing_parameter( $request_id, 'tool name' );
-		}
-
-		if ( isset( $request_params['arguments'] ) && ! is_array( $request_params['arguments'] ) ) {
-			return McpErrorFactory::invalid_params( $request_id, 'arguments must be an object' );
-		}
+	public function call_tool( CallToolRequest $request, McpRequestContext $request_context ): array {
+		$request_params = $request->getParams();
+		$request_id     = $request->getId();
 
 		try {
-			$tool_name = trim( (string) $request_params['name'] );
-			$args      = $request_params['arguments'] ?? array();
+			$tool_name = trim( $request_params->getName() );
+			$args      = $this->callback_arguments( $request_params->getArguments() );
 
 			$mcp_tool = $this->mcp->get_mcp_tool( $tool_name );
-			if ( ! $mcp_tool ) {
+			if ( ! $mcp_tool || ! $mcp_tool->is_available_for( $request_context->schema() ) ) {
 				$this->mcp->get_error_handler()->log(
 					'Tool not found',
 					array(
@@ -219,10 +199,21 @@ class ToolsHandler {
 				return $this->create_error_result( $result->get_error_message() );
 			}
 
+			$structured_content = $result;
+			if ( $result instanceof \JsonSerializable ) {
+				$decoded            = json_decode( (string) wp_json_encode( $result ), true );
+				$result             = is_array( $decoded ) ? $decoded : array( 'result' => $decoded );
+				$structured_content = $result;
+			} elseif ( $result instanceof \stdClass ) {
+				$result = (array) $result;
+			} elseif ( ! is_array( $result ) ) {
+				$result             = array( 'result' => $result );
+				$structured_content = $result;
+			}
+
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
 			if (
-				is_array( $result )
-				&& array_key_exists( 'success', $result )
+				array_key_exists( 'success', $result )
 				&& false === $result['success']
 				&& isset( $result['error'] )
 				&& is_string( $result['error'] )
@@ -231,7 +222,7 @@ class ToolsHandler {
 				return $this->create_error_result( $result['error'] );
 			}
 
-			// Successful tool execution - build CallToolResult DTO.
+			// Successful tool execution - build logical result data.
 
 			// Handle embedded resource results (MCP ContentBlock type: "resource").
 			// This allows tools to return text/blob resources using the MCP schema's EmbeddedResource content block.
@@ -239,13 +230,13 @@ class ToolsHandler {
 			// Two shapes are accepted, and they place `_meta` differently:
 			//
 			// - Nested `{ type, resource: { uri, text, _meta }, _meta }` maps one-to-one onto
-			//   the DTO tree, so the outer `_meta` belongs to the content block and the inner
+			//   the record tree, so the outer `_meta` belongs to the content block and the inner
 			//   one to the resource contents.
 			// - Flat `{ type, uri, mimeType, text, _meta }` is a resource-contents literal
 			//   carrying a `type` tag: every key beside `type` is a `ResourceContents` field,
 			//   and `_meta` is declared there alongside them. Its `_meta` therefore describes
 			//   the resource, which is what the same literal already means to
-			//   `ResourcesHandler::create_content_dto()`. A caller who needs block-level
+			//   `ResourcesHandler::create_content_data()`. A caller who needs block-level
 			//   `_meta` writes the nested form, which exists to express that distinction.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
 				$is_nested     = isset( $result['resource'] ) && is_array( $result['resource'] );
@@ -269,38 +260,34 @@ class ToolsHandler {
 					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
-						return CallToolResult::fromArray(
-							array(
-								'content' => array(
-									ContentBlockHelper::embedded_text_resource(
-										$uri,
-										$resource_item['text'],
-										is_string( $mime_type ) ? $mime_type : null,
-										null,
-										$block_meta,
-										$resource_meta
-									),
+						return array(
+							'content' => array(
+								ContentBlockHelper::embedded_text_resource(
+									$uri,
+									$resource_item['text'],
+									is_string( $mime_type ) ? $mime_type : null,
+									null,
+									$block_meta,
+									$resource_meta
 								),
-								'isError' => false,
-							)
+							),
+							'isError' => false,
 						);
 					}
 
 					if ( $has_blob ) {
-						return CallToolResult::fromArray(
-							array(
-								'content' => array(
-									ContentBlockHelper::embedded_blob_resource(
-										$uri,
-										$resource_item['blob'],
-										is_string( $mime_type ) ? $mime_type : null,
-										null,
-										$block_meta,
-										$resource_meta
-									),
+						return array(
+							'content' => array(
+								ContentBlockHelper::embedded_blob_resource(
+									$uri,
+									$resource_item['blob'],
+									is_string( $mime_type ) ? $mime_type : null,
+									null,
+									$block_meta,
+									$resource_meta
 								),
-								'isError' => false,
-							)
+							),
+							'isError' => false,
 						);
 					}
 				}
@@ -315,19 +302,16 @@ class ToolsHandler {
 				$image_data = base64_encode( $result['results'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
 				$mime_type  = $result['mimeType'] ?? self::DEFAULT_IMAGE_MIME_TYPE;
 
-				return CallToolResult::fromArray(
-					array(
-						'content'           => array(
-							ContentBlockHelper::image(
-								$image_data,
-								$mime_type,
-								null,
-								McpValidator::normalize_meta( $result['_meta'] ?? null )
-							),
+				return array(
+					'content' => array(
+						ContentBlockHelper::image(
+							$image_data,
+							$mime_type,
+							null,
+							McpValidator::normalize_meta( $result['_meta'] ?? null )
 						),
-						'structuredContent' => null,
-						'isError'           => false,
-					)
+					),
+					'isError' => false,
 				);
 			}
 
@@ -337,23 +321,23 @@ class ToolsHandler {
 			// with nothing to tell metadata from a domain field.
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
-			$json_text = wp_json_encode( $result );
+			$json_text = wp_json_encode( $structured_content );
 			if ( false === $json_text ) {
 				$json_text = '{}';
 			}
 
-			return CallToolResult::fromArray(
-				array(
-					'content'           => array( ContentBlockHelper::text( $json_text ) ),
-					'structuredContent' => $result,
-					'isError'           => false,
-				)
+			$result_data                      = array(
+				'content' => array( ContentBlockHelper::text( $json_text ) ),
+				'isError' => false,
 			);
+			$result_data['structuredContent'] = $structured_content;
+
+			return $result_data;
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
 				array(
-					'tool'      => $request_params['name'],
+					'tool'      => $request_params->getName(),
 					'exception' => $exception->getMessage(),
 				)
 			);
@@ -363,21 +347,18 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Create an error CallToolResult from a message string.
+	 * Create logical tool-execution error data from a message string.
 	 *
 	 * @since 0.5.0
 	 *
 	 * @param string $message The error message.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\CallToolResult
+	 * @return array<string, mixed>
 	 */
-	private function create_error_result( string $message ): CallToolResult {
-		return CallToolResult::fromArray(
-			array(
-				'content'           => array( ContentBlockHelper::text( $message ) ),
-				'structuredContent' => null,
-				'isError'           => true,
-			)
+	private function create_error_result( string $message ): array {
+		return array(
+			'content' => array( ContentBlockHelper::text( $message ) ),
+			'isError' => true,
 		);
 	}
 }

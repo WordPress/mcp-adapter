@@ -68,6 +68,7 @@ npm run test:php
 ```
 
 Coverage reports will be generated:
+
 - HTML report: `tests/_output/html/index.html` (open in your browser)
 - Clover XML: `tests/_output/php-coverage.xml` (for CI/CD tools)
 
@@ -76,11 +77,13 @@ Coverage reports will be generated:
 The test suite includes fixtures for verifying observability and error handling:
 
 **DummyObservabilityHandler** (`tests/phpunit/Fixtures/DummyObservabilityHandler.php`)
+
 - Captures `record_event()` calls with event names, tags, and optional timing data
 - Stores events in `$events` array for test assertions
 - Used to verify that requests, successes, errors, and timings are properly tracked
 
 **DummyErrorHandler** (`tests/phpunit/Fixtures/DummyErrorHandler.php`)
+
 - Captures `log()` calls with messages, context, and error types
 - Stores logs in `$logs` array for test assertions
 - Used to verify error handling and logging behavior
@@ -136,9 +139,11 @@ npm run wp-env:test start
 ### Test Failures
 
 - **Class not found**: This typically occurs after adding new classes, pulling changes, or switching branches. Regenerate the Composer autoloader to resolve:
+
   ```bash
   npm run wp-env:test -- run cli --env-cwd=wp-content/plugins/mcp-adapter/ composer dump-autoload
   ```
+
   The `--env-cwd` flag sets the working directory inside the Docker container to ensure Composer operates on the plugin's `composer.json`.
 
 - **Permission errors**: Ensure Docker has the necessary permissions to mount volumes
@@ -155,6 +160,7 @@ npm run wp-env:test start
 The repository has comprehensive CI testing via GitHub Actions ([`.github/workflows/test.yml`](../../.github/workflows/test.yml)):
 
 **Automated Checks:**
+
 - PHPUnit tests via `npm run test:php`
 - PHPCS coding standards
 - PHPStan static analysis (Level 8)

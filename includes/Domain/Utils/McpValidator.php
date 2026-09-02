@@ -297,7 +297,7 @@ class McpValidator {
 	 * Only validates known shared annotation fields. Unknown fields are ignored.
 	 * Used by resources and content types (text, image, audio).
 	 *
-	 * Note: Tools use ToolAnnotations which is a separate type validated by McpToolValidator.
+	 * Tool annotations use their revision catalog shape and are projected separately.
 	 *
 	 * @param array $annotations The annotations to validate.
 	 *
@@ -434,7 +434,7 @@ class McpValidator {
 	}
 
 	/**
-	 * Normalize a `_meta` value for inclusion in a protocol DTO.
+	 * Normalize a `_meta` value for inclusion in a protocol record.
 	 *
 	 * MCP declares `_meta` as `{ [key: string]: unknown }` — a JSON object. PHP has one
 	 * array type for both JSON shapes, so a sequential array (including an empty one)
