@@ -20,9 +20,12 @@ use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
+use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
 use WP\McpSchema\Record;
 use WP\McpSchema\Record\CallToolRequest;
+use WP\McpSchema\Record\Error;
 use WP\McpSchema\Record\GetPromptRequest;
+use WP\McpSchema\Record\HeaderMismatchError;
 use WP\McpSchema\Record\InitializeRequest;
 use WP\McpSchema\Record\ListPromptsRequest;
 use WP\McpSchema\Record\ListResourcesRequest;
@@ -393,6 +396,32 @@ final class DualRevisionProjectionTest extends TestCase {
 		$result_2026_07_28 = McpErrorFactory::resource_not_found( 1, 'file:///missing', Schemas::V2026_07_28 );
 		$this->assertSame( McpErrorFactory::RESOURCE_NOT_FOUND, $result_2025_11_25['error']['code'] );
 		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $result_2026_07_28['error']['code'] );
+	}
+
+	/** Nominal errors and integral-float literals retain their Adapter HTTP meaning. */
+	public function test_nominal_error_with_integral_float_code_maps_to_http_status(): void {
+		$server   = $this->makeServer();
+		$schema   = $server->get_schemas()->forVersion( Schemas::V2026_07_28 );
+		$response = $schema->fromArray(
+			HeaderMismatchError::class,
+			array(
+				'jsonrpc' => '2.0',
+				'error'   => array(
+					'code'    => (float) McpErrorFactory::HEADER_MISMATCH,
+					'message' => 'Header mismatch',
+				),
+			)
+		);
+
+		$this->assertInstanceOf( Error::class, $response->getError() );
+		$this->assertSame( (float) McpErrorFactory::HEADER_MISMATCH, $response->getError()->getCode() );
+
+		$context      = new McpRequestContext( $schema, new \stdClass(), null, 'HTTP' );
+		$orchestrator = new McpWireOrchestrator( $server->create_transport_context() );
+		$this->assertSame(
+			400,
+			$orchestrator->http_response_status( $response, $context, new \stdClass(), Schemas::V2026_07_28 )
+		);
 	}
 
 	/** Neutral content helpers preserve the two distinct metadata levels. */
