@@ -24,7 +24,7 @@ use WP\MCP\Transport\Infrastructure\RequestRouter;
  * requests to the appropriate MCP server. Unlike transport implementations,
  * this is a presentation layer service that can work with any server.
  */
-class StdioServerBridge {
+final class StdioServerBridge {
 
 	/**
 	 * The MCP server to expose via STDIO.
@@ -130,7 +130,7 @@ class StdioServerBridge {
 					// Use fwrite() for precise binary-safe JSON-RPC protocol communication.
 					// WP_CLI output functions would add formatting/prefixes that break MCP protocol.
 					// MCP requires exact control over stdout for machine-to-machine communication.
-					fwrite( STDOUT, $response . "\n" ); // phpcs:ignore
+					fwrite( STDOUT, $response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite, WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- This is for CLI output.
 					fflush( STDOUT );
 				}
 			} catch ( \Throwable $e ) {
@@ -150,7 +150,7 @@ class StdioServerBridge {
 					)
 				);
 
-				fwrite( STDOUT, $error_response . "\n" ); // phpcs:ignore
+				fwrite( STDOUT, $error_response . "\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- This is for CLI output.
 				fflush( STDOUT );
 			}
 		}
@@ -164,7 +164,7 @@ class StdioServerBridge {
 	 * @param string $message The message to log.
 	 */
 	private function log_to_stderr( string $message ): void {
-		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore
+		fwrite( STDERR, "[MCP STDIO Bridge] $message\n" ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fwrite,WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- This is for CLI output.
 	}
 
 	/**
@@ -260,10 +260,10 @@ class StdioServerBridge {
 	/**
 	 * Create a JSON-RPC error response.
 	 *
-	 * @param mixed $id The request ID (can be null).
-	 * @param int $code The error code.
-	 * @param string $message The error message.
-	 * @param string $data Optional error data.
+	 * @param int|string|float|null $id      The request ID, parsed from the JSON-RPC request (or null for notifications).
+	 * @param int                   $code    The error code.
+	 * @param string                $message The error message.
+	 * @param string                $data    Optional error data.
 	 *
 	 * @return string The JSON error response string.
 	 */
@@ -304,31 +304,29 @@ class StdioServerBridge {
 	/**
 	 * Format a handler result as a JSON-RPC response.
 	 *
-	 * @param array $result The handler result.
-	 * @param mixed $id The request ID.
+	 * @param array<string,mixed> $result The handler result.
+	 * @param int|string|float    $id     The request ID, parsed from the JSON-RPC request.
 	 *
 	 * @return string The JSON-RPC response string.
 	 */
 	private function format_response( array $result, $id ): string {
-		// Check if result contains an error
-		if ( isset( $result['error'] ) ) {
-			$error = $result['error'];
-
-			// Ensure error has required fields
-			$error_payload = array(
-				'code'    => $error['code'] ?? McpErrorFactory::INTERNAL_ERROR,
-				'message' => $error['message'] ?? 'Internal error',
-			);
-
-			// Add data field if present
-			if ( isset( $error['data'] ) ) {
-				$error_payload['data'] = $error['data'];
-			}
-
-			return $this->encode_response( JsonRpcResponseBuilder::create_error_response( $id, $error_payload ) );
+		// If there is no error, return a success response
+		if ( ! isset( $result['error'] ) ) {
+			return $this->encode_response( JsonRpcResponseBuilder::create_success_response( $id, $result ) );
 		}
 
-		return $this->encode_response( JsonRpcResponseBuilder::create_success_response( $id, $result ) );
+		// Ensure error has required fields
+		$error_payload = array(
+			'code'    => $result['error']['code'] ?? McpErrorFactory::INTERNAL_ERROR,
+			'message' => $result['error']['message'] ?? 'Internal error',
+		);
+
+		// Add data field if present
+		if ( isset( $result['error']['data'] ) ) {
+			$error_payload['data'] = $result['error']['data'];
+		}
+
+		return $this->encode_response( JsonRpcResponseBuilder::create_error_response( $id, $error_payload ) );
 	}
 
 	/**
