@@ -147,8 +147,18 @@ class HttpTransport implements McpRestTransportInterface {
 	 * @return \WP_REST_Response
 	 */
 	public function handle_request( \WP_REST_Request $request ): \WP_REST_Response {
-		$context = new HttpRequestContext( $request );
+		// Prevent full-page caches (LiteSpeed, WP Rocket, W3TC, WP Super Cache, etc.)
+		// from caching and replaying MCP responses to other users.
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- DONOTCACHEPAGE is the WordPress-wide page-cache convention; it cannot be prefixed.
+		}
 
-		return $this->request_handler->handle_request( $context );
+		$context  = new HttpRequestContext( $request );
+		$response = $this->request_handler->handle_request( $context );
+
+		$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, private' );
+		$response->header( 'Pragma', 'no-cache' );
+
+		return $response;
 	}
 }

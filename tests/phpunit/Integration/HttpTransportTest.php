@@ -990,6 +990,58 @@ final class HttpTransportTest extends TestCase {
 		$this->assertStringContainsString( 'Method not allowed', $data['error']['message'] );
 	}
 
+	// ========== Cache Defense Tests ==========
+
+	public function test_post_response_has_cache_defense_headers(): void {
+		$request  = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		$response = $this->transport->handle_request( $request );
+
+		$headers = $response->get_headers();
+		$this->assertArrayHasKey( 'Cache-Control', $headers );
+		$this->assertEquals( 'no-store, no-cache, must-revalidate, private', $headers['Cache-Control'] );
+		$this->assertArrayHasKey( 'Pragma', $headers );
+		$this->assertEquals( 'no-cache', $headers['Pragma'] );
+		$this->assertTrue( defined( 'DONOTCACHEPAGE' ) && true === DONOTCACHEPAGE );
+	}
+
+	public function test_get_response_has_cache_defense_headers(): void {
+		$request = new WP_REST_Request( 'GET', '/test-mcp' );
+		$request->set_header( 'Accept', 'text/event-stream' );
+
+		$response = $this->transport->handle_request( $request );
+
+		$headers = $response->get_headers();
+		$this->assertArrayHasKey( 'Cache-Control', $headers );
+		$this->assertEquals( 'no-store, no-cache, must-revalidate, private', $headers['Cache-Control'] );
+		$this->assertArrayHasKey( 'Pragma', $headers );
+		$this->assertEquals( 'no-cache', $headers['Pragma'] );
+	}
+
+	public function test_delete_response_has_cache_defense_headers(): void {
+		$request = new WP_REST_Request( 'DELETE', '/test-mcp' );
+
+		$response = $this->transport->handle_request( $request );
+
+		$headers = $response->get_headers();
+		$this->assertArrayHasKey( 'Cache-Control', $headers );
+		$this->assertEquals( 'no-store, no-cache, must-revalidate, private', $headers['Cache-Control'] );
+		$this->assertArrayHasKey( 'Pragma', $headers );
+		$this->assertEquals( 'no-cache', $headers['Pragma'] );
+	}
+
 	// ========== Helper Methods ==========
 
 	private function createPostRequest( array $body ): WP_REST_Request {

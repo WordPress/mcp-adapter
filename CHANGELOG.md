@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file, per [the Ke
 ### Changed
 - Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
 
+### Fixed
+- The MCP HTTP endpoint now sends `Cache-Control: no-store, no-cache, must-revalidate, private` and `Pragma: no-cache` headers, and defines `DONOTCACHEPAGE`, on every response. Previously, full-page caches (LiteSpeed, WP Rocket, W3 Total Cache, WP Super Cache, host-level FastCGI cache) could cache and replay a response to a different user, since the endpoint carried no cache-defense signal.
+
 ## [0.6.1] - 2026-08-13
 
 ### Fixed
