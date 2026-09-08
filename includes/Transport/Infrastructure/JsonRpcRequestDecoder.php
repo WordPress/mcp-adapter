@@ -44,13 +44,17 @@ final class JsonRpcRequestDecoder {
 	}
 
 	/**
-	 * Convert a decoded object graph to associative callback input.
+	 * Convert decoded values or validated records to plain associative data.
 	 *
-	 * @param mixed $value Decoded value.
+	 * @param mixed $value Decoded value or validated schema record.
 	 * @return mixed
 	 * @since n.e.x.t
 	 */
 	public function to_associative( $value ) {
+		if ( $value instanceof \WP\McpSchema\Record ) {
+			return $this->to_associative( $value->jsonSerialize() );
+		}
+
 		if ( $value instanceof \stdClass ) {
 			$result = array();
 			foreach ( get_object_vars( $value ) as $key => $item ) {

@@ -135,8 +135,8 @@ final class HandlerCompatibilityTest extends TestCase {
 		}
 
 		$this->assertSame( 1, $executions );
-		$this->assertTrue( $response['structuredContent']['modified'] );
-		$this->assertTrue( $response['structuredContent']['filtered'] );
+		$this->assertTrue( $response['structuredContent']->modified );
+		$this->assertTrue( $response['structuredContent']->filtered );
 
 		$block = static fn(): WP_Error => new WP_Error( 'blocked', 'Blocked before execution' );
 		add_filter( 'mcp_adapter_pre_tool_call', $block );
@@ -546,7 +546,7 @@ final class HandlerCompatibilityTest extends TestCase {
 
 			$shape  = 'scalar value';
 			$scalar = $handler->call_tool( $request, $this->request_context( $server ) );
-			$this->assertSame( 'scalar value', $scalar['structuredContent']['result'] );
+			$this->assertSame( 'scalar value', $scalar['structuredContent']->result );
 
 			$shape = array(
 				'type'     => 'resource',
