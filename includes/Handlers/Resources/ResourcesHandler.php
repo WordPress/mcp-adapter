@@ -11,7 +11,6 @@ namespace WP\MCP\Handlers\Resources;
 
 use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Record\ListResourceTemplatesRequest;
@@ -275,11 +274,9 @@ class ResourcesHandler {
 	 * resource contents reaches the client. MCP Apps UI resources rely on this: they
 	 * put CSP config and border hints under `_meta.ui` alongside the HTML body.
 	 *
-	 * A list-shaped `_meta` is omitted because MCP declares this field as a JSON object.
-	 *
-	 * Every key is optional and read defensively, because a handler returns whatever
-	 * WordPress handed it: `blob` and `text` are cast to string, `mimeType` is kept
-	 * only when it already is one, and an absent `uri` falls back to $default_uri.
+	 * Every value is carried as given; the schema decides whether the contents fit.
+	 * An absent `uri` falls back to $default_uri and an item with neither `blob` nor
+	 * `text` becomes empty text contents.
 	 *
 	 * @param array{uri?: mixed, mimeType?: mixed, text?: mixed, blob?: mixed, _meta?: mixed} $item The content item array.
 	 * @param string $default_uri The URI to use when the item names none.
@@ -287,34 +284,18 @@ class ResourcesHandler {
 	 * @return array<string, mixed>
 	 */
 	private function create_content_data( array $item, string $default_uri ): array {
-		$item_uri  = $item['uri'] ?? $default_uri;
-		$mime_type = $item['mimeType'] ?? null;
-		$meta      = McpValidator::normalize_meta( $item['_meta'] ?? null );
+		$contents = array(
+			'uri'      => $item['uri'] ?? $default_uri,
+			'mimeType' => $item['mimeType'] ?? null,
+			'_meta'    => $item['_meta'] ?? null,
+		);
 
-		// If there's blob data, create BlobResourceContents.
 		if ( isset( $item['blob'] ) ) {
-			return array_filter(
-				array(
-					'uri'      => $item_uri,
-					'blob'     => (string) $item['blob'],
-					'mimeType' => is_string( $mime_type ) ? $mime_type : null,
-					'_meta'    => $meta,
-				),
-				static fn( $value ): bool => null !== $value
-			);
+			$contents['blob'] = $item['blob'];
+		} else {
+			$contents['text'] = $item['text'] ?? '';
 		}
 
-		// Default to TextResourceContents.
-		$text = $item['text'] ?? '';
-
-		return array_filter(
-			array(
-				'uri'      => $item_uri,
-				'text'     => (string) $text,
-				'mimeType' => is_string( $mime_type ) ? $mime_type : null,
-				'_meta'    => $meta,
-			),
-			static fn( $value ): bool => null !== $value
-		);
+		return array_filter( $contents, static fn( $value ): bool => null !== $value );
 	}
 }

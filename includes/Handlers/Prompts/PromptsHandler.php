@@ -11,7 +11,6 @@ namespace WP\MCP\Handlers\Prompts;
 
 use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Record\GetPromptRequest;
@@ -21,12 +20,6 @@ use WP\McpSchema\Record\Prompt;
 /** Handles prompts/list and prompts/get. */
 class PromptsHandler {
 	use HandlerHelperTrait;
-
-	/** @var list<string> */
-	private static array $valid_content_types = array( 'text', 'image', 'audio', 'resource_link', 'resource' );
-
-	/** @var list<string> */
-	private static array $valid_roles = array( 'user', 'assistant' );
 
 	/** @var string */
 	private static string $default_role = 'user';
@@ -149,6 +142,10 @@ class PromptsHandler {
 	/**
 	 * Normalize supported prompt-result conveniences to canonical result data.
 	 *
+	 * Only the shape is normalized. Roles, content types, and metadata are carried
+	 * as given; the schema decides whether the result fits, and a result that does
+	 * not fit fails the request instead of being repaired.
+	 *
 	 * @return array<string, mixed>
 	 */
 	private function normalize_result( array $result, Prompt $prompt, string $prompt_name ): array {
@@ -156,20 +153,8 @@ class PromptsHandler {
 		$messages    = array();
 
 		if ( isset( $result['messages'] ) && is_array( $result['messages'] ) ) {
-			foreach ( $result['messages'] as $index => $message ) {
-				if ( ! is_array( $message ) ) {
-					$this->mcp->get_error_handler()->log(
-						'Invalid message structure in prompt result, skipping',
-						array(
-							'prompt_name'   => $prompt_name,
-							'message_index' => $index,
-						),
-						'warning'
-					);
-					continue;
-				}
-
-				$messages[] = $this->normalize_message( $message, $prompt_name );
+			foreach ( $result['messages'] as $message ) {
+				$messages[] = is_array( $message ) ? $this->normalize_message( $message ) : $message;
 			}
 		} elseif ( isset( $result['text'] ) && is_string( $result['text'] ) ) {
 			$content = array(
@@ -184,14 +169,10 @@ class PromptsHandler {
 				'content' => $content,
 			);
 		} elseif ( isset( $result['role'], $result['content'] ) ) {
-			$messages[] = $this->normalize_message( $result, $prompt_name );
+			$messages[] = $this->normalize_message( $result );
 		} elseif ( isset( $result['texts'] ) && is_array( $result['texts'] ) ) {
-			$role = $this->validate_role( $result['role'] ?? self::$default_role, $prompt_name );
+			$role = $result['role'] ?? self::$default_role;
 			foreach ( $result['texts'] as $text ) {
-				if ( ! is_string( $text ) ) {
-					continue;
-				}
-
 				$messages[] = array(
 					'role'    => $role,
 					'content' => array(
@@ -236,84 +217,24 @@ class PromptsHandler {
 		return $data;
 	}
 
-	/** @return array<string, mixed> */
-	private function normalize_message( array $message, string $prompt_name ): array {
-		$role    = $this->validate_role( $message['role'] ?? self::$default_role, $prompt_name );
+	/**
+	 * Fill in the message defaults: an absent role is `user`, and a plain string
+	 * content is a text block. Everything else is carried as given.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function normalize_message( array $message ): array {
 		$content = $message['content'] ?? array();
-		if ( ! is_array( $content ) ) {
+		if ( is_string( $content ) ) {
 			$content = array(
 				'type' => 'text',
-				'text' => (string) $content,
+				'text' => $content,
 			);
 		}
 
 		return array(
-			'role'    => $role,
-			'content' => $this->normalize_content_block( $this->validate_content_type( $content, $prompt_name ) ),
+			'role'    => $message['role'] ?? self::$default_role,
+			'content' => $content,
 		);
-	}
-
-	/** Normalize object-shaped metadata on a content block and nested resource. */
-	private function normalize_content_block( array $content ): array {
-		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
-		if ( null === $block_meta ) {
-			unset( $content['_meta'] );
-		} else {
-			$content['_meta'] = $block_meta;
-		}
-
-		if ( 'resource' === ( $content['type'] ?? '' ) && isset( $content['resource'] ) && is_array( $content['resource'] ) ) {
-			$resource      = $content['resource'];
-			$resource_meta = McpValidator::normalize_meta( $resource['_meta'] ?? null );
-			if ( null === $resource_meta ) {
-				unset( $resource['_meta'] );
-			} else {
-				$resource['_meta'] = $resource_meta;
-			}
-			$content['resource'] = $resource;
-		}
-
-		return $content;
-	}
-
-	/** Validate a content type and degrade invalid values to text. */
-	private function validate_content_type( array $content, string $prompt_name ): array {
-		$type = $content['type'] ?? null;
-		if ( is_string( $type ) && in_array( $type, self::$valid_content_types, true ) ) {
-			return $content;
-		}
-
-		$this->mcp->get_error_handler()->log(
-			'Invalid content type in prompt result, converting to text',
-			array(
-				'prompt_name'  => $prompt_name,
-				'invalid_type' => $type,
-			),
-			'warning'
-		);
-
-		$text = isset( $content['text'] ) ? (string) $content['text'] : wp_json_encode( $content, JSON_PRETTY_PRINT );
-		return array(
-			'type' => 'text',
-			'text' => false === $text ? '{}' : $text,
-		);
-	}
-
-	/** Validate a role and degrade invalid values to user. */
-	private function validate_role( string $role, string $prompt_name ): string {
-		if ( in_array( $role, self::$valid_roles, true ) ) {
-			return $role;
-		}
-
-		$this->mcp->get_error_handler()->log(
-			'Invalid role in prompt message, defaulting to user',
-			array(
-				'prompt_name'  => $prompt_name,
-				'invalid_role' => $role,
-			),
-			'warning'
-		);
-
-		return self::$default_role;
 	}
 }

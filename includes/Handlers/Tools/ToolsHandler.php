@@ -12,7 +12,6 @@ namespace WP\MCP\Handlers\Tools;
 use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -265,7 +264,7 @@ class ToolsHandler {
 								ContentBlockHelper::embedded_text_resource(
 									$uri,
 									$resource_item['text'],
-									is_string( $mime_type ) ? $mime_type : null,
+									$mime_type,
 									null,
 									$block_meta,
 									$resource_meta
@@ -281,7 +280,7 @@ class ToolsHandler {
 								ContentBlockHelper::embedded_blob_resource(
 									$uri,
 									$resource_item['blob'],
-									is_string( $mime_type ) ? $mime_type : null,
+									$mime_type,
 									null,
 									$block_meta,
 									$resource_meta
@@ -347,13 +346,23 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Project an explicit content metadata object to the helper's associative view.
+	 * Carry explicit content metadata to the helper as given.
+	 *
+	 * A decoded JSON object (stdClass) and an array both reach the schema unchanged;
+	 * the object is not cast, because a cast would turn numeric-string keys into a
+	 * list the schema rejects. Any other value cannot be a JSON object, so it fails
+	 * the call.
 	 *
 	 * @param mixed $meta Content metadata.
-	 * @return array<string, mixed>|null
+	 * @return array<string, mixed>|\stdClass|null
+	 * @throws \UnexpectedValueException When the value is neither an object nor an array.
 	 */
-	private function content_metadata( $meta ): ?array {
-		return McpValidator::normalize_meta( $meta instanceof \stdClass ? (array) $meta : $meta );
+	private function content_metadata( $meta ) {
+		if ( null === $meta || is_array( $meta ) || $meta instanceof \stdClass ) {
+			return $meta;
+		}
+
+		throw new \UnexpectedValueException( 'Tool result _meta must be a JSON object.' );
 	}
 
 	/**
