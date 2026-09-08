@@ -336,6 +336,216 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertTrue( $response['data']['result']['structuredContent']['ok'] );
 	}
 
+	/** Persisted initialization data can be loaded without schema package classes. */
+	public function test_http_session_persists_plain_client_data(): void {
+		$params   = array(
+			'protocolVersion' => Schemas::V2025_11_25,
+			'capabilities'    => array(
+				'roots'        => array( 'listChanged' => true ),
+				'experimental' => array( 'fixture' => array( 'enabled' => true ) ),
+			),
+			'clientInfo'      => array(
+				'name'    => 'portable-session',
+				'version' => '1.0',
+				'icons'   => array(
+					array(
+						'src'      => 'https://example.org/icon.png',
+						'mimeType' => 'image/png',
+					),
+				),
+			),
+		);
+		$response = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => $params,
+			)
+		);
+		$this->assertSame( 200, $response['status'] );
+		$session_id = $response['headers']['Mcp-Session-Id'];
+		$sessions   = get_user_meta( get_current_user_id(), self::session_meta_key(), true );
+		$this->assertSame( $params, $sessions[ $session_id ]['client_params'] );
+
+		// Simulate a rollback where none of the new package classes can be loaded.
+		$restored = unserialize( serialize( $sessions ), array( 'allowed_classes' => false ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize, WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Trusted test fixture verifies the persistent PHP representation.
+		$this->assertSame( $sessions, $restored );
+		update_user_meta( get_current_user_id(), self::session_meta_key(), $restored );
+		$ping = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 2,
+				'method'  => 'ping',
+			),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+		$this->assertSame( 200, $ping['status'] );
+		$this->assertArrayHasKey( 'result', $ping['data'] );
+	}
+
+	/** Callback serializers retain nested metadata and JSON identity on both wires. */
+	public function test_http_tool_result_serializers_preserve_json_shapes(): void {
+		$numeric_object        = new \stdClass();
+		$numeric_object->{'0'} = 'zero';
+		$numeric_object->{'1'} = 'one';
+		$metadata              = array(
+			'id'    => 12,
+			'key'   => 'fixture',
+			'value' => array(
+				'empty'   => new \stdClass(),
+				'list'    => array(),
+				'null'    => null,
+				'numeric' => $numeric_object,
+			),
+		);
+		$fixtures              = array(
+			array( 'meta_data' => array( $this->serializable_result( $metadata ) ) ),
+			array( 'meta_data' => array( new \ArrayObject( $metadata ) ) ),
+			new \ArrayObject( $metadata ),
+			$this->serializable_result( new \stdClass() ),
+			$this->serializable_result( $numeric_object ),
+		);
+
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+			foreach ( $fixtures as $fixture ) {
+				$response = $this->http_tool_result_fixture( $fixture, $version );
+				$this->assertSame( 200, $response['status'] );
+				$wire = json_decode( $response['json'] );
+				$this->assertFalse( $wire->result->isError );
+				$this->assertSame( wp_json_encode( $fixture ), $wire->result->content[0]->text );
+				$this->assertSame( wp_json_encode( $fixture ), wp_json_encode( $wire->result->structuredContent ) );
+			}
+		}
+	}
+
+	/** Serialized resource objects preserve block and resource metadata ownership. */
+	public function test_http_serialized_resource_object_projects_embedded_content(): void {
+		$fixture = $this->serializable_result(
+			(object) array(
+				'type'     => 'resource',
+				'_meta'    => (object) array( 'owner' => 'block' ),
+				'resource' => (object) array(
+					'uri'   => 'fixture://serialized-resource',
+					'text'  => 'resource text',
+					'_meta' => (object) array( 'owner' => 'resource' ),
+				),
+			)
+		);
+
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+			$response = $this->http_tool_result_fixture( $fixture, $version );
+			$this->assertSame( 200, $response['status'] );
+			$content = $response['data']['result']['content'][0];
+			$this->assertSame( 'resource', $content['type'] );
+			$this->assertSame( 'fixture://serialized-resource', $content['resource']['uri'] );
+			$this->assertSame( 'resource text', $content['resource']['text'] );
+			$this->assertSame( 'block', $content['_meta']['owner'] );
+			$this->assertSame( 'resource', $content['resource']['_meta']['owner'] );
+		}
+	}
+
+	/** Image bytes are converted to base64 before any JSON encoding. */
+	public function test_http_binary_image_results_preserve_content(): void {
+		$bytes = "\x89PNG\r\n\x1a\n";
+		$image = array(
+			'type'     => 'image',
+			'results'  => $bytes,
+			'mimeType' => 'image/png',
+		);
+
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+			foreach ( array( $image, $this->serializable_result( $image ) ) as $fixture ) {
+				$response = $this->http_tool_result_fixture( $fixture, $version );
+				$this->assertSame( 200, $response['status'] );
+				$content = $response['data']['result']['content'][0];
+				$this->assertSame( 'image', $content['type'] );
+				$this->assertSame( 'image/png', $content['mimeType'] );
+				$this->assertSame( $bytes, base64_decode( $content['data'], true ) );
+			}
+		}
+	}
+
+	/** Invalid callback values cannot be silently encoded as successful empty data. */
+	public function test_http_tool_result_json_encoding_fails_closed(): void {
+		$cycle        = new \stdClass();
+		$cycle->value = $cycle;
+
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+			foreach ( array( INF, $this->serializable_result( INF ), $cycle ) as $fixture ) {
+				$response = $this->http_tool_result_fixture( array( 'value' => $fixture ), $version );
+				$this->assertSame( 500, $response['status'] );
+				$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $response['data']['error']['code'] );
+				$this->assertArrayNotHasKey( 'result', $response['data'] );
+			}
+		}
+	}
+
+	/**
+	 * Model a provider metadata object without depending on WooCommerce.
+	 *
+	 * @param mixed $value Serialized callback data.
+	 * @return \JsonSerializable
+	 */
+	private function serializable_result( $value ): \JsonSerializable {
+		return new class( $value ) implements \JsonSerializable {
+			/** @var mixed */
+			private $value;
+
+			/** @param mixed $value Serialized callback data. */
+			public function __construct( $value ) {
+				$this->value = $value;
+			}
+
+			/** @return mixed */
+			#[\ReturnTypeWillChange]
+			public function jsonSerialize() {
+				return $this->value;
+			}
+		};
+	}
+
+	/**
+	 * Execute a callback result through exact HTTP result projection.
+	 *
+	 * @param mixed  $value Callback result.
+	 * @param string $version Negotiated revision.
+	 * @return array{status: int, data: array<string, mixed>, headers: array<string, string>, json: string}
+	 */
+	private function http_tool_result_fixture( $value, string $version ): array {
+		$filter = static function () use ( $value ) {
+			return $value;
+		};
+		add_filter( 'mcp_adapter_tool_call_result', $filter );
+		try {
+			$params = array(
+				'name'      => 'test-always-allowed',
+				'arguments' => new \stdClass(),
+			);
+			if ( Schemas::V2026_07_28 === $version ) {
+				return $this->http_request_2026_07_28( 'tools/call', 42, $params );
+			}
+
+			return $this->http_post(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 42,
+					'method'  => 'tools/call',
+					'params'  => $params,
+				),
+				array(
+					'Mcp-Session-Id'       => $this->initialize_http_session(),
+					'MCP-Protocol-Version' => $version,
+				)
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tool_call_result', $filter );
+		}
+	}
+
 	/** x-mcp-header arguments are mirrored and compared after decoding. */
 	public function test_http_2026_validates_custom_tool_parameter_headers(): void {
 		$tool = McpTool::fromArray(
@@ -973,7 +1183,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		);
 	}
 
-	/** @return array{status: int, data: array<string, mixed>, headers: array<string, string>} */
+	/** @return array{status: int, data: array<string, mixed>, headers: array<string, string>, json: string} */
 	private function http_request_2026_07_28( string $method, int $id, array $params, array $extra_headers = array() ): array {
 		$params['_meta'] = $this->meta_2026_07_28();
 		$headers         = array_merge(
@@ -1021,12 +1231,12 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		return $response['headers']['Mcp-Session-Id'];
 	}
 
-	/** @return array{status: int, data: array<string, mixed>, headers: array<string, string>} */
+	/** @return array{status: int, data: array<string, mixed>, headers: array<string, string>, json: string} */
 	private function http_post( array $payload, array $headers = array() ): array {
 		return $this->http_post_raw( (string) wp_json_encode( $payload ), $headers );
 	}
 
-	/** @return array{status: int, data: array<string, mixed>, headers: array<string, string>} */
+	/** @return array{status: int, data: array<string, mixed>, headers: array<string, string>, json: string} */
 	private function http_post_raw( string $raw, array $headers = array() ): array {
 		$request = new WP_REST_Request( 'POST', '/mcp' );
 		$request->set_body( $raw );
@@ -1042,6 +1252,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 			'status'  => $response->get_status(),
 			'data'    => is_array( $data ) ? $data : array(),
 			'headers' => $response->get_headers(),
+			'json'    => (string) wp_json_encode( $response->get_data() ),
 		);
 	}
 

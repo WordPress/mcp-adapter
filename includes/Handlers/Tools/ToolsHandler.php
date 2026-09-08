@@ -199,13 +199,13 @@ class ToolsHandler {
 				return $this->create_error_result( $result->get_error_message() );
 			}
 
-			$structured_content = $result;
+			// Expose top-level content markers before handling binary image data.
 			if ( $result instanceof \JsonSerializable ) {
-				$decoded            = json_decode( (string) wp_json_encode( $result ), true );
-				$result             = is_array( $decoded ) ? $decoded : array( 'result' => $decoded );
-				$structured_content = $result;
-			} elseif ( $result instanceof \stdClass ) {
-				$result = (array) $result;
+				$result = $result->jsonSerialize();
+			}
+			$structured_content = $result;
+			if ( is_object( $result ) ) {
+				$result = get_object_vars( $result );
 			} elseif ( ! is_array( $result ) ) {
 				$result             = array( 'result' => $result );
 				$structured_content = $result;
@@ -239,8 +239,8 @@ class ToolsHandler {
 			//   `ResourcesHandler::create_content_data()`. A caller who needs block-level
 			//   `_meta` writes the nested form, which exists to express that distinction.
 			if ( isset( $result['type'] ) && 'resource' === $result['type'] ) {
-				$is_nested     = isset( $result['resource'] ) && is_array( $result['resource'] );
-				$resource_item = $is_nested ? $result['resource'] : $result;
+				$is_nested     = isset( $result['resource'] ) && ( is_array( $result['resource'] ) || $result['resource'] instanceof \stdClass );
+				$resource_item = $is_nested ? (array) $result['resource'] : $result;
 
 				$uri       = $resource_item['uri'] ?? null;
 				$mime_type = $resource_item['mimeType'] ?? null;
@@ -255,9 +255,9 @@ class ToolsHandler {
 
 				if ( is_string( $uri ) && '' !== $uri && ( $has_text || $has_blob ) ) {
 					$block_meta    = $is_nested
-						? McpValidator::normalize_meta( $result['_meta'] ?? null )
+						? $this->content_metadata( $result['_meta'] ?? null )
 						: null;
-					$resource_meta = McpValidator::normalize_meta( $resource_item['_meta'] ?? null );
+					$resource_meta = $this->content_metadata( $resource_item['_meta'] ?? null );
 
 					if ( $has_text ) {
 						return array(
@@ -308,7 +308,7 @@ class ToolsHandler {
 							$image_data,
 							$mime_type,
 							null,
-							McpValidator::normalize_meta( $result['_meta'] ?? null )
+							$this->content_metadata( $result['_meta'] ?? null )
 						),
 					),
 					'isError' => false,
@@ -321,18 +321,18 @@ class ToolsHandler {
 			// with nothing to tell metadata from a domain field.
 
 			// Standard result - JSON-encode for text content, include as structuredContent.
-			$json_text = wp_json_encode( $structured_content );
+			// Throw before WordPress's repair retry can change invalid serializer output.
+			$json_text = wp_json_encode( $structured_content, JSON_THROW_ON_ERROR );
 			if ( false === $json_text ) {
-				$json_text = '{}';
+				throw new \RuntimeException( 'Tool result cannot be JSON encoded.' );
 			}
 
-			$result_data                      = array(
-				'content' => array( ContentBlockHelper::text( $json_text ) ),
-				'isError' => false,
+			// Reuse the encoded value so nested serializers run once and JSON objects remain objects.
+			return array(
+				'content'           => array( ContentBlockHelper::text( $json_text ) ),
+				'isError'           => false,
+				'structuredContent' => json_decode( $json_text, false, 512, JSON_THROW_ON_ERROR ),
 			);
-			$result_data['structuredContent'] = $structured_content;
-
-			return $result_data;
 		} catch ( \Throwable $exception ) {
 			$this->mcp->get_error_handler()->log(
 				'Error calling tool',
@@ -344,6 +344,16 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
+	}
+
+	/**
+	 * Project an explicit content metadata object to the helper's associative view.
+	 *
+	 * @param mixed $meta Content metadata.
+	 * @return array<string, mixed>|null
+	 */
+	private function content_metadata( $meta ): ?array {
+		return McpValidator::normalize_meta( $meta instanceof \stdClass ? (array) $meta : $meta );
 	}
 
 	/**
