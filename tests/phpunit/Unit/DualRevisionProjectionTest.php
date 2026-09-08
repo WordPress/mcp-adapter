@@ -37,6 +37,100 @@ use WP\McpSchema\Schemas;
 /** Covers neutral inputs, isolated projections, defaults, and immutable context. */
 final class DualRevisionProjectionTest extends TestCase {
 
+	/** Ability object roots retain the historical explicit empty properties map on the wire. */
+	public function test_ability_tool_object_roots_emit_properties_objects(): void {
+		foreach ( array(
+			array( 'type' => 'object' ),
+			array(
+				'type'       => 'object',
+				'properties' => array(),
+			),
+			array(
+				'type'       => 'object',
+				'properties' => new \stdClass(),
+			),
+		) as $definition ) {
+			$ability = new \WP_Ability(
+				'test/empty-schema-projection',
+				array(
+					'label'               => 'Empty schema projection',
+					'description'         => 'Retain explicit properties for downstream clients.',
+					'category'            => 'test',
+					'input_schema'        => $definition,
+					'output_schema'       => $definition,
+					'execute_callback'    => '__return_empty_array',
+					'permission_callback' => '__return_true',
+				)
+			);
+			$tool    = McpTool::fromAbility( $ability );
+			$this->assertInstanceOf( McpTool::class, $tool );
+			foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+				$record = $tool->get_protocol_record( $this->schema( $version ) );
+				$this->assertNotNull( $record );
+				$wire = json_decode( wp_json_encode( $record ) );
+				foreach ( array( 'inputSchema', 'outputSchema' ) as $field ) {
+					$this->assertArrayHasKey( 'properties', get_object_vars( $wire->{$field} ) );
+					$this->assertInstanceOf( \stdClass::class, $wire->{$field}->properties );
+					$this->assertSame( '{}', wp_json_encode( $wire->{$field}->properties ) );
+				}
+			}
+		}
+	}
+
+	/** The root fallback does not rewrite declared properties, nested schemas or wrapper semantics. */
+	public function test_ability_tool_properties_fallback_preserves_explicit_schemas(): void {
+		$definition = array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'payload' => array( 'type' => 'object' ),
+				'choice'  => array(
+					'type' => array( 'string', 'null' ),
+					'enum' => array( 'one', null ),
+				),
+			),
+			'required'             => array( 'payload' ),
+			'additionalProperties' => false,
+		);
+		foreach ( array(
+			$definition,
+			array(
+				'type'  => 'array',
+				'items' => array( 'type' => 'object' ),
+			),
+		) as $input ) {
+			$ability = new \WP_Ability(
+				'test/explicit-schema-projection',
+				array(
+					'label'               => 'Explicit schema projection',
+					'description'         => 'Preserve declared properties and constraints.',
+					'category'            => 'test',
+					'input_schema'        => $input,
+					'output_schema'       => $input,
+					'execute_callback'    => '__return_empty_array',
+					'permission_callback' => '__return_true',
+				)
+			);
+			$tool    = McpTool::fromAbility( $ability );
+			$this->assertInstanceOf( McpTool::class, $tool );
+			foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+				$record = $tool->get_protocol_record( $this->schema( $version ) );
+				$this->assertNotNull( $record );
+				$wire = json_decode( wp_json_encode( $record ), true );
+				foreach ( array(
+					'inputSchema'  => 'input',
+					'outputSchema' => 'result',
+				) as $field => $wrapper ) {
+					$expected = 'object' === $input['type'] ? $input : array(
+						'type'       => 'object',
+						'properties' => array( $wrapper => $input ),
+						'required'   => array( $wrapper ),
+					);
+					$this->assertSame( $expected, $wire[ $field ] );
+				}
+			}
+		}
+	}
+
 	/** Exact supported identifiers and initialization counter-proposal are finite. */
 	public function test_version_negotiator_supports_only_exact_revisions(): void {
 		$this->assertSame(

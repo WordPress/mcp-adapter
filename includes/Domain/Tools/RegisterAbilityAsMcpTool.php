@@ -92,7 +92,8 @@ class RegisterAbilityAsMcpTool {
 		$tool_data = array(
 			'name'        => $tool_name,
 			'description' => trim( $this->ability->get_description() ),
-			'inputSchema' => $input_transform['schema'],
+			// Retain the empty properties object historically supplied by the schema DTO.
+			'inputSchema' => $input_transform['schema'] + array( 'properties' => new \stdClass() ),
 		);
 
 		// Add optional title from ability label.
@@ -110,7 +111,7 @@ class RegisterAbilityAsMcpTool {
 				$output_schema,
 				'result'
 			);
-			$tool_data['outputSchema'] = $output_transform['schema'];
+			$tool_data['outputSchema'] = $output_transform['schema'] + array( 'properties' => new \stdClass() );
 		}
 
 		// Map annotations from ability meta to MCP format using unified mapper.
