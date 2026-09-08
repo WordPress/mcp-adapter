@@ -13,7 +13,6 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\Prompt;
@@ -137,15 +136,6 @@ final class McpPrompt implements McpComponentInterface {
 			return new WP_Error( 'mcp_prompt_missing_handler', 'Prompt configuration must include a callable "handler" field.' );
 		}
 
-		// Validate and prepare icons if set.
-		$valid_icons = null;
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$valid_icons = $icons_result['valid'];
-			}
-		}
-
 		$prompt_data = array( 'name' => $config['name'] );
 		if ( isset( $config['description'] ) ) {
 			$prompt_data['description'] = $config['description'];
@@ -155,13 +145,13 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['title'] = $config['title'];
 		}
 
-		$prompt_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
-		if ( null !== $prompt_meta ) {
-			$prompt_data['_meta'] = $prompt_meta;
+		// Icons and _meta are carried as given; the schema decides whether they fit.
+		if ( isset( $config['meta'] ) ) {
+			$prompt_data['_meta'] = $config['meta'];
 		}
 
-		if ( null !== $valid_icons ) {
-			$prompt_data['icons'] = $valid_icons;
+		if ( isset( $config['icons'] ) ) {
+			$prompt_data['icons'] = $config['icons'];
 		}
 
 		if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {

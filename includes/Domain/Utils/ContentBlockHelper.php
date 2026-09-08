@@ -12,75 +12,57 @@ namespace WP\MCP\Domain\Utils;
 /**
  * Builds neutral arrays that are validated with the selected result schema.
  *
+ * Every field is carried as given. The schema package decides whether the
+ * block fits the selected revision. `mimeType` and `_meta` values are therefore
+ * not typed here: a decoded JSON object arrives as stdClass and must reach the
+ * schema unchanged, because casting it to an array turns numeric-string keys
+ * into a list.
+ *
  * @since 0.5.0
  */
 final class ContentBlockHelper {
 
 	/**
-	 * Build revision-neutral image content.
+	 * Build image content.
 	 *
-	 * @param string $data Base64-encoded image data.
-	 * @param string $mime_type Media type of the image.
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 *
-	 * @return array<string, mixed> Content block for validation through the selected result schema.
+	 * @param string $data Base64 image data.
+	 * @param mixed $mime_type MIME type, carried as given.
+	 * @param array<string, mixed>|null $annotations Optional annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @return array<string, mixed>
 	 */
-	public static function image( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
+	public static function image( string $data, $mime_type, ?array $annotations = null, $_meta = null ): array {
 		return self::without_nulls(
 			array(
 				'type'        => 'image',
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
+				'_meta'       => $_meta,
 			)
 		);
 	}
 
 	/**
-	 * Build revision-neutral audio content.
-	 *
-	 * @param string $data Base64-encoded audio data.
-	 * @param string $mime_type Media type of the audio.
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 *
-	 * @return array<string, mixed> Content block for validation through the selected result schema.
-	 */
-	public static function audio( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
-		return self::without_nulls(
-			array(
-				'type'        => 'audio',
-				'data'        => $data,
-				'mimeType'    => $mime_type,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		);
-	}
-
-	/**
-	 * Wrap resource contents in an embedded-resource content block.
+	 * Build embedded text resource content.
 	 *
 	 * @since 0.6.0 Added the optional $resource_meta parameter.
 	 *
-	 * @param string $uri Resource identifier.
-	 * @param string $text Text content of the resource.
-	 * @param string|null $mime_type Optional resource media type.
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 * @param array<mixed>|null $resource_meta Optional metadata for the nested resource contents.
-	 *
-	 * @return array<string, mixed> Embedded-resource block with separate outer and resource metadata.
+	 * @param string $uri Resource URI.
+	 * @param string $text Resource text.
+	 * @param mixed $mime_type MIME type, carried as given.
+	 * @param array<string, mixed>|null $annotations Optional block annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param array<string, mixed>|\stdClass|null $resource_meta Optional resource metadata, carried as given.
+	 * @return array<string, mixed>
 	 */
 	public static function embedded_text_resource(
 		string $uri,
 		string $text,
-		?string $mime_type = null,
+		$mime_type = null,
 		?array $annotations = null,
-		?array $_meta = null,
-		?array $resource_meta = null
+		$_meta = null,
+		$resource_meta = null
 	): array {
 		return self::embedded_resource(
 			self::without_nulls(
@@ -88,7 +70,7 @@ final class ContentBlockHelper {
 					'uri'      => $uri,
 					'text'     => $text,
 					'mimeType' => $mime_type,
-					'_meta'    => McpValidator::normalize_meta( $resource_meta ),
+					'_meta'    => $resource_meta,
 				)
 			),
 			$annotations,
@@ -97,26 +79,25 @@ final class ContentBlockHelper {
 	}
 
 	/**
-	 * Wrap resource contents in an embedded-resource content block.
+	 * Build embedded blob resource content.
 	 *
 	 * @since 0.6.0 Added the optional $resource_meta parameter.
 	 *
-	 * @param string $uri Resource identifier.
-	 * @param string $blob Base64-encoded resource contents.
-	 * @param string|null $mime_type Optional resource media type.
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 * @param array<mixed>|null $resource_meta Optional metadata for the nested resource contents.
-	 *
-	 * @return array<string, mixed> Embedded-resource block with separate outer and resource metadata.
+	 * @param string $uri Resource URI.
+	 * @param string $blob Base64 resource data.
+	 * @param mixed $mime_type MIME type, carried as given.
+	 * @param array<string, mixed>|null $annotations Optional block annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param array<string, mixed>|\stdClass|null $resource_meta Optional resource metadata, carried as given.
+	 * @return array<string, mixed>
 	 */
 	public static function embedded_blob_resource(
 		string $uri,
 		string $blob,
-		?string $mime_type = null,
+		$mime_type = null,
 		?array $annotations = null,
-		?array $_meta = null,
-		?array $resource_meta = null
+		$_meta = null,
+		$resource_meta = null
 	): array {
 		return self::embedded_resource(
 			self::without_nulls(
@@ -124,7 +105,7 @@ final class ContentBlockHelper {
 					'uri'      => $uri,
 					'blob'     => $blob,
 					'mimeType' => $mime_type,
-					'_meta'    => McpValidator::normalize_meta( $resource_meta ),
+					'_meta'    => $resource_meta,
 				)
 			),
 			$annotations,
@@ -133,83 +114,39 @@ final class ContentBlockHelper {
 	}
 
 	/**
-	 * Build text content describing an error.
+	 * Build text content.
 	 *
-	 * @param string $message Error text.
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 *
-	 * @return array<string, mixed> Text block; does not itself mark a tool result as an error.
+	 * @param string $text Text.
+	 * @param array<string, mixed>|null $annotations Optional annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @return array<string, mixed>
 	 */
-	public static function error_text( string $message, ?array $annotations = null, ?array $_meta = null ): array {
-		return self::text( $message, $annotations, $_meta );
-	}
-
-	/**
-	 * Build revision-neutral text content.
-	 *
-	 * @param string $text Content text.
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 *
-	 * @return array<string, mixed> Text content block.
-	 */
-	public static function text( string $text, ?array $annotations = null, ?array $_meta = null ): array {
+	public static function text( string $text, ?array $annotations = null, $_meta = null ): array {
 		return self::without_nulls(
 			array(
 				'type'        => 'text',
 				'text'        => $text,
 				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
+				'_meta'       => $_meta,
 			)
 		);
 	}
 
 	/**
-	 * Encode a value as the text of a content block.
+	 * Build the embedded wrapper.
 	 *
-	 * @param mixed $data JSON-encodable value.
-	 * @param int $flags JSON encoding flags passed to wp_json_encode().
-	 * @param array<mixed>|null $annotations Optional content annotations.
-	 * @param array<mixed>|null $_meta Optional metadata for the outer content block.
-	 *
-	 * @return array<string, mixed> Text content block; uses "{}" when JSON encoding fails.
+	 * @param array<string, mixed> $resource_data Resource contents.
+	 * @param array<string, mixed>|null $annotations Optional block annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @return array<string, mixed>
 	 */
-	public static function json_text( $data, int $flags = 0, ?array $annotations = null, ?array $_meta = null ): array {
-		$json = wp_json_encode( $data, $flags );
-		if ( false === $json ) {
-			$json = '{}';
-		}
-
-		return self::text( $json, $annotations, $_meta );
-	}
-
-	/**
-	 * Normalize neutral block arrays.
-	 *
-	 * @param array<int, array<string, mixed>> $blocks Blocks.
-	 * @return array<int, array<string, mixed>>
-	 */
-	public static function to_array_list( array $blocks ): array {
-		return array_values( $blocks );
-	}
-
-	/**
-	 * Build the wrapper around embedded resource contents.
-	 *
-	 * @param array<string, mixed> $resource_data Text or blob resource contents.
-	 * @param array<mixed>|null $annotations Optional outer-block annotations.
-	 * @param array<mixed>|null $_meta Optional outer-block metadata.
-	 *
-	 * @return array<string, mixed> Embedded-resource content block.
-	 */
-	private static function embedded_resource( array $resource_data, ?array $annotations, ?array $_meta ): array {
+	private static function embedded_resource( array $resource_data, ?array $annotations, $_meta ): array {
 		return self::without_nulls(
 			array(
 				'type'        => 'resource',
 				'resource'    => $resource_data,
 				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
+				'_meta'       => $_meta,
 			)
 		);
 	}

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit;
 
+use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
@@ -18,6 +19,8 @@ use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
+use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
+use WP\McpSchema\Record;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Record\GetPromptRequest;
 use WP\McpSchema\Record\ListPromptsRequest;
@@ -151,7 +154,7 @@ final class HandlerCompatibilityTest extends TestCase {
 		$this->assertSame( 'Blocked before execution', $blocked['content'][0]['text'] );
 	}
 
-	/** Resource results preserve advertised URI, text/blob variants, and valid metadata only. */
+	/** Resource results preserve advertised URI, text/blob variants, and metadata as given. */
 	public function test_resource_result_normalization_preserves_identity_and_metadata(): void {
 		$resource = McpResource::fromArray(
 			array(
@@ -189,10 +192,15 @@ final class HandlerCompatibilityTest extends TestCase {
 		$this->assertSame( 'hello', $response['contents'][0]['text'] );
 		$this->assertTrue( $response['contents'][0]['_meta']['ui']['border'] );
 		$this->assertSame( 'YmxvYg==', $response['contents'][1]['blob'] );
-		$this->assertArrayNotHasKey( '_meta', $response['contents'][1] );
+		$this->assertSame( array( 'invalid-list-meta' ), $response['contents'][1]['_meta'] );
+
+		// The list-shaped _meta is not repaired; the schema rejects the whole result on the wire.
+		$error = $this->wire_error( $server, 'resources/read', 5, array( 'uri' => 'fixture://Mixed/Resource' ) );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $error['code'] );
+		$this->assertSame( 'Internal error: Invalid handler result', $error['message'] );
 	}
 
-	/** Invalid prompt roles and content types degrade safely and remain observable. */
+	/** Invalid prompt roles, content types, and metadata are not repaired; the wire result fails. */
 	public function test_prompt_result_normalization_degrades_invalid_role_and_content(): void {
 		$prompt = McpPrompt::fromArray(
 			array(
@@ -228,11 +236,50 @@ final class HandlerCompatibilityTest extends TestCase {
 		);
 		$response = ( new PromptsHandler( $server ) )->get_prompt( $request, $this->request_context( $server ) );
 
-		$this->assertSame( 'user', $response['messages'][0]['role'] );
-		$this->assertSame( 'text', $response['messages'][0]['content']['type'] );
-		$this->assertSame( 'fallback text', $response['messages'][0]['content']['text'] );
-		$this->assertArrayNotHasKey( '_meta', $response['messages'][0]['content'] );
-		$this->assertCount( 2, DummyErrorHandler::$logs );
+		$this->assertSame( 'system', $response['messages'][0]['role'] );
+		$this->assertSame( 'unsupported', $response['messages'][0]['content']['type'] );
+		$this->assertSame( array( 'invalid-list-meta' ), $response['messages'][0]['content']['_meta'] );
+		$this->assertSame( array(), DummyErrorHandler::$logs );
+
+		$error = $this->wire_error( $server, 'prompts/get', 6, array( 'name' => 'normalizing-prompt' ) );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $error['code'] );
+		$this->assertSame( 'Internal error: Invalid handler result', $error['message'] );
+	}
+
+	/**
+	 * Run one 2025-11-25 request through the wire orchestrator and return its error member.
+	 *
+	 * @param array<string, mixed> $params Request params.
+	 * @return array{code: int, message: string}
+	 */
+	private function wire_error( McpServer $server, string $method, int $id, array $params ): array {
+		$message = json_decode(
+			(string) wp_json_encode(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => $id,
+					'method'  => $method,
+					'params'  => $params,
+				)
+			)
+		);
+		$this->assertInstanceOf( \stdClass::class, $message );
+
+		$outcome  = ( new McpWireOrchestrator( $server->create_transport_context() ) )->process(
+			$message,
+			'test',
+			array(),
+			array( 'capabilities' => array() )
+		);
+		$response = $outcome['response'];
+		$this->assertInstanceOf( Record::class, $response );
+		$data = $this->record_array( $response );
+		$this->assertArrayHasKey( 'error', $data );
+
+		return array(
+			'code'    => (int) $data['error']['code'],
+			'message' => (string) $data['error']['message'],
+		);
 	}
 
 	/** Prompt filters retain mutation and fail-closed short-circuit semantics. */
@@ -338,16 +385,23 @@ final class HandlerCompatibilityTest extends TestCase {
 			$this->assertSame( 'assistant', $single['messages'][0]['role'] );
 			$this->assertSame( 'single content', $single['messages'][0]['content']['text'] );
 
+			// Every entry is carried as given; a non-string text is left for the schema to reject.
 			$shape = array( 'texts' => array( 'one', 2, 'two' ), 'role' => 'assistant' );
 			$multi = $handler->get_prompt( $request, $this->request_context( $server ) );
-			$this->assertCount( 2, $multi['messages'] );
-			$this->assertSame( 'two', $multi['messages'][1]['content']['text'] );
+			$this->assertCount( 3, $multi['messages'] );
+			$this->assertSame( 2, $multi['messages'][1]['content']['text'] );
+			$this->assertSame( 'two', $multi['messages'][2]['content']['text'] );
 
 			$shape    = array( 'custom' => 123 );
 			$fallback = $handler->get_prompt( $request, $this->request_context( $server ) );
 			$this->assertStringContainsString( '"custom": 123', $fallback['messages'][0]['content']['text'] );
 
-			$shape = array( 'messages' => array( 'invalid message' ) );
+			// A non-array message is not skipped; it stays in place for the schema to reject.
+			$shape   = array( 'messages' => array( 'invalid message' ) );
+			$invalid = $handler->get_prompt( $request, $this->request_context( $server ) );
+			$this->assertSame( array( 'invalid message' ), $invalid['messages'] );
+
+			$shape = array( 'messages' => array() );
 			$empty = $handler->get_prompt( $request, $this->request_context( $server ) );
 			$this->assertSame( '(No messages returned)', $empty['messages'][0]['content']['text'] );
 		} finally {
@@ -355,10 +409,10 @@ final class HandlerCompatibilityTest extends TestCase {
 		}
 
 		$this->assertNotEmpty( \WP\MCP\Tests\Fixtures\DummyObservabilityHandler::$events );
-		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$this->assertSame( array(), DummyErrorHandler::$logs );
 	}
 
-	/** Prompt resource content keeps block metadata and drops list-shaped nested metadata. */
+	/** Prompt resource content keeps block and nested metadata as given. */
 	public function test_prompt_resource_content_preserves_distinct_metadata_levels(): void {
 		$prompt = McpPrompt::fromArray(
 			array(
@@ -399,7 +453,7 @@ final class HandlerCompatibilityTest extends TestCase {
 		$this->assertSame( 'resource', $content['type'] );
 		$this->assertTrue( $content['_meta']['block'] );
 		$this->assertSame( 'fixture://prompt-resource', $content['resource']['uri'] );
-		$this->assertArrayNotHasKey( '_meta', $content['resource'] );
+		$this->assertSame( array( 'invalid-list-meta' ), $content['resource']['_meta'] );
 	}
 
 	/** Missing prompts retain their protocol error contract. */

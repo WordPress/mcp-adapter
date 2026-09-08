@@ -11,12 +11,17 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Utils;
 
 use DateTime;
+use DateTimeZone;
 
 /**
- * Utility class for validating MCP component data according to MCP specification.
+ * Adapter-side checks that the schema package cannot express.
  *
- * Provides shared validation implementations used across multiple MCP component
- * validators and registration classes. Each method focuses on a specific validation concern.
+ * The php-mcp-schema package is the contract for every emitted field; each
+ * component is projected through it and rejected when it does not fit. This
+ * class keeps only the checks that package cannot make and that the adapter
+ * depends on: the tool/prompt name rule that feeds `McpNameSanitizer` and the
+ * registry lookups, the resource URI scheme that `fold_uri_scheme` relies on,
+ * and the `lastModified` form the official client requires.
  */
 class McpValidator {
 
@@ -63,404 +68,62 @@ class McpValidator {
 	}
 
 	/**
-	 * Validate base64 content.
-	 *
-	 * Checks if a string is valid base64-encoded content.
-	 *
-	 * @param string $content The content to validate as base64.
-	 *
-	 * @return bool True if valid base64, false otherwise.
-	 */
-	public static function validate_base64( string $content ): bool {
-		// Base64 content should not be empty.
-		if ( empty( $content ) ) {
-			return false;
-		}
-
-		// Reject whitespace-only strings (they decode to empty string but aren't valid base64 content).
-		if ( trim( $content ) === '' ) {
-			return false;
-		}
-
-		// Check if it's valid base64 encoding.
-		return base64_decode( $content, true ) !== false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
-	}
-
-	/**
-	 * Validate an array of icons.
-	 *
-	 * Returns valid icons and logs warnings for invalid ones.
-	 * Invalid icons are filtered out (graceful degradation).
-	 *
-	 * @param array $icons Array of icon data.
-	 * @param bool $log_warnings Whether to log warnings for invalid icons. Default true.
-	 *
-	 * @return array{valid: array, errors: array} Array with 'valid' icons and 'errors' details.
-	 * @since 0.5.0
-	 *
-	 */
-	public static function validate_icons_array( array $icons, bool $log_warnings = true ): array {
-		$valid_icons = array();
-		$all_errors  = array();
-
-		foreach ( $icons as $index => $icon ) {
-			if ( ! is_array( $icon ) ) {
-				$all_errors[] = array(
-					'index'  => $index,
-					'errors' => array( __( 'Icon must be an array', 'mcp-adapter' ) ),
-				);
-				continue;
-			}
-
-			$errors = self::get_icon_validation_errors( $icon );
-
-			if ( empty( $errors ) ) {
-				$valid_icons[] = $icon;
-			} else {
-				$all_errors[] = array(
-					'index'  => $index,
-					'errors' => $errors,
-				);
-
-				if ( $log_warnings ) {
-					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-					error_log(
-						sprintf(
-							'MCP Adapter: Invalid icon at index %d skipped: %s',
-							$index,
-							implode( '; ', $errors )
-						)
-					);
-				}
-			}
-		}
-
-		return array(
-			'valid'  => $valid_icons,
-			'errors' => $all_errors,
-		);
-	}
-
-	/**
-	 * Get validation errors for an MCP icon object.
-	 *
-	 * Validates icon fields per MCP 2025-11-25 specification:
-	 * - src (required): Valid URL or data: URI
-	 * - mimeType (optional): String emitted as declared
-	 * - sizes (optional): Array of size strings in WxH format or "any"
-	 * - theme (optional): "light" or "dark"
-	 *
-	 * @param array $icon The icon data to validate.
-	 *
-	 * @return array Array of validation errors, empty if valid.
-	 * @since 0.5.0
-	 *
-	 */
-	public static function get_icon_validation_errors( array $icon ): array {
-		$errors = array();
-
-		// src is required.
-		if ( ! isset( $icon['src'] ) ) {
-			$errors[] = __( 'Icon must have a src field', 'mcp-adapter' );
-		} elseif ( ! is_string( $icon['src'] ) ) {
-			$errors[] = __( 'Icon src must be a string', 'mcp-adapter' );
-		} elseif ( ! self::validate_icon_src( $icon['src'] ) ) {
-			$errors[] = __( 'Icon src must be a valid URL (http/https) or data: URI', 'mcp-adapter' );
-		}
-
-		// mimeType is optional. Only its type is checked.
-		if ( isset( $icon['mimeType'] ) && ! is_string( $icon['mimeType'] ) ) {
-			$errors[] = __( 'Icon mimeType must be a string', 'mcp-adapter' );
-		}
-
-		// sizes is optional but must be valid if present.
-		if ( isset( $icon['sizes'] ) ) {
-			if ( ! is_array( $icon['sizes'] ) ) {
-				$errors[] = __( 'Icon sizes must be an array', 'mcp-adapter' );
-			} else {
-				foreach ( $icon['sizes'] as $index => $size ) {
-					if ( ! is_string( $size ) ) {
-						$errors[] = sprintf(
-						/* translators: %d: array index */
-							__( 'Icon size at index %d must be a string', 'mcp-adapter' ),
-							$index
-						);
-					} elseif ( ! self::validate_icon_size( $size ) ) {
-						$errors[] = sprintf(
-						/* translators: 1: size value, 2: array index */
-							__( 'Icon size "%1$s" at index %2$d must be in WxH format (e.g., "48x48") or "any"', 'mcp-adapter' ),
-							$size,
-							$index
-						);
-					}
-				}
-			}
-		}
-
-		// theme is optional but must be valid if present.
-		if ( isset( $icon['theme'] ) ) {
-			if ( ! is_string( $icon['theme'] ) ) {
-				$errors[] = __( 'Icon theme must be a string', 'mcp-adapter' );
-			} elseif ( ! self::validate_icon_theme( $icon['theme'] ) ) {
-				$errors[] = __( 'Icon theme must be "light" or "dark"', 'mcp-adapter' );
-			}
-		}
-
-		return $errors;
-	}
-
-	/**
-	 * Validate an icon source (src) value.
-	 *
-	 * Icon src must be a valid URL (http/https) or a data: URI with base64-encoded image data.
-	 *
-	 * @param string $src The icon source to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 * @since 0.5.0
-	 *
-	 */
-	public static function validate_icon_src( string $src ): bool {
-		$src = trim( $src );
-
-		if ( empty( $src ) ) {
-			return false;
-		}
-
-		// Check for data: URI.
-		if ( str_starts_with( $src, 'data:' ) ) {
-			// data:[<mediatype>][;base64],<data>
-			// Simplified validation: must have data: prefix and contain comma.
-			return str_contains( $src, ',' );
-		}
-
-		// Check for http/https URL.
-		if ( str_starts_with( $src, 'http://' ) || str_starts_with( $src, 'https://' ) ) {
-			return filter_var( $src, FILTER_VALIDATE_URL ) !== false;
-		}
-
-		return false;
-	}
-
-	/**
-	 * Validate an icon size string.
-	 *
-	 * Icon sizes must be in WxH format (e.g., "48x48", "96x96") or "any" for scalable formats.
-	 * Both width and height must be positive integers (no zero dimensions, no leading zeros).
-	 *
-	 * @param string $size The size string to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 * @since 0.5.0
-	 *
-	 */
-	public static function validate_icon_size( string $size ): bool {
-		$size = trim( $size );
-
-		if ( empty( $size ) ) {
-			return false;
-		}
-
-		// "any" is valid for scalable formats like SVG.
-		if ( 'any' === strtolower( $size ) ) {
-			return true;
-		}
-
-		// Must match WxH format with positive integers (no zero dimensions, no leading zeros).
-		// [1-9]\d* matches: 1, 2, ..., 9, 10, 11, ..., 99, 100, etc.
-		return (bool) preg_match( '/^[1-9]\d*x[1-9]\d*$/', $size );
-	}
-
-	/**
-	 * Validate an icon theme value.
-	 *
-	 * Valid themes are "light" or "dark".
-	 *
-	 * @param string $theme The theme to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 * @since 0.5.0
-	 *
-	 */
-	public static function validate_icon_theme( string $theme ): bool {
-		return in_array( strtolower( trim( $theme ) ), array( 'light', 'dark' ), true );
-	}
-
-	/**
 	 * Get validation errors for shared MCP annotations.
 	 *
-	 * Validates shared annotation fields per MCP 2025-11-25 specification:
-	 * - audience must be an array of valid Role values ("user", "assistant")
-	 * - lastModified must be a valid ISO 8601 formatted string
-	 * - priority must be a number between 0.0 and 1.0
-	 *
-	 * Only validates known shared annotation fields. Unknown fields are ignored.
-	 * Used by resources and content types (text, image, audio).
-	 *
-	 * Tool annotations use their revision catalog shape and are projected separately.
+	 * The official JSON schema declares `lastModified` as a plain string, but the
+	 * official TypeScript SDK client parses it with `z.string().datetime()` and
+	 * rejects a whole `resources/list` result when any member carries a value
+	 * without a time part or a time zone. This is the one adapter check kept for
+	 * client compatibility rather than for the schema; every other annotation
+	 * field is left to the schema package.
 	 *
 	 * @param array $annotations The annotations to validate.
 	 *
 	 * @return array Array of validation errors, empty if valid.
 	 */
 	public static function get_annotation_validation_errors( array $annotations ): array {
-		$errors = array();
-
-		foreach ( $annotations as $field => $value ) {
-			switch ( $field ) {
-				case 'audience':
-					if ( ! is_array( $value ) ) {
-						$errors[] = __( 'Annotation field audience must be an array', 'mcp-adapter' );
-						break;
-					}
-					if ( ! self::validate_roles_array( $value ) ) {
-						$errors[] = __( 'Annotation field audience must contain only valid roles ("user" or "assistant")', 'mcp-adapter' );
-					}
-					break;
-
-				case 'lastModified':
-					if ( ! is_string( $value ) || empty( trim( $value ) ) ) {
-						$errors[] = __( 'Annotation field lastModified must be a non-empty string', 'mcp-adapter' );
-						break;
-					}
-					if ( ! self::validate_iso8601_timestamp( trim( $value ) ) ) {
-						$errors[] = __( 'Annotation field lastModified must be a valid ISO 8601 timestamp', 'mcp-adapter' );
-					}
-					break;
-
-				case 'priority':
-					if ( ! is_numeric( $value ) ) {
-						$errors[] = __( 'Annotation field priority must be a number', 'mcp-adapter' );
-						break;
-					}
-					if ( ! self::validate_priority( $value ) ) {
-						$errors[] = __( 'Annotation field priority must be between 0.0 and 1.0', 'mcp-adapter' );
-					}
-					break;
-
-				default:
-					// Unknown fields are ignored to allow forward compatibility.
-					break;
-			}
+		if ( ! array_key_exists( 'lastModified', $annotations ) ) {
+			return array();
 		}
 
-		return $errors;
-	}
-
-	/**
-	 * Validate an array of roles according to MCP specification.
-	 *
-	 * All roles must be strings and must be either "user" or "assistant".
-	 *
-	 * @param array $roles The roles array to validate.
-	 *
-	 * @return bool True if all roles are valid, false otherwise.
-	 */
-	public static function validate_roles_array( array $roles ): bool {
-		foreach ( $roles as $role ) {
-			if ( ! is_string( $role ) || ! self::validate_role( $role ) ) {
-				return false;
-			}
+		$value = $annotations['lastModified'];
+		if ( ! is_string( $value ) || ! self::validate_iso8601_timestamp( $value ) ) {
+			return array( __( 'Annotation field lastModified must be an ISO 8601 timestamp with a time zone', 'mcp-adapter' ) );
 		}
 
-		return true;
-	}
-
-	/**
-	 * Validate a role value according to MCP specification.
-	 *
-	 * Valid roles are "user" or "assistant".
-	 *
-	 * @param string $role The role to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_role( string $role ): bool {
-		return in_array( $role, array( 'user', 'assistant' ), true );
+		return array();
 	}
 
 	/**
 	 * Validate ISO 8601 timestamp format.
 	 *
-	 * Checks if a string is a valid ISO 8601 timestamp by attempting to parse
-	 * it using multiple ISO 8601 format variations.
+	 * Mirrors the official TypeScript SDK client rule (`z.iso.datetime({ offset: true })`
+	 * in `@modelcontextprotocol/sdk` 1.27): a calendar date, `T`, a time with seconds and
+	 * any number of fractional digits, and a `Z` or `±HH:MM` zone. The client also
+	 * accepts a time without seconds and rejects an offset without a colon; both are
+	 * matched here so the adapter never emits what the client would refuse.
 	 *
 	 * @param string $timestamp The timestamp to validate.
 	 *
 	 * @return bool True if valid ISO 8601 timestamp, false otherwise.
 	 */
 	public static function validate_iso8601_timestamp( string $timestamp ): bool {
-		// Try to parse as DateTime with ISO 8601 format.
-		$datetime = DateTime::createFromFormat( DateTime::ATOM, $timestamp );
-		if ( $datetime && $datetime->format( DateTime::ATOM ) === $timestamp ) {
-			return true;
-		}
-
-		// Try alternative ISO 8601 formats.
-		$formats = array(
-			'Y-m-d\TH:i:s\Z',           // UTC format
-			'Y-m-d\TH:i:sP',            // With timezone offset
-			'Y-m-d\TH:i:s.u\Z',         // With microseconds UTC
-			'Y-m-d\TH:i:s.uP',          // With microseconds and timezone
+		// \z rather than $: a dollar anchor would also match before a trailing newline.
+		$matched = preg_match(
+			'/^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)\z/',
+			$timestamp,
+			$matches
 		);
-
-		foreach ( $formats as $format ) {
-			$datetime = DateTime::createFromFormat( $format, $timestamp );
-			if ( $datetime && $datetime->format( $format ) === $timestamp ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Validate a priority value according to MCP specification.
-	 *
-	 * Priority must be a number between 0.0 and 1.0 (inclusive).
-	 *
-	 * @param mixed $priority The priority value to validate.
-	 *
-	 * @return bool True if valid, false otherwise.
-	 */
-	public static function validate_priority( $priority ): bool {
-		if ( ! is_numeric( $priority ) ) {
+		if ( 1 !== $matched ) {
 			return false;
 		}
 
-		$priority_float = (float) $priority;
+		// The pattern bounds the clock fields; the calendar date still needs a real-day
+		// check. Parse in UTC so a zone that skipped a civil day (Pacific/Apia skipped
+		// 2011-12-30) cannot make a valid date fail under that site's default time zone.
+		$date = DateTime::createFromFormat( '!Y-m-d', $matches[1], new DateTimeZone( 'UTC' ) );
 
-		return $priority_float >= 0.0 && $priority_float <= 1.0;
-	}
-
-	/**
-	 * Normalize a `_meta` value for inclusion in a protocol record.
-	 *
-	 * MCP declares `_meta` as `{ [key: string]: unknown }` — a JSON object. PHP has one
-	 * array type for both JSON shapes, so a sequential array (including an empty one)
-	 * would serialize to a JSON array and put non-conformant output on the wire. Those
-	 * are treated as absent, as is any non-array value.
-	 *
-	 * Returns null rather than raising so an incorrectly shaped optional `_meta` does
-	 * not withhold the payload it accompanies.
-	 *
-	 * @since 0.6.0
-	 *
-	 * @param mixed $meta The raw `_meta` value.
-	 *
-	 * @return array<array-key, mixed>|null A non-empty, non-list array suitable for JSON-object encoding, or null if absent/invalid.
-	 */
-	public static function normalize_meta( $meta ): ?array {
-		if ( ! is_array( $meta ) || array() === $meta ) {
-			return null;
-		}
-
-		// A list serializes to a JSON array. array_is_list() needs PHP 8.1; the floor is 7.4.
-		if ( array_keys( $meta ) === range( 0, count( $meta ) - 1 ) ) {
-			return null;
-		}
-
-		return $meta;
+		return $date instanceof DateTime && $date->format( 'Y-m-d' ) === $matches[1];
 	}
 
 	/**

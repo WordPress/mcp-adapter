@@ -147,21 +147,16 @@ class RegisterAbilityAsMcpTool {
 			$adapter_meta['output_schema_wrapper']     = $output_transform['wrapper_property'];
 		}
 
-		// Map icons from ability.meta.mcp.icons if present.
+		// Icons and `_meta` come from ability.meta.mcp and are carried as given; the
+		// schema decides whether they fit. Adapter metadata is NEVER included in
+		// protocol meta; it is returned separately in adapter_meta.
 		$mcp_meta = $ability_meta['mcp'] ?? array();
-		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$tool_data['icons'] = $icons_result['valid'];
-			}
+		if ( isset( $mcp_meta['icons'] ) ) {
+			$tool_data['icons'] = $mcp_meta['icons'];
 		}
 
-		// Build Tool `_meta`:
-		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
-		// - Adapter metadata is NEVER included in protocol meta; it is returned separately in adapter_meta.
-		$tool_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
-		if ( null !== $tool_meta ) {
-			$tool_data['_meta'] = $tool_meta;
+		if ( isset( $mcp_meta['_meta'] ) ) {
+			$tool_data['_meta'] = $mcp_meta['_meta'];
 		}
 
 		return array(
