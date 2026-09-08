@@ -15,7 +15,7 @@ use WP\MCP\Tests\TestCase;
 /**
  * Test McpAnnotationMapper functionality.
  *
- * Tests only property name mapping. Normalization and validation are tested separately.
+ * Tests property name mapping and feature selection. Values are carried as given.
  */
 final class McpAnnotationMapperTest extends TestCase {
 
@@ -203,30 +203,29 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertCount( 1, $result );
 	}
 
-	public function test_map_performs_light_type_validation(): void {
-		// Test with resource feature type since shared annotations apply to resources, not tools.
+	public function test_map_carries_resource_values_as_given(): void {
+		// Values are not coerced, trimmed, or range-checked; the schema decides.
 		$annotations = array(
-			'audience'     => array( 'user', 'invalid-role' ), // Invalid role passed through
-			'lastModified' => '  whitespace  ',                // Strings get trimmed
-			'priority'     => -0.5,                            // Numbers cast to float, not clamped
+			'audience'     => array( 'user', 'invalid-role' ),
+			'lastModified' => '  whitespace  ',
+			'priority'     => -0.5,
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'resource' );
 
-		// Light validation: basic type checks and trimming only
-		$this->assertSame( array( 'user', 'invalid-role' ), $result['audience'] ); // Array passed through
-		$this->assertSame( 'whitespace', $result['lastModified'] );                 // String trimmed
-		$this->assertSame( -0.5, $result['priority'] );                             // Number not clamped
+		$this->assertSame( $annotations, $result );
 	}
 
-	public function test_map_performs_light_type_validation_for_tools(): void {
+	public function test_map_carries_tool_values_as_given(): void {
 		$annotations = array(
-			'title' => '  untrimmed  ', // Strings get trimmed
+			'readonly' => 'true',
+			'title'    => '  untrimmed  ',
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'tool' );
 
-		$this->assertSame( 'untrimmed', $result['title'] ); // String trimmed
+		$this->assertSame( 'true', $result['readOnlyHint'] );
+		$this->assertSame( '  untrimmed  ', $result['title'] );
 	}
 
 	public function test_map_with_null_ability_property_uses_mcp_field_name_for_tools(): void {
@@ -281,95 +280,5 @@ final class McpAnnotationMapperTest extends TestCase {
 		// Tool-specific annotations SHOULD be mapped
 		$this->assertArrayHasKey( 'readOnlyHint', $result );
 		$this->assertArrayHasKey( 'title', $result );
-	}
-
-	// Boolean Normalization Tests
-
-	public function test_map_normalizes_boolean_true_values(): void {
-		$test_cases = array(
-			true,     // PHP boolean
-			1,        // Integer
-			'1',      // String
-			'true',   // String
-			'TRUE',   // Uppercase string
-			'True',   // Mixed case string
-		);
-
-		foreach ( $test_cases as $value ) {
-			$annotations = array( 'readonly' => $value );
-			$result      = McpAnnotationMapper::map( $annotations, 'tool' );
-
-			$this->assertArrayHasKey( 'readOnlyHint', $result, "Value '{$value}' should result in readOnlyHint key" );
-			$this->assertTrue( $result['readOnlyHint'], "Value '{$value}' should normalize to true" );
-		}
-	}
-
-	public function test_map_normalizes_boolean_false_values(): void {
-		$test_cases = array(
-			false,    // PHP boolean
-			0,        // Integer
-			'0',      // String
-			'false',  // String
-			'FALSE',  // Uppercase string
-			'False',  // Mixed case string
-		);
-
-		foreach ( $test_cases as $index => $value ) {
-			$annotations = array( 'readonly' => $value );
-			$result      = McpAnnotationMapper::map( $annotations, 'tool' );
-
-			$this->assertArrayHasKey( 'readOnlyHint', $result, "Value at index {$index} should result in readOnlyHint key" );
-			$this->assertFalse( $result['readOnlyHint'], "Value at index {$index} should normalize to false" );
-		}
-	}
-
-	public function test_map_drops_invalid_boolean_values(): void {
-		$invalid_values = array(
-			'yes',            // Not a recognized boolean string
-			'no',             // Not a recognized boolean string
-			'on',             // Not a recognized boolean string
-			'off',            // Not a recognized boolean string
-			'',               // Empty string
-			'invalid',        // Random string
-			2,                // Integer other than 0/1
-			-1,               // Negative integer
-			1.0,              // Float (not accepted)
-			0.0,              // Float (not accepted)
-			array(),          // Array
-			array( 'true' ),  // Array containing string
-			null,             // Null (handled separately but should not produce key)
-		);
-
-		foreach ( $invalid_values as $index => $value ) {
-			$annotations = array( 'readonly' => $value );
-			$result      = McpAnnotationMapper::map( $annotations, 'tool' );
-
-			$this->assertArrayNotHasKey(
-				'readOnlyHint',
-				$result,
-				"Invalid value at index {$index} should be dropped (no readOnlyHint key)"
-			);
-		}
-	}
-
-	public function test_map_string_false_does_not_become_true(): void {
-		// This test specifically verifies the bug fix: 'false' string should NOT become true.
-		// PHP's (bool)'false' returns true because 'false' is a non-empty string.
-		$annotations = array(
-			'readonly'    => 'false',
-			'destructive' => 'FALSE',
-			'idempotent'  => 'False',
-		);
-
-		$result = McpAnnotationMapper::map( $annotations, 'tool' );
-
-		$this->assertArrayHasKey( 'readOnlyHint', $result );
-		$this->assertFalse( $result['readOnlyHint'], "'false' string should normalize to false, not true" );
-
-		$this->assertArrayHasKey( 'destructiveHint', $result );
-		$this->assertFalse( $result['destructiveHint'], "'FALSE' string should normalize to false, not true" );
-
-		$this->assertArrayHasKey( 'idempotentHint', $result );
-		$this->assertFalse( $result['idempotentHint'], "'False' string should normalize to false, not true" );
 	}
 }

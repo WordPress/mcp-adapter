@@ -511,7 +511,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Prompt with invalid annotations (should be filtered)
+		// Prompt with invalid annotations (prompt templates carry no annotations, so none reach the wire)
 		wp_register_ability(
 			'test/prompt-invalid-annotations',
 			array(
@@ -751,7 +751,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Tool with some invalid icons (should filter out invalid, keep valid)
+		// Tool with one icon missing src (fails projection, so the tool is rejected at registration)
 		wp_register_ability(
 			'test/with-mixed-icons',
 			array(

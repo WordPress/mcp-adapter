@@ -128,9 +128,14 @@ class RegisterAbilityAsMcpResource {
 		$ability_meta = $this->ability->get_meta();
 		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
+		$name = $this->resolve_resource_name();
+		if ( is_wp_error( $name ) ) {
+			return $name;
+		}
+
 		// Required fields.
 		$resource_data = array(
-			'name' => $this->resolve_resource_name(),
+			'name' => $name,
 			'uri'  => $uri,
 		);
 
@@ -164,44 +169,39 @@ class RegisterAbilityAsMcpResource {
 		}
 
 		// Optional: annotations from ability meta (standardized location: mcp.annotations).
+		// Values are carried as mapped; the schema decides whether they fit. The one
+		// adapter check is lastModified, which the official client requires as an ISO
+		// timestamp with a time zone. A failure rejects the resource.
 		$annotations = $this->get_mcp_meta( 'annotations', 'array' );
 		if ( null !== $annotations ) {
 			$mcp_annotations = McpAnnotationMapper::map( $annotations, 'resource' );
 			if ( ! empty( $mcp_annotations ) ) {
-				// Validate annotation values per MCP specification.
 				$validation_errors = McpValidator::get_annotation_validation_errors( $mcp_annotations );
 				if ( ! empty( $validation_errors ) ) {
-					// Log the issue but don't fail registration - drop invalid annotations.
-					$this->log_deprecation(
-						self::class . '::get_data',
+					return new WP_Error(
+						'resource_annotations_invalid',
 						sprintf(
 						/* translators: 1: ability name, 2: validation errors */
-							__( 'Invalid annotations for resource ability "%1$s" will be dropped: %2$s', 'mcp-adapter' ),
+							__( 'Invalid annotations for resource ability "%1$s": %2$s', 'mcp-adapter' ),
 							$this->ability->get_name(),
 							implode( '; ', $validation_errors )
-						),
-						array( 'validation_errors' => $validation_errors )
+						)
 					);
-				} else {
-					$resource_data['annotations'] = $mcp_annotations;
 				}
+
+				$resource_data['annotations'] = $mcp_annotations;
 			}
 		}
 
-		// Optional: icons from mcp.icons (already in correct location).
-		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$resource_data['icons'] = $icons_result['valid'];
-			}
+		// Icons and `_meta` from ability.meta.mcp are carried as given; the schema
+		// decides whether they fit. Adapter metadata is NEVER included in protocol
+		// meta; it is returned separately in adapter_meta.
+		if ( isset( $mcp_meta['icons'] ) ) {
+			$resource_data['icons'] = $mcp_meta['icons'];
 		}
 
-		// Build Resource `_meta`:
-		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
-		// - Adapter metadata is NEVER included in protocol meta; it is returned separately in adapter_meta.
-		$resource_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
-		if ( null !== $resource_meta ) {
-			$resource_data['_meta'] = $resource_meta;
+		if ( isset( $mcp_meta['_meta'] ) ) {
+			$resource_data['_meta'] = $mcp_meta['_meta'];
 		}
 
 		$adapter_meta = array(
@@ -386,11 +386,13 @@ class RegisterAbilityAsMcpResource {
 	/**
 	 * Resolve the MCP resource name from ability.
 	 *
-	 * Resource names have no charset restrictions (unlike Tool names).
+	 * Resource names have no charset restrictions (unlike Tool names). A filter
+	 * that returns anything but a non-empty string rejects the resource, the same
+	 * way the tool and prompt name filters do.
 	 *
-	 * @return string The resolved resource name.
+	 * @return string|\WP_Error The resolved resource name, or WP_Error when the filter broke it.
 	 */
-	private function resolve_resource_name(): string {
+	private function resolve_resource_name() {
 		$name = $this->ability->get_name();
 
 		/**
@@ -405,13 +407,18 @@ class RegisterAbilityAsMcpResource {
 		 */
 		$filtered_name = apply_filters( 'mcp_adapter_resource_name', $name, $this->ability );
 
-		// Resource names have no charset restrictions, so just ensure it's a non-empty string.
-		if ( is_string( $filtered_name ) && '' !== trim( $filtered_name ) ) {
-			return $filtered_name;
+		if ( ! is_string( $filtered_name ) || '' === trim( $filtered_name ) ) {
+			return new WP_Error(
+				'mcp_resource_name_filter_invalid',
+				sprintf(
+				/* translators: %s: invalid resource name returned by filter */
+					__( 'Filter returned invalid MCP resource name: %s', 'mcp-adapter' ),
+					is_string( $filtered_name ) ? $filtered_name : gettype( $filtered_name )
+				)
+			);
 		}
 
-		// Fall back to original name if filter returns invalid value.
-		return $name;
+		return $filtered_name;
 	}
 
 	/**

@@ -149,13 +149,10 @@ class RegisterAbilityAsMcpPrompt {
 		$ability_meta = $this->ability->get_meta();
 		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
-		// Map icons from ability.meta.mcp.icons if present.
-		// Uses same pattern as tools/resources for consistency.
-		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$data['icons'] = $icons_result['valid'];
-			}
+		// Icons from ability.meta.mcp.icons are carried as given; the schema decides
+		// whether they fit.
+		if ( isset( $mcp_meta['icons'] ) ) {
+			$data['icons'] = $mcp_meta['icons'];
 		}
 
 		// Build adapter metadata, tracking transformation when it occurred.
@@ -175,10 +172,9 @@ class RegisterAbilityAsMcpPrompt {
 			$adapter_meta['input_schema_wrapper']     = $this->schema_wrapper_property;
 		}
 
-		// Preserve user-provided _meta from ability.meta.mcp._meta.
-		$prompt_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
-		if ( null !== $prompt_meta ) {
-			$data['_meta'] = $prompt_meta;
+		// User-provided _meta from ability.meta.mcp._meta is carried as given.
+		if ( isset( $mcp_meta['_meta'] ) ) {
+			$data['_meta'] = $mcp_meta['_meta'];
 		}
 
 		return array(

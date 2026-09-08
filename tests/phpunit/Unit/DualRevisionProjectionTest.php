@@ -563,7 +563,7 @@ final class DualRevisionProjectionTest extends TestCase {
 		$this->assertSame( 'resource', $block['type'] );
 		$this->assertTrue( $block['_meta']['block'] );
 		$this->assertTrue( $block['resource']['_meta']['resource'] );
-		$this->assertArrayNotHasKey( '_meta', ContentBlockHelper::text( 'hello', null, array( 'list' ) ) );
+		$this->assertSame( array( 'list' ), ContentBlockHelper::text( 'hello', null, array( 'list' ) )['_meta'] );
 	}
 
 	/**

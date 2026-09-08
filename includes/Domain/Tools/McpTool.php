@@ -12,7 +12,6 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\Tool;
@@ -151,18 +150,13 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		// Validate and prepare icons if set.
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$tool_data['icons'] = $icons_result['valid'];
-			}
+		// Icons and _meta are carried as given; the schema decides whether they fit.
+		if ( isset( $config['icons'] ) ) {
+			$tool_data['icons'] = $config['icons'];
 		}
 
-		// Preserve user-provided _meta.
-		$tool_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
-		if ( null !== $tool_meta ) {
-			$tool_data['_meta'] = $tool_meta;
+		if ( isset( $config['meta'] ) ) {
+			$tool_data['_meta'] = $config['meta'];
 		}
 
 		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {

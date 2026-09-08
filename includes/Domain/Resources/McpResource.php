@@ -156,20 +156,24 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['size'] = $config['size'];
 		}
 
-		// Validate and include icons if set.
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$resource_data['icons'] = $icons_result['valid'];
-			}
+		// Icons and _meta are carried as given; the schema decides whether they fit.
+		if ( isset( $config['icons'] ) ) {
+			$resource_data['icons'] = $config['icons'];
 		}
 
-		$resource_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
-		if ( null !== $resource_meta ) {
-			$resource_data['_meta'] = $resource_meta;
+		if ( isset( $config['meta'] ) ) {
+			$resource_data['_meta'] = $config['meta'];
 		}
 
 		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+			$annotation_errors = McpValidator::get_annotation_validation_errors( $config['annotations'] );
+			if ( ! empty( $annotation_errors ) ) {
+				return new WP_Error(
+					'mcp_resource_invalid_annotations',
+					sprintf( 'Resource "%s" has invalid annotations: %s', $uri, implode( '; ', $annotation_errors ) )
+				);
+			}
+
 			$resource_data['annotations'] = $config['annotations'];
 		}
 
