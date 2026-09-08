@@ -12,6 +12,7 @@ namespace WP\MCP\Tests\Integration;
 use WP\MCP\Cli\StdioServerBridge;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Resources\McpResource;
+use WP\MCP\Domain\Tools\McpInputRequired;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\TestCase;
@@ -37,6 +38,102 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$server      = $this->makeServer( array( 'test/always-allowed', 'test/image' ), array( 'test/resource' ), array( 'test/prompt' ) );
 		$this->http  = new HttpRequestHandler( $server->create_transport_context() );
 		$this->stdio = new StdioServerBridge( $server );
+	}
+
+	/** Missing client capabilities must be reported as HTTP 400, not a successful response. */
+	public function test_http_2026_missing_capability_returns_bad_request(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'request-form',
+				'permission' => '__return_true',
+				'handler'    => static function () {
+					return new McpInputRequired(
+						array(
+							'confirm' => array(
+								'method' => 'elicitation/create',
+								'params' => array(
+									'mode'            => 'form',
+									'message'         => 'Continue?',
+									'requestedSchema' => array(
+										'type'       => 'object',
+										'properties' => array( 'ok' => array( 'type' => 'boolean' ) ),
+									),
+								),
+							),
+						)
+					);
+				},
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+		$response   = $this->http_request_2026_07_28(
+			'tools/call',
+			901,
+			array(
+				'name'      => 'request-form',
+				'arguments' => new \stdClass(),
+			)
+		);
+		$this->assertSame( 400, $response['status'] );
+		$this->assertSame( McpErrorFactory::MISSING_CAPABILITY, $response['data']['error']['code'] );
+		$this->assertArrayHasKey( 'form', $response['data']['error']['data']['requiredCapabilities']['elicitation'] );
+	}
+
+	/** A direct tool's input_required result crosses the REST boundary without creating a session. */
+	public function test_http_2026_input_required_result_is_stateless(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'       => 'ask-first',
+				'permission' => '__return_true',
+				'handler'    => static function () {
+					return new McpInputRequired(
+						array(
+							'confirm' => array(
+								'method' => 'elicitation/create',
+								'params' => array(
+									'mode'            => 'form',
+									'message'         => 'Continue?',
+									'requestedSchema' => array(
+										'type'       => 'object',
+										'properties' => array( 'ok' => array( 'type' => 'boolean' ) ),
+									),
+								),
+							),
+						),
+						'author-state'
+					);
+				},
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+		$meta       = $this->meta_2026_07_28();
+		$meta['io.modelcontextprotocol/clientCapabilities'] = array( 'elicitation' => new \stdClass() );
+		$response = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 902,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'name'      => 'ask-first',
+					'arguments' => new \stdClass(),
+					'_meta'     => $meta,
+				),
+			),
+			array(
+				'MCP-Protocol-Version' => Schemas::V2026_07_28,
+				'Mcp-Method'           => 'tools/call',
+				'Mcp-Name'             => 'ask-first',
+			)
+		);
+		$this->assertSame( 200, $response['status'] );
+		$this->assertSame( 'input_required', $response['data']['result']['resultType'] );
+		$this->assertSame( 'elicitation/create', $response['data']['result']['inputRequests']['confirm']['method'] );
+		$this->assertSame( 'author-state', $response['data']['result']['requestState'] );
+		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response['headers'] );
 	}
 
 	/** Prove initialization, session context, ping, and canonical list output. */
@@ -279,8 +376,8 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		}
 	}
 
-	/** Fractional elicitation answers survive schema hydration into resource callbacks. */
-	public function test_http_2026_preserves_fractional_input_responses(): void {
+	/** Resource callbacks cannot consume unissued continuation answers. */
+	public function test_http_2026_rejects_resource_input_responses(): void {
 		$received = null;
 		$resource = McpResource::fromArray(
 			array(
@@ -313,10 +410,9 @@ final class DualRevisionWireCorpusTest extends TestCase {
 			)
 		);
 
-		$this->assertSame( 200, $response['status'] );
-		$this->assertIsArray( $received );
-		$this->assertSame( 1.5, $received['inputResponses']['quantity']['content']['amount'] );
-		$this->assertSame( 2, $received['inputResponses']['quantity']['content']['count'] );
+		$this->assertSame( 400, $response['status'] );
+		$this->assertSame( -32602, $response['data']['error']['code'] );
+		$this->assertNull( $received );
 	}
 
 	/** Prove ordinary Ability execution needs no revision branch. */

@@ -27,6 +27,7 @@ use WP\McpSchema\Record\HeaderMismatchError;
 use WP\McpSchema\Record\InitializeRequest;
 use WP\McpSchema\Record\InitializeResult;
 use WP\McpSchema\Record\InitializedNotification;
+use WP\McpSchema\Record\InputRequiredResult;
 use WP\McpSchema\Record\JSONRPCErrorResponse;
 use WP\McpSchema\Record\JSONRPCResultResponse;
 use WP\McpSchema\Record\ListPromptsRequest;
@@ -203,7 +204,7 @@ final class McpWireOrchestrator {
 
 		try {
 			$request_context = Schemas::V2026_07_28 === $selection
-				? $this->context_2026_07_28( $generic, $transport, $transport_metadata )
+				? $this->context_2026_07_28( $message, $transport, $transport_metadata )
 				: $this->context_2025_11_25( $generic, $transport, $transport_metadata, $client_params_2025_11_25 );
 		} catch ( \Throwable $throwable ) {
 			$error = McpErrorFactory::invalid_params( $id, $throwable->getMessage() );
@@ -268,6 +269,13 @@ final class McpWireOrchestrator {
 			$request = $this->hydrate_inbound( $method, false, $schema, $message );
 		} catch ( \Throwable $throwable ) {
 			$error = McpErrorFactory::invalid_params( $id, $throwable->getMessage() );
+			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
+		}
+
+		$params = $generic['params'] ?? array();
+		if ( is_array( $params ) && ( array_key_exists( 'requestState', $params ) || array_key_exists( 'inputResponses', $params ) )
+			&& ( Schemas::V2026_07_28 !== $selection || 'tools/call' !== $method ) ) {
+			$error = McpErrorFactory::invalid_params( $id, 'Continuation parameters are supported only for direct MCP 2026-07-28 tool calls.' );
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
 		}
 
@@ -401,23 +409,22 @@ final class McpWireOrchestrator {
 	}
 
 	/** Construct the 2026 per-request context. */
-	private function context_2026_07_28( array $generic, string $transport, array $metadata ): McpRequestContext {
-		$params       = $generic['params'] ?? array();
-		$meta         = is_array( $params['_meta'] ?? null ) ? $params['_meta'] : array();
-		$revision     = $meta['io.modelcontextprotocol/protocolVersion'] ?? null;
-		$capabilities = $meta['io.modelcontextprotocol/clientCapabilities'] ?? null;
-		if ( Schemas::V2026_07_28 !== $revision || ! is_array( $capabilities ) ) {
+	private function context_2026_07_28( \stdClass $message, string $transport, array $metadata ): McpRequestContext {
+		$meta         = $message->params->_meta ?? null;
+		$revision     = $meta->{'io.modelcontextprotocol/protocolVersion'} ?? null;
+		$capabilities = $meta->{'io.modelcontextprotocol/clientCapabilities'} ?? null;
+		if ( Schemas::V2026_07_28 !== $revision || ! $capabilities instanceof \stdClass ) {
 			throw new \InvalidArgumentException( '2026 requests require exact protocolVersion and object clientCapabilities metadata.' );
 		}
 
-		$client_info = isset( $meta['io.modelcontextprotocol/clientInfo'] ) && is_array( $meta['io.modelcontextprotocol/clientInfo'] )
-			? $this->to_object( $meta['io.modelcontextprotocol/clientInfo'] )
+		$client_info = isset( $meta->{'io.modelcontextprotocol/clientInfo'} ) && $meta->{'io.modelcontextprotocol/clientInfo'} instanceof \stdClass
+			? $meta->{'io.modelcontextprotocol/clientInfo'}
 			: null;
 		$schema      = $this->transport_context->mcp_server->get_schemas()->forVersion( Schemas::V2026_07_28 );
 
 		return new McpRequestContext(
 			$schema,
-			$this->to_object( $capabilities ),
+			$capabilities,
 			$client_info,
 			$transport,
 			$metadata
@@ -465,7 +472,11 @@ final class McpWireOrchestrator {
 			return $this->hydrate_result( $method, $result, $schema );
 		}
 
-		$result['resultType'] = 'complete';
+		$input_required = 'input_required' === ( $result['resultType'] ?? null );
+		if ( $input_required && 'tools/call' !== $method ) {
+			throw new \UnexpectedValueException( 'MRTR is implemented for direct tools/call handlers only.' );
+		}
+		$result['resultType'] = $input_required ? 'input_required' : 'complete';
 		if (
 			in_array(
 				$method,
@@ -519,6 +530,12 @@ final class McpWireOrchestrator {
 			case 'tools/list':
 				return $schema->fromArray( ListToolsResult::class, $data );
 			case 'tools/call':
+				if ( Schemas::V2026_07_28 === $schema->version() && 'input_required' === ( $data['resultType'] ?? null ) ) {
+					if ( ! array_key_exists( 'inputRequests', $data ) && ! array_key_exists( 'requestState', $data ) ) {
+						throw new \UnexpectedValueException( 'Input-required results need inputRequests or requestState.' );
+					}
+					return $schema->fromArray( InputRequiredResult::class, $data );
+				}
 				return $schema->fromArray( CallToolResult::class, $data );
 			case 'resources/list':
 				return $schema->fromArray( ListResourcesResult::class, $data );

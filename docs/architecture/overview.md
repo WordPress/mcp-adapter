@@ -123,13 +123,17 @@ return the same logical WordPress values. The selected revision boundary
 constructs the final generated result record and supplies fields the 2026 schema
 requires:
 
-- `resultType: "complete"` on every successful result;
+- `resultType: "complete"` on completed results;
 - `ttlMs: 0` and `cacheScope: "private"` on discovery, list, and resource-read
   results.
 - `io.modelcontextprotocol/serverInfo` metadata on successful 2026 results.
 
-The Adapter does not emit `input_required` because it does not implement that
-optional capability.
+Direct callable tools can return `input_required` under
+`2026-07-28`. The callback receives the current request's answers and
+opaque state separately from ordinary arguments. The Adapter validates protocol
+structure and client capabilities; the tool author owns state protection, answer
+validation, and workflow decisions. Existing Ability execution and ordinary
+result shapes remain unchanged. See [MRTR tools](../guides/mrtr.md).
 
 List filters retain their original first two arguments and receive the selected
 `Schema` as the third argument. The filtered list is validated again when its
