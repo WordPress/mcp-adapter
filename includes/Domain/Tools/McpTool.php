@@ -269,10 +269,13 @@ final class McpTool implements McpComponentInterface {
 	 * Execute the tool.
 	 *
 	 * @param mixed $arguments Tool arguments.
+	 * @param \WP\MCP\Domain\Tools\McpToolCallContext|null $call_context Request context for direct callable handlers; not passed to Abilities.
 	 *
 	 * @return mixed
+	 *
+	 * @since n.e.x.t Added the `$call_context` parameter.
 	 */
-	public function execute( $arguments ) {
+	public function execute( $arguments, ?McpToolCallContext $call_context = null ) {
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
@@ -281,12 +284,15 @@ final class McpTool implements McpComponentInterface {
 			$result  = self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		} elseif ( null !== $this->handler ) {
 			$handler = $this->handler;
-			$result  = self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $args ) );
+			$result  = self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $args, $call_context ) );
 		} else {
 			return new WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
 		}
 
 		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+		if ( $result instanceof McpInputRequired ) {
 			return $result;
 		}
 
@@ -297,6 +303,15 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Whether this tool delegates execution to a WordPress Ability.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function is_ability_backed(): bool {
+		return null !== $this->ability;
 	}
 
 	/**
