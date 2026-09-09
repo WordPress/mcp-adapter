@@ -10,6 +10,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Prompts;
 
+use WP\MCP\Domain\Utils\McpAbilityMeta;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
@@ -25,7 +26,7 @@ use WP_Error;
  * - Object schemas with properties: Each property becomes a PromptArgument
  * - Flattened schemas (type: string, number, etc.): Wrapped as single argument named "input"
  * - Empty/null schemas: No arguments
- * - Complex schemas (oneOf/anyOf): Treated as no arguments (documented limitation)
+ * - Complex schemas (oneOf/anyOf) without properties: No arguments (documented limitation)
  *
  * Example ability registration:
  * wp_register_ability(
@@ -100,7 +101,7 @@ class RegisterAbilityAsMcpPrompt {
 	 * This follows the `mcp.*` override pattern used elsewhere (mcp.uri, mcp.icons, mcp.annotations).
 	 * Explicit arguments are not inspected; the schema decides whether each entry fits.
 	 *
-	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error Prompt data and adapter metadata, or WP_Error if `mcp.arguments` is not an array.
+	 * @return array{prompt_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error Prompt data and adapter metadata, or WP_Error if `meta.mcp` or `mcp.arguments` is not an array.
 	 * @since 0.5.0
 	 */
 	private function build_prompt_data() {
@@ -109,21 +110,18 @@ class RegisterAbilityAsMcpPrompt {
 			return $prompt_name;
 		}
 
+		$mcp_meta = McpAbilityMeta::mcp( $this->ability );
+		if ( is_wp_error( $mcp_meta ) ) {
+			return $mcp_meta;
+		}
+
+		// Label and description are carried as given; core requires both to be
+		// non-empty strings, so nothing is trimmed or suppressed here.
 		$prompt_data = array(
-			'name' => $prompt_name,
+			'name'        => $prompt_name,
+			'title'       => $this->ability->get_label(),
+			'description' => $this->ability->get_description(),
 		);
-
-		// Add optional title from ability label.
-		$label = trim( $this->ability->get_label() );
-		if ( ! empty( $label ) ) {
-			$prompt_data['title'] = $label;
-		}
-
-		// Add optional description.
-		$description = trim( $this->ability->get_description() );
-		if ( ! empty( $description ) ) {
-			$prompt_data['description'] = $description;
-		}
 
 		// Check for explicit mcp.arguments override first; otherwise auto-convert
 		// from input_schema. Track where the arguments came from and whether a
@@ -131,7 +129,7 @@ class RegisterAbilityAsMcpPrompt {
 		$arguments_source = null;
 		$transform        = null;
 
-		$explicit_arguments = $this->get_explicit_arguments();
+		$explicit_arguments = $this->get_explicit_arguments( $mcp_meta );
 		if ( is_wp_error( $explicit_arguments ) ) {
 			return $explicit_arguments;
 		}
@@ -154,8 +152,6 @@ class RegisterAbilityAsMcpPrompt {
 
 		// Icons from ability.meta.mcp.icons are carried as given; the schema decides
 		// whether they fit.
-		$ability_meta = $this->ability->get_meta();
-		$mcp_meta     = $ability_meta['mcp'] ?? array();
 		if ( isset( $mcp_meta['icons'] ) ) {
 			$prompt_data['icons'] = $mcp_meta['icons'];
 		}
@@ -193,17 +189,12 @@ class RegisterAbilityAsMcpPrompt {
 	 * JSON array. A value that is not an array is an error rather than a silent fall
 	 * back to input_schema conversion. An explicit null counts as not defined.
 	 *
+	 * @param array<string, mixed> $mcp The ability's `meta.mcp` block.
 	 * @return list<mixed>|\WP_Error|null Explicit arguments, WP_Error when set to a non-array, or null if not defined.
 	 * @since 0.5.0
 	 *
 	 */
-	private function get_explicit_arguments() {
-		$meta = $this->ability->get_meta();
-		if ( ! isset( $meta['mcp'] ) || ! is_array( $meta['mcp'] ) ) {
-			return null;
-		}
-
-		$mcp = $meta['mcp'];
+	private function get_explicit_arguments( array $mcp ) {
 		if ( ! isset( $mcp['arguments'] ) ) {
 			return null;
 		}
@@ -241,6 +232,12 @@ class RegisterAbilityAsMcpPrompt {
 	 *   {"name": "tone", "description": "..."}
 	 * ]
 	 *
+	 * Every property becomes an argument named after its key, including a property
+	 * whose schema is a boolean rather than an object. `title` and `description` are
+	 * copied as given whenever set; the schema decides whether they fit. The
+	 * `required` list is only read as a lookup table, so it must be an array to
+	 * have any effect.
+	 *
 	 * Note: `required` is only emitted when true; optional arguments omit the field entirely.
 	 *
 	 * @param array<string,mixed> $input_schema The JSON Schema from ability.
@@ -265,24 +262,21 @@ class RegisterAbilityAsMcpPrompt {
 
 		// Convert each property to an MCP argument.
 		foreach ( $input_schema['properties'] as $property_name => $property_schema ) {
-			if ( ! is_array( $property_schema ) ) {
-				continue;
-			}
-
 			$is_required = in_array( $property_name, $required_fields, true );
 
 			$argument_data = array(
 				'name' => $property_name,
 			);
 
-			// Map JSON Schema title to PromptArgument.title when present.
-			if ( ! empty( $property_schema['title'] ) && is_string( $property_schema['title'] ) ) {
-				$argument_data['title'] = $property_schema['title'];
-			}
+			if ( is_array( $property_schema ) ) {
+				// Map JSON Schema title and description to the PromptArgument fields as given.
+				if ( isset( $property_schema['title'] ) ) {
+					$argument_data['title'] = $property_schema['title'];
+				}
 
-			// Map JSON Schema description to PromptArgument.description when present.
-			if ( ! empty( $property_schema['description'] ) && is_string( $property_schema['description'] ) ) {
-				$argument_data['description'] = $property_schema['description'];
+				if ( isset( $property_schema['description'] ) ) {
+					$argument_data['description'] = $property_schema['description'];
+				}
 			}
 
 			// Only emit required when true; omit for optional arguments.
