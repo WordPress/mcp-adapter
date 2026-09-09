@@ -34,9 +34,14 @@ use WP_Error;
  * - 'mcp.icons' (array): Array of icon objects for UI display
  * - 'mcp._meta' (array): User-provided metadata to pass through
  *
- * Note: Top-level meta keys 'uri', 'mimeType', 'annotations' are deprecated as of 0.5.0.
+ * Values are carried as given; the schema decides whether they fit. A value that
+ * does not fit fails projection, so the registry does not expose the resource.
+ *
+ * Note: Top-level meta keys 'uri', 'mimeType', 'size' are deprecated as of 0.5.0.
  * They still work for backward compatibility but will trigger a `_doing_it_wrong` notice.
- * Use 'mcp.uri', 'mcp.mimeType', 'mcp.annotations' instead.
+ * Use 'mcp.uri', 'mcp.mimeType', 'mcp.size' instead. Top-level 'annotations' is the
+ * location WordPress core defines, so it is read without a notice; 'mcp.annotations'
+ * overrides it.
  *
  * @since 0.5.0
  */
@@ -151,29 +156,29 @@ class RegisterAbilityAsMcpResource {
 			$resource_data['description'] = $description;
 		}
 
-		// Optional: mimeType from ability meta. MCP treats it as an opaque string, so the
-		// value is emitted unaltered once surrounding whitespace is trimmed off; only a
-		// non-empty result is required.
-		$mime_type = $this->get_mcp_meta( 'mimeType', 'string' );
+		// Optional: mimeType and size from ability meta, carried as given.
+		$mime_type = $this->get_mcp_meta( 'mimeType' );
 		if ( null !== $mime_type ) {
-			$mime_type = trim( $mime_type );
-			if ( '' !== $mime_type ) {
-				$resource_data['mimeType'] = $mime_type;
-			}
+			$resource_data['mimeType'] = $mime_type;
 		}
 
-		// Optional: size from ability meta (bytes count for UI display).
-		$size = $this->get_mcp_meta( 'size', 'int' );
-		if ( null !== $size && $size > 0 ) {
+		$size = $this->get_mcp_meta( 'size' );
+		if ( null !== $size ) {
 			$resource_data['size'] = $size;
 		}
 
-		// Optional: annotations from ability meta (standardized location: mcp.annotations).
-		// Values are carried as mapped; the schema decides whether they fit. The one
-		// adapter check is lastModified, which the official client requires as an ISO
-		// timestamp with a time zone. A failure rejects the resource.
-		$annotations = $this->get_mcp_meta( 'annotations', 'array' );
-		if ( null !== $annotations ) {
+		// Optional: annotations. Core defines them at the top level of ability meta and
+		// fills every ability with null defaults; mcp.annotations overrides that. The
+		// mapper drops the nulls, and an empty mapped result omits the key. A value that
+		// is not an array is carried as given for the schema to reject. The one adapter
+		// check is lastModified, which the official client requires as an ISO timestamp
+		// with a time zone. A failure rejects the resource.
+		$annotations = $mcp_meta['annotations'] ?? $ability_meta['annotations'] ?? null;
+		if ( ! is_array( $annotations ) ) {
+			if ( null !== $annotations ) {
+				$resource_data['annotations'] = $annotations;
+			}
+		} else {
 			$mcp_annotations = McpAnnotationMapper::map( $annotations, 'resource' );
 			if ( ! empty( $mcp_annotations ) ) {
 				$validation_errors = McpValidator::get_annotation_validation_errors( $mcp_annotations );
@@ -220,7 +225,7 @@ class RegisterAbilityAsMcpResource {
 	 * @return string|\WP_Error URI string or WP_Error if not found or invalid.
 	 */
 	private function get_uri() {
-		$uri = $this->get_mcp_meta( 'uri', 'string' );
+		$uri = $this->get_mcp_meta( 'uri' );
 
 		if ( null === $uri ) {
 			return new WP_Error(
@@ -233,17 +238,15 @@ class RegisterAbilityAsMcpResource {
 			);
 		}
 
-		$uri = trim( $uri );
-
-		// Validate URI format (RFC 3986).
-		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
+		// The URI is the registry key, so it is matched as given: no trimming.
+		if ( ! is_string( $uri ) || ! McpValidator::validate_resource_uri( $uri ) ) {
 			return new WP_Error(
 				'resource_uri_invalid',
 				sprintf(
 				/* translators: 1: ability name, 2: invalid URI */
 					__( "Invalid resource URI '%2\$s' for ability '%1\$s'. URI must be RFC 3986 compliant with a scheme.", 'mcp-adapter' ),
 					$this->ability->get_name(),
-					$uri
+					is_string( $uri ) ? $uri : gettype( $uri )
 				)
 			);
 		}
@@ -277,79 +280,39 @@ class RegisterAbilityAsMcpResource {
 	 * Get a value from ability meta with standardized lookup.
 	 *
 	 * Looks in 'mcp' namespace first (preferred), then falls back to top-level (deprecated).
-	 * Logs deprecation notice when using top-level location.
+	 * Logs deprecation notice when using top-level location. The value is returned as
+	 * set, whatever its type; the schema decides whether it fits. An explicit null
+	 * counts as not set.
 	 *
 	 * @param string $key The key to look up.
-	 * @param string $type Expected type: 'string', 'int', 'array'.
-	 * @param mixed $default_value Default value if not found.
 	 *
-	 * @return mixed The value or default.
+	 * @return mixed The value, or null when the key is not set in either location.
 	 */
-	private function get_mcp_meta( string $key, string $type = 'string', $default_value = null ) {
+	private function get_mcp_meta( string $key ) {
 		$ability_meta = $this->ability->get_meta();
 		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
 		// Preferred: Check mcp.{key} first.
 		if ( isset( $mcp_meta[ $key ] ) ) {
-			$value = $mcp_meta[ $key ];
-			if ( $this->validate_type( $value, $type ) ) {
-				return $value;
-			}
+			return $mcp_meta[ $key ];
 		}
 
 		// Deprecated fallback: Check top-level meta.{key}.
 		if ( isset( $ability_meta[ $key ] ) ) {
-			$value = $ability_meta[ $key ];
-			if ( $this->validate_type( $value, $type ) ) {
-				// Log deprecation notice.
-				$this->log_deprecation(
-					__METHOD__,
-					sprintf(
-					/* translators: 1: deprecated meta key, 2: new meta key path */
-						__( 'Ability meta key "%1$s" is deprecated. Use "mcp.%1$s" instead.', 'mcp-adapter' ),
-						$key
-					),
-					array( 'deprecated_key' => $key )
-				);
+			$this->log_deprecation(
+				__METHOD__,
+				sprintf(
+				/* translators: 1: deprecated meta key, 2: new meta key path */
+					__( 'Ability meta key "%1$s" is deprecated. Use "mcp.%1$s" instead.', 'mcp-adapter' ),
+					$key
+				),
+				array( 'deprecated_key' => $key )
+			);
 
-				return $value;
-			}
+			return $ability_meta[ $key ];
 		}
 
-		return $default_value;
-	}
-
-	/**
-	 * Validate a value against expected type.
-	 *
-	 * @param mixed $value The value to validate.
-	 * @param string $type Expected type.
-	 *
-	 * @return bool True if valid.
-	 */
-	private function validate_type( $value, string $type ): bool {
-		switch ( $type ) {
-			case 'string':
-				return is_string( $value ) && '' !== trim( $value );
-			case 'int':
-				return is_int( $value ) && $value >= 0;
-			case 'array':
-				// Array must be non-empty AND have at least one non-null, non-empty value.
-				// This prevents false positives when WordPress adds default empty annotations.
-				if ( ! is_array( $value ) || empty( $value ) ) {
-					return false;
-				}
-				// Check if any value in the array is actually meaningful (non-null, non-empty string).
-				foreach ( $value as $item ) {
-					if ( null !== $item && '' !== $item && array() !== $item ) {
-						return true;
-					}
-				}
-
-				return false;
-			default:
-				return false;
-		}
+		return null;
 	}
 
 	/**

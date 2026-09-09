@@ -146,11 +146,12 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['description'] = $config['description'];
 		}
 
-		if ( isset( $config['outputSchema'] ) && is_array( $config['outputSchema'] ) ) {
+		// outputSchema, icons, _meta, annotations, and execution are carried as given;
+		// the schema decides whether they fit.
+		if ( isset( $config['outputSchema'] ) ) {
 			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		// Icons and _meta are carried as given; the schema decides whether they fit.
 		if ( isset( $config['icons'] ) ) {
 			$tool_data['icons'] = $config['icons'];
 		}
@@ -159,11 +160,11 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['_meta'] = $config['meta'];
 		}
 
-		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+		if ( isset( $config['annotations'] ) ) {
 			$tool_data['annotations'] = $config['annotations'];
 		}
 
-		if ( isset( $config['execution'] ) && is_array( $config['execution'] ) ) {
+		if ( isset( $config['execution'] ) ) {
 			$tool_data['execution'] = $config['execution'];
 		}
 

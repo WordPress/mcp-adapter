@@ -111,7 +111,7 @@ final class McpResource implements McpComponentInterface {
 	 * @return self|\WP_Error
 	 */
 	public static function fromArray( array $config ) {
-		if ( empty( $config['uri'] ) ) {
+		if ( ! isset( $config['uri'] ) ) {
 			return new WP_Error( 'mcp_resource_missing_uri', 'Resource configuration must include a "uri" field.' );
 		}
 
@@ -119,9 +119,9 @@ final class McpResource implements McpComponentInterface {
 			return new WP_Error( 'mcp_resource_missing_handler', 'Resource configuration must include a callable "handler" field.' );
 		}
 
-		$uri = trim( $config['uri'] );
-
-		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
+		// The URI is the registry key, so it is matched as given: no trimming.
+		$uri = $config['uri'];
+		if ( ! is_string( $uri ) || ! McpValidator::validate_resource_uri( $uri ) ) {
 			return new WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
 		}
 
@@ -143,16 +143,12 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['description'] = $config['description'];
 		}
 
-		// Include mimeType when non-empty. The value itself is not checked.
+		// mimeType and size are carried as given; the schema decides whether they fit.
 		if ( isset( $config['mimeType'] ) ) {
-			$mime_type = trim( $config['mimeType'] );
-			if ( '' !== $mime_type ) {
-				$resource_data['mimeType'] = $mime_type;
-			}
+			$resource_data['mimeType'] = $config['mimeType'];
 		}
 
-		// Include size only when > 0.
-		if ( isset( $config['size'] ) && $config['size'] > 0 ) {
+		if ( isset( $config['size'] ) ) {
 			$resource_data['size'] = $config['size'];
 		}
 
@@ -165,8 +161,13 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['_meta'] = $config['meta'];
 		}
 
-		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-			$annotation_errors = McpValidator::get_annotation_validation_errors( $config['annotations'] );
+		// Annotations are carried as given. The one adapter check is lastModified, which
+		// the official client requires as an ISO timestamp with a time zone; it runs only
+		// when the value is an array, and a failure rejects the resource.
+		if ( isset( $config['annotations'] ) ) {
+			$annotation_errors = is_array( $config['annotations'] )
+				? McpValidator::get_annotation_validation_errors( $config['annotations'] )
+				: array();
 			if ( ! empty( $annotation_errors ) ) {
 				return new WP_Error(
 					'mcp_resource_invalid_annotations',
