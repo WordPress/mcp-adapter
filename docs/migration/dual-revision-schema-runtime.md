@@ -91,9 +91,12 @@ a completely rejected component also raises `_doing_it_wrong` with the component
 identifier, revisions, and schema error paths (for example, `/icons/0/src`). A
 component valid for one revision remains registered and is exposed only in that
 revision. Invalid handler output fails final projection with JSON-RPC `-32603`,
-`Internal error: Invalid handler result`. Modern result assembly adds server metadata
-before projection; its existing handling of malformed result-level `_meta` can
-still alter that value. The pass-through changes do not remove that limitation.
+`Internal error: Invalid handler result`. For 2026 responses, result `_meta` is
+validated before the Adapter adds `io.modelcontextprotocol/serverInfo`. Lists and
+scalars are rejected; valid arrays and `stdClass` objects retain their fields,
+including numeric object keys, without mutating the supplied object. Explicit
+`null` counts as absent. Supplied `serverInfo` must be schema-valid; the response
+uses the Adapter server's name and version.
 
 The Adapter retains tool/prompt name checks and resource URI scheme checks.
 Resource URIs are used without trimming, have no 2048-byte limit, and may have an

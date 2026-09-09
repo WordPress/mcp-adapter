@@ -33,6 +33,77 @@ use WP_Error;
 /** Protects handler hooks, failure containment, and WordPress result normalization. */
 final class HandlerCompatibilityTest extends TestCase {
 
+	/**
+	 * Result metadata is validated before serverInfo is added, preserving JSON objects.
+	 *
+	 * @dataProvider result_metadata_provider
+	 * @param mixed $meta Handler metadata.
+	 * @param bool $valid Whether the schema accepts the metadata.
+	 */
+	public function test_modern_prompt_result_metadata( $meta, bool $valid ): void {
+		$before = wp_json_encode( $meta );
+		$prompt = McpPrompt::fromArray(
+			array(
+				'name'       => 'result-meta',
+				'handler'    => static fn(): array => array( 'text' => 'hello', '_meta' => $meta ),
+				'permission' => '__return_true',
+			)
+		);
+		$server  = $this->makeServer( array(), array(), array( $prompt ) );
+		$message = (object) array(
+			'jsonrpc' => '2.0',
+			'id'      => 30,
+			'method'  => 'prompts/get',
+			'params'  => (object) array(
+				'name'  => 'result-meta',
+				'_meta' => (object) array(
+					'io.modelcontextprotocol/protocolVersion'     => Schemas::V2026_07_28,
+					'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+				),
+			),
+		);
+		$outcome = ( new McpWireOrchestrator( $server->create_transport_context() ) )->process( $message, 'test' );
+		$wire    = json_decode( wp_json_encode( $outcome['response'] ) );
+		$this->assertSame( $before, wp_json_encode( $meta ), 'Response assembly must not mutate provider metadata.' );
+		if ( ! $valid ) {
+			$this->assertObjectHasProperty( 'error', $wire );
+			$this->assertSame( -32603, $wire->error->code );
+			$this->assertSame( 'Internal error: Invalid handler result', $wire->error->message );
+			$this->assertObjectNotHasProperty( 'result', $wire );
+			return;
+		}
+
+		$this->assertObjectHasProperty( 'result', $wire );
+		$this->assertSame( 'hello', $wire->result->messages[0]->content->text );
+		$this->assertInstanceOf( \stdClass::class, $wire->result->_meta );
+		$this->assertSame( 'Srv', $wire->result->_meta->{'io.modelcontextprotocol/serverInfo'}->name );
+		$this->assertSame( '0.0.1', $wire->result->_meta->{'io.modelcontextprotocol/serverInfo'}->version );
+		foreach ( (array) $meta as $key => $value ) {
+			if ( 'io.modelcontextprotocol/serverInfo' === $key ) {
+				continue;
+			}
+			$this->assertSame( wp_json_encode( $value ), wp_json_encode( $wire->result->_meta->{$key} ) );
+		}
+	}
+
+	/** @return array<string, array{0: mixed, 1: bool}> */
+	public static function result_metadata_provider(): array {
+		return array(
+			'null counts as absent' => array( null, true ),
+			'empty array'          => array( array(), true ),
+			'empty object'         => array( new \stdClass(), true ),
+			'associative array'    => array( array( 'vendor' => array( 'value' => 7 ) ), true ),
+			'object'               => array( (object) array( 'vendor' => (object) array( 'value' => 7 ) ), true ),
+			'numeric object key'   => array( (object) array( '0' => 'keep' ), true ),
+			'existing serverInfo'  => array( array( 'io.modelcontextprotocol/serverInfo' => array( 'name' => 'provider', 'version' => '1' ) ), true ),
+			'invalid serverInfo'   => array( array( 'io.modelcontextprotocol/serverInfo' => 'bad' ), false ),
+			'list'                 => array( array( 'bad-list' ), false ),
+			'string'               => array( 'bad', false ),
+			'number'               => array( 42, false ),
+			'boolean'              => array( false, false ),
+		);
+	}
+
 	/** Recognized malformed prompt shapes fail at the wire instead of becoming fallback text. */
 	public function test_malformed_prompt_shapes_fail_in_both_revisions(): void {
 		foreach ( array(
@@ -46,11 +117,6 @@ final class HandlerCompatibilityTest extends TestCase {
 			$prompt = McpPrompt::fromArray( array( 'name' => 'invalid-shape', 'handler' => static fn(): array => $shape, 'permission' => '__return_true' ) );
 			$server = $this->makeServer( array(), array(), array( $prompt ) );
 			foreach ( array( Schemas::V2025_11_25, Schemas::V2026_07_28 ) as $revision ) {
-				// Modern result assembly adds serverInfo to _meta before schema projection.
-				// Its pre-existing handling of malformed result-level _meta is a separate follow-up.
-				if ( isset( $shape['_meta'] ) && Schemas::V2026_07_28 === $revision ) {
-					continue;
-				}
 				$params = array( 'name' => 'invalid-shape' );
 				if ( Schemas::V2026_07_28 === $revision ) {
 					$params['_meta'] = array(
