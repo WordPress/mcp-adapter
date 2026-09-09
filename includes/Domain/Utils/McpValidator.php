@@ -127,29 +127,19 @@ class McpValidator {
 	}
 
 	/**
-	 * Validate a resource URI format.
+	 * Check that a resource URI starts with a scheme.
 	 *
-	 * Per MCP spec: "The URI can use any protocol; it is up to the server how to interpret it."
-	 * This validates basic URI structure per RFC 3986.
+	 * The schema types `uri` as `format: uri`, which the schema package does not
+	 * enforce. The adapter checks the scheme only, because the registry folds it
+	 * for lookups. Anything after the colon is left to the author: RFC 3986 allows
+	 * an empty path, so a bare `scheme:` passes. There is no length cap.
 	 *
-	 * @param string $uri The URI to validate.
+	 * @param string $uri The URI to check.
 	 *
-	 * @return bool True if valid, false otherwise.
+	 * @return bool True when the URI starts with an RFC 3986 scheme and a colon.
 	 */
 	public static function validate_resource_uri( string $uri ): bool {
-		// URI should not be empty.
-		if ( empty( $uri ) ) {
-			return false;
-		}
-
-		// Check reasonable length constraints.
-		if ( strlen( $uri ) > 2048 ) {
-			return false;
-		}
-
-		// Basic URI validation: must have scheme followed by colon (RFC 3986).
-		// This accepts any protocol as per MCP specification.
-		return (bool) preg_match( '/^' . self::URI_SCHEME_PATTERN . ':.+/', $uri );
+		return (bool) preg_match( '/^' . self::URI_SCHEME_PATTERN . ':/', $uri );
 	}
 
 	/**

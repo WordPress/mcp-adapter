@@ -208,6 +208,10 @@ final class McpValidatorTest extends TestCase {
 			'custom://my-resource',
 			'app://resource/123',
 			'wordpress://post/42',
+			// RFC 3986 allows an empty path after the scheme.
+			'wordpress:',
+			// Nothing after the scheme is checked, and there is no length cap.
+			'http://example.com/' . str_repeat( 'a', 4096 ),
 		);
 
 		foreach ( $valid_uris as $uri ) {
@@ -224,23 +228,13 @@ final class McpValidatorTest extends TestCase {
 			'/path/to/file',
 			'example.com',
 			'resource',
+			// The URI is matched as given, so leading whitespace hides the scheme.
+			' wordpress://post/42',
 		);
 
 		foreach ( $invalid_uris as $uri ) {
 			$this->assertFalse( McpValidator::validate_resource_uri( $uri ), "URI '{$uri}' should be invalid (no scheme)" );
 		}
-	}
-
-	public function test_validate_resource_uri_rejects_too_long(): void {
-		$long_uri = 'http://example.com/' . str_repeat( 'a', 2048 );
-		$this->assertFalse( McpValidator::validate_resource_uri( $long_uri ) );
-	}
-
-	public function test_validate_resource_uri_accepts_max_length(): void {
-		// Build a URI that's exactly 2048 characters
-		$path           = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
-		$max_length_uri = 'http://a.com/' . $path;
-		$this->assertTrue( McpValidator::validate_resource_uri( $max_length_uri ) );
 	}
 
 	// Annotation Validation Tests

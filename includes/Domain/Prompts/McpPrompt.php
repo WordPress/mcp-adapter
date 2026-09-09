@@ -154,8 +154,12 @@ final class McpPrompt implements McpComponentInterface {
 			$prompt_data['icons'] = $config['icons'];
 		}
 
-		if ( isset( $config['arguments'] ) && is_array( $config['arguments'] ) && ! empty( $config['arguments'] ) ) {
-			$prompt_data['arguments'] = array_values( $config['arguments'] );
+		// Arguments are carried as given; a list is re-indexed so it serializes as a
+		// JSON array. The schema decides whether the entries fit.
+		if ( isset( $config['arguments'] ) ) {
+			$prompt_data['arguments'] = is_array( $config['arguments'] )
+				? array_values( $config['arguments'] )
+				: $config['arguments'];
 		}
 
 		$instance          = new self( $prompt_data );
