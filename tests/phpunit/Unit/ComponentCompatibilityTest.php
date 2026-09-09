@@ -57,6 +57,125 @@ final class ThrowingCompatibilityPromptBuilder extends McpPromptBuilder {
 /** Protects component behavior that remains independent of schema representation. */
 final class ComponentCompatibilityTest extends TestCase {
 
+	/** All converters reject malformed adapter metadata before indexing it. */
+	public function test_ability_mcp_meta_must_be_an_array(): void {
+		foreach ( array( new \stdClass(), 'bad', 42 ) as $meta ) {
+			$ability = $this->validation_ability( array( 'mcp' => $meta ) );
+			foreach ( array( McpTool::class, McpResource::class, McpPrompt::class ) as $class ) {
+				$result = $class::fromAbility( $ability );
+				$this->assertWPError( $result );
+				$this->assertSame( 'mcp_ability_invalid_meta', $result->get_error_code() );
+			}
+		}
+	}
+
+	/** Labels and descriptions retain whitespace through every converter and revision. */
+	public function test_ability_labels_are_projected_as_given(): void {
+		$ability = $this->validation_ability( array( 'mcp' => array( 'uri' => 'fixture://labels' ) ) );
+		foreach ( array( McpTool::class, McpResource::class, McpPrompt::class ) as $class ) {
+			$component = $class::fromAbility( $ability );
+			$this->assertInstanceOf( $class, $component );
+			foreach ( array( Schemas::V2025_11_25, Schemas::V2026_07_28 ) as $revision ) {
+				$data = $this->record_array( $component->get_protocol_record( $this->schema( $revision ) ) );
+				$this->assertSame( ' Label ', $data['title'] );
+				$this->assertSame( ' Description ', $data['description'] );
+			}
+		}
+	}
+
+	/** Resource names may be empty or padded; missing names use the URI. */
+	public function test_resource_name_and_filter_preserve_schema_valid_strings(): void {
+		foreach ( array( '', ' name ', null ) as $name ) {
+			$resource = McpResource::fromArray( array( 'uri' => 'fixture:', 'name' => $name, 'handler' => '__return_empty_array' ) );
+			foreach ( array( Schemas::V2025_11_25, Schemas::V2026_07_28 ) as $revision ) {
+				$this->assertSame( $name ?? 'fixture:', $resource->get_protocol_record( $this->schema( $revision ) )->getName() );
+			}
+		}
+		$ability = $this->validation_ability( array( 'mcp' => array( 'uri' => 'fixture://filtered' ) ) );
+		foreach ( array( '', array() ) as $name ) {
+			$filter = static fn() => $name;
+			add_filter( 'mcp_adapter_resource_name', $filter );
+			try {
+				$resource = McpResource::fromAbility( $ability );
+			} finally {
+				remove_filter( 'mcp_adapter_resource_name', $filter );
+			}
+			if ( is_array( $name ) ) {
+				$this->assertWPError( $resource );
+				$this->assertSame( 'mcp_resource_name_filter_invalid', $resource->get_error_code() );
+				continue;
+			}
+			$this->assertSame( '', $resource->get_protocol_record( $this->schema() )->getName() );
+		}
+	}
+
+	/** Core resource annotations are supported; an empty MCP override suppresses them. */
+	public function test_resource_annotation_override_and_last_modified_rejection(): void {
+		foreach ( array( false, true ) as $override ) {
+			$meta = array( 'annotations' => array( 'audience' => array( 'user' ) ), 'mcp' => array( 'uri' => 'fixture://annotations' ) );
+			if ( $override ) {
+				$meta['mcp']['annotations'] = array();
+			}
+			$resource = McpResource::fromAbility( $this->validation_ability( $meta ) );
+			$data     = $this->record_array( $resource->get_protocol_record( $this->schema() ) );
+			if ( $override ) {
+				$this->assertArrayNotHasKey( 'annotations', $data );
+				continue;
+			}
+			$this->assertSame( array( 'user' ), $data['annotations']['audience'] );
+		}
+		$annotations = array( 'lastModified' => '2026-09-09' );
+		$direct      = McpResource::fromArray( array( 'uri' => 'fixture://date', 'annotations' => $annotations, 'handler' => '__return_empty_array' ) );
+		$converted   = McpResource::fromAbility( $this->validation_ability( array( 'mcp' => array( 'uri' => 'fixture://date', 'annotations' => $annotations ) ) ) );
+		$this->assertSame( 'mcp_resource_invalid_annotations', $direct->get_error_code() );
+		$this->assertSame( 'resource_annotations_invalid', $converted->get_error_code() );
+	}
+
+	/** Fallback arguments retain boolean properties and empty titles without type repair. */
+	public function test_prompt_arguments_preserve_supplied_values(): void {
+		$schema = array(
+			'type'       => 'object',
+			'properties' => array( 'q' => array( 'type' => 'string', 'title' => '', 'description' => '' ), 'flag' => true ),
+			'required'   => array( 'q' ),
+		);
+		$prompt = McpPrompt::fromAbility( $this->validation_ability( array(), $schema ) );
+		foreach ( array( Schemas::V2025_11_25, Schemas::V2026_07_28 ) as $revision ) {
+			$data = $this->record_array( $prompt->get_protocol_record( $this->schema( $revision ) ) );
+			$this->assertSame( array( array( 'name' => 'q', 'title' => '', 'description' => '', 'required' => true ), array( 'name' => 'flag' ) ), $data['arguments'] );
+		}
+		foreach ( array(
+			array( 'mcp' => array( 'arguments' => array( array( 'name' => 'q', 'required' => 'yes' ) ) ) ),
+			array(),
+		) as $meta ) {
+			$schema['properties']['q']['title'] = 42;
+			$prompt = McpPrompt::fromAbility( $this->validation_ability( $meta, $schema ) );
+			$this->assertInstanceOf( McpPrompt::class, $prompt );
+			foreach ( array( Schemas::V2025_11_25, Schemas::V2026_07_28 ) as $revision ) {
+				$this->assertFalse( $prompt->is_available_for( $this->schema( $revision ) ) );
+				$this->assertStringContainsString( '/arguments/0/', $prompt->get_projection_error( $revision )->getMessage() );
+			}
+		}
+		$prompt = McpPrompt::fromAbility( $this->validation_ability( array( 'mcp' => array( 'arguments' => 'bad' ) ) ) );
+		$this->assertSame( 'mcp_prompt_invalid_arguments', $prompt->get_error_code() );
+	}
+
+	/** Create a local ability without mutating the global ability registry. */
+	private function validation_ability( array $meta, array $schema = array() ): \WP_Ability {
+		return new \WP_Ability(
+			'test/validation-cleanup',
+			array(
+				'label'               => ' Label ',
+				'description'         => ' Description ',
+				'category'            => 'test',
+				'input_schema'        => $schema,
+				'meta'                => $meta,
+				'execute_callback'    => '__return_empty_array',
+				'permission_callback' => '__return_true',
+			)
+		);
+	}
+
+
 	public function set_up(): void {
 		parent::set_up();
 		CompatibilityPromptBuilder::$configure_count = 0;
