@@ -21,6 +21,7 @@ use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
 use WP\McpSchema\Record;
+use WP\McpSchema\Schemas;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Record\GetPromptRequest;
 use WP\McpSchema\Record\ListPromptsRequest;
@@ -31,6 +32,80 @@ use WP_Error;
 
 /** Protects handler hooks, failure containment, and WordPress result normalization. */
 final class HandlerCompatibilityTest extends TestCase {
+
+	/** Recognized malformed prompt shapes fail at the wire instead of becoming fallback text. */
+	public function test_malformed_prompt_shapes_fail_in_both_revisions(): void {
+		foreach ( array(
+			array( 'messages' => 'bad' ),
+			array( 'texts' => 'bad' ),
+			array( 'text' => 5 ),
+			array( 'text' => 'ok', 'description' => 5 ),
+			array( 'text' => 'ok', 'annotations' => 'bad' ),
+			array( 'text' => 'ok', '_meta' => array( 'bad-list' ) ),
+		) as $shape ) {
+			$prompt = McpPrompt::fromArray( array( 'name' => 'invalid-shape', 'handler' => static fn(): array => $shape, 'permission' => '__return_true' ) );
+			$server = $this->makeServer( array(), array(), array( $prompt ) );
+			foreach ( array( Schemas::V2025_11_25, Schemas::V2026_07_28 ) as $revision ) {
+				// Modern result assembly adds serverInfo to _meta before schema projection.
+				// Its pre-existing handling of malformed result-level _meta is a separate follow-up.
+				if ( isset( $shape['_meta'] ) && Schemas::V2026_07_28 === $revision ) {
+					continue;
+				}
+				$params = array( 'name' => 'invalid-shape' );
+				if ( Schemas::V2026_07_28 === $revision ) {
+					$params['_meta'] = array(
+						'io.modelcontextprotocol/protocolVersion'     => $revision,
+						'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+					);
+				}
+				$error = $this->wire_error( $server, 'prompts/get', 20, $params );
+				$this->assertSame( -32603, $error['code'] );
+				$this->assertSame( 'Internal error: Invalid handler result', $error['message'] );
+			}
+		}
+	}
+
+	/** Message conveniences retain extra keys and reindex associative message lists. */
+	public function test_prompt_messages_retain_extra_keys_and_result_meta(): void {
+		$prompt = McpPrompt::fromArray(
+			array(
+				'name'       => 'message-keys',
+				'handler'    => static fn(): array => array(
+					'messages' => array( 'key' => array( 'content' => 'hello', 'extra' => 1, '_meta' => array( 'message' => true ) ) ),
+					'_meta'    => array( 'result' => true ),
+				),
+				'permission' => '__return_true',
+			)
+		);
+		$server  = $this->makeServer( array(), array(), array( $prompt ) );
+		$request = $this->schema()->fromArray( GetPromptRequest::class, array( 'jsonrpc' => '2.0', 'id' => 21, 'method' => 'prompts/get', 'params' => array( 'name' => 'message-keys' ) ) );
+		$result  = ( new PromptsHandler( $server ) )->get_prompt( $request, $this->request_context( $server ) );
+		$this->assertSame( array( 0 ), array_keys( $result['messages'] ) );
+		$this->assertSame( 1, $result['messages'][0]['extra'] );
+		$this->assertSame( 'user', $result['messages'][0]['role'] );
+		$this->assertSame( 'hello', $result['messages'][0]['content']['text'] );
+		$this->assertTrue( $result['messages'][0]['_meta']['message'] );
+		$this->assertTrue( $result['_meta']['result'] );
+	}
+
+	/** A recursive fallback value produces an execution error rather than invented JSON. */
+	public function test_prompt_json_encoding_failure_is_contained(): void {
+		$recursive         = new \stdClass();
+		$recursive->child  = $recursive;
+		$prompt = McpPrompt::fromArray(
+			array(
+				'name'       => 'recursive-prompt',
+				'handler'    => static fn(): array => array( 'custom' => $recursive ),
+				'permission' => '__return_true',
+			)
+		);
+		$server = $this->makeServer( array(), array(), array( $prompt ) );
+		$error  = $this->wire_error( $server, 'prompts/get', 22, array( 'name' => 'recursive-prompt' ) );
+		$this->assertSame( -32603, $error['code'] );
+		$this->assertStringContainsString( 'Prompt execution failed', $error['message'] );
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
+	}
+
 
 	/** Non-array list-filter results fall back to the original lists and are logged. */
 	public function test_invalid_list_filters_fall_back_to_original_components(): void {
@@ -247,7 +322,7 @@ final class HandlerCompatibilityTest extends TestCase {
 	}
 
 	/**
-	 * Run one 2025-11-25 request through the wire orchestrator and return its error member.
+	 * Run one request through the wire orchestrator and return its error member.
 	 *
 	 * @param array<string, mixed> $params Request params.
 	 * @return array{code: int, message: string}

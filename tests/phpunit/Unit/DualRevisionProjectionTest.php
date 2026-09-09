@@ -13,6 +13,8 @@ use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Domain\Resources\McpResource;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
@@ -36,6 +38,101 @@ use WP\McpSchema\Schemas;
 
 /** Covers neutral inputs, isolated projections, defaults, and immutable context. */
 final class DualRevisionProjectionTest extends TestCase {
+
+	/** Malformed Ability fixtures are exercised explicitly, outside default discovery. */
+	public function test_invalid_ability_prompts_are_rejected_at_registration(): void {
+		$this->setExpectedIncorrectUsage( 'WP\\MCP\\Core\\McpComponentRegistry::has_any_projection' );
+		$server = $this->makeServer(
+			array(),
+			array(),
+			array( 'test/prompt-with-mixed-icons', 'test/prompt-invalid-explicit-args-no-name', 'test/prompt-invalid-explicit-args-not-array' )
+		);
+		$this->assertSame( 0, $server->count_prompts() );
+		$this->assertCount( 6, DummyErrorHandler::$logs );
+	}
+
+	/** Rejected metadata is reported with schema paths without removing healthy peers. */
+	public function test_schema_rejections_log_and_notify_for_each_component_kind(): void {
+		$this->setExpectedIncorrectUsage( 'WP\\MCP\\Core\\McpComponentRegistry::has_any_projection' );
+		$notices = array();
+		$capture = static function ( $function, $message ) use ( &$notices ): void {
+			if ( 'WP\\MCP\\Core\\McpComponentRegistry::has_any_projection' === $function ) {
+				$notices[] = $message;
+			}
+		};
+		add_action( 'doing_it_wrong_run', $capture, 10, 2 );
+		try {
+			foreach ( array( McpTool::class, McpResource::class, McpPrompt::class ) as $class ) {
+				foreach ( array(
+					array( 'icons' => array( array( 'theme' => 'light' ) ) ),
+					array( 'meta' => array( 'invalid-list' ) ),
+				) as $invalid ) {
+					DummyErrorHandler::reset();
+					$notices = array();
+					$base    = array( 'name' => 'bad-component', 'uri' => 'fixture://bad', 'handler' => '__return_empty_array' );
+					$bad     = $class::fromArray( array_merge( $base, $invalid ) );
+					$good    = $class::fromArray( array_merge( $base, array( 'name' => 'good-component', 'uri' => 'fixture://good' ) ) );
+					$this->assertInstanceOf( $class, $bad );
+					$this->assertInstanceOf( $class, $good );
+					$components = array( $bad, $good );
+					$server     = $this->makeServer(
+						McpTool::class === $class ? $components : array(),
+						McpResource::class === $class ? $components : array(),
+						McpPrompt::class === $class ? $components : array()
+					);
+					$this->assertSame( 1, $server->count_tools() + $server->count_resources() + $server->count_prompts() );
+					$this->assertCount( 1, $notices );
+					$logs = DummyErrorHandler::$logs;
+					$this->assertCount( 2, $logs );
+					foreach ( $logs as $log ) {
+						$this->assertSame( 'warning', $log['type'] );
+						$this->assertStringContainsString( isset( $invalid['icons'] ) ? '/icons/0/src' : '/_meta', $log['message'] );
+						$this->assertStringContainsString( esc_html( $log['message'] ), $notices[0] );
+					}
+					foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
+						$this->assertFalse( $bad->is_available_for( $this->schema( $revision ) ) );
+						$this->assertTrue( $good->is_available_for( $this->schema( $revision ) ) );
+					}
+				}
+			}
+		} finally {
+			remove_action( 'doing_it_wrong_run', $capture, 10 );
+		}
+	}
+
+	/** A revision-specific failure logs without declaring the registration incorrect. */
+	public function test_partial_projection_registration_does_not_notify(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'      => 'partial-projection',
+				'execution' => array( 'taskSupport' => 'invalid' ),
+				'handler'   => '__return_empty_array',
+			)
+		);
+		$server = $this->makeServer( array( $tool ) );
+		$this->assertSame( 1, $server->count_tools() );
+		$this->assertFalse( $server->get_mcp_tool( 'partial-projection' )->is_available_for( $this->schema( Schemas::V2025_11_25 ) ) );
+		$this->assertNotNull( $server->get_mcp_tool( 'partial-projection' )->get_protocol_record( $this->schema( Schemas::V2026_07_28 ) ) );
+		$this->assertCount( 1, DummyErrorHandler::$logs );
+	}
+
+	/** A supplied inputSchema reaches projection unchanged; only absence selects a default. */
+	public function test_direct_tool_input_schema_is_not_repaired(): void {
+		foreach ( array( 'bad', array( 'properties' => array() ) ) as $input ) {
+			$tool = McpTool::fromArray( array( 'name' => 'schema-test', 'inputSchema' => $input, 'handler' => '__return_empty_array' ) );
+			$this->assertInstanceOf( McpTool::class, $tool );
+			foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
+				$this->assertFalse( $tool->is_available_for( $this->schema( $revision ) ) );
+				$this->assertStringContainsString( '/inputSchema', $tool->get_projection_error( $revision )->getMessage() );
+			}
+		}
+		$tool = McpTool::fromArray( array( 'name' => 'schema-default', 'handler' => '__return_empty_array' ) );
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
+			$data = $this->record_array( $tool->get_protocol_record( $this->schema( $revision ) ) );
+			$this->assertSame( array( 'type' => 'object' ), $data['inputSchema'] );
+		}
+	}
+
 
 	/** Ability object roots retain the historical explicit empty properties map on the wire. */
 	public function test_ability_tool_object_roots_emit_properties_objects(): void {
@@ -309,9 +406,10 @@ final class DualRevisionProjectionTest extends TestCase {
 		);
 		$this->assertInstanceOf( McpTool::class, $tool );
 
+		$this->setExpectedIncorrectUsage( 'WP\\MCP\\Core\\McpComponentRegistry::has_any_projection' );
 		$server = $this->makeServer( array( $tool ) );
 		$this->assertSame( 0, $server->count_tools() );
-		$this->assertNotEmpty( \WP\MCP\Tests\Fixtures\DummyErrorHandler::$logs );
+		$this->assertNotEmpty( DummyErrorHandler::$logs );
 	}
 
 	/** Ordinary Ability configuration projects without author-owned revision branches. */
