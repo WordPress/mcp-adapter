@@ -165,14 +165,18 @@ class PromptsHandler {
 	/**
 	 * Convert supported prompt result forms into logical message data.
 	 *
-	 * Only the shape is normalized. Roles, content types, and metadata are carried
-	 * as given; the schema decides whether the result fits, and a result that does
-	 * not fit fails the request instead of being repaired.
+	 * Only the shape is normalized. Roles, content types, description, annotations
+	 * and metadata are carried as given whenever they are set; an explicit null
+	 * counts as absent, as everywhere else in the adapter. The schema decides
+	 * whether the result fits, and a result that does not fit fails the request
+	 * instead of being repaired. The registered prompt description fills in only
+	 * when the result has none. An empty message list is emitted as given; the
+	 * schema and the official client both accept it.
 	 *
 	 * @return array<string, mixed>
 	 */
 	private function normalize_result( array $result, Prompt $prompt, string $prompt_name ): array {
-		$description = isset( $result['description'] ) && is_string( $result['description'] ) ? $result['description'] : $prompt->getDescription();
+		$description = isset( $result['description'] ) ? $result['description'] : $prompt->getDescription();
 		$messages    = array();
 
 		if ( isset( $result['messages'] ) && is_array( $result['messages'] ) ) {
@@ -184,7 +188,7 @@ class PromptsHandler {
 				'type' => 'text',
 				'text' => $result['text'],
 			);
-			if ( isset( $result['annotations'] ) && is_array( $result['annotations'] ) ) {
+			if ( isset( $result['annotations'] ) ) {
 				$content['annotations'] = $result['annotations'];
 			}
 			$messages[] = array(
@@ -222,19 +226,12 @@ class PromptsHandler {
 			);
 		}
 
-		if ( empty( $messages ) ) {
-			$messages[] = array(
-				'role'    => self::$default_role,
-				'content' => array(
-					'type' => 'text',
-					'text' => '(No messages returned)',
-				),
-			);
-		}
-
 		$data = array( 'messages' => $messages );
 		if ( null !== $description ) {
 			$data['description'] = $description;
+		}
+		if ( isset( $result['_meta'] ) ) {
+			$data['_meta'] = $result['_meta'];
 		}
 
 		return $data;

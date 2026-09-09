@@ -401,9 +401,10 @@ final class HandlerCompatibilityTest extends TestCase {
 			$invalid = $handler->get_prompt( $request, $this->request_context( $server ) );
 			$this->assertSame( array( 'invalid message' ), $invalid['messages'] );
 
+			// An empty message list is emitted as given; the schema and the official client accept it.
 			$shape = array( 'messages' => array() );
 			$empty = $handler->get_prompt( $request, $this->request_context( $server ) );
-			$this->assertSame( '(No messages returned)', $empty['messages'][0]['content']['text'] );
+			$this->assertSame( array(), $empty['messages'] );
 		} finally {
 			remove_filter( 'mcp_adapter_prompt_get_result', $filter );
 		}
