@@ -191,12 +191,13 @@ class RegisterAbilityAsMcpPrompt {
 	 * (messages[].content.annotations).
 	 *
 	 * Arguments Resolution:
-	 * 1. If `ability.meta.mcp.arguments` is defined and non-empty, use it directly (explicit override)
+	 * 1. If `ability.meta.mcp.arguments` is defined and non-empty, use it as given (explicit override)
 	 * 2. Otherwise, auto-convert from `ability.input_schema`
 	 *
 	 * This follows the `mcp.*` override pattern used elsewhere (mcp.uri, mcp.icons, mcp.annotations).
+	 * Explicit arguments are not inspected; the schema decides whether each entry fits.
 	 *
-	 * @return array<string,mixed>|\WP_Error Prompt data array, or WP_Error if explicit arguments are invalid.
+	 * @return array<string,mixed>|\WP_Error Prompt data array, or WP_Error if `mcp.arguments` is not an array.
 	 * @since 0.5.0
 	 *
 	 */
@@ -224,15 +225,12 @@ class RegisterAbilityAsMcpPrompt {
 
 		// Check for explicit mcp.arguments override first.
 		$explicit_arguments = $this->get_explicit_arguments();
-		if ( is_array( $explicit_arguments ) && ! empty( $explicit_arguments ) ) {
-			$arguments = $this->convert_explicit_arguments( $explicit_arguments );
-			if ( is_wp_error( $arguments ) ) {
-				return $arguments;
-			}
-			if ( ! empty( $arguments ) ) {
-				$prompt_data['arguments'] = $arguments;
-				$this->arguments_source   = 'explicit';
-			}
+		if ( is_wp_error( $explicit_arguments ) ) {
+			return $explicit_arguments;
+		}
+		if ( ! empty( $explicit_arguments ) ) {
+			$prompt_data['arguments'] = $explicit_arguments;
+			$this->arguments_source   = 'explicit';
 
 			return $prompt_data;
 		}
@@ -260,91 +258,37 @@ class RegisterAbilityAsMcpPrompt {
 	/**
 	 * Get explicit arguments from ability meta.mcp.arguments.
 	 *
-	 * @return list<array<string,mixed>>|null Explicit arguments array or null if not defined.
+	 * Entries are carried as given and only re-indexed so the list serializes as a
+	 * JSON array. A value that is not an array is an error rather than a silent fall
+	 * back to input_schema conversion. An explicit null counts as not defined.
+	 *
+	 * @return list<mixed>|\WP_Error|null Explicit arguments, WP_Error when set to a non-array, or null if not defined.
 	 * @since 0.5.0
 	 *
 	 */
-	private function get_explicit_arguments(): ?array {
+	private function get_explicit_arguments() {
 		$meta = $this->ability->get_meta();
 		if ( ! isset( $meta['mcp'] ) || ! is_array( $meta['mcp'] ) ) {
 			return null;
 		}
 
 		$mcp = $meta['mcp'];
-		if ( ! isset( $mcp['arguments'] ) || ! is_array( $mcp['arguments'] ) ) {
+		if ( ! isset( $mcp['arguments'] ) ) {
 			return null;
 		}
 
-		return array_values( $mcp['arguments'] );
-	}
-
-	/**
-	 * Convert and validate explicit arguments from ability.meta.mcp.arguments.
-	 *
-	 * Per MCP 2025-11-25 specification, PromptArgument has:
-	 * - name (string, required): Argument identifier
-	 * - title (string, optional): Human-readable display name
-	 * - description (string, optional): Human-readable description
-	 * - required (boolean, optional): Whether the argument must be provided
-	 *
-	 * @param list<array<string,mixed>> $explicit_arguments User-defined arguments array.
-	 *
-	 * @return list<array<string, mixed>>|\WP_Error Prompt argument data or WP_Error.
-	 * @since 0.5.0
-	 *
-	 */
-	private function convert_explicit_arguments( array $explicit_arguments ) {
-		$arguments = array();
-
-		foreach ( $explicit_arguments as $index => $arg ) {
-			if ( ! is_array( $arg ) ) {
-				return new WP_Error(
-					'mcp_prompt_invalid_argument',
-					sprintf(
-					/* translators: 1: argument index, 2: ability name */
-						__( 'Argument at index %1$d must be an array for ability "%2$s".', 'mcp-adapter' ),
-						$index,
-						$this->ability->get_name()
-					)
-				);
-			}
-
-			// Validate required 'name' field.
-			if ( ! isset( $arg['name'] ) || ! is_string( $arg['name'] ) || '' === trim( $arg['name'] ) ) {
-				return new WP_Error(
-					'mcp_prompt_argument_missing_name',
-					sprintf(
-					/* translators: 1: argument index, 2: ability name */
-						__( 'Argument at index %1$d is missing required "name" field for ability "%2$s".', 'mcp-adapter' ),
-						$index,
-						$this->ability->get_name()
-					)
-				);
-			}
-
-			$argument_data = array(
-				'name' => trim( $arg['name'] ),
+		if ( ! is_array( $mcp['arguments'] ) ) {
+			return new WP_Error(
+				'mcp_prompt_invalid_arguments',
+				sprintf(
+				/* translators: %s: ability name */
+					__( 'Ability meta "mcp.arguments" must be an array for ability "%s".', 'mcp-adapter' ),
+					$this->ability->get_name()
+				)
 			);
-
-			// Map optional 'title' field.
-			if ( isset( $arg['title'] ) && is_string( $arg['title'] ) && '' !== trim( $arg['title'] ) ) {
-				$argument_data['title'] = trim( $arg['title'] );
-			}
-
-			// Map optional 'description' field.
-			if ( isset( $arg['description'] ) && is_string( $arg['description'] ) && '' !== trim( $arg['description'] ) ) {
-				$argument_data['description'] = trim( $arg['description'] );
-			}
-
-			// Map optional 'required' field (only emit when true, per existing pattern).
-			if ( isset( $arg['required'] ) && true === $arg['required'] ) {
-				$argument_data['required'] = true;
-			}
-
-			$arguments[] = $argument_data;
 		}
 
-		return $arguments;
+		return array_values( $mcp['arguments'] );
 	}
 
 	/**
