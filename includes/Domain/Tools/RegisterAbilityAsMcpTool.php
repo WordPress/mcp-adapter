@@ -10,6 +10,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Tools;
 
+use WP\MCP\Domain\Utils\McpAbilityMeta;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
@@ -19,7 +20,7 @@ use WP_Error;
 /**
  * RegisterAbilityAsMcpTool class.
  *
- * This class registers a WordPress ability as an MCP tool.
+ * This class builds revision-neutral MCP tool data from a WordPress ability.
  *
  * @internal
  *
@@ -84,24 +85,26 @@ class RegisterAbilityAsMcpTool {
 			return $tool_name;
 		}
 
+		$mcp_meta = McpAbilityMeta::mcp( $this->ability );
+		if ( is_wp_error( $mcp_meta ) ) {
+			return $mcp_meta;
+		}
+
 		// Transform input schema to MCP-compatible object format.
 		$input_transform = SchemaTransformer::transform_to_object_schema(
 			$this->ability->get_input_schema()
 		);
 
+		// Label and description are carried as given; core requires both to be
+		// non-empty strings, so nothing is trimmed or suppressed here.
+		$label     = $this->ability->get_label();
 		$tool_data = array(
 			'name'        => $tool_name,
-			'description' => trim( $this->ability->get_description() ),
+			'description' => $this->ability->get_description(),
 			// Retain the empty properties object historically supplied by the schema DTO.
 			'inputSchema' => $input_transform['schema'] + array( 'properties' => new \stdClass() ),
+			'title'       => $label,
 		);
-
-		// Add optional title from ability label.
-		$label = $this->ability->get_label();
-		$label = trim( $label );
-		if ( ! empty( $label ) ) {
-			$tool_data['title'] = $label;
-		}
 
 		// Add optional output schema, transformed to object format if needed.
 		$output_schema    = $this->ability->get_output_schema();
@@ -124,7 +127,7 @@ class RegisterAbilityAsMcpTool {
 		}
 
 		// Set annotations.title from label if annotations exist but don't have a title.
-		if ( ! empty( $label ) && isset( $tool_data['annotations'] ) && ! isset( $tool_data['annotations']['title'] ) ) {
+		if ( isset( $tool_data['annotations'] ) && ! isset( $tool_data['annotations']['title'] ) ) {
 			$tool_data['annotations']['title'] = $label;
 		}
 
@@ -150,7 +153,6 @@ class RegisterAbilityAsMcpTool {
 		// Icons and `_meta` come from ability.meta.mcp and are carried as given; the
 		// schema decides whether they fit. Adapter metadata is NEVER included in
 		// protocol meta; it is returned separately in adapter_meta.
-		$mcp_meta = $ability_meta['mcp'] ?? array();
 		if ( isset( $mcp_meta['icons'] ) ) {
 			$tool_data['icons'] = $mcp_meta['icons'];
 		}

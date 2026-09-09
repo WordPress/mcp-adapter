@@ -10,6 +10,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
+use WP\MCP\Domain\Utils\McpAbilityMeta;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
@@ -100,36 +101,31 @@ class RegisterAbilityAsMcpResource {
 	 *
 	 */
 	private function build_resource_data() {
+		$mcp_meta = McpAbilityMeta::mcp( $this->ability );
+		if ( is_wp_error( $mcp_meta ) ) {
+			return $mcp_meta;
+		}
+
 		$uri = $this->get_uri();
 		if ( is_wp_error( $uri ) ) {
 			return $uri;
 		}
 
 		$ability_meta = $this->ability->get_meta();
-		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
 		$name = $this->resolve_resource_name();
 		if ( is_wp_error( $name ) ) {
 			return $name;
 		}
 
-		// Required fields.
+		// Label and description are carried as given; core requires both to be
+		// non-empty strings, so nothing is trimmed or suppressed here.
 		$resource_data = array(
-			'name' => $name,
-			'uri'  => $uri,
+			'name'        => $name,
+			'uri'         => $uri,
+			'title'       => $this->ability->get_label(),
+			'description' => $this->ability->get_description(),
 		);
-
-		// Optional: title from ability label (human-readable display name).
-		$label = trim( $this->ability->get_label() );
-		if ( '' !== $label ) {
-			$resource_data['title'] = $label;
-		}
-
-		// Optional: description.
-		$description = trim( $this->ability->get_description() );
-		if ( '' !== $description ) {
-			$resource_data['description'] = $description;
-		}
 
 		// Optional: mimeType and size from ability meta, carried as given.
 		$mime_type = $this->get_mcp_meta( 'mimeType' );
@@ -324,9 +320,9 @@ class RegisterAbilityAsMcpResource {
 	/**
 	 * Resolve the MCP resource name from ability.
 	 *
-	 * Resource names have no charset restrictions (unlike Tool names). A filter
-	 * that returns anything but a non-empty string rejects the resource, the same
-	 * way the tool and prompt name filters do.
+	 * Resource names have no charset restrictions (unlike Tool names), and the
+	 * schema accepts an empty name. A filter that returns anything but a string
+	 * rejects the resource, the same way the tool and prompt name filters do.
 	 *
 	 * @return string|\WP_Error The resolved resource name, or WP_Error when the filter broke it.
 	 */
@@ -345,13 +341,13 @@ class RegisterAbilityAsMcpResource {
 		 */
 		$filtered_name = apply_filters( 'mcp_adapter_resource_name', $name, $this->ability );
 
-		if ( ! is_string( $filtered_name ) || '' === trim( $filtered_name ) ) {
+		if ( ! is_string( $filtered_name ) ) {
 			return new WP_Error(
 				'mcp_resource_name_filter_invalid',
 				sprintf(
-				/* translators: %s: invalid resource name returned by filter */
+				/* translators: %s: PHP type of the value returned by the filter */
 					__( 'Filter returned invalid MCP resource name: %s', 'mcp-adapter' ),
-					is_string( $filtered_name ) ? $filtered_name : gettype( $filtered_name )
+					gettype( $filtered_name )
 				)
 			);
 		}
