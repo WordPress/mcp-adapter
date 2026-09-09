@@ -210,6 +210,7 @@ class PromptsHandler {
 			);
 			$text = wp_json_encode( $result, JSON_PRETTY_PRINT );
 			if ( false === $text ) {
+				// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception text is internal protocol diagnostics, not HTML output.
 				throw new \UnexpectedValueException( 'Prompt result could not be JSON-encoded: ' . json_last_error_msg() );
 			}
 			$messages[] = array(
