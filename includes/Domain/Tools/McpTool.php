@@ -127,16 +127,12 @@ final class McpTool implements McpComponentInterface {
 			return new WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
 		}
 
-		// Prepare input schema - ensure it's an object type for MCP compliance.
-		$input_schema = $config['inputSchema'] ?? array( 'type' => 'object' );
-		if ( ! isset( $input_schema['type'] ) ) {
-			$input_schema['type'] = 'object';
-		}
-
-		// Build tool data array.
+		// A tool without an input schema gets the empty object schema the official SDK
+		// emits for that case. A schema that is set is carried as given; the MCP schema
+		// decides whether it fits.
 		$tool_data = array(
 			'name'        => $config['name'],
-			'inputSchema' => $input_schema,
+			'inputSchema' => $config['inputSchema'] ?? array( 'type' => 'object' ),
 		);
 
 		// Optional fields.

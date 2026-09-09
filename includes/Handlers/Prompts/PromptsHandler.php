@@ -142,13 +142,18 @@ class PromptsHandler {
 	/**
 	 * Normalize supported prompt-result conveniences to canonical result data.
 	 *
-	 * Only the shape is normalized. Roles, content types, description, annotations
-	 * and metadata are carried as given whenever they are set; an explicit null
-	 * counts as absent, as everywhere else in the adapter. The schema decides
-	 * whether the result fits, and a result that does not fit fails the request
-	 * instead of being repaired. The registered prompt description fills in only
-	 * when the result has none. An empty message list is emitted as given; the
-	 * schema and the official client both accept it.
+	 * Only the shape is normalized, and the shape is chosen by which key is set:
+	 * `messages`, `text`, `role` with `content`, or `texts`. The value under that
+	 * key is carried as given, so a wrong-typed value reaches the schema instead
+	 * of falling through to the JSON fallback. Roles, content types, description,
+	 * annotations and metadata are carried as given whenever they are set; an
+	 * explicit null counts as absent, as everywhere else in the adapter. The
+	 * schema decides whether the result fits, and a result that does not fit
+	 * fails the request instead of being repaired. The registered prompt
+	 * description fills in only when the result has none. An empty message list
+	 * is emitted as given; the schema and the official client both accept it.
+	 *
+	 * @throws \UnexpectedValueException When a result with none of the known keys cannot be JSON-encoded.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -156,11 +161,17 @@ class PromptsHandler {
 		$description = isset( $result['description'] ) ? $result['description'] : $prompt->getDescription();
 		$messages    = array();
 
-		if ( isset( $result['messages'] ) && is_array( $result['messages'] ) ) {
-			foreach ( $result['messages'] as $message ) {
-				$messages[] = is_array( $message ) ? $this->normalize_message( $message ) : $message;
+		if ( isset( $result['messages'] ) ) {
+			// A list is re-indexed so it serializes as a JSON array; anything else is
+			// carried as given for the schema to reject.
+			$messages = $result['messages'];
+			if ( is_array( $messages ) ) {
+				$messages = array();
+				foreach ( $result['messages'] as $message ) {
+					$messages[] = is_array( $message ) ? $this->normalize_message( $message ) : $message;
+				}
 			}
-		} elseif ( isset( $result['text'] ) && is_string( $result['text'] ) ) {
+		} elseif ( isset( $result['text'] ) ) {
 			$content = array(
 				'type' => 'text',
 				'text' => $result['text'],
@@ -174,16 +185,20 @@ class PromptsHandler {
 			);
 		} elseif ( isset( $result['role'], $result['content'] ) ) {
 			$messages[] = $this->normalize_message( $result );
-		} elseif ( isset( $result['texts'] ) && is_array( $result['texts'] ) ) {
-			$role = $result['role'] ?? self::$default_role;
-			foreach ( $result['texts'] as $text ) {
-				$messages[] = array(
-					'role'    => $role,
-					'content' => array(
-						'type' => 'text',
-						'text' => $text,
-					),
-				);
+		} elseif ( isset( $result['texts'] ) ) {
+			$messages = $result['texts'];
+			if ( is_array( $messages ) ) {
+				$messages = array();
+				$role     = $result['role'] ?? self::$default_role;
+				foreach ( $result['texts'] as $text ) {
+					$messages[] = array(
+						'role'    => $role,
+						'content' => array(
+							'type' => 'text',
+							'text' => $text,
+						),
+					);
+				}
 			}
 		} else {
 			$this->mcp->get_observability_handler()->record_event(
@@ -193,12 +208,15 @@ class PromptsHandler {
 					'result_keys' => array_keys( $result ),
 				)
 			);
-			$text       = wp_json_encode( $result, JSON_PRETTY_PRINT );
+			$text = wp_json_encode( $result, JSON_PRETTY_PRINT );
+			if ( false === $text ) {
+				throw new \UnexpectedValueException( 'Prompt result could not be JSON-encoded: ' . json_last_error_msg() );
+			}
 			$messages[] = array(
 				'role'    => self::$default_role,
 				'content' => array(
 					'type' => 'text',
-					'text' => false === $text ? '{}' : $text,
+					'text' => $text,
 				),
 			);
 		}
@@ -216,22 +234,20 @@ class PromptsHandler {
 
 	/**
 	 * Fill in the message defaults: an absent role is `user`, and a plain string
-	 * content is a text block. Everything else is carried as given.
+	 * content is a text block. Every other key is carried as given.
 	 *
+	 * @param array<string, mixed> $message The message as returned by the ability.
 	 * @return array<string, mixed>
 	 */
 	private function normalize_message( array $message ): array {
-		$content = $message['content'] ?? array();
-		if ( is_string( $content ) ) {
-			$content = array(
+		$message['role'] = $message['role'] ?? self::$default_role;
+		if ( isset( $message['content'] ) && is_string( $message['content'] ) ) {
+			$message['content'] = array(
 				'type' => 'text',
-				'text' => $content,
+				'text' => $message['content'],
 			);
 		}
 
-		return array(
-			'role'    => $message['role'] ?? self::$default_role,
-			'content' => $content,
-		);
+		return $message;
 	}
 }

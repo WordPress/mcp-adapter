@@ -127,13 +127,9 @@ final class McpResource implements McpComponentInterface {
 			return new WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
 		}
 
-		$name = isset( $config['name'] ) ? trim( $config['name'] ) : $uri;
-		if ( '' === $name ) {
-			return new WP_Error( 'mcp_resource_missing_name', 'Resource "name" cannot be empty.' );
-		}
-
+		// The name is carried as given; the URI stands in only when no name is set.
 		$resource_data = array(
-			'name' => $name,
+			'name' => $config['name'] ?? $uri,
 			'uri'  => $uri,
 		);
 
