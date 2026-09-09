@@ -15,7 +15,7 @@ use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
 use WP\McpSchema\Record;
 
 /** Exposes one MCP server over newline-delimited STDIO. */
-class StdioServerBridge {
+final class StdioServerBridge {
 
 	/** @var \WP\MCP\Core\McpServer */
 	private McpServer $server;
