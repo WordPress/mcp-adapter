@@ -18,7 +18,7 @@ use WP_Error;
 /**
  * Converts WordPress abilities to MCP Resource metadata.
  *
-	 * This class builds neutral Resource metadata for revision projection.
+ * This class builds neutral Resource metadata for revision projection.
  * It extracts metadata only (uri, name, title, description, mimeType, size, icons, annotations).
  * Resource content (text/blob) is resolved separately at resources/read time.
  *
@@ -42,6 +42,8 @@ use WP_Error;
  * Use 'mcp.uri', 'mcp.mimeType', 'mcp.size' instead. Top-level 'annotations' is the
  * location WordPress core defines, so it is read without a notice; 'mcp.annotations'
  * overrides it.
+ *
+ * @internal
  *
  * @since 0.5.0
  */
@@ -73,48 +75,21 @@ class RegisterAbilityAsMcpResource {
 	}
 
 	/**
-	 * Make a new instance of the class.
+	 * Build neutral Resource data and adapter metadata for internal wiring.
+	 *
+	 * This method returns protocol-only data and provides the adapter metadata
+	 * separately. Exact validation happens independently for each schema projection.
 	 *
 	 * @param \WP_Ability $ability The ability.
-	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler for logging.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
 	 *
-	 * @return array<string, mixed>|\WP_Error Returns Resource data or WP_Error if validation fails.
+	 * @return array{resource_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @since 0.5.0
 	 */
-	public static function make( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
+	public static function build( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
 		$resource = new self( $ability, $error_handler );
 
-		return $resource->get_resource();
-	}
-
-	/**
-	 * Get the neutral MCP resource data.
-	 *
-	 * @return array<string, mixed>|\WP_Error Returns the Resource data or WP_Error.
-	 */
-	private function get_resource() {
-		$data = $this->get_data();
-		if ( is_wp_error( $data ) ) {
-			return $data;
-		}
-
-		return $data;
-	}
-
-	/**
-	 * Get the MCP resource data array.
-	 *
-	 * Builds metadata-only Resource data. Content (text/blob) is NOT included here;
-	 * content is resolved at resources/read time by ResourcesHandler.
-	 *
-	 * @return array<string,mixed>|\WP_Error Resource data array or WP_Error if validation fails.
-	 */
-	private function get_data() {
-		$built = $this->build_resource_data();
-		if ( is_wp_error( $built ) ) {
-			return $built;
-		}
-
-		return $built['resource_data'];
+		return $resource->build_resource_data();
 	}
 
 	/**
@@ -382,33 +357,5 @@ class RegisterAbilityAsMcpResource {
 		}
 
 		return $filtered_name;
-	}
-
-	/**
-	 * Build clean neutral Resource data and adapter metadata for internal wiring.
-	 *
-	 * This method returns protocol-only data and provides the adapter metadata
-	 * separately. Exact validation happens independently for each schema projection.
-	 * wiring to protocol surfaces.
-	 *
-	 * @param \WP_Ability $ability The ability.
-	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
-	 *
-	 * @return array{resource_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since 0.5.0
-	 *
-	 */
-	public static function build( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
-		$resource = new self( $ability, $error_handler );
-		$data     = $resource->build_resource_data();
-
-		if ( is_wp_error( $data ) ) {
-			return $data;
-		}
-
-		return array(
-			'resource_data' => $data['resource_data'],
-			'adapter_meta'  => $data['adapter_meta'],
-		);
 	}
 }

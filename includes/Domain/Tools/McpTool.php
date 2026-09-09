@@ -13,6 +13,7 @@ namespace WP\MCP\Domain\Tools;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
+use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\Tool;
 use WP\McpSchema\Schema;
@@ -49,6 +50,7 @@ use WP_Error;
  */
 final class McpTool implements McpComponentInterface {
 	use RevisionProjectionTrait;
+	use ThrowableGuardTrait;
 
 	// =========================================================================
 	// Runtime Properties
@@ -278,27 +280,12 @@ final class McpTool implements McpComponentInterface {
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
-
-			try {
-				$result = $this->ability->execute( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
+			$result  = self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		} elseif ( null !== $this->handler ) {
-			try {
-				$result = call_user_func( $this->handler, $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$handler = $this->handler;
+			$result  = self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $args ) );
 		} else {
 			return new WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
 		}
@@ -368,32 +355,18 @@ final class McpTool implements McpComponentInterface {
 
 		// Ability-backed tools delegate to the ability's permission system.
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
 
-			try {
-				return $this->ability->check_permissions( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
 		}
 
 		// Callable-backed tools use their required permission callback.
 		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $args );
+			$callback = $this->permission_callback;
+			$result   = self::guard( 'mcp_permission_check_failed', static fn() => call_user_func( $callback, $args ) );
 
-				return $result instanceof WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return $result instanceof WP_Error ? $result : (bool) $result;
 		}
 
 		// Defensive fallback: should never reach here if factories are used correctly.

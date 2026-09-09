@@ -14,6 +14,7 @@ use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
+use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\Prompt;
 use WP\McpSchema\Schema;
@@ -56,6 +57,7 @@ use WP_Error;
  */
 final class McpPrompt implements McpComponentInterface {
 	use RevisionProjectionTrait;
+	use ThrowableGuardTrait;
 
 	// =========================================================================
 	// Runtime Properties
@@ -213,14 +215,9 @@ final class McpPrompt implements McpComponentInterface {
 	 * @return self|\WP_Error
 	 */
 	public static function fromBuilder( McpPromptBuilderInterface $builder ) {
-		try {
-			$prompt = $builder->build();
-		} catch ( \Throwable $throwable ) {
-			return new WP_Error(
-				'mcp_prompt_builder_failed',
-				$throwable->getMessage(),
-				array( 'error_type' => get_class( $throwable ) )
-			);
+		$prompt = self::guard( 'mcp_prompt_builder_failed', static fn() => $builder->build() );
+		if ( $prompt instanceof WP_Error ) {
+			return $prompt;
 		}
 
 		$instance          = new self( $prompt );
@@ -275,37 +272,15 @@ final class McpPrompt implements McpComponentInterface {
 		$args = is_array( $args ) ? $args : array();
 
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
-
-			try {
-				$result = $this->ability->execute( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
+			$result  = self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		} elseif ( null !== $this->builder ) {
-			try {
-				$result = $this->builder->handle( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$builder = $this->builder;
+			$result  = self::guard( 'mcp_execution_failed', static fn() => $builder->handle( $args ) );
 		} elseif ( null !== $this->handler ) {
-			try {
-				$result = call_user_func( $this->handler, $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$handler = $this->handler;
+			$result  = self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $args ) );
 		} else {
 			return new WP_Error( 'mcp_prompt_no_handler', 'No prompt execution strategy configured.' );
 		}
@@ -353,43 +328,23 @@ final class McpPrompt implements McpComponentInterface {
 		$args = is_array( $args ) ? $args : array();
 
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
 
-			try {
-				return $this->ability->check_permissions( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
 		}
 
 		if ( null !== $this->builder ) {
-			try {
-				return $this->builder->has_permission( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$builder = $this->builder;
+
+			return self::guard( 'mcp_permission_check_failed', static fn() => $builder->has_permission( $args ) );
 		}
 
 		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $args );
+			$callback = $this->permission_callback;
+			$result   = self::guard( 'mcp_permission_check_failed', static fn() => call_user_func( $callback, $args ) );
 
-				return $result instanceof WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return $result instanceof WP_Error ? $result : (bool) $result;
 		}
 
 		return new WP_Error(

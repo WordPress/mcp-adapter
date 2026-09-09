@@ -13,6 +13,7 @@ namespace WP\MCP\Domain\Resources;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
+use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\Resource;
@@ -48,6 +49,7 @@ use WP_Error;
  */
 final class McpResource implements McpComponentInterface {
 	use RevisionProjectionTrait;
+	use ThrowableGuardTrait;
 
 	// =========================================================================
 	// Runtime Properties
@@ -255,27 +257,15 @@ final class McpResource implements McpComponentInterface {
 	public function execute( $arguments ) {
 		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
-			try {
-				return $this->ability->execute();
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+
+			return self::guard( 'mcp_execution_failed', static fn() => $ability->execute() );
 		}
 
 		if ( null !== $this->handler ) {
-			try {
-				return call_user_func( $this->handler, $arguments );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$handler = $this->handler;
+
+			return self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $arguments ) );
 		}
 
 		return new WP_Error( 'mcp_resource_no_handler', 'No resource execution strategy configured.' );
@@ -291,29 +281,16 @@ final class McpResource implements McpComponentInterface {
 	public function check_permission( $arguments ) {
 		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
-			try {
-				return $this->ability->check_permissions();
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions() );
 		}
 
 		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $arguments );
+			$callback = $this->permission_callback;
+			$result   = self::guard( 'mcp_permission_check_failed', static fn() => call_user_func( $callback, $arguments ) );
 
-				return $result instanceof WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return $result instanceof WP_Error ? $result : (bool) $result;
 		}
 
 		return new WP_Error(
