@@ -87,6 +87,28 @@ trait RevisionProjectionTrait {
 	}
 
 	/**
+	 * Get the clean protocol record for one revision.
+	 *
+	 * @param \WP\McpSchema\Schema $schema Selected schema.
+	 */
+	abstract public function get_protocol_record( Schema $schema ): Record;
+
+	/**
+	 * Check exact-revision projection availability.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function is_available_for( Schema $schema ): bool {
+		try {
+			$this->get_protocol_record( $schema );
+		} catch ( \Throwable $throwable ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Return a cached projection error for diagnostics.
 	 *
 	 * @param string $revision Exact revision.

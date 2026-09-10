@@ -241,21 +241,6 @@ final class McpResource implements McpComponentInterface {
 	}
 
 	/**
-	 * Check exact-revision projection availability.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function is_available_for( Schema $schema ): bool {
-		try {
-			$this->get_protocol_record( $schema );
-		} catch ( \Throwable $throwable ) {
-			return false;
-		}
-
-		return true;
-	}
-
-	/**
 	 * Execute the resource read.
 	 *
 	 * @param mixed $arguments Read arguments (may be empty).
