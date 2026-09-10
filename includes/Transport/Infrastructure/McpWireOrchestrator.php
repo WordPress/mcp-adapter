@@ -718,17 +718,21 @@ final class McpWireOrchestrator {
 
 		$arguments = is_array( $params['arguments'] ?? null ) ? $params['arguments'] : array();
 		foreach ( $tool->get_header_annotations( $context->schema() ) as $annotation ) {
-			$present    = false;
-			$value      = $this->value_at_path( $arguments, $annotation['path'], $present );
-			$header_key = strtolower( 'mcp-param-' . $annotation['name'] );
+			$present     = false;
+			$value       = $this->value_at_path( $arguments, $annotation['path'], $present );
+			$header_name = 'Mcp-Param-' . $annotation['name'];
 			if ( ! $present || null === $value ) {
 				continue;
 			}
 
-			$raw_header   = $headers[ $header_key ] ?? $headers[ str_replace( '-', '_', $header_key ) ] ?? null;
+			// PHP and WordPress fold "-" and "_" in header names to one form, and
+			// HttpRequestContext stores that form with hyphens. Fold the lookup key the
+			// same way so annotation names containing "_" still find their header.
+			$header_key   = str_replace( '_', '-', strtolower( $header_name ) );
+			$raw_header   = $headers[ $header_key ] ?? null;
 			$header_value = $this->decode_header_value( $raw_header );
 			if ( null === $header_value || ! $this->header_value_matches( $header_value, $value ) ) {
-				return McpErrorFactory::header_mismatch( $id, sprintf( '%s is missing or does not match the request body', $header_key ) );
+				return McpErrorFactory::header_mismatch( $id, sprintf( '%s is missing or does not match the request body', $header_name ) );
 			}
 		}
 
