@@ -880,6 +880,46 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 400, $missing_meta['status'] );
 		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $missing_meta['data']['error']['code'] );
 
+		// A header-selected 2026 request with absent or non-object params must reach the same
+		// invalid-params error instead of failing while the metadata is read.
+		$malformed_params = array(
+			'absent' => array(
+				'jsonrpc' => '2.0',
+				'id'      => 33,
+				'method'  => 'tools/list',
+			),
+			'null'   => array(
+				'jsonrpc' => '2.0',
+				'id'      => 34,
+				'method'  => 'tools/list',
+				'params'  => null,
+			),
+			'string' => array(
+				'jsonrpc' => '2.0',
+				'id'      => 35,
+				'method'  => 'tools/list',
+				'params'  => 'not-an-object',
+			),
+			'list'   => array(
+				'jsonrpc' => '2.0',
+				'id'      => 36,
+				'method'  => 'tools/list',
+				'params'  => array( 1, 2 ),
+			),
+		);
+		foreach ( $malformed_params as $shape => $payload ) {
+			$response = $this->http_post(
+				$payload,
+				array(
+					'MCP-Protocol-Version' => Schemas::V2026_07_28,
+					'Mcp-Method'           => 'tools/list',
+				)
+			);
+			$this->assertSame( 400, $response['status'], "params shape: {$shape}" );
+			$this->assertSame( McpErrorFactory::INVALID_PARAMS, $response['data']['error']['code'], "params shape: {$shape}" );
+			$this->assertSame( $payload['id'], $response['data']['id'], "params shape: {$shape}" );
+		}
+
 		$unsupported = $this->http_post(
 			array(
 				'jsonrpc' => '2.0',
