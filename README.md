@@ -10,7 +10,7 @@ The official WordPress package for MCP integration that exposes WordPress abilit
 
 ## Overview
 
-MCP Adapter bridges WordPress's [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) with exact MCP [`2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/) and [`2026-07-28`](https://modelcontextprotocol.io/specification/2026-07-28/) revisions, giving AI agents a standardized way to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
+MCP Adapter bridges WordPress's [Abilities API](https://developer.wordpress.org/news/2025/11/introducing-the-wordpress-abilities-api/) with exact MCP [`2025-11-25`](https://modelcontextprotocol.io/specification/2025-11-25/) and [`2026-07-28`](https://modelcontextprotocol.io/specification/2026-07-28/) revisions (legacy `2025-06-18`, `2025-03-26`, and `2024-11-05` clients are served through the `2025-11-25` schema), giving AI agents a standardized way to interact with WordPress functionality. It includes HTTP and STDIO transport support, comprehensive error handling, and an extensible architecture for custom integrations.
 
 ## Features
 

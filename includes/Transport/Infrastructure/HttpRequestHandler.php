@@ -9,9 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Record;
-use WP\McpSchema\Schemas;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -79,17 +79,17 @@ class HttpRequestHandler {
 				return new \WP_REST_Response( $session_validation, McpErrorFactory::get_http_status_for_error( $session_validation ) );
 			}
 
-			if ( Schemas::V2025_11_25 !== $context->protocol_version ) {
-				$error = McpErrorFactory::invalid_request( $safe_id, 'MCP-Protocol-Version must be 2025-11-25 for an established 2025 session' );
-				return new \WP_REST_Response( $error, 400 );
-			}
-
 			$session = SessionManager::get_session( get_current_user_id(), (string) $context->session_id );
 			if ( ! is_array( $session ) || ! is_array( $session['client_params'] ?? null ) ) {
 				$error = McpErrorFactory::session_not_found( $safe_id, 'Session context is unavailable' );
 				return new \WP_REST_Response( $error, 404 );
 			}
 			$client_params_2025_11_25 = $session['client_params'];
+
+			$header_error = $this->validate_session_protocol_version( $context->protocol_version, $client_params_2025_11_25, $safe_id );
+			if ( null !== $header_error ) {
+				return new \WP_REST_Response( $header_error, 400 );
+			}
 		}
 
 		$processed = $this->orchestrator->process(
@@ -133,5 +133,32 @@ class HttpRequestHandler {
 		}
 
 		return $response;
+	}
+
+	/**
+	 * Check the MCP-Protocol-Version header against the version negotiated at initialization.
+	 *
+	 * The header must match the negotiated identifier whenever it is sent. It may
+	 * be omitted only for sessions negotiated under a revision that predates the
+	 * header, see {@see McpVersionNegotiator::PROTOCOL_VERSION_HEADER_SINCE}.
+	 *
+	 * @param string|null          $header_version Request header value.
+	 * @param array<string, mixed> $client_params  Stored initialize params.
+	 * @param string|int|null      $request_id     Readable JSON-RPC request ID.
+	 * @return array<string, mixed>|null Error payload, or null when the header is acceptable.
+	 * @since n.e.x.t
+	 */
+	private function validate_session_protocol_version( ?string $header_version, array $client_params, $request_id ): ?array {
+		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );
+
+		if ( null === $header_version ) {
+			return McpVersionNegotiator::requires_protocol_version_header( $negotiated )
+				? McpErrorFactory::invalid_request( $request_id, sprintf( 'MCP-Protocol-Version header is required for a %s session', $negotiated ) )
+				: null;
+		}
+
+		return $header_version === $negotiated
+			? null
+			: McpErrorFactory::invalid_request( $request_id, sprintf( 'MCP-Protocol-Version must be %s for this session', $negotiated ) );
 	}
 }

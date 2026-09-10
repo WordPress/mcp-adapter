@@ -131,16 +131,47 @@ final class DualRevisionProjectionTest extends TestCase {
 		}
 	}
 
-	/** Exact supported identifiers and initialization counter-proposal are finite. */
+	/** Exact schema-backed identifiers, legacy identifiers, and the counter-proposal are finite. */
 	public function test_version_negotiator_supports_only_exact_revisions(): void {
 		$this->assertSame(
 			array( Schemas::V2026_07_28, Schemas::V2025_11_25 ),
 			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS
 		);
+		$this->assertSame(
+			array( '2025-06-18', '2025-03-26', '2024-11-05' ),
+			McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS
+		);
 		$this->assertTrue( McpVersionNegotiator::is_supported( Schemas::V2025_11_25 ) );
 		$this->assertTrue( McpVersionNegotiator::is_supported( Schemas::V2026_07_28 ) );
 		$this->assertFalse( McpVersionNegotiator::is_supported( '2025-06-18' ) );
 		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( Schemas::V2026_07_28 ) );
+		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( '2099-01-01' ) );
+		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( '' ) );
+	}
+
+	/** Legacy identifiers negotiate by name and resolve to the 2025-11-25 schema. */
+	public function test_version_negotiator_serves_legacy_identifiers_through_2025_schema(): void {
+		foreach ( McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS as $legacy ) {
+			$this->assertTrue( McpVersionNegotiator::is_negotiable( $legacy ) );
+			$this->assertFalse( McpVersionNegotiator::is_supported( $legacy ) );
+			$this->assertSame( $legacy, McpVersionNegotiator::negotiate( $legacy ) );
+			$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::schema_version_for( $legacy ) );
+		}
+
+		$this->assertTrue( McpVersionNegotiator::is_negotiable( Schemas::V2025_11_25 ) );
+		$this->assertFalse( McpVersionNegotiator::is_negotiable( Schemas::V2026_07_28 ) );
+		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::schema_version_for( Schemas::V2025_11_25 ) );
+		$this->assertSame( Schemas::V2026_07_28, McpVersionNegotiator::schema_version_for( Schemas::V2026_07_28 ) );
+
+		$this->assertTrue( McpVersionNegotiator::requires_protocol_version_header( Schemas::V2025_11_25 ) );
+		$this->assertTrue( McpVersionNegotiator::requires_protocol_version_header( '2025-06-18' ) );
+		$this->assertFalse( McpVersionNegotiator::requires_protocol_version_header( '2025-03-26' ) );
+		$this->assertFalse( McpVersionNegotiator::requires_protocol_version_header( '2024-11-05' ) );
+
+		$this->assertSame(
+			array( Schemas::V2026_07_28, Schemas::V2025_11_25, '2025-06-18', '2025-03-26', '2024-11-05' ),
+			McpVersionNegotiator::advertised_protocol_versions()
+		);
 	}
 
 	/** Removed standardized Tool fields remain internal dead weight, not 2026 output. */
