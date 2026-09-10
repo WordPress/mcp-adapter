@@ -25,9 +25,9 @@
 		"lint:php:stan": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script phpstan",
 		"plugin-zip": "wp-scripts plugin-zip",
 		"test:php": "npm run wp-env:test -- run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
-		"wp-env": "wp-env",
+		"wp-env": "node bin/patch-wp-env-bullseye.mjs && wp-env",
 		"wp-env:cli": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/",
-		"wp-env:test": "wp-env --config=.wp-env.test.json"
+		"wp-env:test": "node bin/patch-wp-env-bullseye.mjs && wp-env --config=.wp-env.test.json"
 	},
 	"devDependencies": {
 		"@wordpress/env": "^11.14.0",
