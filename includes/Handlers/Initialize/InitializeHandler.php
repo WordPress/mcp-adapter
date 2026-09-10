@@ -51,7 +51,7 @@ class InitializeHandler {
 		$result = $schema->fromArray(
 			InitializeResult::class,
 			array(
-				'protocolVersion' => $request_context->revision(),
+				'protocolVersion' => $request_context->protocol_version(),
 				'capabilities'    => array(
 					'prompts'   => array( 'listChanged' => false ),
 					'resources' => array(

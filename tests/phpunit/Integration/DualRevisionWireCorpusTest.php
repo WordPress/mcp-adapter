@@ -959,6 +959,145 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( McpErrorFactory::SESSION_NOT_FOUND, $after_delete['data']['error']['code'] );
 	}
 
+	/** A 2025-06-18 proposal is echoed, served by the 2025-11-25 schema, and bound to its own header value. */
+	public function test_http_legacy_2025_06_18_session_echoes_identifier_and_requires_matching_header(): void {
+		$initialize = $this->http_post( $this->initialize_payload( 'init-legacy', '2025-06-18' ) );
+		$this->assertSame( 200, $initialize['status'] );
+		$this->assertSame( '2025-06-18', $initialize['data']['result']['protocolVersion'] );
+		$this->assertArrayHasKey( 'Mcp-Session-Id', $initialize['headers'] );
+		$session_id = $initialize['headers']['Mcp-Session-Id'];
+
+		$list = $this->http_post(
+			$this->list_payload( 90 ),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => '2025-06-18',
+			)
+		);
+		$this->assertSame( 200, $list['status'] );
+		$this->assertSame( 'test-always-allowed', $list['data']['result']['tools'][0]['name'] );
+		$this->assertArrayNotHasKey( 'resultType', $list['data']['result'] );
+
+		$mismatch = $this->http_post(
+			$this->list_payload( 91 ),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+		$this->assertSame( 400, $mismatch['status'] );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $mismatch['data']['error']['code'] );
+		$this->assertSame( 91, $mismatch['data']['id'] );
+
+		$missing = $this->http_post( $this->list_payload( 92 ), array( 'Mcp-Session-Id' => $session_id ) );
+		$this->assertSame( 400, $missing['status'] );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $missing['data']['error']['code'] );
+
+		$delete = new WP_REST_Request( 'DELETE', '/mcp' );
+		$delete->set_header( 'MCP-Protocol-Version', '2025-06-18' );
+		$delete->set_header( 'Mcp-Session-Id', $session_id );
+		$delete_response = $this->http->handle_request( new HttpRequestContext( $delete ) );
+		$this->assertSame( 200, $delete_response->get_status() );
+	}
+
+	/** Identifiers that predate the header may omit it, but a sent header must still match. */
+	public function test_http_legacy_pre_header_sessions_may_omit_protocol_version_header(): void {
+		foreach ( array( '2025-03-26', '2024-11-05' ) as $legacy ) {
+			$initialize = $this->http_post( $this->initialize_payload( 'init-' . $legacy, $legacy ) );
+			$this->assertSame( 200, $initialize['status'] );
+			$this->assertSame( $legacy, $initialize['data']['result']['protocolVersion'] );
+			$session_id = $initialize['headers']['Mcp-Session-Id'];
+
+			$without_header = $this->http_post( $this->list_payload( 93 ), array( 'Mcp-Session-Id' => $session_id ) );
+			$this->assertSame( 200, $without_header['status'], $legacy );
+			$this->assertSame( 'test-always-allowed', $without_header['data']['result']['tools'][0]['name'] );
+
+			$with_header = $this->http_post(
+				$this->list_payload( 94 ),
+				array(
+					'Mcp-Session-Id'       => $session_id,
+					'MCP-Protocol-Version' => $legacy,
+				)
+			);
+			$this->assertSame( 200, $with_header['status'], $legacy );
+
+			$mismatch = $this->http_post(
+				$this->list_payload( 95 ),
+				array(
+					'Mcp-Session-Id'       => $session_id,
+					'MCP-Protocol-Version' => Schemas::V2025_11_25,
+				)
+			);
+			$this->assertSame( 400, $mismatch['status'], $legacy );
+			$this->assertSame( McpErrorFactory::INVALID_REQUEST, $mismatch['data']['error']['code'] );
+		}
+	}
+
+	/** Unknown proposals still receive the exact 2025-11-25 counter-proposal. */
+	public function test_http_unknown_initialize_proposal_receives_2025_11_25(): void {
+		$initialize = $this->http_post( $this->initialize_payload( 'init-unknown', '2099-01-01' ) );
+		$this->assertSame( 200, $initialize['status'] );
+		$this->assertSame( Schemas::V2025_11_25, $initialize['data']['result']['protocolVersion'] );
+	}
+
+	/** A legacy header on a request without a session is not an unsupported version. */
+	public function test_http_legacy_header_without_session_requires_initialization(): void {
+		$response = $this->http_post( $this->list_payload( 96 ), array( 'MCP-Protocol-Version' => '2025-06-18' ) );
+		$this->assertSame( 400, $response['status'] );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $response['data']['error']['code'] );
+		$this->assertStringContainsString( 'Mcp-Session-Id', $response['data']['error']['message'] );
+	}
+
+	/** STDIO echoes a legacy proposal and serves the session through the 2025 schema. */
+	public function test_stdio_legacy_initialize_echoes_identifier(): void {
+		$initialize = $this->stdio_request( $this->initialize_payload( 97, '2025-06-18' ) );
+		$this->assertSame( '2025-06-18', $initialize['result']['protocolVersion'] );
+		$this->assertSame(
+			'',
+			$this->stdio_notification(
+				array(
+					'jsonrpc' => '2.0',
+					'method'  => 'notifications/initialized',
+				)
+			)
+		);
+
+		$list = $this->stdio_request( $this->list_payload( 98 ) );
+		$this->assertSame( 'test-always-allowed', $list['result']['tools'][0]['name'] );
+		$this->assertArrayNotHasKey( 'resultType', $list['result'] );
+	}
+
+	/**
+	 * Build one 2025-style initialize payload.
+	 *
+	 * @param string|int $id Request ID.
+	 * @return array<string, mixed>
+	 */
+	private function initialize_payload( $id, string $protocol_version ): array {
+		return array(
+			'jsonrpc' => '2.0',
+			'id'      => $id,
+			'method'  => 'initialize',
+			'params'  => array(
+				'protocolVersion' => $protocol_version,
+				'capabilities'    => new \stdClass(),
+				'clientInfo'      => array(
+					'name'    => 'legacy-test',
+					'version' => '1.0',
+				),
+			),
+		);
+	}
+
+	/** @return array<string, mixed> */
+	private function list_payload( int $id ): array {
+		return array(
+			'jsonrpc' => '2.0',
+			'id'      => $id,
+			'method'  => 'tools/list',
+		);
+	}
+
 	/** Embedded-resource records retain both metadata levels in final JSON for each revision. */
 	public function test_wire_serializes_embedded_resource_without_placeholder_objects(): void {
 		$tool = McpTool::fromArray(

@@ -21,6 +21,9 @@ final class McpRequestContext {
 	/** @var \WP\McpSchema\Schema */
 	private Schema $schema;
 
+	/** @var string */
+	private string $protocol_version;
+
 	/** @var \stdClass */
 	private \stdClass $client_capabilities;
 
@@ -41,6 +44,7 @@ final class McpRequestContext {
 	 * @param \stdClass|null       $client_info         Client identity when supplied.
 	 * @param string               $transport           Transport name.
 	 * @param array<string, mixed> $transport_metadata  Transport-owned metadata.
+	 * @param string|null          $protocol_version    Negotiated protocol version when it differs from the schema revision.
 	 * @since n.e.x.t
 	 */
 	public function __construct(
@@ -48,9 +52,11 @@ final class McpRequestContext {
 		\stdClass $client_capabilities,
 		?\stdClass $client_info,
 		string $transport,
-		array $transport_metadata = array()
+		array $transport_metadata = array(),
+		?string $protocol_version = null
 	) {
 		$this->schema              = $schema;
+		$this->protocol_version    = $protocol_version ?? $schema->version();
 		$this->client_capabilities = self::copy_object( $client_capabilities );
 		$this->client_info         = null === $client_info ? null : self::copy_object( $client_info );
 		$this->transport           = $transport;
@@ -64,6 +70,19 @@ final class McpRequestContext {
 	 */
 	public function revision(): string {
 		return $this->schema->version();
+	}
+
+	/**
+	 * Get the negotiated protocol version.
+	 *
+	 * Equals {@see revision()} unless a legacy identifier is served through the
+	 * 2025-11-25 schema, in which case this is the identifier the peer negotiated
+	 * and expects on the wire.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function protocol_version(): string {
+		return $this->protocol_version;
 	}
 
 	/**

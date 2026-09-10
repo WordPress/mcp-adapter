@@ -1,7 +1,7 @@
 # Architecture overview
 
 MCP Adapter exposes WordPress Abilities as MCP tools, resources, and prompts
-under two exact protocol revisions: `2025-11-25` and `2026-07-28`. It stores
+under two schema-backed protocol revisions: `2025-11-25` and `2026-07-28`. It stores
 component configuration independently of the protocol, then validates every
 request, component projection, result, and response through the exact selected
 `php-mcp-schema` catalog.
@@ -54,12 +54,32 @@ the wire.
 MCP `2025-11-25` implements `initialize`,
 `notifications/initialized`, and `ping`. HTTP initialization may create a
 WordPress-user-bound `Mcp-Session-Id`; subsequent HTTP requests require that
-session and exact `MCP-Protocol-Version: 2025-11-25`. STDIO retains the
-initialization context in the bridge process.
+session and an `MCP-Protocol-Version` header equal to the negotiated
+identifier. STDIO retains the initialization context in the bridge process.
 
 An unsupported initialization proposal receives exact `2025-11-25` as the
 counter-proposal. Initialization never negotiates `2026-07-28` through
 `initialize`.
+
+#### Legacy identifiers
+
+`2025-06-18`, `2025-03-26`, and `2024-11-05` have no schema of their own. When
+a client proposes one of them, `initialize` echoes it back and the session is
+served through the `2025-11-25` schema. This is sound because every
+server-emitted change between those revisions and `2025-11-25` is an optional
+additive field (icons, `serverInfo.description`, tasks, `title`, `_meta`,
+`structuredContent`); the `2025-11-25` projection is a valid response for each
+of them, and official clients that only speak those revisions parse it
+unchanged. `McpRequestContext::protocol_version()` carries the negotiated
+identifier; `revision()` carries the schema revision.
+
+`MCP-Protocol-Version` must equal the negotiated identifier whenever it is sent.
+Sessions negotiated under `2025-03-26` or `2024-11-05` may omit it, because the
+header was introduced in `2025-06-18`. Real `2024-11-05` clients use the
+HTTP+SSE transport, which the Adapter does not implement, so that identifier is
+reachable over STDIO or from newer clients that still send it. The list lives in
+`McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`; extending it requires
+re-checking the additive-only invariant against the official changelogs.
 
 ### `2026-07-28`
 

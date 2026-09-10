@@ -91,7 +91,7 @@ final class McpWireOrchestrator {
 			return 'process';
 		}
 
-		$is_2025 = Schemas::V2025_11_25 === $header_revision || null === $header_revision;
+		$is_2025 = null === $header_revision || McpVersionNegotiator::is_negotiable( $header_revision );
 		return $is_2025 && 'DELETE' === $method ? 'terminate-session' : 'reject';
 	}
 
@@ -355,8 +355,8 @@ final class McpWireOrchestrator {
 		}
 
 		$requested = is_string( $body_revision ) ? $body_revision : $header_revision;
-		if ( null !== $requested && ! McpVersionNegotiator::is_supported( $requested ) ) {
-			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS );
+		if ( null !== $requested && ! McpVersionNegotiator::is_negotiable( $requested ) ) {
+			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, McpVersionNegotiator::advertised_protocol_versions() );
 		}
 
 		if ( 'initialize' === $method ) {
@@ -370,14 +370,33 @@ final class McpWireOrchestrator {
 		return Schemas::V2025_11_25;
 	}
 
-	/** Construct the 2025 initialization/session context. */
+	/**
+	 * Construct the 2025 initialization/session context.
+	 *
+	 * The negotiated identifier comes from the client's own proposal, so a
+	 * legacy revision is echoed while the 2025-11-25 schema serves it. See
+	 * {@see McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS}.
+	 */
 	private function context_2025_11_25( array $generic, string $transport, array $metadata, ?array $client_params_2025_11_25 ): McpRequestContext {
 		$params       = 'initialize' === $generic['method'] ? ( $generic['params'] ?? array() ) : ( $client_params_2025_11_25 ?? array() );
 		$capabilities = $this->to_object( $params['capabilities'] ?? array() );
 		$client_info  = isset( $params['clientInfo'] ) ? $this->to_object( $params['clientInfo'] ) : null;
+		$negotiated   = self::negotiated_protocol_version( $params );
 
-		$schema = $this->transport_context->mcp_server->get_schemas()->forVersion( Schemas::V2025_11_25 );
-		return new McpRequestContext( $schema, $capabilities, $client_info, $transport, $metadata );
+		$schema = $this->transport_context->mcp_server->get_schemas()->forVersion( McpVersionNegotiator::schema_version_for( $negotiated ) );
+		return new McpRequestContext( $schema, $capabilities, $client_info, $transport, $metadata, $negotiated );
+	}
+
+	/**
+	 * Resolve the protocol version negotiated from stored or inbound 2025 initialize params.
+	 *
+	 * @param array<string, mixed> $client_params Initialize params.
+	 * @since n.e.x.t
+	 */
+	public static function negotiated_protocol_version( array $client_params ): string {
+		$proposed = $client_params['protocolVersion'] ?? null;
+
+		return McpVersionNegotiator::negotiate( is_string( $proposed ) ? $proposed : '' );
 	}
 
 	/** Construct the 2026 per-request context. */

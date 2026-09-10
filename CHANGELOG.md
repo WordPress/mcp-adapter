@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 ## [Unreleased] - TBD
 
 ### Breaking Changes
-- Supported MCP revisions are now exactly `2025-11-25` and `2026-07-28`. Negotiation for `2025-06-18` and `2024-11-05` has been removed.
+- Schema-backed MCP revisions are exactly `2025-11-25` and `2026-07-28`. `2025-06-18` and `2024-11-05` no longer have their own DTOs; they are negotiated as legacy identifiers and served through the `2025-11-25` schema (see Added). `McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS` now lists only the schema-backed revisions; legacy identifiers moved to `McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`.
 - Protocol-facing server getters `get_tools()`, `get_resources()`, `get_prompts()`, and `get_prompt()` require a selected `Schema`. There is no implicit default revision.
 - The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/dual-revision-schema-runtime.md).
 - `McpToolValidator`, `McpResourceValidator`, `McpPromptValidator`, `McpErrorFactory::validate_jsonrpc_message()`, `McpServer::is_mcp_validation_enabled()`, and the `mcp_adapter_validation_enabled` filter have been removed. Wire validation always runs through the selected schema.
@@ -15,6 +15,8 @@ All notable changes to this project will be documented in this file, per [the Ke
 - `wp mcp-adapter list` adds per-revision tool, resource, and prompt columns.
 
 ### Added
+- Legacy MCP identifiers `2025-06-18`, `2025-03-26`, and `2024-11-05` negotiate through `initialize` and are echoed back verbatim while the `2025-11-25` schema serves the session. Every server-emitted difference between those revisions and `2025-11-25` is an optional additive field, so the projection is unchanged. `MCP-Protocol-Version` must match the negotiated identifier when sent, and may be omitted only for sessions negotiated under `2025-03-26` or `2024-11-05`, which predate the header. `2025-03-26` is newly negotiable.
+- `McpRequestContext::protocol_version()` returns the negotiated identifier; `revision()` continues to return the schema revision.
 - MCP `2026-07-28` support: the sessionless `server/discover` lifecycle, per-request protocol metadata in the request body, and the `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`, and `Mcp-Param-*` headers over HTTP. STDIO accepts either revision per line.
 - `McpRequestContext`, an immutable per-request context carrying the selected schema, transport, and session data.
 - `McpWireOrchestrator` and `JsonRpcRequestDecoder`, one decode, validate, dispatch, and encode boundary shared by the HTTP and STDIO transports.
