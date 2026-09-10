@@ -23,7 +23,7 @@
 		"lint:php": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script lint",
 		"lint:php:fix": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script format",
 		"lint:php:stan": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ composer run-script phpstan",
-		"plugin-zip": "bash tests/artifact/verify.sh",
+		"plugin-zip": "wp-scripts plugin-zip",
 		"test:php": "npm run wp-env:test -- run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/ vendor/bin/phpunit -c phpunit.xml.dist",
 		"wp-env": "node bin/patch-wp-env-bullseye.mjs && wp-env",
 		"wp-env:cli": "wp-env run cli --env-cwd=wp-content/plugins/$(basename \"$(pwd)\")/",
