@@ -23,7 +23,7 @@ interface McpRestTransportInterface extends McpTransportInterface {
 ## Custom REST transport
 
 Delegate MCP processing to `HttpRequestHandler`. It owns the exact 2025 session
-lifecycle, the sessionless 2026 lifecycle, Origin checks, revision selection,
+lifecycle, the sessionless 2026 lifecycle, revision selection,
 header validation, schema hydration, response encoding, and HTTP status.
 
 ```php

@@ -37,10 +37,6 @@ class HttpRequestHandler {
 
 	/** Route one HTTP request. */
 	public function handle_request( HttpRequestContext $context ): \WP_REST_Response {
-		if ( ! $this->is_valid_origin( $context->origin_header ) ) {
-			return new \WP_REST_Response( McpErrorFactory::permission_denied( null, 'Invalid Origin header' ), 403 );
-		}
-
 		$action = $this->orchestrator->http_method_action( $context->method, $context->protocol_version );
 		if ( 'process' === $action ) {
 			return $this->handle_post( $context );
@@ -137,67 +133,5 @@ class HttpRequestHandler {
 		}
 
 		return $response;
-	}
-
-	/** Validate a present browser Origin against this WordPress installation. */
-	private function is_valid_origin( ?string $origin ): bool {
-		if ( null === $origin || '' === $origin ) {
-			return true;
-		}
-
-		/**
-		 * Filters exact HTTP origins allowed to call MCP endpoints.
-		 *
-		 * @since n.e.x.t
-		 *
-		 * @param list<string> $origins Allowed origins.
-		 * @param \WP\MCP\Core\McpServer $server MCP server.
-		 */
-		$allowed = apply_filters(
-			'mcp_adapter_allowed_http_origins',
-			array( home_url(), site_url(), rest_url() ),
-			$this->transport_context->mcp_server
-		);
-		if ( ! is_array( $allowed ) ) {
-			return false;
-		}
-
-		$normalized = $this->normalize_origin( $origin, true );
-		if ( null === $normalized ) {
-			return false;
-		}
-		foreach ( $allowed as $candidate ) {
-			if ( is_string( $candidate ) && $normalized === $this->normalize_origin( $candidate, false ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/** Normalize an origin to scheme, host, and effective port. */
-	private function normalize_origin( string $url, bool $strict_origin ): ?string {
-		$parts = wp_parse_url( $url );
-		if ( ! is_array( $parts ) || ! isset( $parts['scheme'], $parts['host'] ) ) {
-			return null;
-		}
-		if (
-			$strict_origin
-			&& (
-				isset( $parts['user'] )
-				|| isset( $parts['pass'] )
-				|| isset( $parts['query'] )
-				|| isset( $parts['fragment'] )
-				|| ( isset( $parts['path'] ) && '' !== $parts['path'] && '/' !== $parts['path'] )
-			)
-		) {
-			return null;
-		}
-
-		$scheme = strtolower( (string) $parts['scheme'] );
-		$host   = strtolower( (string) $parts['host'] );
-		$port   = isset( $parts['port'] ) ? (int) $parts['port'] : ( 'https' === $scheme ? 443 : 80 );
-
-		return sprintf( '%s://%s:%d', $scheme, $host, $port );
 	}
 }
