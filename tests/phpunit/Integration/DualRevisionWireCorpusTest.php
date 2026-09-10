@@ -642,6 +642,59 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 200, $nested_response['status'] );
 	}
 
+	/** An x-mcp-header name containing "_" still finds its header after WordPress folds the name. */
+	public function test_http_2026_matches_underscore_tool_parameter_headers(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'tenant-tool',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'tenant' => array(
+							'type'         => 'string',
+							'x-mcp-header' => 'tenant_id',
+						),
+					),
+				),
+				'handler'     => static fn( array $arguments ): array => $arguments,
+				'permission'  => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+		$payload = array(
+			'jsonrpc' => '2.0',
+			'id'      => 15,
+			'method'  => 'tools/call',
+			'params'  => array(
+				'name'      => 'tenant-tool',
+				'arguments' => array( 'tenant' => 'acme' ),
+				'_meta'     => $this->meta_2026_07_28(),
+			),
+		);
+		$headers = array(
+			'MCP-Protocol-Version' => Schemas::V2026_07_28,
+			'Mcp-Method'           => 'tools/call',
+			'Mcp-Name'             => 'tenant-tool',
+			'Mcp-Param-tenant_id'  => 'acme',
+		);
+
+		$valid = $this->http_post( $payload, $headers );
+		$this->assertSame( 200, $valid['status'] );
+
+		$headers['Mcp-Param-tenant_id'] = 'other';
+		$mismatch                       = $this->http_post( $payload, $headers );
+		$this->assertSame( 400, $mismatch['status'] );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $mismatch['data']['error']['code'] );
+
+		unset( $headers['Mcp-Param-tenant_id'] );
+		$missing = $this->http_post( $payload, $headers );
+		$this->assertSame( 400, $missing['status'] );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $missing['data']['error']['code'] );
+	}
+
 	/** Modern requests reject removed and noncanonical methods before dispatch. */
 	public function test_http_2026_rejects_ping_and_tools_list_all(): void {
 		foreach ( array( 'initialize', 'notifications/initialized', 'ping', 'tools/list/all', 'logging/setLevel', 'roots/list', 'tasks/get', 'elicitation/create' ) as $method ) {
