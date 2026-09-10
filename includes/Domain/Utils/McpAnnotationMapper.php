@@ -74,7 +74,7 @@ class McpAnnotationMapper {
 		'openWorldHint'   => array(
 			'type'             => 'boolean',
 			'features'         => array( 'tool' ),
-			'ability_property' => null,
+			'ability_property' => 'open_world',
 		),
 		'title'           => array(
 			'type'             => 'string',
