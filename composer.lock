@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "19b8fa73490504c907697a3fd15d9add",
+    "content-hash": "9b6ad5cf0faf06969beb9fcd767d39f2",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -76,12 +76,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/WordPress/php-mcp-schema.git",
-                "reference": "5e08fc16189d22ce9dac651ab11347af4ffc5f22"
+                "reference": "57be52482554b4b205ccdac15be56810551bd8b2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/5e08fc16189d22ce9dac651ab11347af4ffc5f22",
-                "reference": "5e08fc16189d22ce9dac651ab11347af4ffc5f22",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/57be52482554b4b205ccdac15be56810551bd8b2",
+                "reference": "57be52482554b4b205ccdac15be56810551bd8b2",
                 "shasum": ""
             },
             "require": {
@@ -135,7 +135,7 @@
                 "source": "https://github.com/WordPress/php-mcp-schema/tree/feature/dual-revision-schema-runtime",
                 "issues": "https://github.com/WordPress/php-mcp-schema/issues"
             },
-            "time": "2026-09-02T10:12:00+00:00"
+            "time": "2026-09-10T09:04:48+00:00"
         }
     ],
     "packages-dev": [
