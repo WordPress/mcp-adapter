@@ -72,8 +72,7 @@ MCP 2026 HTTP validates `MCP-Protocol-Version`, `Mcp-Method`, applicable
 `Mcp-Name`, and declared `Mcp-Param-*` values against the body. Missing or
 mismatched headers return HTTP 400 with `-32020`. Unsupported per-request
 versions return `-32022` with `requested` and `supported`. Removed or
-unimplemented methods return `-32601`. A present browser `Origin` must match an
-allowed WordPress origin before the request is processed.
+unimplemented methods return `-32601`.
 
 STDIO has no header layer. A single bridge can process initialized 2025 lines
 and self-contained 2026 lines without changing global revision state.
@@ -143,6 +142,6 @@ npm run plugin-zip
 
 The PHPUnit corpus includes conforming raw HTTP and STDIO lifecycle, tool,
 resource, and prompt positives for both revisions; cross-revision method
-negatives; Origin, header, metadata, numeric, and unsupported-version failures;
+negatives; header, metadata, numeric, and unsupported-version failures;
 ordinary Ability execution; hook preservation; isolated component projections;
 and forbidden-symbol scans.

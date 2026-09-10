@@ -904,58 +904,18 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response['headers'] );
 	}
 
-	/** Present Origin must match the WordPress installation. */
-	public function test_http_validates_origin_and_ignores_modern_session_headers(): void {
+	/** Modern requests ignore 2025 session headers. */
+	public function test_http_2026_ignores_session_headers(): void {
 		$valid = $this->http_request_2026_07_28(
 			'tools/list',
 			79,
 			array(),
 			array(
-				'Origin'         => home_url(),
 				'Mcp-Session-Id' => 'ignored',
 				'Last-Event-ID'  => 'ignored',
 			)
 		);
 		$this->assertSame( 200, $valid['status'] );
-
-		$invalid = $this->http_request_2026_07_28(
-			'tools/list',
-			80,
-			array(),
-			array( 'Origin' => 'https://evil.example' )
-		);
-		$this->assertSame( 403, $invalid['status'] );
-	}
-
-	/** The Origin allowlist filter accepts exact origins and invalid filter values fail closed. */
-	public function test_http_origin_allowlist_filter_is_enforced_fail_closed(): void {
-		$allow = static fn(): array => array( 'https://trusted.example' );
-		add_filter( 'mcp_adapter_allowed_http_origins', $allow );
-		try {
-			$trusted = $this->http_request_2026_07_28(
-				'tools/list',
-				84,
-				array(),
-				array( 'Origin' => 'https://trusted.example' )
-			);
-		} finally {
-			remove_filter( 'mcp_adapter_allowed_http_origins', $allow );
-		}
-		$this->assertSame( 200, $trusted['status'] );
-
-		$invalid = static fn(): string => 'https://trusted.example';
-		add_filter( 'mcp_adapter_allowed_http_origins', $invalid );
-		try {
-			$rejected = $this->http_request_2026_07_28(
-				'tools/list',
-				85,
-				array(),
-				array( 'Origin' => 'https://trusted.example' )
-			);
-		} finally {
-			remove_filter( 'mcp_adapter_allowed_http_origins', $invalid );
-		}
-		$this->assertSame( 403, $rejected['status'] );
 	}
 
 	/** GET and DELETE are unavailable for the sessionless 2026 transport. */

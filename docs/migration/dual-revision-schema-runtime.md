@@ -131,9 +131,6 @@ requires body metadata plus `MCP-Protocol-Version`, `Mcp-Method`, applicable
 `Mcp-Name`, and declared `Mcp-Param-*` headers. STDIO carries revision metadata
 in each modern request body and can alternate exact revisions line by line.
 
-Present browser `Origin` headers must match the WordPress installation or an
-origin allowed through `mcp_adapter_allowed_http_origins`.
-
 Batch requests are rejected before dispatch.
 
 ## Verification

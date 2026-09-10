@@ -225,7 +225,6 @@ final class HttpSessionValidatorTest extends TestCase {
 
 		$context = new HttpRequestContext( $request );
 
-		$this->assertSame( 'https://example.org', $context->origin_header );
 		$this->assertCount( 2, $context->headers );
 		$this->assertSame( 'tools/call', $context->headers['mcp-method'] );
 		$this->assertSame( 'eu', $context->headers['mcp-param-region'] );

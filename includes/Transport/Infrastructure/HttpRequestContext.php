@@ -62,9 +62,6 @@ class HttpRequestContext {
 	 */
 	public ?string $accept_header;
 
-	/** @var string|null Origin header used only for DNS-rebinding protection. */
-	public ?string $origin_header;
-
 	/**
 	 * Constructor.
 	 *
@@ -76,7 +73,6 @@ class HttpRequestContext {
 		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
-		$this->origin_header    = $request->get_header( 'origin' );
 		$this->raw_body         = 'POST' === $this->method ? ( $request->get_body() ?? '' ) : '';
 		$this->headers          = array();
 		foreach ( $request->get_headers() as $name => $values ) {
