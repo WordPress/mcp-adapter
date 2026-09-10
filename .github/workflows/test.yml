@@ -234,6 +234,9 @@ jobs:
         run: |
           npm run test:php
 
+      - name: Run WP-CLI command registration tests
+        run: npm run test:cli
+
       - name: Upload code coverage report
         continue-on-error: true
         if: ${{ matrix.coverage }}

@@ -19,13 +19,13 @@ Serves an MCP server via STDIO transport for communication with MCP clients.
 #### Syntax
 
 ```bash
-wp mcp-adapter serve [--server=<server-id>] [--user=<id|login|email>]
+wp mcp-adapter serve [--server=<server-id>]
 ```
 
 #### Options
 
 - `--server=<server-id>` - The ID of the MCP server to serve. If not specified, uses the first available server.
-- `--user=<id|login|email>` - Run as a specific WordPress user for permission checks. Without this, runs as unauthenticated (limited capabilities).
+- `--user=<id|login|email>` is a WP-CLI global option that selects the WordPress user for permission checks. It is not a `mcp-adapter serve` option. Without it, the server runs as unauthenticated with limited capabilities.
 
 #### Examples
 
