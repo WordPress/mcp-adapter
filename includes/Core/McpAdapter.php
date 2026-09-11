@@ -191,9 +191,9 @@ final class McpAdapter {
 	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize.
 	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
 	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
-	 * @param list<string> $tools Ability names to register as tools.
-	 * @param list<string> $resources Resources to register.
-	 * @param list<string> $prompts Prompts to register.
+	 * @param list<string|\WP\MCP\Domain\Tools\McpTool> $tools Ability names or MCP tools to register.
+	 * @param list<string|\WP\MCP\Domain\Resources\McpResource> $resources Ability names or MCP resources to register.
+	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Ability names, MCP prompts, or prompt builders to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
 	 * @return \WP\MCP\Core\McpAdapter|\WP_Error McpAdapter instance on success, WP_Error on failure.

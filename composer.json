@@ -57,7 +57,7 @@
 	"require": {
 		"php": "^7.4 || ^8.0",
 		"automattic/jetpack-autoloader": "^5.0",
-		"wordpress/php-mcp-schema": "^0.1.0",
+		"wordpress/php-mcp-schema": "^0.2.0",
 		"ext-json": "*"
 	},
 	"require-dev": {

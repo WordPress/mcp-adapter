@@ -1,6 +1,6 @@
 <?php
 /**
- * HTTP Request Handler for MCP Transport
+ * HTTP request handler for exact MCP revisions.
  *
  * @package McpAdapter
  */
@@ -11,342 +11,154 @@ namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\McpSchema\Record;
 
-// Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
-/**
- * Handles HTTP request routing and processing for MCP transports.
- *
- * Centralizes request routing logic to eliminate duplication and provide
- * consistent request handling across transport implementations.
- *
- * @internal
- */
+/** Handles HTTP lifecycle, sessions, and raw-wire responses. */
 class HttpRequestHandler {
 
-	/**
-	 * The transport context.
-	 *
-	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
-	 */
+	/** @var \WP\MCP\Transport\Infrastructure\McpTransportContext */
 	public McpTransportContext $transport_context;
 
-	/**
-	 * Constructor.
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context The transport context.
-	 */
+	/** @var \WP\MCP\Transport\Infrastructure\McpWireOrchestrator */
+	private McpWireOrchestrator $orchestrator;
+
+	/** Constructor. */
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->transport_context = $transport_context;
+		$this->orchestrator      = new McpWireOrchestrator( $transport_context );
 	}
 
-	/**
-	 * Get the transport context.
-	 *
-	 * @since 0.5.0
-	 *
-	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext
-	 */
+	/** Get transport context. */
 	public function get_transport_context(): McpTransportContext {
 		return $this->transport_context;
 	}
 
-	/**
-	 * Route HTTP request to appropriate handler.
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return \WP_REST_Response HTTP response.
-	 */
+	/** Route one HTTP request. */
 	public function handle_request( HttpRequestContext $context ): \WP_REST_Response {
-		// Handle POST requests (sending MCP messages to server)
-		if ( 'POST' === $context->method ) {
-			return $this->handle_mcp_request( $context );
+		$action = $this->orchestrator->http_method_action( $context->method, $context->protocol_version );
+		if ( 'process' === $action ) {
+			return $this->handle_post( $context );
 		}
 
-		// Handle GET requests (reserved for SSE streaming; currently not implemented).
-		if ( 'GET' === $context->method ) {
-			return $this->handle_sse_request();
-		}
-
-		// Handle DELETE requests (session termination)
-		if ( 'DELETE' === $context->method ) {
-			return $this->handle_session_termination( $context );
-		}
-
-		// Method not allowed
-		return new \WP_REST_Response(
-			McpErrorFactory::invalid_request( null, 'Method not allowed' )->toArray(),
-			405
-		);
-	}
-
-
-	/**
-	 * Handle MCP POST requests.
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return \WP_REST_Response MCP response.
-	 */
-	private function handle_mcp_request( HttpRequestContext $context ): \WP_REST_Response {
-		try {
-			// Validate request body
-			if ( null === $context->body ) {
-				return new \WP_REST_Response(
-					McpErrorFactory::parse_error( null, 'Invalid JSON in request body' )->toArray(),
-					400
-				);
+		if ( 'terminate-session' === $action ) {
+			$result = HttpSessionValidator::terminate_session_with_error_handler( $context, $this->transport_context->error_handler );
+			if ( true !== $result ) {
+				return new \WP_REST_Response( $result, McpErrorFactory::get_http_status_for_error( $result ) );
 			}
 
-			return $this->process_mcp_messages( $context );
-		} catch ( \Throwable $exception ) {
-			$this->transport_context->mcp_server->get_error_handler()->log(
-				'Unexpected error in handle_mcp_request',
-				array(
-					'transport' => static::class,
-					'server_id' => $this->transport_context->mcp_server->get_server_id(),
-					'error'     => $exception->getMessage(),
-				)
-			);
-
-			return new \WP_REST_Response(
-				McpErrorFactory::internal_error( null, 'Handler error occurred' )->toArray(),
-				500
-			);
-		}
-	}
-
-	/**
-	 * Process MCP messages using JsonRpcResponseBuilder.
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return \WP_REST_Response MCP response.
-	 */
-	private function process_mcp_messages( HttpRequestContext $context ): \WP_REST_Response {
-		$is_batch_request = JsonRpcResponseBuilder::is_batch_request( $context->body );
-		$messages         = JsonRpcResponseBuilder::normalize_messages( $context->body );
-
-		$response_body = JsonRpcResponseBuilder::process_messages(
-			$messages,
-			$is_batch_request,
-			function ( array $message ) use ( $context ) {
-				return $this->process_single_message( $message, $context );
-			}
-		);
-
-		// Per MCP spec 2025-06-18: Notifications return HTTP 202 Accepted with no body.
-		// A null response_body indicates only notifications were processed (no requests with IDs).
-		if ( null === $response_body ) {
-			return new \WP_REST_Response( null, 202 );
+			return new \WP_REST_Response( null, 200 );
 		}
 
-		// Determine HTTP status code based on error type
-		if ( ! $is_batch_request && isset( $response_body['error'] ) ) {
-			$http_status = McpErrorFactory::get_http_status_for_error( $response_body );
-
-			return new \WP_REST_Response( $response_body, $http_status );
-		}
-
-		return new \WP_REST_Response( $response_body, 200 );
-	}
-
-	/**
-	 * Process a single MCP message.
-	 *
-	 * @param array $message The MCP JSON-RPC message.
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return array|null JSON-RPC response or null for notifications.
-	 */
-	private function process_single_message( array $message, HttpRequestContext $context ): ?array {
-		// Validate JSON-RPC message format
-		$validation = McpErrorFactory::validate_jsonrpc_message( $message );
-		if ( true !== $validation ) {
-			return $validation->toArray();
-		}
-
-		// Handle notifications (no response required)
-		if ( isset( $message['method'] ) && ! isset( $message['id'] ) ) {
-			return null; // Notifications don't get a response
-		}
-
-		// Process requests with IDs
-		if ( isset( $message['method'] ) && isset( $message['id'] ) ) {
-			return $this->process_jsonrpc_request( $message, $context );
-		}
-
-		// JSON-RPC responses from client (has result/error, no method) also return null.
-		// Per MCP spec: client responses get HTTP 202 Accepted with no body, same as notifications.
-		return null;
-	}
-
-	/**
-	 * Process a JSON-RPC request message.
-	 *
-	 * @param array $message The JSON-RPC message.
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return array JSON-RPC response.
-	 */
-	private function process_jsonrpc_request( array $message, HttpRequestContext $context ): array {
-		$request_id = $message['id']; // Preserve original scalar ID (string, number, or null)
-		$method     = $message['method'];
-		$params     = $message['params'] ?? array();
-
-		// Validate session for all requests except initialize (router will handle initialize session creation)
-		if ( 'initialize' !== $method ) {
-			$session_validation = HttpSessionValidator::validate_session_with_error_handler( $context, $this->transport_context->error_handler );
-			if ( true !== $session_validation ) {
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $session_validation['error'] ?? $session_validation );
-			}
-
-			// Validate MCP-Protocol-Version header for non-initialize requests.
-			$protocol_version_error = $this->validate_protocol_version_header( $context );
-			if ( null !== $protocol_version_error ) {
-				return JsonRpcResponseBuilder::create_error_response( $request_id, $protocol_version_error );
-			}
-		}
-
-		// Route the request through the transport context
-		$result = $this->transport_context->request_router->route_request(
-			$method,
-			$params,
-			$request_id,
-			$this->get_transport_name(),
-			$context
-		);
-
-		// Handle session header if provided by router
-		if ( isset( $result['_session_id'] ) ) {
-			$this->add_session_header_to_response( $result['_session_id'] );
-			unset( $result['_session_id'] ); // Remove from actual response data
-		}
-
-		// Format response based on result
-		if ( isset( $result['error'] ) ) {
-			return JsonRpcResponseBuilder::create_error_response( $request_id, $result['error'] );
-		}
-
-		return JsonRpcResponseBuilder::create_success_response( $request_id, $result );
-	}
-
-	/**
-	 * Get transport name for observability.
-	 *
-	 * @return string Transport name.
-	 */
-	private function get_transport_name(): string {
-		return 'HTTP';
-	}
-
-	/**
-	 * Validate the MCP-Protocol-Version header on non-initialize requests.
-	 *
-	 * A missing header is accepted (returns null). A header containing a supported
-	 * version is also accepted. An unsupported version returns a JSON-RPC
-	 * invalid-request error payload.
-	 *
-	 * @since 0.5.0
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return array{
-	 *   code: int,
-	 *   message: string,
-	 *   data: mixed|null
-	 * }|null Null when the header is absent or valid, error payload otherwise.
-	 */
-	private function validate_protocol_version_header( HttpRequestContext $context ): ?array {
-		if ( null === $context->protocol_version ) {
-			return null;
-		}
-
-		if ( McpVersionNegotiator::is_supported( $context->protocol_version ) ) {
-			return null;
-		}
-
-		/**
-		 * Necessary because the McpSchema's `Error` class doesn't allow for type-hinted array shapes.
-		 *
-		 * @var array{
-		 *   code: int,
-		 *   message: string,
-		 *   data: mixed|null
-		 * } $error
-		 */
-		$error = McpErrorFactory::create_error( // phpcs:ignore SlevomatCodingStandard.Variables.UselessVariable.UselessVariable
-			McpErrorFactory::INVALID_REQUEST,
-			sprintf(
-				'Bad Request: Unsupported protocol version: %s (supported versions: %s)',
-				$context->protocol_version,
-				implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
-			)
-		)->toArray();
-		return $error;
-	}
-
-	/**
-	 * Add session header to the REST response.
-	 *
-	 * Uses a static flag to prevent multiple filters from being added
-	 * if this method is called multiple times during a single request
-	 * (e.g., during batch JSON-RPC processing).
-	 *
-	 * @param string $session_id The session ID to add to the response header.
-	 *
-	 * @return void
-	 */
-	private function add_session_header_to_response( string $session_id ): void {
-		static $current_session_id = null;
-
-		// Only add filter once per request, or if session ID changes
-		if ( null !== $current_session_id && $current_session_id === $session_id ) {
-			return;
-		}
-
-		add_filter(
-			'rest_post_dispatch',
-			static function ( $response ) use ( $session_id ) {
-				if ( $response instanceof \WP_REST_Response ) {
-					$response->header( 'Mcp-Session-Id', $session_id );
-				}
-
-				return $response;
-			}
-		);
-
-		$current_session_id = $session_id;
-	}
-
-	/**
-	 * Handle GET requests (SSE streaming).
-	 *
-	 * @return \WP_REST_Response SSE response.
-	 */
-	private function handle_sse_request(): \WP_REST_Response {
-		// SSE streaming not yet implemented - return HTTP 405 with no body
 		return new \WP_REST_Response( null, 405 );
 	}
 
-	/**
-	 * Handle DELETE requests (session termination).
-	 *
-	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context The HTTP request context.
-	 *
-	 * @return \WP_REST_Response Termination response.
-	 */
-	private function handle_session_termination( HttpRequestContext $context ): \WP_REST_Response {
-		$result = HttpSessionValidator::terminate_session_with_error_handler( $context, $this->transport_context->error_handler );
-
-		if ( true !== $result ) {
-			$http_status = McpErrorFactory::get_http_status_for_error( $result );
-
-			return new \WP_REST_Response( $result, $http_status );
+	/** Handle one raw POST body. */
+	private function handle_post( HttpRequestContext $context ): \WP_REST_Response {
+		try {
+			$message = $this->orchestrator->decode( $context->raw_body );
+		} catch ( \UnexpectedValueException | \RangeException $exception ) {
+			return new \WP_REST_Response( McpErrorFactory::invalid_request( null, $exception->getMessage() ), 400 );
+		} catch ( \Throwable $throwable ) {
+			return new \WP_REST_Response( McpErrorFactory::parse_error( null, $throwable->getMessage() ), 400 );
 		}
 
-		return new \WP_REST_Response( null, 200 );
+		$method                   = isset( $message->method ) && is_string( $message->method ) ? $message->method : null;
+		$raw_id                   = $message->id ?? null;
+		$safe_id                  = is_string( $raw_id ) || is_int( $raw_id ) ? $raw_id : null;
+		$client_params_2025_11_25 = null;
+
+		if ( $this->orchestrator->requires_2025_11_25_http_session( $message, $context->protocol_version ) ) {
+			$session_validation = HttpSessionValidator::validate_session_with_error_handler(
+				$context,
+				$this->transport_context->error_handler,
+				$safe_id
+			);
+			if ( true !== $session_validation ) {
+				return new \WP_REST_Response( $session_validation, McpErrorFactory::get_http_status_for_error( $session_validation ) );
+			}
+
+			$session = SessionManager::get_session( get_current_user_id(), (string) $context->session_id );
+			if ( ! is_array( $session ) || ! is_array( $session['client_params'] ?? null ) ) {
+				$error = McpErrorFactory::session_not_found( $safe_id, 'Session context is unavailable' );
+				return new \WP_REST_Response( $error, 404 );
+			}
+			$client_params_2025_11_25 = $session['client_params'];
+
+			$header_error = $this->validate_session_protocol_version( $context->protocol_version, $client_params_2025_11_25, $safe_id );
+			if ( null !== $header_error ) {
+				return new \WP_REST_Response( $header_error, 400 );
+			}
+		}
+
+		$processed = $this->orchestrator->process(
+			$message,
+			'HTTP',
+			array(
+				'headers'          => $context->headers,
+				'protocol_version' => $context->protocol_version,
+				'session_id'       => $context->session_id,
+			),
+			$client_params_2025_11_25
+		);
+
+		if ( null === $processed['response'] ) {
+			return new \WP_REST_Response( null, 202 );
+		}
+
+		$new_session_id = null;
+		if ( 'initialize' === $method && $processed['response'] instanceof Record && is_array( $processed['initializeParams'] ) ) {
+			$session = HttpSessionValidator::create_session_with_error_handler(
+				$processed['initializeParams'],
+				$this->transport_context->error_handler,
+				$safe_id
+			);
+			if ( is_array( $session ) ) {
+				return new \WP_REST_Response( $session, McpErrorFactory::get_http_status_for_error( $session ) );
+			}
+			$new_session_id = $session;
+		}
+
+		$data     = $processed['response'] instanceof Record ? $processed['response']->jsonSerialize() : $processed['response'];
+		$status   = $this->orchestrator->http_response_status(
+			$processed['response'],
+			$processed['context'],
+			$message,
+			$context->protocol_version
+		);
+		$response = new \WP_REST_Response( $data, $status );
+		if ( null !== $new_session_id ) {
+			$response->header( 'Mcp-Session-Id', $new_session_id );
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Check the MCP-Protocol-Version header against the version negotiated at initialization.
+	 *
+	 * The header must match the negotiated identifier whenever it is sent. It may
+	 * be omitted only for sessions negotiated under a revision that predates the
+	 * header, see {@see McpVersionNegotiator::PROTOCOL_VERSION_HEADER_SINCE}.
+	 *
+	 * @param string|null          $header_version Request header value.
+	 * @param array<string, mixed> $client_params  Stored initialize params.
+	 * @param string|int|null      $request_id     Readable JSON-RPC request ID.
+	 * @return array<string, mixed>|null Error payload, or null when the header is acceptable.
+	 * @since n.e.x.t
+	 */
+	private function validate_session_protocol_version( ?string $header_version, array $client_params, $request_id ): ?array {
+		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );
+
+		if ( null === $header_version ) {
+			return McpVersionNegotiator::requires_protocol_version_header( $negotiated )
+				? McpErrorFactory::invalid_request( $request_id, sprintf( 'MCP-Protocol-Version header is required for a %s session', $negotiated ) )
+				: null;
+		}
+
+		return $header_version === $negotiated
+			? null
+			: McpErrorFactory::invalid_request( $request_id, sprintf( 'MCP-Protocol-Version must be %s for this session', $negotiated ) );
 	}
 }

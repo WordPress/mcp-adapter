@@ -9,8 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Handlers\System;
 
-use WP\McpSchema\Common\AbstractDataTransferObject;
-use WP\McpSchema\Common\Protocol\DTO\Result;
+use WP\MCP\Core\McpRequestContext;
+use WP\McpSchema\Record\PingRequest;
 
 /**
  * Handles system-related MCP methods.
@@ -19,9 +19,13 @@ class SystemHandler {
 	/**
 	 * Handles the ping request.
 	 *
-	 * @return \WP\McpSchema\Common\AbstractDataTransferObject Empty result DTO per MCP specification.
+	 * @param \WP\McpSchema\Record\PingRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @return array<string, mixed> Logical empty result.
+	 * @since n.e.x.t
 	 */
-	public function ping(): AbstractDataTransferObject {
-		return Result::fromArray( array() );
+	public function ping( PingRequest $request, McpRequestContext $request_context ): array {
+		unset( $request, $request_context );
+		return array();
 	}
 }

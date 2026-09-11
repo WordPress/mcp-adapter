@@ -166,7 +166,32 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 		$this->assertEquals( 'test/always-allowed', $result['name'] );
 		$this->assertEquals( 'Always Allowed', $result['label'] );
 		$this->assertEquals( 'Returns a simple payload', $result['description'] );
-		$this->assertIsArray( $result['input_schema'] );
+		$this->assertInstanceOf( \stdClass::class, $result['input_schema'] );
+	}
+
+	public function test_execute_serializes_empty_input_schema_as_object(): void {
+		$this->register_ability_in_hook(
+			'test/no-input-info',
+			array(
+				'label'               => 'No Input Info Test',
+				'description'         => 'Ability with no input schema',
+				'category'            => 'test',
+				'input_schema'        => array(),
+				'execute_callback'    => static fn (): array => array( 'ok' => true ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		$result = GetAbilityInfoAbility::execute(
+			array(
+				'ability_name' => 'test/no-input-info',
+			)
+		);
+
+		$this->assertInstanceOf( \stdClass::class, $result['input_schema'] );
+		$this->assertSame( '{}', wp_json_encode( $result['input_schema'] ) );
+
+		wp_unregister_ability( 'test/no-input-info' );
 	}
 
 	public function test_execute_with_ability_having_output_schema(): void {

@@ -18,7 +18,9 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
+use WP\McpSchema\Record\Prompt;
+use WP\McpSchema\Schema;
+use WP\McpSchema\Schemas;
 
 /**
  * WordPress MCP Server - Represents a single MCP server with its tools, resources, and prompts.
@@ -94,12 +96,8 @@ class McpServer {
 	 */
 	private McpTransportFactory $transport_factory;
 
-	/**
-	 * Whether MCP validation is enabled.
-	 *
-	 * @var bool
-	 */
-	private bool $mcp_validation_enabled;
+	/** @var \WP\McpSchema\Schemas */
+	private Schemas $schemas;
 
 	/**
 	 * Transport permission callback.
@@ -121,9 +119,9 @@ class McpServer {
 	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize (e.g., [McpRestTransport::class]).
 	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler Error handler class to use (e.g., NullMcpErrorHandler::class). Must implement McpErrorHandlerInterface. If null, NullMcpErrorHandler will be used.
 	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler Observability handler class to use (e.g., NullMcpObservabilityHandler::class). Must implement McpObservabilityHandlerInterface. If null, NullMcpObservabilityHandler will be used.
-	 * @param list<string> $tools Optional ability names to register as tools during construction.
-	 * @param list<string> $resources Optional resources to register during construction.
-	 * @param list<string> $prompts Optional prompts to register during construction.
+	 * @param list<string|\WP\MCP\Domain\Tools\McpTool> $tools Optional ability names or MCP tools to register during construction.
+	 * @param list<string|\WP\MCP\Domain\Resources\McpResource> $resources Optional ability names or MCP resources to register during construction.
+	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Optional ability names, MCP prompts, or prompt builders to register during construction.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
 	 * @throws \Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
@@ -152,20 +150,7 @@ class McpServer {
 		$this->server_version                = $server_version;
 		$this->transport_permission_callback = $transport_permission_callback;
 
-		/**
-		 * Filters whether MCP protocol validation is enabled for a server.
-		 *
-		 * Validation is disabled by default for performance, as the Abilities API
-		 * also validates all abilities. Enable this filter for stricter MCP protocol
-		 * compliance checking during development or debugging.
-		 *
-		 * @since 0.3.0
-		 *
-		 * @param bool      $enabled   Whether validation is enabled. Default false.
-		 * @param string    $server_id The server ID being configured.
-		 * @param \WP\MCP\Core\McpServer $server    The McpServer instance being constructed.
-		 */
-		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false, $this->server_id, $this );
+		$this->schemas = Schemas::create();
 
 		// Setup handlers and components
 		$this->setup_handlers( $error_handler, $observability_handler );
@@ -201,9 +186,9 @@ class McpServer {
 	/**
 	 * Setup component registry and transport factory.
 	 *
-	 * @param list<string> $tools Tools to register.
-	 * @param list<string> $resources Resources to register.
-	 * @param list<string> $prompts Prompts to register.
+	 * @param list<string|\WP\MCP\Domain\Tools\McpTool> $tools Tools to register.
+	 * @param list<string|\WP\MCP\Domain\Resources\McpResource> $resources Resources to register.
+	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Prompts to register.
 	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Transport classes to initialize.
 	 *
 	 * @throws \Exception
@@ -213,7 +198,8 @@ class McpServer {
 		$this->component_registry = new McpComponentRegistry(
 			$this,
 			$this->error_handler,
-			$this->observability_handler
+			$this->observability_handler,
+			$this->schemas
 		);
 
 		// Initialize transport factory
@@ -229,9 +215,9 @@ class McpServer {
 	/**
 	 * Register initial tools, resources, and prompts.
 	 *
-	 * @param list<string> $tools Tools to register.
-	 * @param list<string> $resources Resources to register.
-	 * @param list<string> $prompts Prompts to register.
+	 * @param list<string|\WP\MCP\Domain\Tools\McpTool> $tools Tools to register.
+	 * @param list<string|\WP\MCP\Domain\Resources\McpResource> $resources Resources to register.
+	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Prompts to register.
 	 */
 	private function register_mcp_components( array $tools, array $resources, array $prompts ): void {
 		// Register tools if provided
@@ -338,28 +324,58 @@ class McpServer {
 	/**
 	 * Get all tools registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Tools\DTO\Tool>
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return array<string, \WP\McpSchema\Record\Tool>
 	 */
-	public function get_tools(): array {
-		return $this->component_registry->get_tools();
+	public function get_tools( Schema $schema ): array {
+		return $this->component_registry->get_tools( $schema );
 	}
 
 	/**
 	 * Get all resources registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Resources\DTO\Resource>
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return array<string, \WP\McpSchema\Record\Resource>
 	 */
-	public function get_resources(): array {
-		return $this->component_registry->get_resources();
+	public function get_resources( Schema $schema ): array {
+		return $this->component_registry->get_resources( $schema );
 	}
 
 	/**
 	 * Get all prompts registered to this server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Prompts\DTO\Prompt>
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return array<string, \WP\McpSchema\Record\Prompt>
 	 */
-	public function get_prompts(): array {
-		return $this->component_registry->get_prompts();
+	public function get_prompts( Schema $schema ): array {
+		return $this->component_registry->get_prompts( $schema );
+	}
+
+	/**
+	 * Get the neutral registered tool count.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function count_tools(): int {
+		return $this->component_registry->count_tools();
+	}
+
+	/**
+	 * Get the neutral registered resource count.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function count_resources(): int {
+		return $this->component_registry->count_resources();
+	}
+
+	/**
+	 * Get the neutral registered prompt count.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function count_prompts(): int {
+		return $this->component_registry->count_prompts();
 	}
 
 	/**
@@ -395,12 +411,17 @@ class McpServer {
 	 *
 	 * @param string $prompt_name Prompt name.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt|null
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return \WP\McpSchema\Record\Prompt|null
 	 */
-	public function get_prompt( string $prompt_name ): ?PromptDto {
+	public function get_prompt( string $prompt_name, Schema $schema ): ?Prompt {
 		$mcp_prompt = $this->component_registry->get_mcp_prompt( $prompt_name );
 
-		return $mcp_prompt ? $mcp_prompt->get_protocol_dto() : null;
+		if ( ! $mcp_prompt || ! $mcp_prompt->is_available_for( $schema ) ) {
+			return null;
+		}
+
+		return $mcp_prompt->get_protocol_record( $schema );
 	}
 
 	/**
@@ -438,11 +459,11 @@ class McpServer {
 	}
 
 	/**
-	 * Check if MCP validation is enabled.
+	 * Get the server-owned exact schemas.
 	 *
-	 * @return bool
+	 * @since n.e.x.t
 	 */
-	public function is_mcp_validation_enabled(): bool {
-		return $this->mcp_validation_enabled;
+	public function get_schemas(): Schemas {
+		return $this->schemas;
 	}
 }
