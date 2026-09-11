@@ -173,6 +173,7 @@ class McpErrorFactory {
 			case self::INVALID_REQUEST:
 			case self::HEADER_MISMATCH:
 			case self::UNSUPPORTED_VERSION:
+			case self::MISSING_CAPABILITY:
 				return 400;
 			case self::UNAUTHORIZED:
 				return 401;
