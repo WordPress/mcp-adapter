@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f09daae0187565a284841fb71bfe5f02",
+    "content-hash": "44caaa0a729673fe7be51db4819e390b",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -72,16 +72,16 @@
         },
         {
             "name": "wordpress/php-mcp-schema",
-            "version": "dev-feature/dual-revision-schema-runtime",
+            "version": "v0.2.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/WordPress/php-mcp-schema.git",
-                "reference": "8bb0c7ceeea6e080fd6709099e5550a053fe9baa"
+                "url": "https://github.com/WordPress/php-mcp-schema",
+                "reference": "f6119d9520e462afd0e42d431c9815b55c6b8d28"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/8bb0c7ceeea6e080fd6709099e5550a053fe9baa",
-                "reference": "8bb0c7ceeea6e080fd6709099e5550a053fe9baa",
+                "url": "https://api.github.com/repos/WordPress/php-mcp-schema/zipball/f6119d9520e462afd0e42d431c9815b55c6b8d28",
+                "reference": "f6119d9520e462afd0e42d431c9815b55c6b8d28",
                 "shasum": ""
             },
             "require": {
@@ -97,23 +97,7 @@
                     "WP\\McpSchema\\": "src/"
                 }
             },
-            "scripts": {
-                "analyse": [
-                    "phpstan analyse"
-                ],
-                "artifact:verify": [
-                    "tests/artifact/verify.sh"
-                ],
-                "autoload:verify": [
-                    "@composer dump-autoload --optimize --strict-psr --strict-ambiguous"
-                ],
-                "phpstan": [
-                    "@analyse"
-                ],
-                "test": [
-                    "phpunit"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "GPL-2.0-or-later"
             ],
@@ -131,11 +115,7 @@
                 "php",
                 "schema"
             ],
-            "support": {
-                "source": "https://github.com/WordPress/php-mcp-schema/tree/feature/dual-revision-schema-runtime",
-                "issues": "https://github.com/WordPress/php-mcp-schema/issues"
-            },
-            "time": "2026-09-11T05:35:01+00:00"
+            "time": "2026-09-11T10:17:52+00:00"
         }
     ],
     "packages-dev": [
@@ -3260,9 +3240,7 @@
         }
     ],
     "minimum-stability": "dev",
-    "stability-flags": {
-        "wordpress/php-mcp-schema": 20
-    },
+    "stability-flags": {},
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
