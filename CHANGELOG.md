@@ -14,6 +14,11 @@ All notable changes to this project will be documented in this file, per [the Ke
 - JSON-RPC batch requests are rejected before dispatch.
 - `wp mcp-adapter list` adds per-revision tool, resource, and prompt columns.
 
+- Invalid protocol fields are no longer silently dropped or repaired. Components invalid in every supported schema revision are rejected. Handler values reach final schema projection, except that existing 2026 result assembly can still alter malformed result-level `_meta` before validation. This reverses the 0.6.0 omission of malformed `_meta`. See the [validation migration notes](docs/migration/dual-revision-schema-runtime.md#validation-and-rejected-components).
+- Invalid protocol fields are no longer silently dropped or repaired. Components invalid in every supported schema revision are rejected. Handler values reach final schema projection. In 2026 responses, result `_meta` is validated before server identification is added, so malformed metadata is rejected and valid object fields are preserved. This reverses the 0.6.0 omission of malformed `_meta`. See the [validation migration notes](docs/migration/dual-revision-schema-runtime.md#validation-and-rejected-components).
+- Removed validation and content helpers and the resource/prompt converter `make()` and getter layers are listed in the [migration guide](docs/migration/dual-revision-schema-runtime.md#removed-helpers-and-converter-methods).
+- Non-array Ability `meta.mcp` now returns `mcp_ability_invalid_meta`. Removed errors: `mcp_resource_missing_name`, `mcp_prompt_invalid_argument`, and `mcp_prompt_argument_missing_name`. Non-array prompt arguments return `mcp_prompt_invalid_arguments`; resource-name filters reject non-strings only.
+
 ### Added
 - Legacy MCP identifiers `2025-06-18`, `2025-03-26`, and `2024-11-05` negotiate through `initialize` and are echoed back verbatim while the `2025-11-25` schema serves the session. Every server-emitted difference between those revisions and `2025-11-25` is an optional additive field, so the projection is unchanged. `MCP-Protocol-Version` must match the negotiated identifier when sent, and may be omitted only for sessions negotiated under `2025-03-26` or `2024-11-05`, which predate the header. `2025-03-26` is newly negotiable.
 - `McpRequestContext::protocol_version()` returns the negotiated identifier; `revision()` continues to return the schema revision.
@@ -23,8 +28,14 @@ All notable changes to this project will be documented in this file, per [the Ke
 - `McpTool`, `McpResource`, and `McpPrompt` expose `get_protocol_record( Schema $schema )` and `is_available_for()`. A component is omitted from a revision whose schema cannot represent it.
 - The `mcp_adapter_tools_list`, `mcp_adapter_resources_list`, `mcp_adapter_prompts_list`, and `mcp_adapter_initialize_response` filters receive the selected schema as a third argument.
 - Raw-wire, architecture, and projection test coverage for both revisions.
+- Components rejected by every supported schema revision raise `_doing_it_wrong` with schema error paths, in addition to error-handler logs.
 
 ### Changed
+- Resource abilities support core's top-level `meta.annotations` without a deprecation notice. `meta.mcp.annotations` overrides it, and an empty array suppresses annotations instead of falling back.
+- Ability labels and descriptions preserve whitespace, and tool `title` is always emitted from the label. Resource names may be empty; absent names use the URI.
+- Resource URIs are no longer trimmed or limited to 2048 bytes; bare schemes such as `wordpress:` are accepted. Invalid `lastModified` timestamps reject resources on both registration paths.
+- Prompt results preserve supplied descriptions, metadata, message keys, and empty message lists. Malformed recognized shapes reach schema validation; JSON fallback encoding failures return execution errors.
+- Direct tool factories default `inputSchema` only when absent. Prompt fallback arguments include boolean property schemas and preserve supplied titles and descriptions.
 - Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
 - `initialize`, `notifications/initialized`, and `ping` are served only for `2025-11-25`; `server/discover` only for `2026-07-28`. The 2025 HTTP session lifecycle is unchanged.
 - Adapter-owned `2026-07-28` output omits `Tool.execution`, adds `resultType: "complete"` to completed results, and adds `ttlMs: 0` and `cacheScope: "private"` to discovery, list, and resource-read results.

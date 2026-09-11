@@ -10,6 +10,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Domain\Resources;
 
+use WP\MCP\Domain\Utils\McpAbilityMeta;
 use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
@@ -18,7 +19,7 @@ use WP_Error;
 /**
  * Converts WordPress abilities to MCP Resource metadata.
  *
-	 * This class builds neutral Resource metadata for revision projection.
+ * This class builds neutral Resource metadata for revision projection.
  * It extracts metadata only (uri, name, title, description, mimeType, size, icons, annotations).
  * Resource content (text/blob) is resolved separately at resources/read time.
  *
@@ -34,9 +35,16 @@ use WP_Error;
  * - 'mcp.icons' (array): Array of icon objects for UI display
  * - 'mcp._meta' (array): User-provided metadata to pass through
  *
- * Note: Top-level meta keys 'uri', 'mimeType', 'annotations' are deprecated as of 0.5.0.
+ * Values are carried as given; the schema decides whether they fit. A value that
+ * does not fit fails projection, so the registry does not expose the resource.
+ *
+ * Note: Top-level meta keys 'uri', 'mimeType', 'size' are deprecated as of 0.5.0.
  * They still work for backward compatibility but will trigger a `_doing_it_wrong` notice.
- * Use 'mcp.uri', 'mcp.mimeType', 'mcp.annotations' instead.
+ * Use 'mcp.uri', 'mcp.mimeType', 'mcp.size' instead. Top-level 'annotations' is the
+ * location WordPress core defines, so it is read without a notice; 'mcp.annotations'
+ * overrides it.
+ *
+ * @internal
  *
  * @since 0.5.0
  */
@@ -68,48 +76,21 @@ class RegisterAbilityAsMcpResource {
 	}
 
 	/**
-	 * Make a new instance of the class.
+	 * Build neutral Resource data and adapter metadata for internal wiring.
+	 *
+	 * This method returns protocol-only data and provides the adapter metadata
+	 * separately. Exact validation happens independently for each schema projection.
 	 *
 	 * @param \WP_Ability $ability The ability.
-	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler for logging.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
 	 *
-	 * @return array<string, mixed>|\WP_Error Returns Resource data or WP_Error if validation fails.
+	 * @return array{resource_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
+	 * @since 0.5.0
 	 */
-	public static function make( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
+	public static function build( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
 		$resource = new self( $ability, $error_handler );
 
-		return $resource->get_resource();
-	}
-
-	/**
-	 * Get the neutral MCP resource data.
-	 *
-	 * @return array<string, mixed>|\WP_Error Returns the Resource data or WP_Error.
-	 */
-	private function get_resource() {
-		$data = $this->get_data();
-		if ( is_wp_error( $data ) ) {
-			return $data;
-		}
-
-		return $data;
-	}
-
-	/**
-	 * Get the MCP resource data array.
-	 *
-	 * Builds metadata-only Resource data. Content (text/blob) is NOT included here;
-	 * content is resolved at resources/read time by ResourcesHandler.
-	 *
-	 * @return array<string,mixed>|\WP_Error Resource data array or WP_Error if validation fails.
-	 */
-	private function get_data() {
-		$built = $this->build_resource_data();
-		if ( is_wp_error( $built ) ) {
-			return $built;
-		}
-
-		return $built['resource_data'];
+		return $resource->build_resource_data();
 	}
 
 	/**
@@ -120,88 +101,83 @@ class RegisterAbilityAsMcpResource {
 	 *
 	 */
 	private function build_resource_data() {
+		$mcp_meta = McpAbilityMeta::mcp( $this->ability );
+		if ( is_wp_error( $mcp_meta ) ) {
+			return $mcp_meta;
+		}
+
 		$uri = $this->get_uri();
 		if ( is_wp_error( $uri ) ) {
 			return $uri;
 		}
 
 		$ability_meta = $this->ability->get_meta();
-		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
-		// Required fields.
+		$name = $this->resolve_resource_name();
+		if ( is_wp_error( $name ) ) {
+			return $name;
+		}
+
+		// Label and description are carried as given; core requires both to be
+		// non-empty strings, so nothing is trimmed or suppressed here.
 		$resource_data = array(
-			'name' => $this->resolve_resource_name(),
-			'uri'  => $uri,
+			'name'        => $name,
+			'uri'         => $uri,
+			'title'       => $this->ability->get_label(),
+			'description' => $this->ability->get_description(),
 		);
 
-		// Optional: title from ability label (human-readable display name).
-		$label = trim( $this->ability->get_label() );
-		if ( '' !== $label ) {
-			$resource_data['title'] = $label;
-		}
-
-		// Optional: description.
-		$description = trim( $this->ability->get_description() );
-		if ( '' !== $description ) {
-			$resource_data['description'] = $description;
-		}
-
-		// Optional: mimeType from ability meta. MCP treats it as an opaque string, so the
-		// value is emitted unaltered once surrounding whitespace is trimmed off; only a
-		// non-empty result is required.
-		$mime_type = $this->get_mcp_meta( 'mimeType', 'string' );
+		// Optional: mimeType and size from ability meta, carried as given.
+		$mime_type = $this->get_mcp_meta( 'mimeType' );
 		if ( null !== $mime_type ) {
-			$mime_type = trim( $mime_type );
-			if ( '' !== $mime_type ) {
-				$resource_data['mimeType'] = $mime_type;
-			}
+			$resource_data['mimeType'] = $mime_type;
 		}
 
-		// Optional: size from ability meta (bytes count for UI display).
-		$size = $this->get_mcp_meta( 'size', 'int' );
-		if ( null !== $size && $size > 0 ) {
+		$size = $this->get_mcp_meta( 'size' );
+		if ( null !== $size ) {
 			$resource_data['size'] = $size;
 		}
 
-		// Optional: annotations from ability meta (standardized location: mcp.annotations).
-		$annotations = $this->get_mcp_meta( 'annotations', 'array' );
-		if ( null !== $annotations ) {
+		// Optional: annotations. Core defines them at the top level of ability meta and
+		// fills every ability with null defaults; mcp.annotations overrides that. The
+		// mapper drops the nulls, and an empty mapped result omits the key. A value that
+		// is not an array is carried as given for the schema to reject. The one adapter
+		// check is lastModified, which the official client requires as an ISO timestamp
+		// with a time zone. A failure rejects the resource.
+		$annotations = $mcp_meta['annotations'] ?? $ability_meta['annotations'] ?? null;
+		if ( ! is_array( $annotations ) ) {
+			if ( null !== $annotations ) {
+				$resource_data['annotations'] = $annotations;
+			}
+		} else {
 			$mcp_annotations = McpAnnotationMapper::map( $annotations, 'resource' );
 			if ( ! empty( $mcp_annotations ) ) {
-				// Validate annotation values per MCP specification.
 				$validation_errors = McpValidator::get_annotation_validation_errors( $mcp_annotations );
 				if ( ! empty( $validation_errors ) ) {
-					// Log the issue but don't fail registration - drop invalid annotations.
-					$this->log_deprecation(
-						self::class . '::get_data',
+					return new WP_Error(
+						'resource_annotations_invalid',
 						sprintf(
 						/* translators: 1: ability name, 2: validation errors */
-							__( 'Invalid annotations for resource ability "%1$s" will be dropped: %2$s', 'mcp-adapter' ),
+							__( 'Invalid annotations for resource ability "%1$s": %2$s', 'mcp-adapter' ),
 							$this->ability->get_name(),
 							implode( '; ', $validation_errors )
-						),
-						array( 'validation_errors' => $validation_errors )
+						)
 					);
-				} else {
-					$resource_data['annotations'] = $mcp_annotations;
 				}
+
+				$resource_data['annotations'] = $mcp_annotations;
 			}
 		}
 
-		// Optional: icons from mcp.icons (already in correct location).
-		if ( ! empty( $mcp_meta['icons'] ) && is_array( $mcp_meta['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $mcp_meta['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$resource_data['icons'] = $icons_result['valid'];
-			}
+		// Icons and `_meta` from ability.meta.mcp are carried as given; the schema
+		// decides whether they fit. Adapter metadata is NEVER included in protocol
+		// meta; it is returned separately in adapter_meta.
+		if ( isset( $mcp_meta['icons'] ) ) {
+			$resource_data['icons'] = $mcp_meta['icons'];
 		}
 
-		// Build Resource `_meta`:
-		// - Preserve user-provided `_meta` from ability.meta.mcp._meta.
-		// - Adapter metadata is NEVER included in protocol meta; it is returned separately in adapter_meta.
-		$resource_meta = McpValidator::normalize_meta( $mcp_meta['_meta'] ?? null );
-		if ( null !== $resource_meta ) {
-			$resource_data['_meta'] = $resource_meta;
+		if ( isset( $mcp_meta['_meta'] ) ) {
+			$resource_data['_meta'] = $mcp_meta['_meta'];
 		}
 
 		$adapter_meta = array(
@@ -220,7 +196,7 @@ class RegisterAbilityAsMcpResource {
 	 * @return string|\WP_Error URI string or WP_Error if not found or invalid.
 	 */
 	private function get_uri() {
-		$uri = $this->get_mcp_meta( 'uri', 'string' );
+		$uri = $this->get_mcp_meta( 'uri' );
 
 		if ( null === $uri ) {
 			return new WP_Error(
@@ -233,17 +209,15 @@ class RegisterAbilityAsMcpResource {
 			);
 		}
 
-		$uri = trim( $uri );
-
-		// Validate URI format (RFC 3986).
-		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
+		// The URI is the registry key, so it is matched as given: no trimming.
+		if ( ! is_string( $uri ) || ! McpValidator::validate_resource_uri( $uri ) ) {
 			return new WP_Error(
 				'resource_uri_invalid',
 				sprintf(
 				/* translators: 1: ability name, 2: invalid URI */
 					__( "Invalid resource URI '%2\$s' for ability '%1\$s'. URI must be RFC 3986 compliant with a scheme.", 'mcp-adapter' ),
 					$this->ability->get_name(),
-					$uri
+					is_string( $uri ) ? $uri : gettype( $uri )
 				)
 			);
 		}
@@ -277,79 +251,39 @@ class RegisterAbilityAsMcpResource {
 	 * Get a value from ability meta with standardized lookup.
 	 *
 	 * Looks in 'mcp' namespace first (preferred), then falls back to top-level (deprecated).
-	 * Logs deprecation notice when using top-level location.
+	 * Logs deprecation notice when using top-level location. The value is returned as
+	 * set, whatever its type; the schema decides whether it fits. An explicit null
+	 * counts as not set.
 	 *
 	 * @param string $key The key to look up.
-	 * @param string $type Expected type: 'string', 'int', 'array'.
-	 * @param mixed $default_value Default value if not found.
 	 *
-	 * @return mixed The value or default.
+	 * @return mixed The value, or null when the key is not set in either location.
 	 */
-	private function get_mcp_meta( string $key, string $type = 'string', $default_value = null ) {
+	private function get_mcp_meta( string $key ) {
 		$ability_meta = $this->ability->get_meta();
 		$mcp_meta     = $ability_meta['mcp'] ?? array();
 
 		// Preferred: Check mcp.{key} first.
 		if ( isset( $mcp_meta[ $key ] ) ) {
-			$value = $mcp_meta[ $key ];
-			if ( $this->validate_type( $value, $type ) ) {
-				return $value;
-			}
+			return $mcp_meta[ $key ];
 		}
 
 		// Deprecated fallback: Check top-level meta.{key}.
 		if ( isset( $ability_meta[ $key ] ) ) {
-			$value = $ability_meta[ $key ];
-			if ( $this->validate_type( $value, $type ) ) {
-				// Log deprecation notice.
-				$this->log_deprecation(
-					__METHOD__,
-					sprintf(
-					/* translators: 1: deprecated meta key, 2: new meta key path */
-						__( 'Ability meta key "%1$s" is deprecated. Use "mcp.%1$s" instead.', 'mcp-adapter' ),
-						$key
-					),
-					array( 'deprecated_key' => $key )
-				);
+			$this->log_deprecation(
+				__METHOD__,
+				sprintf(
+				/* translators: 1: deprecated meta key, 2: new meta key path */
+					__( 'Ability meta key "%1$s" is deprecated. Use "mcp.%1$s" instead.', 'mcp-adapter' ),
+					$key
+				),
+				array( 'deprecated_key' => $key )
+			);
 
-				return $value;
-			}
+			return $ability_meta[ $key ];
 		}
 
-		return $default_value;
-	}
-
-	/**
-	 * Validate a value against expected type.
-	 *
-	 * @param mixed $value The value to validate.
-	 * @param string $type Expected type.
-	 *
-	 * @return bool True if valid.
-	 */
-	private function validate_type( $value, string $type ): bool {
-		switch ( $type ) {
-			case 'string':
-				return is_string( $value ) && '' !== trim( $value );
-			case 'int':
-				return is_int( $value ) && $value >= 0;
-			case 'array':
-				// Array must be non-empty AND have at least one non-null, non-empty value.
-				// This prevents false positives when WordPress adds default empty annotations.
-				if ( ! is_array( $value ) || empty( $value ) ) {
-					return false;
-				}
-				// Check if any value in the array is actually meaningful (non-null, non-empty string).
-				foreach ( $value as $item ) {
-					if ( null !== $item && '' !== $item && array() !== $item ) {
-						return true;
-					}
-				}
-
-				return false;
-			default:
-				return false;
-		}
+		return null;
 	}
 
 	/**
@@ -386,11 +320,13 @@ class RegisterAbilityAsMcpResource {
 	/**
 	 * Resolve the MCP resource name from ability.
 	 *
-	 * Resource names have no charset restrictions (unlike Tool names).
+	 * Resource names have no charset restrictions (unlike Tool names), and the
+	 * schema accepts an empty name. A filter that returns anything but a string
+	 * rejects the resource, the same way the tool and prompt name filters do.
 	 *
-	 * @return string The resolved resource name.
+	 * @return string|\WP_Error The resolved resource name, or WP_Error when the filter broke it.
 	 */
-	private function resolve_resource_name(): string {
+	private function resolve_resource_name() {
 		$name = $this->ability->get_name();
 
 		/**
@@ -405,40 +341,17 @@ class RegisterAbilityAsMcpResource {
 		 */
 		$filtered_name = apply_filters( 'mcp_adapter_resource_name', $name, $this->ability );
 
-		// Resource names have no charset restrictions, so just ensure it's a non-empty string.
-		if ( is_string( $filtered_name ) && '' !== trim( $filtered_name ) ) {
-			return $filtered_name;
+		if ( ! is_string( $filtered_name ) ) {
+			return new WP_Error(
+				'mcp_resource_name_filter_invalid',
+				sprintf(
+				/* translators: %s: PHP type of the value returned by the filter */
+					__( 'Filter returned invalid MCP resource name: %s', 'mcp-adapter' ),
+					gettype( $filtered_name )
+				)
+			);
 		}
 
-		// Fall back to original name if filter returns invalid value.
-		return $name;
-	}
-
-	/**
-	 * Build clean neutral Resource data and adapter metadata for internal wiring.
-	 *
-	 * This method returns protocol-only data and provides the adapter metadata
-	 * separately. Exact validation happens independently for each schema projection.
-	 * wiring to protocol surfaces.
-	 *
-	 * @param \WP_Ability $ability The ability.
-	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Optional error handler.
-	 *
-	 * @return array{resource_data: array<string, mixed>, adapter_meta: array<string, mixed>}|\WP_Error
-	 * @since 0.5.0
-	 *
-	 */
-	public static function build( \WP_Ability $ability, ?McpErrorHandlerInterface $error_handler = null ) {
-		$resource = new self( $ability, $error_handler );
-		$data     = $resource->build_resource_data();
-
-		if ( is_wp_error( $data ) ) {
-			return $data;
-		}
-
-		return array(
-			'resource_data' => $data['resource_data'],
-			'adapter_meta'  => $data['adapter_meta'],
-		);
+		return $filtered_name;
 	}
 }

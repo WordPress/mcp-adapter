@@ -10,7 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
-use WP\MCP\Domain\Utils\McpValidator;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -86,9 +85,9 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	 * Additional metadata for MCP clients.
 	 *
 	 * Use this to attach purpose-specific metadata that MCP clients can consume.
-	 * Key names are kept as written. MCP declares `_meta` an object, so {@see self::build()}
-	 * emits this only when it is a non-empty associative array; a list or an empty array
-	 * would serialize as a JSON array and is omitted instead.
+	 * Key names are kept as written. {@see self::build()} emits this unless it is still
+	 * the empty default; MCP declares `_meta` an object, so a list makes the prompt
+	 * unavailable.
 	 *
 	 * @since 0.5.0
 	 *
@@ -148,30 +147,17 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 			);
 		}
 
-		// Validate and prepare icons if set.
-		$valid_icons = null;
-		if ( ! empty( $this->icons ) ) {
-			$icons_result = McpValidator::validate_icons_array( $this->icons );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$valid_icons = $icons_result['valid'];
-			}
-		}
-
+		// Icons and _meta are carried as given; the schema decides whether they fit.
 		$prompt_data = array(
 			'name'        => $this->name,
 			'title'       => $this->title,
 			'description' => $this->description,
 			'arguments'   => $argument_data,
+			'icons'       => $this->icons,
 		);
 
-		$prompt_meta = McpValidator::normalize_meta( $this->meta );
-		if ( null !== $prompt_meta ) {
-			$prompt_data['_meta'] = $prompt_meta;
-		}
-
-		// Only include icons if valid ones exist.
-		if ( null !== $valid_icons ) {
-			$prompt_data['icons'] = $valid_icons;
+		if ( array() !== $this->meta ) {
+			$prompt_data['_meta'] = $this->meta;
 		}
 
 		return array_filter( $prompt_data, static fn( $value ): bool => null !== $value );
@@ -227,8 +213,8 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Set the prompt icons for UI display.
 	 *
-	 * Icons are validated during build() using McpValidator::validate_icons_array().
-	 * Invalid icons are filtered out with warnings (graceful degradation).
+	 * Icons are carried into the prompt record as given. A list that does not fit
+	 * the selected MCP revision makes the prompt unavailable for that revision.
 	 *
 	 * Per MCP 2025-11-25:
 	 * - MUST support: image/png, image/jpeg, image/jpg
@@ -260,8 +246,9 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Set additional metadata.
 	 *
-	 * Key names are kept as written. MCP declares `_meta` an object, so {@see self::build()}
-	 * emits this only when it is a non-empty associative array.
+	 * Key names are kept as written. {@see self::build()} emits this unless it is still
+	 * the empty default; MCP declares `_meta` an object, so a list makes the prompt
+	 * unavailable.
 	 *
 	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
 	 *

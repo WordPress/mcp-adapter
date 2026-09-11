@@ -35,24 +35,27 @@ final class McpValidatorTest extends TestCase {
 		$this->assertTrue( McpValidator::validate_iso8601_timestamp( $valid_timestamp ) );
 	}
 
-	public function test_validate_iso8601_timestamp_with_microseconds_utc(): void {
-		// Note: Microsecond formats may not be supported by all DateTime implementations
-		// PHP's DateTime::createFromFormat with microseconds doesn't always round-trip correctly
-		$valid_timestamp = '2024-01-15T10:30:00.123Z';
-		// This might fail due to PHP DateTime limitations with microseconds
-		$result = McpValidator::validate_iso8601_timestamp( $valid_timestamp );
-		// Accept either true or false - microseconds support is implementation-dependent
-		$this->assertIsBool( $result );
+	public function test_validate_iso8601_timestamp_with_fractional_seconds(): void {
+		// Any number of fractional digits is accepted, as by the official SDK client.
+		$this->assertTrue( McpValidator::validate_iso8601_timestamp( '2024-01-15T10:30:00.1Z' ) );
+		$this->assertTrue( McpValidator::validate_iso8601_timestamp( '2024-01-15T10:30:00.123Z' ) );
+		$this->assertTrue( McpValidator::validate_iso8601_timestamp( '2024-01-15T10:30:00.123456Z' ) );
+		$this->assertTrue( McpValidator::validate_iso8601_timestamp( '2024-01-15T10:30:00.123+00:00' ) );
 	}
 
-	public function test_validate_iso8601_timestamp_with_microseconds_timezone(): void {
-		// Note: Microsecond formats may not be supported by all DateTime implementations
-		// PHP's DateTime::createFromFormat with microseconds doesn't always round-trip correctly
-		$valid_timestamp = '2024-01-15T10:30:00.123+00:00';
-		// This might fail due to PHP DateTime limitations with microseconds
-		$result = McpValidator::validate_iso8601_timestamp( $valid_timestamp );
-		// Accept either true or false - microseconds support is implementation-dependent
-		$this->assertIsBool( $result );
+	public function test_validate_iso8601_timestamp_without_seconds(): void {
+		$this->assertTrue( McpValidator::validate_iso8601_timestamp( '2024-01-15T10:30Z' ) );
+	}
+
+	public function test_validate_iso8601_timestamp_ignores_default_time_zone(): void {
+		// Pacific/Apia skipped 2011-12-30 entirely; the calendar check must not depend on the site zone.
+		$previous = date_default_timezone_get();
+		date_default_timezone_set( 'Pacific/Apia' );
+		try {
+			$this->assertTrue( McpValidator::validate_iso8601_timestamp( '2011-12-30T12:00:00Z' ) );
+		} finally {
+			date_default_timezone_set( $previous );
+		}
 	}
 
 	public function test_validate_iso8601_timestamp_rejects_invalid_format(): void {
@@ -63,6 +66,12 @@ final class McpValidatorTest extends TestCase {
 			'invalid-date',
 			'',
 			'2024-13-45T99:99:99Z',
+			'2024-02-30T10:30:00Z',
+			'2024-01-15T10:30:00',
+			'2024-01-15T10:30:00+0200',
+			'2024-01-15T10:30:00z',
+			'2024-01-15T24:00:00Z',
+			"2024-01-15T10:30:00Z\n",
 		);
 
 		foreach ( $invalid_timestamps as $timestamp ) {
@@ -188,57 +197,6 @@ final class McpValidatorTest extends TestCase {
 		$this->assertFalse( McpValidator::validate_name( 'namespace/tool' ) );
 	}
 
-	// Base64 Validation Tests
-
-	public function test_validate_base64_with_valid_content(): void {
-		$valid_base64 = array(
-			'SGVsbG8gV29ybGQ=', // "Hello World"
-			'YWJjZGVmZw==',     // "abcdefg"
-			'MTIzNDU2Nzg5MA==', // "1234567890"
-		);
-
-		foreach ( $valid_base64 as $content ) {
-			$this->assertTrue( McpValidator::validate_base64( $content ), "Base64 '{$content}' should be valid" );
-		}
-	}
-
-	public function test_validate_base64_rejects_empty_string(): void {
-		$this->assertFalse( McpValidator::validate_base64( '' ) );
-	}
-
-	public function test_validate_base64_rejects_invalid_content(): void {
-		$invalid_base64 = array(
-			'not-base64!!!',
-			'12345',
-			'abc@def',
-		);
-
-		foreach ( $invalid_base64 as $content ) {
-			$this->assertFalse( McpValidator::validate_base64( $content ), "Content '{$content}' should not be valid base64" );
-		}
-	}
-
-	public function test_validate_base64_rejects_whitespace_only(): void {
-		// Whitespace-only strings might decode successfully (to empty string),
-		// but they should be rejected as invalid base64 content
-		$whitespace_content = '   ';
-		// The validator checks empty() first, which returns false for whitespace-only strings
-		// Then base64_decode might succeed, but we expect it to be rejected
-		// Actually, base64_decode('   ', true) returns false, so this should work
-		$this->assertFalse( McpValidator::validate_base64( $whitespace_content ), 'Whitespace-only content should not be valid base64' );
-	}
-
-	public function test_validate_base64_with_padding_variations(): void {
-		// Base64 strings can have different padding
-		$valid_with_padding = 'SGVsbG8='; // "Hello"
-		$valid_no_padding   = 'SGVsbG8';   // "Hello" without padding (might be invalid)
-
-		$this->assertTrue( McpValidator::validate_base64( $valid_with_padding ) );
-		// Padding-less might be invalid depending on implementation
-		$result = McpValidator::validate_base64( $valid_no_padding );
-		$this->assertIsBool( $result );
-	}
-
 	// Resource URI Validation Tests
 
 	public function test_validate_resource_uri_with_valid_uris(): void {
@@ -250,6 +208,10 @@ final class McpValidatorTest extends TestCase {
 			'custom://my-resource',
 			'app://resource/123',
 			'wordpress://post/42',
+			// RFC 3986 allows an empty path after the scheme.
+			'wordpress:',
+			// Nothing after the scheme is checked, and there is no length cap.
+			'http://example.com/' . str_repeat( 'a', 4096 ),
 		);
 
 		foreach ( $valid_uris as $uri ) {
@@ -266,6 +228,8 @@ final class McpValidatorTest extends TestCase {
 			'/path/to/file',
 			'example.com',
 			'resource',
+			// The URI is matched as given, so leading whitespace hides the scheme.
+			' wordpress://post/42',
 		);
 
 		foreach ( $invalid_uris as $uri ) {
@@ -273,572 +237,47 @@ final class McpValidatorTest extends TestCase {
 		}
 	}
 
-	public function test_validate_resource_uri_rejects_too_long(): void {
-		$long_uri = 'http://example.com/' . str_repeat( 'a', 2048 );
-		$this->assertFalse( McpValidator::validate_resource_uri( $long_uri ) );
-	}
-
-	public function test_validate_resource_uri_accepts_max_length(): void {
-		// Build a URI that's exactly 2048 characters
-		$path           = str_repeat( 'a', 2048 - strlen( 'http://a.com/' ) );
-		$max_length_uri = 'http://a.com/' . $path;
-		$this->assertTrue( McpValidator::validate_resource_uri( $max_length_uri ) );
-	}
-
-	// Role Validation Tests
-
-	public function test_validate_role_with_valid_roles(): void {
-		$this->assertTrue( McpValidator::validate_role( 'user' ) );
-		$this->assertTrue( McpValidator::validate_role( 'assistant' ) );
-	}
-
-	public function test_validate_role_rejects_invalid_roles(): void {
-		$invalid_roles = array(
-			'admin',
-			'system',
-			'moderator',
-			'',
-			'User',       // Case sensitive
-			'ASSISTANT',  // Case sensitive
-		);
-
-		foreach ( $invalid_roles as $role ) {
-			$this->assertFalse( McpValidator::validate_role( $role ), "Role '{$role}' should be invalid" );
-		}
-	}
-
-	// Roles Array Validation Tests
-
-	public function test_validate_roles_array_with_valid_arrays(): void {
-		$valid_arrays = array(
-			array( 'user' ),
-			array( 'assistant' ),
-			array( 'user', 'assistant' ),
-			array( 'assistant', 'user' ),
-		);
-
-		foreach ( $valid_arrays as $roles ) {
-			$this->assertTrue( McpValidator::validate_roles_array( $roles ), 'Roles array should be valid' );
-		}
-	}
-
-	public function test_validate_roles_array_accepts_empty_array(): void {
-		$this->assertTrue( McpValidator::validate_roles_array( array() ) );
-	}
-
-	public function test_validate_roles_array_rejects_invalid_roles(): void {
-		$invalid_arrays = array(
-			array( 'admin' ),
-			array( 'user', 'admin' ),
-			array( 'User' ),              // Case sensitive
-			array( 'user', 'assistant', 'system' ),
-		);
-
-		foreach ( $invalid_arrays as $roles ) {
-			$this->assertFalse( McpValidator::validate_roles_array( $roles ), 'Roles array should be invalid' );
-		}
-	}
-
-	public function test_validate_roles_array_rejects_non_string_values(): void {
-		$invalid_arrays = array(
-			array( 1, 2 ),
-			array( 'user', 123 ),
-			array( 'user', null ),
-			array( 'user', true ),
-		);
-
-		foreach ( $invalid_arrays as $roles ) {
-			$this->assertFalse( McpValidator::validate_roles_array( $roles ), 'Roles array with non-strings should be invalid' );
-		}
-	}
-
-	// Priority Validation Tests
-
-	public function test_validate_priority_with_valid_values(): void {
-		$valid_priorities = array(
-			0.0,
-			0.5,
-			1.0,
-			0,
-			1,
-			0.25,
-			0.75,
-			'0.5',  // Numeric string
-		);
-
-		foreach ( $valid_priorities as $priority ) {
-			$this->assertTrue( McpValidator::validate_priority( $priority ), "Priority '{$priority}' should be valid" );
-		}
-	}
-
-	public function test_validate_priority_rejects_out_of_range(): void {
-		$invalid_priorities = array(
-			-0.1,
-			1.1,
-			2,
-			-1,
-			100,
-		);
-
-		foreach ( $invalid_priorities as $priority ) {
-			$this->assertFalse( McpValidator::validate_priority( $priority ), "Priority '{$priority}' should be invalid" );
-		}
-	}
-
-	public function test_validate_priority_rejects_non_numeric(): void {
-		$invalid_priorities = array(
-			'not-a-number',
-			'',
-			null,
-			true,
-			false,
-			array(),
-		);
-
-		foreach ( $invalid_priorities as $priority ) {
-			$this->assertFalse( McpValidator::validate_priority( $priority ), 'Non-numeric priority should be invalid' );
-		}
-	}
-
 	// Annotation Validation Tests
 
-	public function test_get_annotation_validation_errors_with_valid_annotations(): void {
-		$valid_annotations = array(
-			'audience'     => array( 'user', 'assistant' ),
-			'lastModified' => '2024-01-15T10:30:00Z',
-			'priority'     => 0.5,
-		);
-
-		$errors = McpValidator::get_annotation_validation_errors( $valid_annotations );
-		$this->assertEmpty( $errors );
+	public function test_get_annotation_validation_errors_accepts_timestamp_with_time_zone(): void {
+		$this->assertSame( array(), McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15T10:30:00Z' ) ) );
+		$this->assertSame( array(), McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15T10:30:00+02:00' ) ) );
+		$this->assertSame( array(), McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15T10:30:00.123Z' ) ) );
 	}
 
-	public function test_get_annotation_validation_errors_with_partial_annotations(): void {
-		// Only audience
-		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array( 'user' ) ) );
-		$this->assertEmpty( $errors );
-
-		// Only lastModified
-		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15T10:30:00Z' ) );
-		$this->assertEmpty( $errors );
-
-		// Only priority
-		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 0.5 ) );
-		$this->assertEmpty( $errors );
-	}
-
-	public function test_get_annotation_validation_errors_ignores_unknown_fields(): void {
-		// Unknown fields should be ignored, not cause errors
+	public function test_get_annotation_validation_errors_ignores_every_other_field(): void {
+		// Only lastModified is checked here; the schema package decides the rest.
 		$annotations = array(
-			'audience'    => array( 'user' ),
+			'audience'    => 'not-an-array',
+			'priority'    => 1.5,
 			'customField' => 'value',
 		);
 
-		$errors = McpValidator::get_annotation_validation_errors( $annotations );
-		$this->assertEmpty( $errors, 'Unknown fields should be ignored' );
-	}
-
-	public function test_get_annotation_validation_errors_validates_audience(): void {
-		// Invalid: not an array
-		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => 'user' ) );
-		$this->assertNotEmpty( $errors );
-
-		// Valid: empty array (no audience preference).
-		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array() ) );
-		$this->assertEmpty( $errors );
-
-		// Invalid: invalid role
-		$errors = McpValidator::get_annotation_validation_errors( array( 'audience' => array( 'admin' ) ) );
-		$this->assertNotEmpty( $errors );
-	}
-
-	public function test_get_annotation_validation_errors_validates_lastModified(): void {
-		// Invalid: not a string
-		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => 12345 ) );
-		$this->assertNotEmpty( $errors );
-
-		// Invalid: empty string
-		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => '' ) );
-		$this->assertNotEmpty( $errors );
-
-		// Invalid: invalid timestamp format
-		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => '2024-01-15' ) );
-		$this->assertNotEmpty( $errors );
-	}
-
-	public function test_get_annotation_validation_errors_validates_priority(): void {
-		// Invalid: not numeric
-		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 'high' ) );
-		$this->assertNotEmpty( $errors );
-
-		// Invalid: out of range (too low)
-		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => -0.1 ) );
-		$this->assertNotEmpty( $errors );
-
-		// Invalid: out of range (too high)
-		$errors = McpValidator::get_annotation_validation_errors( array( 'priority' => 1.5 ) );
-		$this->assertNotEmpty( $errors );
-	}
-
-	// Icon Source Validation Tests
-
-	public function test_validate_icon_src_with_valid_https_url(): void {
-		$this->assertTrue( McpValidator::validate_icon_src( 'https://example.com/icon.png' ) );
-		$this->assertTrue( McpValidator::validate_icon_src( 'https://cdn.example.com/icons/my-icon-48x48.png' ) );
-	}
-
-	public function test_validate_icon_src_with_valid_http_url(): void {
-		$this->assertTrue( McpValidator::validate_icon_src( 'http://example.com/icon.png' ) );
-	}
-
-	public function test_validate_icon_src_with_valid_data_uri(): void {
-		// Minimal valid data URI.
-		$this->assertTrue( McpValidator::validate_icon_src( 'data:image/png;base64,iVBORw0KGgo=' ) );
-		// Data URI without base64 encoding.
-		$this->assertTrue( McpValidator::validate_icon_src( 'data:text/plain,Hello' ) );
-	}
-
-	public function test_validate_icon_src_rejects_empty_string(): void {
-		$this->assertFalse( McpValidator::validate_icon_src( '' ) );
-	}
-
-	public function test_validate_icon_src_rejects_whitespace_only(): void {
-		$this->assertFalse( McpValidator::validate_icon_src( '   ' ) );
-	}
-
-	public function test_validate_icon_src_rejects_relative_paths(): void {
-		$this->assertFalse( McpValidator::validate_icon_src( '/icons/icon.png' ) );
-		$this->assertFalse( McpValidator::validate_icon_src( 'icons/icon.png' ) );
-		$this->assertFalse( McpValidator::validate_icon_src( '../icon.png' ) );
-	}
-
-	public function test_validate_icon_src_rejects_invalid_urls(): void {
-		$this->assertFalse( McpValidator::validate_icon_src( 'ftp://example.com/icon.png' ) );
-		$this->assertFalse( McpValidator::validate_icon_src( 'file:///path/to/icon.png' ) );
-		$this->assertFalse( McpValidator::validate_icon_src( 'just-a-string' ) );
-	}
-
-	public function test_validate_icon_src_rejects_invalid_data_uri(): void {
-		// Data URI without comma separator.
-		$this->assertFalse( McpValidator::validate_icon_src( 'data:image/png' ) );
-	}
-
-	// Icon Size Validation Tests
-
-	public function test_validate_icon_size_with_valid_sizes(): void {
-		$this->assertTrue( McpValidator::validate_icon_size( '48x48' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '96x96' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '192x192' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '16x16' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '512x512' ) );
-	}
-
-	public function test_validate_icon_size_with_any(): void {
-		$this->assertTrue( McpValidator::validate_icon_size( 'any' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( 'ANY' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( 'Any' ) );
-	}
-
-	public function test_validate_icon_size_with_whitespace_trimmed(): void {
-		$this->assertTrue( McpValidator::validate_icon_size( ' 48x48 ' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( ' any ' ) );
-	}
-
-	public function test_validate_icon_size_rejects_empty_string(): void {
-		$this->assertFalse( McpValidator::validate_icon_size( '' ) );
-	}
-
-	public function test_validate_icon_size_rejects_invalid_formats(): void {
-		$this->assertFalse( McpValidator::validate_icon_size( '48' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '48x' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( 'x48' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '48x48x48' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( 'large' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '48px' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '48 x 48' ) );
-	}
-
-	public function test_validate_icon_size_rejects_zero_dimensions(): void {
-		// Zero dimensions are invalid - an icon can't have zero width or height.
-		// phpcs:disable PHPCompatibility.Numbers.RemovedHexadecimalNumericStrings.Found -- These are size strings, not hex numbers.
-		$this->assertFalse( McpValidator::validate_icon_size( '0x0' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '0x48' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '48x0' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '00x00' ) );
-		// phpcs:enable PHPCompatibility.Numbers.RemovedHexadecimalNumericStrings.Found
-	}
-
-	public function test_validate_icon_size_rejects_leading_zeros(): void {
-		// Leading zeros indicate malformed input.
-		$this->assertFalse( McpValidator::validate_icon_size( '048x048' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '048x48' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '48x048' ) );
-		$this->assertFalse( McpValidator::validate_icon_size( '0048x0048' ) );
-	}
-
-	public function test_validate_icon_size_accepts_very_large_dimensions(): void {
-		// Very large dimensions should be valid (though impractical).
-		$this->assertTrue( McpValidator::validate_icon_size( '99999x99999' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '1000000x1000000' ) );
-	}
-
-	public function test_validate_icon_size_accepts_non_square(): void {
-		// Non-square icons are valid.
-		$this->assertTrue( McpValidator::validate_icon_size( '48x96' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '100x50' ) );
-		$this->assertTrue( McpValidator::validate_icon_size( '1920x1080' ) );
-	}
-
-	// Icon Theme Validation Tests
-
-	public function test_validate_icon_theme_with_valid_themes(): void {
-		$this->assertTrue( McpValidator::validate_icon_theme( 'light' ) );
-		$this->assertTrue( McpValidator::validate_icon_theme( 'dark' ) );
-	}
-
-	public function test_validate_icon_theme_case_insensitive(): void {
-		$this->assertTrue( McpValidator::validate_icon_theme( 'LIGHT' ) );
-		$this->assertTrue( McpValidator::validate_icon_theme( 'DARK' ) );
-		$this->assertTrue( McpValidator::validate_icon_theme( 'Light' ) );
-		$this->assertTrue( McpValidator::validate_icon_theme( 'Dark' ) );
-	}
-
-	public function test_validate_icon_theme_with_whitespace_trimmed(): void {
-		$this->assertTrue( McpValidator::validate_icon_theme( ' light ' ) );
-		$this->assertTrue( McpValidator::validate_icon_theme( ' dark ' ) );
-	}
-
-	public function test_validate_icon_theme_rejects_invalid_themes(): void {
-		$this->assertFalse( McpValidator::validate_icon_theme( '' ) );
-		$this->assertFalse( McpValidator::validate_icon_theme( 'auto' ) );
-		$this->assertFalse( McpValidator::validate_icon_theme( 'system' ) );
-		$this->assertFalse( McpValidator::validate_icon_theme( 'high-contrast' ) );
-	}
-
-	// Icon Validation Errors Tests
-
-	public function test_get_icon_validation_errors_with_valid_full_icon(): void {
-		$icon = array(
-			'src'      => 'https://example.com/icon.png',
-			'mimeType' => 'image/png',
-			'sizes'    => array( '48x48', '96x96' ),
-			'theme'    => 'light',
-		);
-
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-		$this->assertEmpty( $errors );
-	}
-
-	public function test_get_icon_validation_errors_with_minimal_icon(): void {
-		// Only src is required.
-		$icon = array( 'src' => 'https://example.com/icon.png' );
-
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-		$this->assertEmpty( $errors );
-	}
-
-	public function test_get_icon_validation_errors_missing_src(): void {
-		$icon   = array( 'mimeType' => 'image/png' );
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'src', $errors[0] );
-	}
-
-	public function test_get_icon_validation_errors_invalid_src(): void {
-		$icon   = array( 'src' => 'not-a-valid-url' );
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-
-		$this->assertNotEmpty( $errors );
-	}
-
-	public function test_get_icon_validation_errors_src_not_string(): void {
-		$icon   = array( 'src' => 123 );
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'string', $errors[0] );
-	}
-
-	public function test_get_icon_validation_errors_accepts_any_mime_type_string(): void {
-		$icon = array(
-			'src'      => 'https://example.com/icon.gif',
-			'mimeType' => 'image/gif',
-		);
-
-		$this->assertSame( array(), McpValidator::get_icon_validation_errors( $icon ) );
-	}
-
-	public function test_get_icon_validation_errors_rejects_non_string_mime_type(): void {
-		$icon = array(
-			'src'      => 'https://example.com/icon.png',
-			'mimeType' => 123,
-		);
-
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-		$this->assertNotEmpty( $errors );
-		$this->assertStringContainsString( 'Icon mimeType must be a string', implode( ' ', $errors ) );
-	}
-
-	public function test_get_icon_validation_errors_invalid_sizes_not_array(): void {
-		$icon = array(
-			'src'   => 'https://example.com/icon.png',
-			'sizes' => '48x48', // Should be array.
-		);
-
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-		$this->assertNotEmpty( $errors );
-	}
-
-	public function test_get_icon_validation_errors_invalid_size_format(): void {
-		$icon = array(
-			'src'   => 'https://example.com/icon.png',
-			'sizes' => array( '48x48', 'invalid' ),
-		);
-
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-		$this->assertNotEmpty( $errors );
-	}
-
-	public function test_get_icon_validation_errors_invalid_theme(): void {
-		$icon = array(
-			'src'   => 'https://example.com/icon.png',
-			'theme' => 'invalid-theme',
-		);
-
-		$errors = McpValidator::get_icon_validation_errors( $icon );
-		$this->assertNotEmpty( $errors );
-	}
-
-	// Icons Array Validation Tests
-
-	public function test_validate_icons_array_with_valid_icons(): void {
-		$icons = array(
-			array( 'src' => 'https://example.com/icon1.png' ),
-			array(
-				'src'      => 'https://example.com/icon2.png',
-				'mimeType' => 'image/png',
-			),
-		);
-
-		$result = McpValidator::validate_icons_array( $icons, false );
-
-		$this->assertCount( 2, $result['valid'] );
-		$this->assertEmpty( $result['errors'] );
-	}
-
-	public function test_validate_icons_array_filters_invalid_icons(): void {
-		$icons = array(
-			array( 'src' => 'https://example.com/valid.png' ),
-			array( 'src' => 'invalid-url' ),
-			array( 'src' => 'https://example.com/another-valid.png' ),
-		);
-
-		$result = McpValidator::validate_icons_array( $icons, false );
-
-		$this->assertCount( 2, $result['valid'] );
-		$this->assertCount( 1, $result['errors'] );
-		$this->assertEquals( 1, $result['errors'][0]['index'] );
-	}
-
-	public function test_validate_icons_array_rejects_non_array_items(): void {
-		$icons = array(
-			array( 'src' => 'https://example.com/icon.png' ),
-			'not-an-array',
-		);
-
-		$result = McpValidator::validate_icons_array( $icons, false );
-
-		$this->assertCount( 1, $result['valid'] );
-		$this->assertCount( 1, $result['errors'] );
-	}
-
-	public function test_validate_icons_array_empty_array(): void {
-		$result = McpValidator::validate_icons_array( array(), false );
-
-		$this->assertEmpty( $result['valid'] );
-		$this->assertEmpty( $result['errors'] );
-	}
-
-	public function test_validate_icons_array_all_invalid(): void {
-		$icons = array(
-			array( 'src' => 'invalid1' ),
-			array( 'mimeType' => 'image/png' ), // Missing src.
-		);
-
-		$result = McpValidator::validate_icons_array( $icons, false );
-
-		$this->assertEmpty( $result['valid'] );
-		$this->assertCount( 2, $result['errors'] );
-	}
-
-	public function test_validate_icons_array_preserves_valid_icon_data(): void {
-		$icons = array(
-			array(
-				'src'      => 'https://example.com/icon.png',
-				'mimeType' => 'image/png',
-				'sizes'    => array( '48x48' ),
-				'theme'    => 'light',
-			),
-		);
-
-		$result = McpValidator::validate_icons_array( $icons, false );
-
-		$this->assertCount( 1, $result['valid'] );
-		$this->assertEquals( 'https://example.com/icon.png', $result['valid'][0]['src'] );
-		$this->assertEquals( 'image/png', $result['valid'][0]['mimeType'] );
-		$this->assertEquals( array( '48x48' ), $result['valid'][0]['sizes'] );
-		$this->assertEquals( 'light', $result['valid'][0]['theme'] );
-	}
-
-	public function test_normalize_meta_keeps_associative_array(): void {
-		$meta = array( 'ui' => array( 'prefersBorder' => true ) );
-
-		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
-	}
-
-	public function test_normalize_meta_keeps_prefixed_keys(): void {
-		// Reverse-DNS and vendor prefixes are valid _meta key names per MCP.
-		$meta = array(
-			'com.example/hint'      => 'value',
-			'openai/outputTemplate' => 'ui://example/app',
-		);
-
-		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
+		$this->assertSame( array(), McpValidator::get_annotation_validation_errors( $annotations ) );
 	}
 
 	/**
-	 * @dataProvider data_unsupported_meta_values
+	 * @dataProvider data_invalid_last_modified_values
 	 *
-	 * @param mixed $meta The value to normalize.
+	 * @param mixed $value The lastModified value.
 	 */
-	public function test_normalize_meta_omits_unsupported_outer_values( $meta ): void {
-		$this->assertNull( McpValidator::normalize_meta( $meta ) );
+	public function test_get_annotation_validation_errors_rejects_last_modified( $value ): void {
+		$errors = McpValidator::get_annotation_validation_errors( array( 'lastModified' => $value ) );
+
+		$this->assertCount( 1, $errors );
 	}
 
 	/**
 	 * @return array<string, array{0: mixed}>
 	 */
-	public function data_unsupported_meta_values(): array {
+	public function data_invalid_last_modified_values(): array {
 		return array(
-			'null'          => array( null ),
-			'string'        => array( 'not-an-object' ),
-			'int'           => array( 42 ),
-			'bool'          => array( true ),
-			'object'        => array( new \stdClass() ),
-			// These are arrays, but they serialize to a JSON array rather than an object.
-			'empty array'   => array( array() ),
-			'list'          => array( array( 'a', 'b' ) ),
-			'numeric keys'  => array( array( 0 => 'a', 1 => 'b' ) ),
-			'string digits' => array( array( '0' => 'a', '1' => 'b' ) ),
+			'not a string'     => array( 12345 ),
+			'empty string'     => array( '' ),
+			'date only'        => array( '2024-01-15' ),
+			'naive date time'  => array( '2024-01-15T10:30:00' ),
+			'garbage'          => array( 'garbage' ),
+			'padded timestamp' => array( ' 2024-01-15T10:30:00Z ' ),
 		);
 	}
-
-	public function test_normalize_meta_keeps_sparse_numeric_keys(): void {
-		// Not a list, so it serializes as {"1":"a"} — a valid JSON object.
-		$meta = array( 1 => 'a' );
-
-		$this->assertSame( $meta, McpValidator::normalize_meta( $meta ) );
-	}
-
 }

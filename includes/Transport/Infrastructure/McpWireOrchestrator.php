@@ -45,6 +45,7 @@ use WP\McpSchema\Record\PingRequest;
 use WP\McpSchema\Record\ReadResourceRequest;
 use WP\McpSchema\Record\ReadResourceResult;
 use WP\McpSchema\Record\ReadResourceResultResponse;
+use WP\McpSchema\Record\ResultMetaObject;
 use WP\McpSchema\Record\UnsupportedProtocolVersionError;
 use WP\McpSchema\Schema;
 use WP\McpSchema\Schemas;
@@ -475,12 +476,18 @@ final class McpWireOrchestrator {
 			$result['ttlMs']      = 0;
 			$result['cacheScope'] = 'private';
 		}
-		$meta                                       = is_array( $result['_meta'] ?? null ) ? $result['_meta'] : array();
-		$meta['io.modelcontextprotocol/serverInfo'] = array(
+		// Validate provider metadata before adding serverInfo: adding a string key to a
+		// list would turn it into an object, hiding the invalid shape from the schema.
+		$meta_data = $result['_meta'] ?? array();
+		$meta      = is_array( $meta_data )
+			? $schema->fromArray( ResultMetaObject::class, $meta_data )
+			: $schema->fromValue( ResultMetaObject::class, $meta_data );
+		$meta      = $meta->jsonSerialize();
+		$meta->{'io.modelcontextprotocol/serverInfo'} = array(
 			'name'    => $this->transport_context->mcp_server->get_server_name(),
 			'version' => $this->transport_context->mcp_server->get_server_version(),
 		);
-		$result['_meta']                            = $meta;
+		$result['_meta']                              = $meta;
 
 		return $this->hydrate_result( $method, $result, $schema );
 	}

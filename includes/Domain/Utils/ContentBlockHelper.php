@@ -12,44 +12,55 @@ namespace WP\MCP\Domain\Utils;
 /**
  * Builds neutral arrays that are validated with the selected result schema.
  *
+ * Every field is carried as given. The schema package decides whether the
+ * block fits the selected revision. `mimeType` and `_meta` values are therefore
+ * not typed here: a decoded JSON object arrives as stdClass and must reach the
+ * schema unchanged, because casting it to an array turns numeric-string keys
+ * into a list.
+ *
  * @since 0.5.0
  */
 final class ContentBlockHelper {
 
-	/** Build image content. */
-	public static function image( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
+	/**
+	 * Build image content.
+	 *
+	 * @param string $data Base64 image data.
+	 * @param mixed $mime_type MIME type, carried as given.
+	 * @param array<string, mixed>|null $annotations Optional annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @return array<string, mixed>
+	 */
+	public static function image( string $data, $mime_type, ?array $annotations = null, $_meta = null ): array {
 		return self::without_nulls(
 			array(
 				'type'        => 'image',
 				'data'        => $data,
 				'mimeType'    => $mime_type,
 				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
+				'_meta'       => $_meta,
 			)
 		);
 	}
 
-	/** Build audio content. */
-	public static function audio( string $data, string $mime_type, ?array $annotations = null, ?array $_meta = null ): array {
-		return self::without_nulls(
-			array(
-				'type'        => 'audio',
-				'data'        => $data,
-				'mimeType'    => $mime_type,
-				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
-			)
-		);
-	}
-
-	/** Build embedded text resource content. */
+	/**
+	 * Build embedded text resource content.
+	 *
+	 * @param string $uri Resource URI.
+	 * @param string $text Resource text.
+	 * @param mixed $mime_type MIME type, carried as given.
+	 * @param array<string, mixed>|null $annotations Optional block annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param array<string, mixed>|\stdClass|null $resource_meta Optional resource metadata, carried as given.
+	 * @return array<string, mixed>
+	 */
 	public static function embedded_text_resource(
 		string $uri,
 		string $text,
-		?string $mime_type = null,
+		$mime_type = null,
 		?array $annotations = null,
-		?array $_meta = null,
-		?array $resource_meta = null
+		$_meta = null,
+		$resource_meta = null
 	): array {
 		return self::embedded_resource(
 			self::without_nulls(
@@ -57,7 +68,7 @@ final class ContentBlockHelper {
 					'uri'      => $uri,
 					'text'     => $text,
 					'mimeType' => $mime_type,
-					'_meta'    => McpValidator::normalize_meta( $resource_meta ),
+					'_meta'    => $resource_meta,
 				)
 			),
 			$annotations,
@@ -65,14 +76,24 @@ final class ContentBlockHelper {
 		);
 	}
 
-	/** Build embedded blob resource content. */
+	/**
+	 * Build embedded blob resource content.
+	 *
+	 * @param string $uri Resource URI.
+	 * @param string $blob Base64 resource data.
+	 * @param mixed $mime_type MIME type, carried as given.
+	 * @param array<string, mixed>|null $annotations Optional block annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param array<string, mixed>|\stdClass|null $resource_meta Optional resource metadata, carried as given.
+	 * @return array<string, mixed>
+	 */
 	public static function embedded_blob_resource(
 		string $uri,
 		string $blob,
-		?string $mime_type = null,
+		$mime_type = null,
 		?array $annotations = null,
-		?array $_meta = null,
-		?array $resource_meta = null
+		$_meta = null,
+		$resource_meta = null
 	): array {
 		return self::embedded_resource(
 			self::without_nulls(
@@ -80,7 +101,7 @@ final class ContentBlockHelper {
 					'uri'      => $uri,
 					'blob'     => $blob,
 					'mimeType' => $mime_type,
-					'_meta'    => McpValidator::normalize_meta( $resource_meta ),
+					'_meta'    => $resource_meta,
 				)
 			),
 			$annotations,
@@ -88,55 +109,40 @@ final class ContentBlockHelper {
 		);
 	}
 
-	/** Build text content used for an error. */
-	public static function error_text( string $message, ?array $annotations = null, ?array $_meta = null ): array {
-		return self::text( $message, $annotations, $_meta );
-	}
-
-	/** Build text content. */
-	public static function text( string $text, ?array $annotations = null, ?array $_meta = null ): array {
+	/**
+	 * Build text content.
+	 *
+	 * @param string $text Text.
+	 * @param array<string, mixed>|null $annotations Optional annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @return array<string, mixed>
+	 */
+	public static function text( string $text, ?array $annotations = null, $_meta = null ): array {
 		return self::without_nulls(
 			array(
 				'type'        => 'text',
 				'text'        => $text,
 				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
+				'_meta'       => $_meta,
 			)
 		);
 	}
 
 	/**
-	 * Build text content from JSON-encodable data.
+	 * Build the embedded wrapper.
 	 *
-	 * @param mixed $data JSON-encodable data.
+	 * @param array<string, mixed> $resource_data Resource contents.
+	 * @param array<string, mixed>|null $annotations Optional block annotations.
+	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @return array<string, mixed>
 	 */
-	public static function json_text( $data, int $flags = 0, ?array $annotations = null, ?array $_meta = null ): array {
-		$json = wp_json_encode( $data, $flags );
-		if ( false === $json ) {
-			$json = '{}';
-		}
-
-		return self::text( $json, $annotations, $_meta );
-	}
-
-	/**
-	 * Normalize neutral block arrays.
-	 *
-	 * @param array<int, array<string, mixed>> $blocks Blocks.
-	 * @return array<int, array<string, mixed>>
-	 */
-	public static function to_array_list( array $blocks ): array {
-		return array_values( $blocks );
-	}
-
-	/** Build the embedded wrapper. */
-	private static function embedded_resource( array $resource_data, ?array $annotations, ?array $_meta ): array {
+	private static function embedded_resource( array $resource_data, ?array $annotations, $_meta ): array {
 		return self::without_nulls(
 			array(
 				'type'        => 'resource',
 				'resource'    => $resource_data,
 				'annotations' => $annotations,
-				'_meta'       => McpValidator::normalize_meta( $_meta ),
+				'_meta'       => $_meta,
 			)
 		);
 	}

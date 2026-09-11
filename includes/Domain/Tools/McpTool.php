@@ -12,8 +12,8 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
+use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\Tool;
 use WP\McpSchema\Schema;
@@ -50,6 +50,7 @@ use WP_Error;
  */
 final class McpTool implements McpComponentInterface {
 	use RevisionProjectionTrait;
+	use ThrowableGuardTrait;
 
 	// =========================================================================
 	// Runtime Properties
@@ -126,16 +127,12 @@ final class McpTool implements McpComponentInterface {
 			return new WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
 		}
 
-		// Prepare input schema - ensure it's an object type for MCP compliance.
-		$input_schema = $config['inputSchema'] ?? array( 'type' => 'object' );
-		if ( ! isset( $input_schema['type'] ) ) {
-			$input_schema['type'] = 'object';
-		}
-
-		// Build tool data array.
+		// A tool without an input schema gets the empty object schema the official SDK
+		// emits for that case. A schema that is set is carried as given; the MCP schema
+		// decides whether it fits.
 		$tool_data = array(
 			'name'        => $config['name'],
-			'inputSchema' => $input_schema,
+			'inputSchema' => $config['inputSchema'] ?? array( 'type' => 'object' ),
 		);
 
 		// Optional fields.
@@ -147,29 +144,25 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['description'] = $config['description'];
 		}
 
-		if ( isset( $config['outputSchema'] ) && is_array( $config['outputSchema'] ) ) {
+		// outputSchema, icons, _meta, annotations, and execution are carried as given;
+		// the schema decides whether they fit.
+		if ( isset( $config['outputSchema'] ) ) {
 			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		// Validate and prepare icons if set.
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$tool_data['icons'] = $icons_result['valid'];
-			}
+		if ( isset( $config['icons'] ) ) {
+			$tool_data['icons'] = $config['icons'];
 		}
 
-		// Preserve user-provided _meta.
-		$tool_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
-		if ( null !== $tool_meta ) {
-			$tool_data['_meta'] = $tool_meta;
+		if ( isset( $config['meta'] ) ) {
+			$tool_data['_meta'] = $config['meta'];
 		}
 
-		if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
+		if ( isset( $config['annotations'] ) ) {
 			$tool_data['annotations'] = $config['annotations'];
 		}
 
-		if ( isset( $config['execution'] ) && is_array( $config['execution'] ) ) {
+		if ( isset( $config['execution'] ) ) {
 			$tool_data['execution'] = $config['execution'];
 		}
 
@@ -283,27 +276,12 @@ final class McpTool implements McpComponentInterface {
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
-
-			try {
-				$result = $this->ability->execute( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
+			$result  = self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		} elseif ( null !== $this->handler ) {
-			try {
-				$result = call_user_func( $this->handler, $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$handler = $this->handler;
+			$result  = self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $args ) );
 		} else {
 			return new WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
 		}
@@ -373,32 +351,18 @@ final class McpTool implements McpComponentInterface {
 
 		// Ability-backed tools delegate to the ability's permission system.
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
 
-			try {
-				return $this->ability->check_permissions( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
 		}
 
 		// Callable-backed tools use their required permission callback.
 		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $args );
+			$callback = $this->permission_callback;
+			$result   = self::guard( 'mcp_permission_check_failed', static fn() => call_user_func( $callback, $args ) );
 
-				return $result instanceof WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return $result instanceof WP_Error ? $result : (bool) $result;
 		}
 
 		// Defensive fallback: should never reach here if factories are used correctly.
