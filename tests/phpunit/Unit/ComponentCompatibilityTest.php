@@ -251,6 +251,134 @@ final class ComponentCompatibilityTest extends TestCase {
 		$this->assertCount( 1, $server->get_resources( $this->schema( Schemas::V2026_07_28 ) ) );
 	}
 
+	/** Prompt and resource name filters apply, and invalid filter results fail the translation. */
+	public function test_ability_name_and_uri_filters_validate_their_results(): void {
+		$prompt_ability   = wp_get_ability( 'test/prompt' );
+		$resource_ability = wp_get_ability( 'test/resource' );
+		$tool_ability     = wp_get_ability( 'test/always-allowed' );
+		$this->assertNotNull( $prompt_ability );
+		$this->assertNotNull( $resource_ability );
+		$this->assertNotNull( $tool_ability );
+
+		$prompt_filter   = static fn(): string => 'custom-prompt-name';
+		$resource_filter = static fn( string $name ): string => 'filtered-' . $name;
+		add_filter( 'mcp_adapter_prompt_name', $prompt_filter );
+		add_filter( 'mcp_adapter_resource_name', $resource_filter );
+		try {
+			$prompt = McpPrompt::fromAbility( $prompt_ability );
+			$this->assertInstanceOf( McpPrompt::class, $prompt );
+			$this->assertSame( 'custom-prompt-name', $prompt->get_name() );
+
+			$resource = McpResource::fromAbility( $resource_ability );
+			$this->assertInstanceOf( McpResource::class, $resource );
+			$this->assertSame( 'filtered-test/resource', $resource->get_protocol_record( $this->schema() )->getName() );
+		} finally {
+			remove_filter( 'mcp_adapter_prompt_name', $prompt_filter );
+			remove_filter( 'mcp_adapter_resource_name', $resource_filter );
+		}
+
+		$invalid_name = static fn(): string => 'invalid name with spaces';
+		$invalid_uri  = static fn(): string => 'invalid-no-scheme';
+		add_filter( 'mcp_adapter_prompt_name', $invalid_name );
+		add_filter( 'mcp_adapter_tool_name', $invalid_name );
+		add_filter( 'mcp_adapter_resource_uri', $invalid_uri );
+		try {
+			$prompt_error = McpPrompt::fromAbility( $prompt_ability );
+			$this->assertInstanceOf( WP_Error::class, $prompt_error );
+			$this->assertSame( 'mcp_prompt_name_filter_invalid', $prompt_error->get_error_code() );
+
+			$tool_error = McpTool::fromAbility( $tool_ability );
+			$this->assertInstanceOf( WP_Error::class, $tool_error );
+			$this->assertSame( 'mcp_tool_name_filter_invalid', $tool_error->get_error_code() );
+
+			$resource_error = McpResource::fromAbility( $resource_ability );
+			$this->assertInstanceOf( WP_Error::class, $resource_error );
+			$this->assertSame( 'mcp_resource_uri_filter_invalid', $resource_error->get_error_code() );
+		} finally {
+			remove_filter( 'mcp_adapter_prompt_name', $invalid_name );
+			remove_filter( 'mcp_adapter_tool_name', $invalid_name );
+			remove_filter( 'mcp_adapter_resource_uri', $invalid_uri );
+		}
+	}
+
+	/** Flattened ability schemas record their wrapper, unwrap tool input, and wrap tool output. */
+	public function test_ability_schema_wrappers_unwrap_input_and_wrap_output(): void {
+		$this->register_ability_in_hook(
+			'test/wrapped-string-tool',
+			array(
+				'label'               => 'Wrapped string tool',
+				'description'         => 'Flat string input and output',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'string' ),
+				'output_schema'       => array( 'type' => 'string' ),
+				'execute_callback'    => static fn( $input ) => $input,
+				'permission_callback' => static fn( $input ): bool => 'allowed' === $input,
+				'meta'                => array( 'mcp' => array( 'public' => true ) ),
+			)
+		);
+		$this->register_ability_in_hook(
+			'test/object-in-string-out-tool',
+			array(
+				'label'               => 'Object in, string out',
+				'description'         => 'Object input keeps its shape; string output is wrapped',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array( 'value' => array( 'type' => 'string' ) ),
+				),
+				'output_schema'       => array( 'type' => 'string' ),
+				'execute_callback'    => static fn( array $input ): string => (string) ( $input['value'] ?? '' ),
+				'permission_callback' => '__return_true',
+				'meta'                => array( 'mcp' => array( 'public' => true ) ),
+			)
+		);
+
+		try {
+			$wrapped_ability = wp_get_ability( 'test/wrapped-string-tool' );
+			$object_ability  = wp_get_ability( 'test/object-in-string-out-tool' );
+			$prompt_ability  = wp_get_ability( 'test/prompt-flattened-string' );
+			$this->assertNotNull( $wrapped_ability );
+			$this->assertNotNull( $object_ability );
+			$this->assertNotNull( $prompt_ability );
+
+			$wrapped = McpTool::fromAbility( $wrapped_ability );
+			$this->assertInstanceOf( McpTool::class, $wrapped );
+			$this->assertSame(
+				array(
+					'ability'                   => 'test/wrapped-string-tool',
+					'input_schema_transformed'  => true,
+					'input_schema_wrapper'      => 'input',
+					'output_schema_transformed' => true,
+					'output_schema_wrapper'     => 'result',
+				),
+				$wrapped->get_adapter_meta()
+			);
+			$this->assertSame( array( 'result' => 'allowed' ), $wrapped->execute( array( 'input' => 'allowed' ) ) );
+			$this->assertTrue( $wrapped->check_permission( array( 'input' => 'allowed' ) ) );
+			$this->assertFalse( $wrapped->check_permission( array( 'input' => 'denied' ) ) );
+
+			$object = McpTool::fromAbility( $object_ability );
+			$this->assertInstanceOf( McpTool::class, $object );
+			$this->assertSame(
+				array(
+					'ability'                   => 'test/object-in-string-out-tool',
+					'output_schema_transformed' => true,
+					'output_schema_wrapper'     => 'result',
+				),
+				$object->get_adapter_meta()
+			);
+			$this->assertSame( array( 'result' => 'plain' ), $object->execute( array( 'value' => 'plain' ) ) );
+
+			$prompt = McpPrompt::fromAbility( $prompt_ability );
+			$this->assertInstanceOf( McpPrompt::class, $prompt );
+			$this->assertTrue( $prompt->get_adapter_meta()['input_schema_transformed'] );
+			$this->assertSame( 'input', $prompt->get_adapter_meta()['input_schema_wrapper'] );
+		} finally {
+			wp_unregister_ability( 'test/wrapped-string-tool' );
+			wp_unregister_ability( 'test/object-in-string-out-tool' );
+		}
+	}
+
 	/** Registry failures are isolated, logged, and emitted through opt-in observability. */
 	public function test_registry_failure_containment_and_observability(): void {
 		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
@@ -420,6 +548,8 @@ final class ComponentCompatibilityTest extends TestCase {
 		$permission_error = $permission_tool->check_permission( array() );
 		$this->assertInstanceOf( WP_Error::class, $execution_error );
 		$this->assertInstanceOf( WP_Error::class, $permission_error );
+		$this->assertSame( 'ability_callback_exception', $execution_error->get_error_code() );
+		$this->assertSame( 'ability_callback_exception', $permission_error->get_error_code() );
 		$this->assertStringContainsString( 'boom', $execution_error->get_error_message() );
 		$this->assertStringContainsString( 'nope', $permission_error->get_error_message() );
 		$this->assertSame( 'test/execute-exception', $execute_tool->get_adapter_meta()['ability'] );

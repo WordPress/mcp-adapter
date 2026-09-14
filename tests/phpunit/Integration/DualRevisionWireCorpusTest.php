@@ -14,9 +14,11 @@ use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\HttpRequestHandler;
+use WP\MCP\Transport\Infrastructure\SessionManager;
 use WP\McpSchema\Schemas;
 use WP_REST_Request;
 
@@ -1291,6 +1293,181 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response['headers'] );
 	}
 
+	/** Exhausted session update retries fail initialize and reach the configured error handler. */
+	public function test_http_initialize_reports_exhausted_session_update_retries(): void {
+		$attempts = 0;
+		$meta_key = self::session_meta_key();
+		$block    = static function ( $check, $object_id, $key ) use ( &$attempts, $meta_key ) {
+			if ( $meta_key !== $key ) {
+				return $check;
+			}
+			++$attempts;
+
+			return false;
+		};
+		add_filter( 'update_user_metadata', $block, 10, 3 );
+		try {
+			$response = $this->http_post( $this->initialize_payload( 79, Schemas::V2025_11_25 ) );
+		} finally {
+			remove_filter( 'update_user_metadata', $block, 10 );
+		}
+
+		$this->assertSame( 500, $response['status'] );
+		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $response['data']['error']['code'] );
+		$this->assertSame( 79, $response['data']['id'] );
+		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response['headers'] );
+		$this->assertSame( 5, $attempts );
+
+		$logs = array_values(
+			array_filter(
+				DummyErrorHandler::$logs,
+				static fn( array $log ): bool => 'Failed to persist MCP sessions after exhausting update retries.' === $log['message']
+			)
+		);
+		$this->assertCount( 1, $logs );
+		$this->assertSame(
+			array(
+				'component' => SessionManager::class,
+				'method'    => 'mutate_sessions',
+				'user_id'   => 1,
+				'attempts'  => 5,
+			),
+			$logs[0]['context']
+		);
+	}
+
+	/** Image blocks carry object _meta and omit list-shaped _meta in both revisions. */
+	public function test_http_image_block_meta_is_emitted_only_as_an_object(): void {
+		$image = array(
+			'type'     => 'image',
+			'results'  => "\x89PNG\r\n",
+			'mimeType' => 'image/png',
+		);
+
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+			$with_meta = $this->http_tool_result_fixture( $image + array( '_meta' => array( 'ui' => array( 'prefersBorder' => true ) ) ), $version );
+			$this->assertSame( 200, $with_meta['status'], $version );
+			$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $with_meta['data']['result']['content'][0]['_meta'], $version );
+
+			$with_list = $this->http_tool_result_fixture( $image + array( '_meta' => array( 'a', 'b' ) ), $version );
+			$this->assertSame( 200, $with_list['status'], $version );
+			$this->assertArrayNotHasKey( '_meta', $with_list['data']['result']['content'][0], $version );
+			$this->assertNotEmpty( $with_list['data']['result']['content'][0]['data'], $version );
+		}
+	}
+
+	/** Server capability containers serialize as JSON objects in initialize and server/discover. */
+	public function test_http_capability_objects_serialize_as_json_objects(): void {
+		$initialize = $this->http_post( $this->initialize_payload( 80, Schemas::V2025_11_25 ) );
+		$discover   = $this->http_request_2026_07_28( 'server/discover', 81, array() );
+		$this->assertSame( 200, $initialize['status'] );
+		$this->assertSame( 200, $discover['status'] );
+
+		foreach ( array( $initialize['json'], $discover['json'] ) as $json ) {
+			$decoded      = json_decode( $json, false, 512, JSON_THROW_ON_ERROR );
+			$capabilities = $decoded->result->capabilities;
+			$this->assertInstanceOf( \stdClass::class, $capabilities );
+			foreach ( array( 'prompts', 'resources', 'tools' ) as $capability ) {
+				$this->assertInstanceOf( \stdClass::class, $capabilities->{$capability}, $capability );
+				$this->assertFalse( $capabilities->{$capability}->listChanged, $capability );
+			}
+		}
+
+		$initialize_capabilities = json_decode( $initialize['json'], false, 512, JSON_THROW_ON_ERROR )->result->capabilities;
+		$this->assertFalse( $initialize_capabilities->resources->subscribe );
+	}
+
+	/** Ability callback exceptions become isError tool results and internal protocol errors on both revisions. */
+	public function test_http_ability_callback_exceptions_map_to_result_and_protocol_errors(): void {
+		$throwing = static function (): void {
+			throw new \RuntimeException( 'Execute exception' );
+		};
+		$this->register_ability_in_hook(
+			'test/resource-execute-exception',
+			array(
+				'label'               => 'Resource execute exception',
+				'description'         => 'Throws in execute',
+				'category'            => 'test',
+				'execute_callback'    => $throwing,
+				'permission_callback' => '__return_true',
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://test/resource-exception',
+					),
+				),
+			)
+		);
+		$this->register_ability_in_hook(
+			'test/prompt-execute-exception',
+			array(
+				'label'               => 'Prompt execute exception',
+				'description'         => 'Throws in execute',
+				'category'            => 'test',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array( 'input' => array( 'type' => 'string' ) ),
+				),
+				'execute_callback'    => $throwing,
+				'permission_callback' => '__return_true',
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'prompt',
+					),
+				),
+			)
+		);
+
+		try {
+			$server     = $this->makeServer(
+				array( 'test/execute-exception', 'test/permission-exception' ),
+				array( 'test/resource-execute-exception' ),
+				array( 'test/prompt-execute-exception' )
+			);
+			$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+			foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
+				$session_id = Schemas::V2025_11_25 === $version ? $this->initialize_http_session() : null;
+				$arguments  = array( 'arguments' => new \stdClass() );
+
+				$execute = $this->http_request_for( $version, 'tools/call', 82, array( 'name' => 'test-execute-exception' ) + $arguments, $session_id );
+				$this->assertSame( 200, $execute['status'], $version );
+				$this->assertTrue( $execute['data']['result']['isError'], $version );
+				$this->assertSame( 'text', $execute['data']['result']['content'][0]['type'], $version );
+				$this->assertStringContainsString( 'boom', $execute['data']['result']['content'][0]['text'], $version );
+
+				$permission = $this->http_request_for( $version, 'tools/call', 83, array( 'name' => 'test-permission-exception' ) + $arguments, $session_id );
+				$this->assertSame( 200, $permission['status'], $version );
+				$this->assertTrue( $permission['data']['result']['isError'], $version );
+				$this->assertStringContainsString( 'nope', $permission['data']['result']['content'][0]['text'], $version );
+
+				$resource = $this->http_request_for( $version, 'resources/read', 84, array( 'uri' => 'WordPress://test/resource-exception' ), $session_id );
+				$this->assertSame( 500, $resource['status'], $version );
+				$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $resource['data']['error']['code'], $version );
+				$this->assertStringContainsString( 'Execute exception', $resource['data']['error']['message'], $version );
+
+				$prompt = $this->http_request_for(
+					$version,
+					'prompts/get',
+					85,
+					array(
+						'name'      => 'test-prompt-execute-exception',
+						'arguments' => array( 'input' => 'x' ),
+					),
+					$session_id
+				);
+				$this->assertSame( 500, $prompt['status'], $version );
+				$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $prompt['data']['error']['code'], $version );
+				$this->assertStringContainsString( 'Execute exception', $prompt['data']['error']['message'], $version );
+			}
+		} finally {
+			wp_unregister_ability( 'test/resource-execute-exception' );
+			wp_unregister_ability( 'test/prompt-execute-exception' );
+		}
+	}
+
 	/** Modern requests ignore 2025 session headers. */
 	public function test_http_2026_ignores_session_headers(): void {
 		$valid = $this->http_request_2026_07_28(
@@ -1715,6 +1892,30 @@ final class DualRevisionWireCorpusTest extends TestCase {
 				'params'  => $params,
 			),
 			$headers
+		);
+	}
+
+	/**
+	 * Send one request under either revision.
+	 *
+	 * @return array{status: int, data: array<string, mixed>, headers: array<string, string>, json: string}
+	 */
+	private function http_request_for( string $version, string $method, int $id, array $params, ?string $session_id ): array {
+		if ( Schemas::V2026_07_28 === $version ) {
+			return $this->http_request_2026_07_28( $method, $id, $params );
+		}
+
+		return $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => $id,
+				'method'  => $method,
+				'params'  => $params,
+			),
+			array(
+				'Mcp-Session-Id'       => (string) $session_id,
+				'MCP-Protocol-Version' => $version,
+			)
 		);
 	}
 
