@@ -138,6 +138,11 @@ in each modern request body and can alternate exact revisions line by line.
 
 Batch requests are rejected before dispatch.
 
+`resources/read` forwards only the protocol-defined parameters (`uri`, `_meta`,
+`inputResponses`, and `requestState`) to permission callbacks, the
+`mcp_adapter_pre_resource_read` filter, and resource handlers. Any other key in
+the request params is dropped before dispatch.
+
 ## Verification
 
 After migrating a direct integration, run:

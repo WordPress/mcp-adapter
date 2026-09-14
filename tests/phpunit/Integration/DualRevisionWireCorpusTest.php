@@ -319,6 +319,71 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 2, $received['inputResponses']['quantity']['content']['count'] );
 	}
 
+	/** Unknown resources/read params reach neither permission, the pre-read filter, nor the handler. */
+	public function test_http_resource_read_forwards_only_protocol_parameters(): void {
+		$seen     = array();
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'test://params',
+				'handler'    => static function ( array $params ) use ( &$seen ): string {
+					$seen['handler'] = $params;
+					return 'content';
+				},
+				'permission' => static function ( array $params ) use ( &$seen ): bool {
+					$seen['permission'] = $params;
+					return true;
+				},
+			)
+		);
+		$this->assertInstanceOf( McpResource::class, $resource );
+		$server     = $this->makeServer( array(), array( $resource ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+		add_filter(
+			'mcp_adapter_pre_resource_read',
+			static function ( array $params ) use ( &$seen ): array {
+				$seen['filter'] = $params;
+				return $params;
+			}
+		);
+
+		$modern = $this->http_request_2026_07_28(
+			'resources/read',
+			24,
+			array(
+				'uri'         => 'test://params',
+				'customParam' => 'ignored',
+			)
+		);
+		$this->assertSame( 200, $modern['status'] );
+		$this->assertSame( 'content', $modern['data']['result']['contents'][0]['text'] );
+		foreach ( array( 'permission', 'filter', 'handler' ) as $stage ) {
+			$this->assertSame( 'test://params', $seen[ $stage ]['uri'], $stage );
+			$this->assertArrayNotHasKey( 'customParam', $seen[ $stage ], $stage );
+		}
+
+		$seen   = array();
+		$legacy = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 25,
+				'method'  => 'resources/read',
+				'params'  => array(
+					'uri'         => 'test://params',
+					'customParam' => 'ignored',
+				),
+			),
+			array(
+				'Mcp-Session-Id'       => $this->initialize_http_session(),
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+		$this->assertSame( 200, $legacy['status'] );
+		$this->assertSame( 'content', $legacy['data']['result']['contents'][0]['text'] );
+		foreach ( array( 'permission', 'filter', 'handler' ) as $stage ) {
+			$this->assertSame( array( 'uri' => 'test://params' ), $seen[ $stage ], $stage );
+		}
+	}
+
 	/** Prove ordinary Ability execution needs no revision branch. */
 	public function test_http_2026_tool_call_executes_ordinary_ability(): void {
 		$response = $this->http_request_2026_07_28(
