@@ -114,7 +114,7 @@ class ResourcesHandler {
 	public function read_resource( ReadResourceRequest $request, McpRequestContext $request_context ): array {
 		$params         = $request->getParams();
 		$request_id     = $request->getId();
-		$uri            = trim( $params->getUri() );
+		$uri            = $params->getUri();
 		$request_params = array( 'uri' => $params->getUri() );
 		$meta           = $params->getMeta();
 		if ( null !== $meta ) {

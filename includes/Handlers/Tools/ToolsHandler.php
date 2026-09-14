@@ -110,7 +110,7 @@ class ToolsHandler {
 		$request_id     = $request->getId();
 
 		try {
-			$tool_name = trim( $request_params->getName() );
+			$tool_name = $request_params->getName();
 			$args      = $this->callback_arguments( $request_params->getArguments() );
 
 			$mcp_tool = $this->mcp->get_mcp_tool( $tool_name );

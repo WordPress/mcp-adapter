@@ -695,6 +695,93 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $missing['data']['error']['code'] );
 	}
 
+	/** Names and URIs are looked up as sent, so a padded name cannot skip the Mcp-Param check. */
+	public function test_http_padded_names_and_uris_are_not_trimmed(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'regional-tool',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'region' => array(
+							'type'         => 'string',
+							'x-mcp-header' => 'Region',
+						),
+					),
+				),
+				'handler'     => static fn( array $arguments ): array => $arguments,
+				'permission'  => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ), array( 'test/resource' ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+		$padded_name = ' regional-tool ';
+		$padded_uri  = ' WordPress://local/resource-1 ';
+
+		// Mcp-Name matches the padded body name, but no Mcp-Param-Region mirror is sent.
+		// A trimmed lookup would run the tool without the mirror the specification requires.
+		$bypass = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 16,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'name'      => $padded_name,
+					'arguments' => array( 'region' => 'eu-west' ),
+					'_meta'     => $this->meta_2026_07_28(),
+				),
+			),
+			array(
+				'MCP-Protocol-Version' => Schemas::V2026_07_28,
+				'Mcp-Method'           => 'tools/call',
+				'Mcp-Name'             => '=?base64?' . base64_encode( $padded_name ) . '?=', // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Required MCP header sentinel encoding.
+			)
+		);
+		$this->assertArrayNotHasKey( 'result', $bypass['data'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $bypass['data']['error']['code'] );
+		$this->assertStringContainsString( 'Tool not found', $bypass['data']['error']['message'] );
+
+		$resource_2026 = $this->http_request_2026_07_28( 'resources/read', 17, array( 'uri' => $padded_uri ) );
+		$this->assertArrayNotHasKey( 'result', $resource_2026['data'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $resource_2026['data']['error']['code'] );
+		$this->assertSame( $padded_uri, $resource_2026['data']['error']['data']['uri'] );
+
+		$legacy_headers = array(
+			'Mcp-Session-Id'       => $this->initialize_http_session(),
+			'MCP-Protocol-Version' => Schemas::V2025_11_25,
+		);
+		$call_2025      = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 18,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'name'      => $padded_name,
+					'arguments' => array( 'region' => 'eu-west' ),
+				),
+			),
+			$legacy_headers
+		);
+		$this->assertArrayNotHasKey( 'result', $call_2025['data'] );
+		$this->assertSame( McpErrorFactory::INVALID_PARAMS, $call_2025['data']['error']['code'] );
+		$this->assertStringContainsString( 'Tool not found', $call_2025['data']['error']['message'] );
+
+		$resource_2025 = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 19,
+				'method'  => 'resources/read',
+				'params'  => array( 'uri' => $padded_uri ),
+			),
+			$legacy_headers
+		);
+		$this->assertSame( 404, $resource_2025['status'] );
+		$this->assertSame( McpErrorFactory::RESOURCE_NOT_FOUND, $resource_2025['data']['error']['code'] );
+		$this->assertSame( $padded_uri, $resource_2025['data']['error']['data']['uri'] );
+	}
+
 	/** Modern requests reject removed and noncanonical methods before dispatch. */
 	public function test_http_2026_rejects_ping_and_tools_list_all(): void {
 		foreach ( array( 'initialize', 'notifications/initialized', 'ping', 'tools/list/all', 'logging/setLevel', 'roots/list', 'tasks/get', 'elicitation/create' ) as $method ) {
