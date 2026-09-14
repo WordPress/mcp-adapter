@@ -2,7 +2,10 @@
 
 set -eu
 
-help_output="$(wp mcp-adapter serve --help 2>&1)"
+if ! help_output="$(wp help mcp-adapter serve 2>&1)"; then
+	printf '%s\n' "$help_output" >&2
+	exit 1
+fi
 
 case "$help_output" in
 	*"conflicts with a global argument"*|*"already registered"*)
