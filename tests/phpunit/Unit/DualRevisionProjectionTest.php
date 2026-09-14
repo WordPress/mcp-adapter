@@ -315,6 +315,7 @@ final class DualRevisionProjectionTest extends TestCase {
 					array(
 						'name' => 'Region',
 						'path' => $case['path'],
+						'type' => 'string',
 					),
 				),
 				$tool->get_header_annotations( $this->schema( Schemas::V2026_07_28 ) ),

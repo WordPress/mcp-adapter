@@ -735,6 +735,63 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertTrue( $executed );
 	}
 
+	/** Integer-declared header mirrors compare numerically; other declarations compare as strings. */
+	public function test_http_2026_compares_integer_parameter_headers_numerically(): void {
+		$tool = McpTool::fromArray(
+			array(
+				'name'        => 'counting-tool',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'count' => array(
+							'type'         => 'integer',
+							'x-mcp-header' => 'Count',
+						),
+						'label' => array(
+							'type'         => 'string',
+							'x-mcp-header' => 'Label',
+						),
+					),
+				),
+				'handler'     => static fn( array $arguments ): array => $arguments,
+				'permission'  => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+		$headers = array(
+			'MCP-Protocol-Version' => Schemas::V2026_07_28,
+			'Mcp-Method'           => 'tools/call',
+			'Mcp-Name'             => 'counting-tool',
+		);
+		$meta    = (string) wp_json_encode( $this->meta_2026_07_28() );
+		$body    = static fn( string $count ): string => '{"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":"counting-tool","arguments":{"count":' . $count . '},"_meta":' . $meta . '}}';
+
+		foreach ( array( array( '42.0', '42' ), array( '42', '42.0' ), array( '42.0', '42.0' ), array( '-7', '-7' ) ) as [ $body_count, $header_count ] ) {
+			$match = $this->http_post_raw( $body( $body_count ), array_merge( $headers, array( 'Mcp-Param-Count' => $header_count ) ) );
+			$this->assertSame( 200, $match['status'], $body_count . ' vs ' . $header_count );
+		}
+
+		foreach ( array( '43', ' 42 ', '+42', '4.2e1', '' ) as $header_count ) {
+			$mismatch = $this->http_post_raw( $body( '42' ), array_merge( $headers, array( 'Mcp-Param-Count' => $header_count ) ) );
+			$this->assertSame( 400, $mismatch['status'], $header_count );
+			$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $mismatch['data']['error']['code'], $header_count );
+		}
+
+		$oversized = $this->http_post_raw( $body( '9007199254740992' ), array_merge( $headers, array( 'Mcp-Param-Count' => '9007199254740992' ) ) );
+		$this->assertSame( 400, $oversized['status'] );
+
+		// A string declaration compares the body's decimal string, so a header 42.0 does not match a body 42.
+		$label_body = static fn( string $label ): string => '{"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"counting-tool","arguments":{"label":' . $label . '},"_meta":' . $meta . '}}';
+		$string_ok  = $this->http_post_raw( $label_body( '42' ), array_merge( $headers, array( 'Mcp-Param-Label' => '42' ) ) );
+		$this->assertSame( 200, $string_ok['status'] );
+		$string_bad = $this->http_post_raw( $label_body( '42' ), array_merge( $headers, array( 'Mcp-Param-Label' => '42.0' ) ) );
+		$this->assertSame( 400, $string_bad['status'] );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $string_bad['data']['error']['code'] );
+	}
+
 	/** Names and URIs are looked up as sent, so a padded name cannot skip the Mcp-Param check. */
 	public function test_http_padded_names_and_uris_are_not_trimmed(): void {
 		$tool = McpTool::fromArray(

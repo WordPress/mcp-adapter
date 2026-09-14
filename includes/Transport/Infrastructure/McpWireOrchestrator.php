@@ -731,7 +731,7 @@ final class McpWireOrchestrator {
 			$header_key   = str_replace( '_', '-', strtolower( $header_name ) );
 			$raw_header   = $headers[ $header_key ] ?? null;
 			$header_value = $this->decode_header_value( $raw_header );
-			if ( null === $header_value || ! $this->header_value_matches( $header_value, $value ) ) {
+			if ( null === $header_value || ! $this->header_value_matches( $header_value, $value, $annotation['type'] ) ) {
 				return McpErrorFactory::header_mismatch( $id, sprintf( '%s is missing or does not match the request body', $header_name ) );
 			}
 		}
@@ -777,16 +777,29 @@ final class McpWireOrchestrator {
 		return is_string( $value ) && 1 === preg_match( '/^[\x20-\x7E]*$/D', $value ) ? $value : null;
 	}
 
-	/** @param mixed $body_value Body value. Compare a decoded primitive header value to the body value. */
-	private function header_value_matches( string $header_value, $body_value ): bool {
+	/**
+	 * Compare a decoded primitive header value to the body value.
+	 *
+	 * @param string $header_value Decoded header value.
+	 * @param mixed $body_value Body value.
+	 * @param string $declared_type The x-mcp-header property type: string, integer, or boolean.
+	 */
+	private function header_value_matches( string $header_value, $body_value, string $declared_type ): bool {
 		if ( is_bool( $body_value ) ) {
 			return ( $body_value ? 'true' : 'false' ) === $header_value;
 		}
-		if ( is_int( $body_value ) ) {
-			if ( $body_value > 9007199254740991 || $body_value < -9007199254740991 ) {
+		if ( is_int( $body_value ) || is_float( $body_value ) ) {
+			if ( ! is_finite( $body_value ) || abs( $body_value ) > 9007199254740991 ) {
 				return false;
 			}
-			return is_numeric( $header_value ) && (float) $header_value === (float) $body_value;
+			// Integer declarations compare numerically, so a body 42.0 matches a header 42.
+			// The strict decimal gate applies to the header only: "0x2A", " 42 ", and "1e1"
+			// never coerce. Other declarations compare the body's decimal string.
+			if ( 'integer' === $declared_type ) {
+				return 1 === preg_match( '/^-?\d+(\.\d+)?$/D', $header_value ) && (float) $header_value === (float) $body_value;
+			}
+
+			return (string) $body_value === $header_value;
 		}
 
 		return is_string( $body_value ) && $body_value === $header_value;
