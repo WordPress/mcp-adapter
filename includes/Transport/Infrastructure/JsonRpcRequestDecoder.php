@@ -39,8 +39,28 @@ final class JsonRpcRequestDecoder {
 			throw new \UnexpectedValueException( 'The JSON-RPC payload must be one JSON object; batches are not supported.' );
 		}
 		$this->assert_finite_numbers( $value );
+		$this->normalize_integral_id( $value );
 
 		return $value;
+	}
+
+	/**
+	 * Treat an integral float id such as 1.0 as the integer id JSON-RPC allows.
+	 *
+	 * JSON has one number type, so a client that sends 1.0 sends the integer 1.
+	 * Normalize before hydration so every response and error echoes the integer.
+	 */
+	private function normalize_integral_id( \stdClass $message ): void {
+		if ( ! property_exists( $message, 'id' ) || ! is_float( $message->id ) ) {
+			return;
+		}
+
+		$id = $message->id;
+		if ( floor( $id ) !== $id || $id < -( 2 ** 63 ) || $id >= 2 ** 63 ) {
+			return;
+		}
+
+		$message->id = (int) $id;
 	}
 
 	/**
