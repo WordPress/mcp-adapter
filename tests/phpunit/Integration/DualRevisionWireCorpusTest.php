@@ -695,6 +695,46 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $missing['data']['error']['code'] );
 	}
 
+	/** A stdClass properties node still declares header mirrors, so a missing header blocks execution. */
+	public function test_http_2026_validates_parameter_headers_declared_in_stdclass_schema_nodes(): void {
+		$executed = false;
+		$tool     = McpTool::fromArray(
+			array(
+				'name'        => 'object-schema-tool',
+				'inputSchema' => array(
+					'type'       => 'object',
+					'properties' => (object) array(
+						'region' => (object) array(
+							'type'         => 'string',
+							'x-mcp-header' => 'Region',
+						),
+					),
+				),
+				'handler'     => static function ( array $arguments ) use ( &$executed ): array {
+					$executed = true;
+					return $arguments;
+				},
+				'permission'  => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+
+		$params  = array(
+			'name'      => 'object-schema-tool',
+			'arguments' => array( 'region' => 'eu-west' ),
+		);
+		$missing = $this->http_request_2026_07_28( 'tools/call', 20, $params );
+		$this->assertSame( 400, $missing['status'] );
+		$this->assertSame( McpErrorFactory::HEADER_MISMATCH, $missing['data']['error']['code'] );
+		$this->assertFalse( $executed );
+
+		$valid = $this->http_request_2026_07_28( 'tools/call', 21, $params, array( 'Mcp-Param-Region' => 'eu-west' ) );
+		$this->assertSame( 200, $valid['status'] );
+		$this->assertTrue( $executed );
+	}
+
 	/** Names and URIs are looked up as sent, so a padded name cannot skip the Mcp-Param check. */
 	public function test_http_padded_names_and_uris_are_not_trimmed(): void {
 		$tool = McpTool::fromArray(

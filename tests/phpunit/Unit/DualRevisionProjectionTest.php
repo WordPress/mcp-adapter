@@ -273,6 +273,56 @@ final class DualRevisionProjectionTest extends TestCase {
 		$this->assertTrue( $nested->is_available_for( $this->schema( Schemas::V2026_07_28 ) ) );
 	}
 
+	/** Schema nodes decoded as stdClass are scanned for header annotations like arrays. */
+	public function test_header_annotations_are_found_in_stdclass_schema_nodes(): void {
+		$annotation = (object) array(
+			'type'         => 'string',
+			'x-mcp-header' => 'Region',
+		);
+		$cases      = array(
+			'properties object' => array(
+				'schema' => array(
+					'type'       => 'object',
+					'properties' => (object) array( 'region' => $annotation ),
+				),
+				'path'   => array( 'region' ),
+			),
+			'child object'      => array(
+				'schema' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'location' => (object) array(
+							'type'       => 'object',
+							'properties' => (object) array( 'region' => $annotation ),
+						),
+					),
+				),
+				'path'   => array( 'location', 'region' ),
+			),
+		);
+
+		foreach ( $cases as $label => $case ) {
+			$tool = McpTool::fromArray(
+				array(
+					'name'        => 'stdclass-header-tool',
+					'inputSchema' => $case['schema'],
+					'handler'     => static fn(): array => array(),
+				)
+			);
+			$this->assertInstanceOf( McpTool::class, $tool, $label );
+			$this->assertSame(
+				array(
+					array(
+						'name' => 'Region',
+						'path' => $case['path'],
+					),
+				),
+				$tool->get_header_annotations( $this->schema( Schemas::V2026_07_28 ) ),
+				$label
+			);
+		}
+	}
+
 	/** Optional prompt description is omitted rather than projected as null. */
 	public function test_direct_prompt_without_description_projects_to_both_revisions(): void {
 		$prompt = McpPrompt::fromArray(
