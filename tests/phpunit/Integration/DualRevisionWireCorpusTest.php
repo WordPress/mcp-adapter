@@ -401,6 +401,63 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertTrue( $response['data']['result']['structuredContent']['ok'] );
 	}
 
+	/** List-shaped tool results keep structuredContent on 2026 and drop it on 2025, whose schema requires an object. */
+	public function test_http_list_shaped_structured_content_is_revision_specific(): void {
+		$state        = new \stdClass();
+		$state->shape = array();
+		$tool         = McpTool::fromArray(
+			array(
+				'name'        => 'list-tool',
+				'inputSchema' => array( 'type' => 'object' ),
+				'handler'     => static function () use ( $state ) {
+					return $state->shape;
+				},
+				'permission'  => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server     = $this->makeServer( array( $tool ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+		$session_id = $this->initialize_http_session();
+
+		foreach ( array( array( 'a', 'b' ), array() ) as $list ) {
+			$state->shape = $list;
+			$expected     = (string) wp_json_encode( $list );
+
+			$modern = $this->http_request_2026_07_28(
+				'tools/call',
+				26,
+				array(
+					'name'      => 'list-tool',
+					'arguments' => new \stdClass(),
+				)
+			);
+			$this->assertSame( 200, $modern['status'], $expected );
+			$this->assertSame( $list, $modern['data']['result']['structuredContent'], $expected );
+			$this->assertSame( $expected, $modern['data']['result']['content'][0]['text'], $expected );
+
+			$legacy = $this->http_post(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 27,
+					'method'  => 'tools/call',
+					'params'  => array(
+						'name'      => 'list-tool',
+						'arguments' => new \stdClass(),
+					),
+				),
+				array(
+					'Mcp-Session-Id'       => $session_id,
+					'MCP-Protocol-Version' => Schemas::V2025_11_25,
+				)
+			);
+			$this->assertSame( 200, $legacy['status'], $expected );
+			$this->assertArrayNotHasKey( 'structuredContent', $legacy['data']['result'], $expected );
+			$this->assertSame( $expected, $legacy['data']['result']['content'][0]['text'], $expected );
+			$this->assertFalse( $legacy['data']['result']['isError'], $expected );
+		}
+	}
+
 	/** Persisted initialization data can be loaded without schema package classes. */
 	public function test_http_session_persists_plain_client_data(): void {
 		$params   = array(
@@ -1328,6 +1385,26 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$delete->set_header( 'Mcp-Session-Id', $session_id );
 		$delete_response = $this->http->handle_request( new HttpRequestContext( $delete ) );
 		$this->assertSame( 200, $delete_response->get_status() );
+	}
+
+	/** A 2025-11-25 session requires the MCP-Protocol-Version header on every request after initialize. */
+	public function test_http_2025_11_25_session_requires_protocol_version_header(): void {
+		$session_id = $this->initialize_http_session();
+
+		$missing = $this->http_post( $this->list_payload( 93 ), array( 'Mcp-Session-Id' => $session_id ) );
+		$this->assertSame( 400, $missing['status'] );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $missing['data']['error']['code'] );
+		$this->assertSame( 93, $missing['data']['id'] );
+		$this->assertStringContainsString( 'required for a 2025-11-25 session', $missing['data']['error']['message'] );
+
+		$present = $this->http_post(
+			$this->list_payload( 94 ),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => Schemas::V2025_11_25,
+			)
+		);
+		$this->assertSame( 200, $present['status'] );
 	}
 
 	/** Identifiers that predate the header may omit it, but a sent header must still match. */

@@ -128,6 +128,11 @@ final list-result record is constructed.
   `-32022`.
 - Missing tools and prompts use standard Invalid Params (`-32602`) in both
   revisions.
+- 2025 `tools/call` responses omit `structuredContent` when a tool returns a
+  JSON list, including an empty list, because the 2025-11-25 schema types that
+  field as an object. The text content block still carries the encoded list.
+  2026 responses keep the list because the 2026-07-28 schema accepts any JSON
+  value there.
 
 ## Transport changes
 

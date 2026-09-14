@@ -32,6 +32,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - Session validation errors carry the JSON-RPC request ID of the failing request instead of `null`.
 - `tools/call` and `resources/read` look up the tool name and resource URI exactly as sent. Surrounding whitespace is no longer trimmed, so a padded name cannot bypass the `2026-07-28` `Mcp-Param-*` header check.
 - `resources/read` forwards only the protocol-defined parameters (`uri`, `_meta`, `inputResponses`, `requestState`) to permission callbacks, the `mcp_adapter_pre_resource_read` filter, and resource handlers. Unknown request keys are dropped.
+- `2025-11-25` `tools/call` responses omit `structuredContent` when a tool returns a JSON list, because that schema types the field as an object. The text block still carries the encoded list. `2026-07-28` responses keep the list.
 - `wordpress/php-mcp-schema` is temporarily pinned to a reviewed commit through a VCS repository until the dual-revision runtime is released.
 
 ### Fixed
