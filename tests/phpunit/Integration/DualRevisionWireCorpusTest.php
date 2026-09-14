@@ -1336,7 +1336,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		);
 	}
 
-	/** Image blocks carry object _meta and omit list-shaped _meta in both revisions. */
+	/** Image blocks carry object _meta; list-shaped _meta fails final projection in both revisions. */
 	public function test_http_image_block_meta_is_emitted_only_as_an_object(): void {
 		$image = array(
 			'type'     => 'image',
@@ -1350,9 +1350,9 @@ final class DualRevisionWireCorpusTest extends TestCase {
 			$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $with_meta['data']['result']['content'][0]['_meta'], $version );
 
 			$with_list = $this->http_tool_result_fixture( $image + array( '_meta' => array( 'a', 'b' ) ), $version );
-			$this->assertSame( 200, $with_list['status'], $version );
-			$this->assertArrayNotHasKey( '_meta', $with_list['data']['result']['content'][0], $version );
-			$this->assertNotEmpty( $with_list['data']['result']['content'][0]['data'], $version );
+			$this->assertSame( 500, $with_list['status'], $version );
+			$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $with_list['data']['error']['code'], $version );
+			$this->assertStringContainsString( 'Invalid handler result', $with_list['data']['error']['message'], $version );
 		}
 	}
 
