@@ -2,6 +2,8 @@
 
 set -eu
 
+wp plugin activate mcp-adapter >/dev/null
+
 if ! help_output="$(wp help mcp-adapter serve 2>&1)"; then
 	printf '%s\n' "$help_output" >&2
 	exit 1
