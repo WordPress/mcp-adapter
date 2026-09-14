@@ -1033,6 +1033,33 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		}
 	}
 
+	/** An integral float id such as 1.0 is the integer id 1 on both transports and revisions. */
+	public function test_http_and_stdio_accept_integral_float_request_ids(): void {
+		$meta = (string) wp_json_encode( $this->meta_2026_07_28() );
+		$http = $this->http_post_raw(
+			'{"jsonrpc":"2.0","id":1.0,"method":"tools/list","params":{"_meta":' . $meta . '}}',
+			array(
+				'MCP-Protocol-Version' => Schemas::V2026_07_28,
+				'Mcp-Method'           => 'tools/list',
+			)
+		);
+		$this->assertSame( 200, $http['status'] );
+		$this->assertSame( 1, $http['data']['id'] );
+		$this->assertStringContainsString( '"id":1,', $http['json'] );
+
+		$stdio = $this->stdio_raw( '{"jsonrpc":"2.0","id":7.0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"wire-test","version":"1.0"}}}' );
+		$this->assertSame( 7, $stdio['id'] );
+		$this->assertSame( Schemas::V2025_11_25, $stdio['result']['protocolVersion'] );
+
+		// Session preflight errors echo the normalized id too.
+		$missing_session = $this->http_post_raw(
+			'{"jsonrpc":"2.0","id":3.0,"method":"tools/list"}',
+			array( 'MCP-Protocol-Version' => Schemas::V2025_11_25 )
+		);
+		$this->assertSame( 3, $missing_session['data']['id'] );
+		$this->assertArrayHasKey( 'error', $missing_session['data'] );
+	}
+
 	/** Schema-invalid JSON-RPC version and request IDs map to invalid request on both transports. */
 	public function test_http_and_stdio_reject_invalid_jsonrpc_records(): void {
 		foreach (
