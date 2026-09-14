@@ -441,10 +441,6 @@ final class McpTool implements McpComponentInterface {
 	 * @return array<int, array{name: string, path: list<string>}>
 	 */
 	private function collect_header_annotations( $schema ): array {
-		if ( ! is_array( $schema ) ) {
-			return array();
-		}
-
 		$names       = array();
 		$annotations = array();
 		$this->scan_header_annotations( $schema, false, true, array(), $names, $annotations );
@@ -463,6 +459,10 @@ final class McpTool implements McpComponentInterface {
 	 * @param array<int, array{name: string, path: list<string>}> $annotations Valid annotations.
 	 */
 	private function scan_header_annotations( $node, bool $property_schema, bool $reachable, array $path, array &$names, array &$annotations ): void {
+		// JSON-decoded schemas may carry objects as stdClass. Scan them like arrays.
+		if ( $node instanceof \stdClass ) {
+			$node = get_object_vars( $node );
+		}
 		if ( ! is_array( $node ) ) {
 			return;
 		}
@@ -489,6 +489,9 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		foreach ( $node as $keyword => $value ) {
+			if ( $value instanceof \stdClass ) {
+				$value = get_object_vars( $value );
+			}
 			if ( 'properties' === $keyword && is_array( $value ) ) {
 				foreach ( $value as $property_name => $property ) {
 					$property_path   = $path;
