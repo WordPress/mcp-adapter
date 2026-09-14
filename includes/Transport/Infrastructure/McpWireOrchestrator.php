@@ -356,7 +356,7 @@ final class McpWireOrchestrator {
 
 		$requested = is_string( $body_revision ) ? $body_revision : $header_revision;
 		if ( null !== $requested && ! McpVersionNegotiator::is_negotiable( $requested ) ) {
-			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, McpVersionNegotiator::advertised_protocol_versions() );
+			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS );
 		}
 
 		if ( 'initialize' === $method ) {

@@ -48,10 +48,15 @@ final class McpVersionNegotiator {
 	 * list requires re-checking that invariant against the official changelog of
 	 * every revision between the new entry and 2025-11-25.
 	 *
-	 * 2024-11-05 and 2025-03-26 predate the `MCP-Protocol-Version` header, so
-	 * sessions negotiated under them may omit it. Real 2024-11-05 clients use the
-	 * HTTP+SSE transport, which this Adapter does not implement; that identifier
-	 * is only reachable over STDIO or from newer clients that still send it.
+	 * 2025-03-26 is deliberately absent: that revision requires servers to receive
+	 * JSON-RPC batches, which this Adapter rejects before dispatch. A client that
+	 * proposes it receives 2025-11-25 as the counter-proposal, as on every release
+	 * before this list existed.
+	 *
+	 * 2024-11-05 predates the `MCP-Protocol-Version` header, so sessions
+	 * negotiated under it may omit it. Real 2024-11-05 clients use the HTTP+SSE
+	 * transport, which this Adapter does not implement; that identifier is only
+	 * reachable over STDIO or from newer clients that still send it.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -60,7 +65,6 @@ final class McpVersionNegotiator {
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
 	public const LEGACY_PROTOCOL_VERSIONS = array(
 		'2025-06-18',
-		'2025-03-26',
 		'2024-11-05',
 	);
 
@@ -143,16 +147,5 @@ final class McpVersionNegotiator {
 	 */
 	public static function requires_protocol_version_header( string $negotiated_version ): bool {
 		return strcmp( $negotiated_version, self::PROTOCOL_VERSION_HEADER_SINCE ) >= 0;
-	}
-
-	/**
-	 * Every protocol version this server accepts, supported first, then legacy, newest-first.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @return array<int, string>
-	 */
-	public static function advertised_protocol_versions(): array {
-		return array_merge( self::SUPPORTED_PROTOCOL_VERSIONS, self::LEGACY_PROTOCOL_VERSIONS );
 	}
 }

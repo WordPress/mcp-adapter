@@ -138,7 +138,7 @@ final class DualRevisionProjectionTest extends TestCase {
 			McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS
 		);
 		$this->assertSame(
-			array( '2025-06-18', '2025-03-26', '2024-11-05' ),
+			array( '2025-06-18', '2024-11-05' ),
 			McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS
 		);
 		$this->assertTrue( McpVersionNegotiator::is_supported( Schemas::V2025_11_25 ) );
@@ -146,6 +146,7 @@ final class DualRevisionProjectionTest extends TestCase {
 		$this->assertFalse( McpVersionNegotiator::is_supported( '2025-06-18' ) );
 		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( Schemas::V2026_07_28 ) );
 		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( '2099-01-01' ) );
+		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( '2025-03-26' ) );
 		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::negotiate( '' ) );
 	}
 
@@ -165,13 +166,7 @@ final class DualRevisionProjectionTest extends TestCase {
 
 		$this->assertTrue( McpVersionNegotiator::requires_protocol_version_header( Schemas::V2025_11_25 ) );
 		$this->assertTrue( McpVersionNegotiator::requires_protocol_version_header( '2025-06-18' ) );
-		$this->assertFalse( McpVersionNegotiator::requires_protocol_version_header( '2025-03-26' ) );
 		$this->assertFalse( McpVersionNegotiator::requires_protocol_version_header( '2024-11-05' ) );
-
-		$this->assertSame(
-			array( Schemas::V2026_07_28, Schemas::V2025_11_25, '2025-06-18', '2025-03-26', '2024-11-05' ),
-			McpVersionNegotiator::advertised_protocol_versions()
-		);
 	}
 
 	/** Removed standardized Tool fields remain internal dead weight, not 2026 output. */
