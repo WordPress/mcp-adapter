@@ -30,6 +30,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - Adapter-owned `2026-07-28` output omits `Tool.execution`, adds `resultType: "complete"` to completed results, and adds `ttlMs: 0` and `cacheScope: "private"` to discovery, list, and resource-read results.
 - Missing tools and prompts return Invalid Params (`-32602`) in both revisions. Missing resources return `-32002` in `2025-11-25` and `-32602` in `2026-07-28`. An unsupported per-request version returns `-32022`.
 - Session validation errors carry the JSON-RPC request ID of the failing request instead of `null`.
+- `tools/call` and `resources/read` look up the tool name and resource URI exactly as sent. Surrounding whitespace is no longer trimmed, so a padded name cannot bypass the `2026-07-28` `Mcp-Param-*` header check.
 - `wordpress/php-mcp-schema` is temporarily pinned to a reviewed commit through a VCS repository until the dual-revision runtime is released.
 
 ### Fixed
