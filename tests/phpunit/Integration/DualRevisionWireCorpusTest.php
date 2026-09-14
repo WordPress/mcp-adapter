@@ -804,6 +804,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 400, $unsupported['status'] );
 		$this->assertSame( McpErrorFactory::UNSUPPORTED_VERSION, $unsupported['data']['error']['code'] );
 		$this->assertSame( '2099-01-01', $unsupported['data']['error']['data']['requested'] );
+		$this->assertSame( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, $unsupported['data']['error']['data']['supported'] );
 	}
 
 	/** Batches are rejected on both transports before any handler executes. */
@@ -1055,7 +1056,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 
 	/** Identifiers that predate the header may omit it, but a sent header must still match. */
 	public function test_http_legacy_pre_header_sessions_may_omit_protocol_version_header(): void {
-		foreach ( array( '2025-03-26', '2024-11-05' ) as $legacy ) {
+		foreach ( array( '2024-11-05' ) as $legacy ) {
 			$initialize = $this->http_post( $this->initialize_payload( 'init-' . $legacy, $legacy ) );
 			$this->assertSame( 200, $initialize['status'] );
 			$this->assertSame( $legacy, $initialize['data']['result']['protocolVersion'] );
@@ -1086,11 +1087,13 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		}
 	}
 
-	/** Unknown proposals still receive the exact 2025-11-25 counter-proposal. */
+	/** Unknown proposals, and 2025-03-26 whose batching requirement is not met, receive the exact 2025-11-25 counter-proposal. */
 	public function test_http_unknown_initialize_proposal_receives_2025_11_25(): void {
-		$initialize = $this->http_post( $this->initialize_payload( 'init-unknown', '2099-01-01' ) );
-		$this->assertSame( 200, $initialize['status'] );
-		$this->assertSame( Schemas::V2025_11_25, $initialize['data']['result']['protocolVersion'] );
+		foreach ( array( '2099-01-01', '2025-03-26' ) as $proposed ) {
+			$initialize = $this->http_post( $this->initialize_payload( 'init-' . $proposed, $proposed ) );
+			$this->assertSame( 200, $initialize['status'], $proposed );
+			$this->assertSame( Schemas::V2025_11_25, $initialize['data']['result']['protocolVersion'], $proposed );
+		}
 	}
 
 	/** A legacy header on a request without a session is not an unsupported version. */

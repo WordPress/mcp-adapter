@@ -2,7 +2,7 @@
 
 MCP Adapter now supports exact MCP `2025-11-25` and `2026-07-28` through the
 revision-selected `wordpress/php-mcp-schema` record runtime. Clients that
-propose `2025-06-18`, `2025-03-26`, or `2024-11-05` keep working: the
+propose `2025-06-18` or `2024-11-05` keep working: the
 identifier is echoed back and the session is served through the `2025-11-25`
 schema. Ordinary Ability authors do not add protocol branches; direct
 Adapter/schema consumers must make the changes below.

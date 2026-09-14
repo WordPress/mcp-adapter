@@ -63,7 +63,7 @@ counter-proposal. Initialization never negotiates `2026-07-28` through
 
 #### Legacy identifiers
 
-`2025-06-18`, `2025-03-26`, and `2024-11-05` have no schema of their own. When
+`2025-06-18` and `2024-11-05` have no schema of their own. When
 a client proposes one of them, `initialize` echoes it back and the session is
 served through the `2025-11-25` schema. This is sound because every
 server-emitted change between those revisions and `2025-11-25` is an optional
@@ -74,8 +74,10 @@ unchanged. `McpRequestContext::protocol_version()` carries the negotiated
 identifier; `revision()` carries the schema revision.
 
 `MCP-Protocol-Version` must equal the negotiated identifier whenever it is sent.
-Sessions negotiated under `2025-03-26` or `2024-11-05` may omit it, because the
-header was introduced in `2025-06-18`. Real `2024-11-05` clients use the
+Sessions negotiated under `2024-11-05` may omit it, because the header was
+introduced in `2025-06-18`. `2025-03-26` is not negotiable: that revision
+requires servers to receive JSON-RPC batches, which the Adapter rejects, so a
+proposal receives `2025-11-25`. Real `2024-11-05` clients use the
 HTTP+SSE transport, which the Adapter does not implement, so that identifier is
 reachable over STDIO or from newer clients that still send it. The list lives in
 `McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`; extending it requires
