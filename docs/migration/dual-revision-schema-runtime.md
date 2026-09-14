@@ -77,6 +77,18 @@ revision and absent from another.
 The CLI reports neutral registration counts plus per-revision availability. Wire
 discovery returns only records valid for the selected revision.
 
+Factory validation is deferred to projection. `McpTool::fromArray()`,
+`McpResource::fromArray()`, and `McpPrompt::fromArray()` return `WP_Error` only
+for structural problems: a missing name or URI, a missing handler, or an invalid
+resource URI. A schema problem, such as an invalid `x-mcp-header` annotation or
+an input schema the selected revision cannot represent, no longer fails
+construction. It surfaces when a revision is selected: `is_available_for()`
+returns `false` and `get_projection_error( $revision )` returns the throwable.
+At registration the server logs a warning for each revision a component cannot
+project to and rejects the component only when no supported revision can
+represent it. Code that relied on `is_wp_error()` to catch schema problems
+should check `is_available_for()` for each revision it serves.
+
 ## Direct Adapter integrations
 
 Protocol-facing Adapter internals now receive validated records and an exact

@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/dual-revision-schema-runtime.md).
 - `McpToolValidator`, `McpResourceValidator`, `McpPromptValidator`, `McpErrorFactory::validate_jsonrpc_message()`, `McpServer::is_mcp_validation_enabled()`, and the `mcp_adapter_validation_enabled` filter have been removed. Wire validation always runs through the selected schema.
 - `RequestRouter::route_request()`, method handlers, `McpErrorFactory`, `ContentBlockHelper`, and `McpPromptBuilderInterface::build()` now exchange schema records and revision-neutral arrays instead of DTOs. `JsonRpcResponseBuilder` has been removed. Custom transports must delegate to `HttpRequestHandler` or `McpWireOrchestrator`.
+- `McpTool::fromArray()`, `McpResource::fromArray()`, and `McpPrompt::fromArray()` return `WP_Error` only for structural problems (missing name, URI, or handler; invalid resource URI). Schema and annotation problems no longer fail construction; they are reported per revision through `is_available_for()` and `get_projection_error()` and logged as warnings at registration.
 - The non-canonical `tools/list/all` method and `ToolsHandler::list_all_tools()` have been removed.
 - JSON-RPC batch requests are rejected before dispatch.
 - `wp mcp-adapter list` adds per-revision tool, resource, and prompt columns.
