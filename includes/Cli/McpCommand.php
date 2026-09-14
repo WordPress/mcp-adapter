@@ -37,10 +37,10 @@ final class McpCommand extends \WP_CLI_Command {
 	 * ## EXAMPLES
 	 *
 	 *     # Serve the default MCP server as admin user
-	 *     wp mcp-adapter serve --user=admin
+	 *     wp --user=admin mcp-adapter serve
 	 *
 	 *     # Serve a specific server as user with ID 1
-	 *     wp mcp-adapter serve --server=my-mcp-server --user=1
+	 *     wp --user=1 mcp-adapter serve --server=my-mcp-server
 	 *
 	 *     # Serve without authentication (limited capabilities)
 	 *     wp mcp-adapter serve --server=public-server

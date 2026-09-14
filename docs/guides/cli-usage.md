@@ -31,10 +31,10 @@ wp mcp-adapter serve [--server=<server-id>]
 
 ```bash
 # Serve the default MCP server as admin user
-wp mcp-adapter serve --user=admin
+wp --user=admin mcp-adapter serve
 
 # Serve a specific server as user with ID 1
-wp mcp-adapter serve --server=my-mcp-server --user=1
+wp --user=1 mcp-adapter serve --server=my-mcp-server
 
 # Serve without authentication (limited capabilities)
 wp mcp-adapter serve --server=public-server
@@ -108,11 +108,11 @@ Many MCP clients can launch subprocess servers. Point the client's config at the
       "command": "wp",
       "args": [
         "--path=/path/to/your/wordpress/site",
+        "--user=admin",
         "mcp-adapter",
         "serve",
         // Change the server ID and user as needed
-        "--server=mcp-adapter-default-server",
-        "--user=admin"
+        "--server=mcp-adapter-default-server"
       ]
     },
   }
@@ -152,13 +152,13 @@ The CLI commands are particularly useful for development:
 
 ```bash
 # Test your MCP server locally
-wp mcp-adapter serve --user=admin --server=my-dev-server
+wp --user=admin mcp-adapter serve --server=my-dev-server
 
 # List available servers during development
 wp mcp-adapter list --format=json | jq '.[].id'
 
 # Test with different user permissions
-wp mcp-adapter serve --user=editor --server=content-server
+wp --user=editor mcp-adapter serve --server=content-server
 ```
 
 ## Authentication and Permissions
@@ -169,13 +169,13 @@ When using the `--user` option, the MCP server runs with that user's capabilitie
 
 ```bash
 # Run as administrator (full access)
-wp mcp-adapter serve --user=admin
+wp --user=admin mcp-adapter serve
 
 # Run as editor (limited access)
-wp mcp-adapter serve --user=editor
+wp --user=editor mcp-adapter serve
 
 # Run as specific user ID
-wp mcp-adapter serve --user=123
+wp --user=123 mcp-adapter serve
 ```
 
 ### Permission Debugging
@@ -183,7 +183,7 @@ wp mcp-adapter serve --user=123
 Use WP-CLI's `--debug` flag to see permission checks:
 
 ```bash
-wp mcp-adapter serve --user=admin --debug
+wp --user=admin --debug mcp-adapter serve
 ```
 
 ## Error Handling
@@ -200,7 +200,7 @@ wp mcp-adapter serve --server=nonexistent
 
 **User Not Found**
 ```bash
-wp mcp-adapter serve --user=baduser
+wp --user=baduser mcp-adapter serve
 # Error: Invalid user ID, email or login:'baduser'
 ```
 
@@ -215,7 +215,7 @@ wp mcp-adapter serve
 Enable debug output for troubleshooting:
 
 ```bash
-wp mcp-adapter serve --user=admin --debug
+wp --user=admin --debug mcp-adapter serve
 ```
 
 This will show:
@@ -235,7 +235,7 @@ When multiple servers are available, specify which one to serve:
 wp mcp-adapter list
 
 # Serve specific server
-wp mcp-adapter serve --server=content-management --user=admin
+wp --user=admin mcp-adapter serve --server=content-management
 ```
 
 ### Environment-Specific Configurations
@@ -244,13 +244,13 @@ Use different configurations for different environments:
 
 ```bash
 # Development
-wp mcp-adapter serve --server=dev-server --user=admin
+wp --user=admin mcp-adapter serve --server=dev-server
 
 # Staging
-wp mcp-adapter serve --server=staging-server --user=staging-user
+wp --user=staging-user mcp-adapter serve --server=staging-server
 
 # Production (limited access)
-wp mcp-adapter serve --server=prod-server --user=api-user
+wp --user=api-user mcp-adapter serve --server=prod-server
 ```
 
 ## Best Practices

@@ -195,7 +195,7 @@ The STDIO transport used by WP-CLI does not require HTTP sessions. Each `wp mcp-
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | \
-  wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+  wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 ## Server Configuration
@@ -440,15 +440,15 @@ add_filter('mcp_adapter_execute_ability_capability', function() {
 ```bash
 # List all available tools
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | \
-  wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+  wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # Get info about a specific ability
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mcp-adapter-get-ability-info","arguments":{"ability_name":"my-plugin/create-post"}}}' | \
-  wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+  wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # Execute an ability
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mcp-adapter-execute-ability","arguments":{"ability_name":"my-plugin/create-post","parameters":{"title":"Test Post","content":"Hello World"}}}}' | \
-  wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+  wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 ### HTTP REST API

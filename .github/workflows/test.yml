@@ -234,6 +234,10 @@ jobs:
         run: |
           npm run test:php
 
+      - name: Run WP-CLI command registration tests
+        if: ${{ matrix.php == '8.5' && matrix.wp == 'latest' && !matrix.coverage }}
+        run: npm run test:cli
+
       - name: Upload code coverage report
         continue-on-error: true
         if: ${{ matrix.coverage }}

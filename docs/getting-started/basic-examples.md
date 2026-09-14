@@ -119,7 +119,7 @@ The ability is automatically available via the default MCP server at `/wp-json/m
 
 ```bash
 # Create a draft post using WP-CLI
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-create-post","arguments":{"title":"My First MCP Post","content":"This post was created using MCP!","status":"draft"}}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-create-post","arguments":{"title":"My First MCP Post","content":"This post was created using MCP!","status":"draft"}}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 ## Example 2: Resource - Site Configuration
@@ -170,10 +170,10 @@ The ability is automatically available via the default MCP server.
 
 ```bash
 # Read the site configuration resource
-echo '{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"wordpress://site/config"}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"wordpress://site/config"}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # List all available resources
-echo '{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 ## Example 3: Prompt - Code Review
@@ -243,10 +243,10 @@ The ability is automatically available via the default MCP server.
 
 ```bash
 # Get a code review prompt
-echo '{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"my-plugin-code-review","arguments":{"code":"function hello() { console.log(\"world\"); }","focus":["security","performance"]}}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"prompts/get","params":{"name":"my-plugin-code-review","arguments":{"code":"function hello() { console.log(\"world\"); }","focus":["security","performance"]}}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # List all available prompts
-echo '{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 ## Key Points
@@ -270,13 +270,13 @@ For full details on annotations, their semantics, and usage guidelines, see the 
 Use WP-CLI with the default server:
 ```bash
 # List all available tools
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # List all available resources  
-echo '{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"resources/list","params":{}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # List all available prompts
-echo '{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 ## Next Steps

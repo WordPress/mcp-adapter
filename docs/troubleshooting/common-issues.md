@@ -16,7 +16,7 @@ wp option get permalink_structure
 ### Permission Denied
 ```bash
 # Test with admin user
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # Check user capabilities
 wp user list --fields=ID,user_login,roles

@@ -95,10 +95,10 @@ Test your MCP server:
 **Using WP-CLI (STDIO transport):**
 ```bash
 # List available tools
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 
 # Execute the site info tool
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-get-site-info","arguments":{"include_stats":true}}}' | wp mcp-adapter serve --user=admin --server=mcp-adapter-default-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"my-plugin-get-site-info","arguments":{"include_stats":true}}}' | wp --user=admin mcp-adapter serve --server=mcp-adapter-default-server
 ```
 
 **Using HTTP REST API:**

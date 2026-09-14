@@ -213,10 +213,10 @@ Test permission callbacks with different user roles:
 
 ```bash
 # Test as admin
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapter serve --user=admin --server=admin-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp --user=admin mcp-adapter serve --server=admin-server
 
 # Test as editor (should fail for admin-only server)
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp mcp-adapter serve --user=editor --server=admin-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | wp --user=editor mcp-adapter serve --server=admin-server
 ```
 
 ## Implementation Notes
