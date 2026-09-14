@@ -90,7 +90,7 @@ final class McpTool implements McpComponentInterface {
 	 */
 	private array $observability_context = array();
 
-	/** @var array<int, array{name: string, path: list<string>}>|null */
+	/** @var array<int, array{name: string, path: list<string>, type: string}>|null */
 	private ?array $header_annotations = null;
 
 	// =========================================================================
@@ -259,7 +259,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Return validated modern HTTP header annotations.
 	 *
-	 * @return array<int, array{name: string, path: list<string>}>
+	 * @return array<int, array{name: string, path: list<string>, type: string}>
 	 * @since n.e.x.t
 	 */
 	public function get_header_annotations( Schema $schema ): array {
@@ -438,7 +438,7 @@ final class McpTool implements McpComponentInterface {
 	 * Collect and validate the 2026 x-mcp-header definitions.
 	 *
 	 * @param mixed $schema Tool input schema.
-	 * @return array<int, array{name: string, path: list<string>}>
+	 * @return array<int, array{name: string, path: list<string>, type: string}>
 	 */
 	private function collect_header_annotations( $schema ): array {
 		$names       = array();
@@ -456,7 +456,7 @@ final class McpTool implements McpComponentInterface {
 	 * @param bool $reachable Whether its path contains only properties keys.
 	 * @param list<string> $path Property path.
 	 * @param array<string, true> $names Case-insensitive header names.
-	 * @param array<int, array{name: string, path: list<string>}> $annotations Valid annotations.
+	 * @param array<int, array{name: string, path: list<string>, type: string}> $annotations Valid annotations.
 	 */
 	private function scan_header_annotations( $node, bool $property_schema, bool $reachable, array $path, array &$names, array &$annotations ): void {
 		// JSON-decoded schemas may carry objects as stdClass. Scan them like arrays.
@@ -485,6 +485,7 @@ final class McpTool implements McpComponentInterface {
 			$annotations[]    = array(
 				'name' => $name,
 				'path' => $path,
+				'type' => $type,
 			);
 		}
 
