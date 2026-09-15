@@ -93,7 +93,8 @@ final class McpWireOrchestrator {
 			return 'process';
 		}
 
-		$is_2025 = null === $header_revision || McpVersionNegotiator::is_negotiable( $header_revision );
+		$is_2025 = in_array( Schemas::V2025_11_25, $this->transport_context->mcp_server->get_supported_protocol_versions(), true )
+			&& ( null === $header_revision || McpVersionNegotiator::is_negotiable( $header_revision ) );
 		return $is_2025 && 'DELETE' === $method ? 'terminate-session' : 'reject';
 	}
 
@@ -359,13 +360,21 @@ final class McpWireOrchestrator {
 			? $metadata['protocol_version']
 			: null;
 
+		$supported = $this->transport_context->mcp_server->get_supported_protocol_versions();
 		if ( Schemas::V2026_07_28 === $body_revision || Schemas::V2026_07_28 === $header_revision ) {
-			return Schemas::V2026_07_28;
+			return in_array( Schemas::V2026_07_28, $supported, true )
+				? Schemas::V2026_07_28
+				: McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, Schemas::V2026_07_28, $supported );
 		}
 
 		$requested = is_string( $body_revision ) ? $body_revision : $header_revision;
 		if ( null !== $requested && ! McpVersionNegotiator::is_negotiable( $requested ) ) {
-			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS );
+			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, $supported );
+		}
+
+		if ( ! in_array( Schemas::V2025_11_25, $supported, true ) ) {
+			$requested = $requested ?? ( is_string( $params['protocolVersion'] ?? null ) ? $params['protocolVersion'] : Schemas::V2025_11_25 );
+			return McpErrorFactory::unsupported_protocol_version( $generic['id'] ?? null, $requested, $supported );
 		}
 
 		if ( 'initialize' === $method ) {
@@ -434,7 +443,7 @@ final class McpWireOrchestrator {
 	/** @return array<string, mixed> Logical server/discover result data. */
 	private function create_discover_data(): array {
 		return array(
-			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
+			'supportedVersions' => $this->transport_context->mcp_server->get_supported_protocol_versions(),
 			'capabilities'      => array(
 				'prompts'   => array( 'listChanged' => false ),
 				'resources' => array( 'listChanged' => false ),

@@ -11,6 +11,7 @@ namespace WP\MCP\Tests\Integration;
 
 use WP\MCP\Cli\StdioServerBridge;
 use WP\MCP\Core\McpVersionNegotiator;
+use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpInputRequired;
 use WP\MCP\Domain\Tools\McpTool;
@@ -136,6 +137,63 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 'elicitation/create', $response['data']['result']['inputRequests']['confirm']['method'] );
 		$this->assertSame( 'author-state', $response['data']['result']['requestState'] );
 		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response['headers'] );
+	}
+
+	/** A modern-only endpoint rejects legacy requests before creating a session. */
+	public function test_modern_only_server_admission_and_discovery(): void {
+		$sessions_before = get_user_meta( 1, self::session_meta_key(), true );
+		$server = $this->restricted_server( array( Schemas::V2026_07_28 ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+		$this->stdio = new StdioServerBridge( $server );
+		$discovery = $this->http_request_2026_07_28( 'server/discover', 1, array() );
+		$this->assertSame( array( Schemas::V2026_07_28 ), $discovery['data']['result']['supportedVersions'] );
+		$this->assertSame( 200, $this->http_request_2026_07_28( 'tools/list', 2, array() )['status'] );
+
+		foreach ( array( Schemas::V2025_11_25, '2025-06-18', '2024-11-05' ) as $revision ) {
+			$payload = $this->initialize_payload( 1, $revision );
+			foreach ( array( array(), array( 'MCP-Protocol-Version' => $revision ) ) as $headers ) {
+				$response = $this->http_post( $payload, $headers );
+				$this->assertSame( 400, $response['status'] );
+				$this->assertSame( -32022, $response['data']['error']['code'] );
+				$this->assertSame( array( Schemas::V2026_07_28 ), $response['data']['error']['data']['supported'] );
+				$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response['headers'] );
+			}
+			$this->assertSame( -32022, $this->stdio_request( $payload )['error']['code'] );
+		}
+		$direct = $this->http_post( array( 'jsonrpc' => '2.0', 'id' => 3, 'method' => 'tools/list' ) );
+		$this->assertSame( -32022, $direct['data']['error']['code'] );
+		$request = new WP_REST_Request( 'DELETE', '/mcp' );
+		$this->assertSame( 405, $this->http->handle_request( new HttpRequestContext( $request ) )->get_status() );
+		$this->assertSame( $sessions_before, get_user_meta( 1, self::session_meta_key(), true ) );
+	}
+
+	/** An old-only server rejects modern requests and keeps the legacy lifecycle. */
+	public function test_legacy_only_server_admission(): void {
+		$server = $this->restricted_server( array( Schemas::V2025_11_25 ) );
+		$this->http = new HttpRequestHandler( $server->create_transport_context() );
+		$response = $this->http_request_2026_07_28( 'tools/list', 1, array() );
+		$this->assertSame( 400, $response['status'] );
+		$this->assertSame( array( Schemas::V2025_11_25 ), $response['data']['error']['data']['supported'] );
+		$initialize = $this->http_post( $this->initialize_payload( 1, '2025-06-18' ) );
+		$this->assertSame( '2025-06-18', $initialize['data']['result']['protocolVersion'] );
+		$this->assertArrayHasKey( 'Mcp-Session-Id', $initialize['headers'] );
+	}
+
+	/** Invalid configuration cannot silently broaden the accepted revisions. */
+	public function test_invalid_server_revisions_fail_closed(): void {
+		foreach ( array( array(), array( 'unknown' ), array( '2025-06-18' ), array( 2026 ) ) as $revisions ) {
+			try {
+				$this->restricted_server( $revisions );
+				$this->fail( 'Invalid revisions must be rejected.' );
+			} catch ( \InvalidArgumentException $exception ) {
+				$this->assertNotEmpty( $exception->getMessage() );
+			}
+		}
+	}
+
+	/** @param list<string> $revisions Enabled schema revisions. */
+	private function restricted_server( array $revisions ): McpServer {
+		return new McpServer( 'restricted', 'mcp', '/restricted', 'Restricted', 'Test', '1', array(), DummyErrorHandler::class, null, array( 'test/always-allowed' ), array(), array(), null, $revisions );
 	}
 
 	/** Prove initialization, session context, ping, and canonical list output. */

@@ -25,6 +25,25 @@ The default server also auto-discovers public abilities with `mcp.type` set to `
 - Sites with many plugins registering abilities — no server reconfiguration needed
 - Scenarios where context window efficiency matters (only 3 tool schemas sent to the AI)
 
+### Restricting a custom server's protocol revisions
+
+Pass the optional final `supported_protocol_versions` argument to `create_server()`
+(or the `McpServer` constructor) to restrict one endpoint. Use
+`array( '2026-07-28' )` for a modern-only endpoint or `array( '2025-11-25' )`
+for a legacy-only endpoint. The default `null` enables both revisions.
+
+The list must be nonempty and contain only schema revisions from
+`McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS`. Duplicate entries are removed.
+An invalid configuration returns `WP_Error` from `create_server()`; direct
+construction throws `InvalidArgumentException`.
+
+`server/discover` and unsupported-version errors report the configured list.
+With only `2026-07-28` enabled, legacy requests are rejected before session
+lookup or creation, including headerless `initialize` requests. HTTP `DELETE`
+is unavailable. Enabling `2025-11-25` also enables its existing legacy identifiers;
+those aliases are not separate configuration entries. Other servers retain
+their own configuration.
+
 ### Custom server: direct tool registration
 
 A custom server is created explicitly via the `mcp_adapter_init` hook. Each ability you list is registered as a standalone MCP tool, resource, or prompt with its own schema visible directly in `tools/list`:

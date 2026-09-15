@@ -196,9 +196,11 @@ final class McpAdapter {
 	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Ability names, MCP prompts, or prompt builders to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
+	 * @param list<string>|null $supported_protocol_versions Enabled schema revisions, or null for all supported revisions.
+	 *
 	 * @return \WP\MCP\Core\McpAdapter|\WP_Error McpAdapter instance on success, WP_Error on failure.
 	 */
-	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null ) {
+	public function create_server( string $server_id, string $server_route_namespace, string $server_route, string $server_name, string $server_description, string $server_version, array $mcp_transports, ?string $error_handler, ?string $observability_handler = null, array $tools = array(), array $resources = array(), array $prompts = array(), ?callable $transport_permission_callback = null, ?array $supported_protocol_versions = null ) {
 		// Use NullMcpErrorHandler if no error handler is provided.
 		if ( ! $error_handler ) {
 			$error_handler = NullMcpErrorHandler::class;
@@ -301,7 +303,8 @@ final class McpAdapter {
 				$tools,
 				$resources,
 				$prompts,
-				$transport_permission_callback
+				$transport_permission_callback,
+				$supported_protocol_versions
 			);
 		} catch ( \Throwable $e ) {
 			return new WP_Error(

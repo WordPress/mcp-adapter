@@ -100,6 +100,14 @@ class McpServer {
 	private Schemas $schemas;
 
 	/**
+	 * Enabled schema revisions; legacy aliases follow the 2025 revision.
+	 *
+	 * @since n.e.x.t
+	 * @var list<string>
+	 */
+	private array $supported_protocol_versions;
+
+	/**
 	 * Transport permission callback.
 	 *
 	 * @var callable|null
@@ -124,6 +132,9 @@ class McpServer {
 	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Optional ability names, MCP prompts, or prompt builders to register during construction.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
+	 * @param list<string>|null $supported_protocol_versions Enabled schema revisions, or null for all supported revisions.
+	 *
+	 * @throws \InvalidArgumentException For an empty or unsupported revision list.
 	 * @throws \Exception Thrown if the MCP transport class does not extend AbstractMcpTransport.
 	 */
 	public function __construct(
@@ -139,8 +150,20 @@ class McpServer {
 		array $tools = array(),
 		array $resources = array(),
 		array $prompts = array(),
-		?callable $transport_permission_callback = null
+		?callable $transport_permission_callback = null,
+		?array $supported_protocol_versions = null
 	) {
+		$supported_protocol_versions = $supported_protocol_versions ?? McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS;
+		if ( array() === $supported_protocol_versions ) {
+			throw new \InvalidArgumentException( 'A server must support at least one protocol revision.' );
+		}
+		foreach ( $supported_protocol_versions as $revision ) {
+			if ( ! is_string( $revision ) || ! McpVersionNegotiator::is_supported( $revision ) ) {
+				throw new \InvalidArgumentException( 'Server protocol revisions must have a supported schema.' );
+			}
+		}
+		$this->supported_protocol_versions = array_values( array_unique( $supported_protocol_versions ) );
+
 		// Store server configuration
 		$this->server_id                     = $server_id;
 		$this->server_route_namespace        = $server_route_namespace;
@@ -155,6 +178,16 @@ class McpServer {
 		// Setup handlers and components
 		$this->setup_handlers( $error_handler, $observability_handler );
 		$this->setup_components( $tools, $resources, $prompts, $mcp_transports );
+	}
+
+	/**
+	 * Return the schema revisions enabled for this server.
+	 *
+	 * @since n.e.x.t
+	 * @return list<string>
+	 */
+	public function get_supported_protocol_versions(): array {
+		return $this->supported_protocol_versions;
 	}
 
 	/**
