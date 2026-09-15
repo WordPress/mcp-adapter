@@ -31,6 +31,39 @@ final class MrtrToolsTest extends TestCase {
 		$this->assertSame( array( 'value' => 7 ), $result['structuredContent'] );
 	}
 
+	/** Exact client argument JSON remains available without changing the callback array contract. */
+	public function test_original_argument_context_preserves_shapes_and_isolation(): void {
+		$original = json_decode( '{"object":{},"list":[],"map":{"0":"zero","1":{}},"number":1.0}' );
+		$received = null;
+		$normalized = null;
+		$tool = $this->tool(
+			static function ( array $args, McpToolCallContext $context ) use ( &$received, &$normalized ): array {
+				$received = $context;
+				$normalized = $args;
+				$copy = $context->arguments();
+				$copy->map->{'1'}->mutated = true;
+				$copy->object->mutated = true;
+				return array( 'ok' => true );
+			}
+		);
+		$response = $this->call( $this->makeServer( array( $tool ) ), array( 'arguments' => $original ), 1 );
+		$this->assertFalse( $response['result']['isError'] );
+		$this->assertInstanceOf( McpToolCallContext::class, $received );
+		$this->assertSame( array(), $normalized['object'] );
+		$this->assertSame( array(), $normalized['list'] );
+		$this->assertSame(
+			'{"object":{},"list":[],"map":{"0":"zero","1":{}},"number":1.0}',
+			json_encode( $received->arguments(), JSON_PRESERVE_ZERO_FRACTION )
+		);
+		$this->assertSame( 1.0, $received->arguments()->number );
+
+		$context = new McpToolCallContext( $this->request_context( $this->makeServer() ), new \stdClass(), null, false, $original );
+		$original->object->changed = true;
+		$this->assertSame( '{}', json_encode( $context->arguments()->object ) );
+		$without = new McpToolCallContext( $this->request_context( $this->makeServer() ), new \stdClass(), null, false );
+		$this->assertNull( $without->arguments() );
+	}
+
 	/** Ability callbacks receive only domain input and cannot consume MRTR fields. */
 	public function test_ability_callback_contract_is_preserved(): void {
 		$calls          = 0;
@@ -491,7 +524,8 @@ final class MrtrToolsTest extends TestCase {
 					'id'      => $id,
 					'method'  => $method,
 					'params'  => $params,
-				)
+				),
+				JSON_PRESERVE_ZERO_FRACTION
 			)
 		);
 		$response = $wire->process( $message, 'STDIO', array(), Schemas::V2025_11_25 === $revision ? array( 'capabilities' => new \stdClass() ) : null )['response'];

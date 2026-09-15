@@ -27,6 +27,9 @@ final class McpToolCallContext {
 	/** @var string|null */
 	private ?string $request_state;
 
+	/** @var string|null Original argument JSON, before callback normalization or filters. */
+	private ?string $arguments;
+
 	/** @var bool */
 	private bool $continuation;
 
@@ -36,16 +39,32 @@ final class McpToolCallContext {
 	 * @param string|null                    $request_state Untrusted client-supplied state, not verified by the Adapter.
 	 * @param bool                           $continuation  Whether the client supplied any continuation field.
 	 *
-	 * @throws \JsonException If the responses cannot be encoded.
+	 * @param \stdClass|null                 $arguments     Original schema-valid arguments before callback normalization or filters.
+	 *
+	 * @throws \JsonException If the responses or arguments cannot be encoded.
 	 *
 	 * @internal Constructed by the Adapter after protocol schema validation.
 	 * @since n.e.x.t
 	 */
-	public function __construct( McpRequestContext $request, \stdClass $responses, ?string $request_state, bool $continuation ) {
+	public function __construct( McpRequestContext $request, \stdClass $responses, ?string $request_state, bool $continuation, ?\stdClass $arguments = null ) {
 		$this->request       = $request;
 		$this->responses     = json_encode( $responses, JSON_THROW_ON_ERROR ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Preserve strict JSON failures and exact values in client input.
 		$this->request_state = $request_state;
 		$this->continuation  = $continuation;
+		$this->arguments     = null === $arguments ? null : json_encode( $arguments, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Preserve original JSON types and strict encoding failures.
+	}
+
+	/**
+	 * Get a defensive copy of the original arguments, before normalization or filters.
+	 *
+	 * This is client input, not a replacement for permission checks or input validation.
+	 * Null means the client omitted arguments (or the context was constructed without them).
+	 *
+	 * @throws \JsonException If the stored arguments cannot be decoded.
+	 * @since n.e.x.t
+	 */
+	public function arguments(): ?\stdClass {
+		return null === $this->arguments ? null : json_decode( $this->arguments, false, 512, JSON_THROW_ON_ERROR );
 	}
 
 	/**

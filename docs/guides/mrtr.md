@@ -33,6 +33,7 @@ data. Normal values and `WP_Error` follow the existing result handling.
 | --- | --- |
 | `revision()` | The selected MCP revision. |
 | `client_capabilities()` | Capabilities declared for this request. |
+| `arguments()` | A defensive copy of original client arguments before normalization or filters, preserving JSON objects and arrays; `null` when omitted. This remains untrusted input. |
 | `input_responses()` | A defensive copy of this request's schema-valid response map. No history is accumulated. |
 | `request_state()` | The untrusted, opaque string supplied by the client, or `null`. |
 | `is_continuation()` | The client supplied continuation fields. This does not prove a previous interaction. |

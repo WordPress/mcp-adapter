@@ -141,7 +141,8 @@ class ToolsHandler {
 					$request_context,
 					null === $responses ? new \stdClass() : json_decode( json_encode( $responses, JSON_THROW_ON_ERROR ), false, 512, JSON_THROW_ON_ERROR ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Preserve exact client input without normalization.
 					$request_params->getRequestState(),
-					$has_continuation
+					$has_continuation,
+					$request_params->getArguments()
 				);
 			}
 
