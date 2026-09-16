@@ -18,22 +18,46 @@ use WP\McpSchema\Schema;
  */
 final class McpRequestContext {
 
-	/** @var \WP\McpSchema\Schema */
+	/**
+	 * Selected schema used for request and response records.
+	 *
+	 * @var \WP\McpSchema\Schema
+	 */
 	private Schema $schema;
 
-	/** @var string */
+	/**
+	 * Negotiated identifier, which may differ from the backing schema revision.
+	 *
+	 * @var string
+	 */
 	private string $protocol_version;
 
-	/** @var \stdClass */
+	/**
+	 * Snapshot of the client capability object.
+	 *
+	 * @var \stdClass
+	 */
 	private \stdClass $client_capabilities;
 
-	/** @var \stdClass|null */
+	/**
+	 * Snapshot of client identification metadata, when supplied.
+	 *
+	 * @var \stdClass|null
+	 */
 	private ?\stdClass $client_info;
 
-	/** @var string */
+	/**
+	 * Name of the transport handling this request.
+	 *
+	 * @var string
+	 */
 	private string $transport;
 
-	/** @var array<string, mixed> */
+	/**
+	 * Transport-owned request metadata copied with JSON object/list identity preserved.
+	 *
+	 * @var array<string, mixed>
+	 */
 	private array $transport_metadata;
 
 	/**
@@ -131,7 +155,13 @@ final class McpRequestContext {
 		return self::copy_array( $this->transport_metadata );
 	}
 
-	/** Deep-copy one array while preserving its key identity. */
+	/**
+	 * Copy nested JSON values while preserving array keys.
+	 *
+	 * @param array<mixed> $value Source array.
+	 *
+	 * @return array<mixed> Copied array; non-JSON object instances retain their identity.
+	 */
 	private static function copy_array( array $value ): array {
 		$copy = array();
 		foreach ( $value as $key => $item ) {
@@ -141,7 +171,13 @@ final class McpRequestContext {
 		return $copy;
 	}
 
-	/** Deep-copy one JSON object. */
+	/**
+	 * Copy the properties and nested JSON values of an object.
+	 *
+	 * @param \stdClass $source Source JSON object.
+	 *
+	 * @return \stdClass Independent JSON object copy.
+	 */
 	private static function copy_object( \stdClass $source ): \stdClass {
 		$copy = new \stdClass();
 		foreach ( get_object_vars( $source ) as $key => $item ) {

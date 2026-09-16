@@ -20,10 +20,17 @@ final class JsonRpcRequestDecoder {
 	private const MAX_DEPTH = 512;
 
 	/**
-	 * Decode one JSON-RPC object.
+	 * Decode one JSON-RPC object while preserving JSON value types.
 	 *
-	 * @throws \InvalidArgumentException When JSON is malformed, unsafe, or not one object.
 	 * @since n.e.x.t
+	 *
+	 * @param string $json Raw JSON request or notification.
+	 *
+	 * @return \stdClass Decoded object with integral float IDs normalized.
+	 *
+	 * @throws \InvalidArgumentException If JSON is malformed.
+	 * @throws \UnexpectedValueException If the root is not an object, including batch arrays.
+	 * @throws \RangeException If an integer token exceeds the native range or a decoded number is non-finite.
 	 */
 	public function decode( string $json ): \stdClass {
 		$this->assert_native_integers( $json );
@@ -45,10 +52,11 @@ final class JsonRpcRequestDecoder {
 	}
 
 	/**
-	 * Treat an integral float id such as 1.0 as the integer id JSON-RPC allows.
+	 * Convert a mathematically integral float request ID to a native integer.
 	 *
-	 * JSON has one number type, so a client that sends 1.0 sends the integer 1.
-	 * Normalize before hydration so every response and error echoes the integer.
+	 * @param \stdClass $message Decoded message, updated in place when the ID is representable.
+	 *
+	 * @return void
 	 */
 	private function normalize_integral_id( \stdClass $message ): void {
 		if ( ! property_exists( $message, 'id' ) || ! is_float( $message->id ) ) {
@@ -91,7 +99,15 @@ final class JsonRpcRequestDecoder {
 		return $value;
 	}
 
-	/** Reject integer tokens that json_decode() would silently turn into floats. */
+	/**
+	 * Reject integer tokens that JSON decoding would silently convert to floats.
+	 *
+	 * @param string $json Raw JSON, scanned without treating quoted digits as numbers.
+	 *
+	 * @return void
+	 *
+	 * @throws \RangeException If an integer token exceeds the native PHP integer range.
+	 */
 	private function assert_native_integers( string $json ): void {
 		$length    = strlen( $json );
 		$in_string = false;
@@ -189,7 +205,13 @@ final class JsonRpcRequestDecoder {
 		}
 	}
 
-	/** Check one integer token against the current native range. */
+	/**
+	 * Check whether an integer token fits the native PHP integer range.
+	 *
+	 * @param string $token Decimal JSON integer token.
+	 *
+	 * @return bool Whether the token can be represented without float conversion.
+	 */
 	private function is_native_integer( string $token ): bool {
 		$negative = '-' === $token[0];
 		$digits   = ltrim( ltrim( $token, '-' ), '0' );

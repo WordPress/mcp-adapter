@@ -96,7 +96,19 @@ class McpServer {
 	 */
 	private McpTransportFactory $transport_factory;
 
-	/** @var \WP\McpSchema\Schemas */
+	/**
+	 * Schema catalog provider shared by this server.
+	 *
+	 * Contains the supported revision catalogs. Each catalog defines MCP request,
+	 * response, tool, resource, and prompt record structures for that revision.
+	 *
+	 * Access an individual catalog with:
+	 *
+	 *     $schema = $this->schemas->forVersion( $revision );
+	 *
+	 * @var \WP\McpSchema\Schemas
+	 * @see \WP\McpSchema\Schemas::forVersion()
+	 */
 	private Schemas $schemas;
 
 	/**

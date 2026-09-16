@@ -48,6 +48,11 @@ final class McpCommand extends \WP_CLI_Command {
 	 *
 	 * @when after_wp_load
 	 * @synopsis [--server=<server-id>]
+	 *
+	 * @param array $args Positional WP-CLI arguments.
+	 * @param array $assoc_args Named WP-CLI options.
+	 *
+	 * @return void
 	 */
 	public function serve( array $args, array $assoc_args ): void {
 
@@ -123,9 +128,14 @@ final class McpCommand extends \WP_CLI_Command {
 	 *     # Count components available under MCP 2026-07-28
 	 *     wp mcp-adapter list --protocol=2026-07-28
 	 *
+	 * @since n.e.x.t Supports selecting a schema revision for component counts.
 	 * @when after_wp_load
 	 * @synopsis [--format=<format>] [--protocol=<revision>]
-	 * @since n.e.x.t Supports selecting a schema revision for component counts.
+	 *
+	 * @param array $args Positional WP-CLI arguments.
+	 * @param array $assoc_args Named WP-CLI options.
+	 *
+	 * @return void
 	 */
 	public function list( array $args, array $assoc_args ): void {
 		$protocol = $assoc_args['protocol'] ?? null;

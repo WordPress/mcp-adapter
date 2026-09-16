@@ -43,7 +43,11 @@ class HttpRequestContext {
 	 */
 	public string $raw_body;
 
-	/** @var array<string, string> */
+	/**
+	 * Normalized MCP header names mapped to their first string value.
+	 *
+	 * @var array<string, string>
+	 */
 	public array $headers;
 
 	/**

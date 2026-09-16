@@ -18,23 +18,47 @@ use WP\McpSchema\Record\GetPromptRequest;
 use WP\McpSchema\Record\ListPromptsRequest;
 use WP\McpSchema\Record\Prompt;
 
-/** Handles prompts/list and prompts/get. */
+/**
+ * Lists projected prompts and executes prompts through their domain models.
+ *
+ * Returns logical result data for final revision-specific schema validation.
+ */
 class PromptsHandler {
 	use HandlerHelperTrait;
 
-	/** @var list<string> */
+	/**
+	 * Supported prompt content discriminators.
+	 *
+	 * @var list<string>
+	 */
 	private static array $valid_content_types = array( 'text', 'image', 'audio', 'resource_link', 'resource' );
 
-	/** @var list<string> */
+	/**
+	 * Accepted roles for prompt messages.
+	 *
+	 * @var list<string>
+	 */
 	private static array $valid_roles = array( 'user', 'assistant' );
 
-	/** @var string */
+	/**
+	 * Role used when a message omits its role or supplies an unsupported one.
+	 *
+	 * @var string
+	 */
 	private static string $default_role = 'user';
 
-	/** @var \WP\MCP\Core\McpServer */
+	/**
+	 * Server used for prompt lookup, execution diagnostics, and observability.
+	 *
+	 * @var \WP\MCP\Core\McpServer
+	 */
 	private McpServer $mcp;
 
-	/** Constructor. */
+	/**
+	 * Initialize the handler for one server.
+	 *
+	 * @param \WP\MCP\Core\McpServer $mcp Server providing prompt lookup and diagnostics.
+	 */
 	public function __construct( McpServer $mcp ) {
 		$this->mcp = $mcp;
 	}
@@ -103,6 +127,11 @@ class PromptsHandler {
 			 * Filters prompt arguments before execution.
 			 *
 			 * @since 0.5.0
+			 *
+			 * @param array $arguments Prompt arguments; return WP_Error to stop execution.
+			 * @param string $prompt_name Requested prompt name.
+			 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt Prompt execution component.
+			 * @param \WP\MCP\Core\McpServer $server Server owning the prompt.
 			 */
 			$arguments = apply_filters( 'mcp_adapter_pre_prompt_get', $arguments, $prompt_name, $mcp_prompt, $this->mcp );
 			if ( is_wp_error( $arguments ) ) {
@@ -115,6 +144,12 @@ class PromptsHandler {
 			 * Filters the prompt execution result before normalization.
 			 *
 			 * @since 0.5.0
+			 *
+			 * @param mixed|\WP_Error $result Raw execution result or error.
+			 * @param array $arguments Arguments used for execution.
+			 * @param string $prompt_name Requested prompt name.
+			 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt Prompt execution component.
+			 * @param \WP\MCP\Core\McpServer $server Server owning the prompt.
 			 */
 			$result = apply_filters( 'mcp_adapter_prompt_get_result', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
 			if ( is_wp_error( $result ) ) {
@@ -147,9 +182,16 @@ class PromptsHandler {
 	}
 
 	/**
-	 * Normalize supported prompt-result conveniences to canonical result data.
+	 * Convert supported prompt result forms into logical message data.
 	 *
-	 * @return array<string, mixed>
+	 * Accepts message lists, text shortcuts, or a single role/content pair. Other
+	 * arrays become JSON text; empty message output receives a placeholder.
+	 *
+	 * @param array<string, mixed> $result Callback result after filtering.
+	 * @param \WP\McpSchema\Record\Prompt $prompt Projected prompt definition supplying default description.
+	 * @param string $prompt_name Prompt identifier for diagnostics.
+	 *
+	 * @return array<string, mixed> Prompt result with messages and optional description.
 	 */
 	private function normalize_result( array $result, Prompt $prompt, string $prompt_name ): array {
 		$description = isset( $result['description'] ) && is_string( $result['description'] ) ? $result['description'] : $prompt->getDescription();
@@ -236,7 +278,14 @@ class PromptsHandler {
 		return $data;
 	}
 
-	/** @return array<string, mixed> */
+	/**
+	 * Normalize one message role and content block.
+	 *
+	 * @param array<string, mixed> $message Message data from the callback.
+	 * @param string $prompt_name Prompt identifier for diagnostics.
+	 *
+	 * @return array<string, mixed> Message with a supported role and normalized content.
+	 */
 	private function normalize_message( array $message, string $prompt_name ): array {
 		$role    = $this->validate_role( $message['role'] ?? self::$default_role, $prompt_name );
 		$content = $message['content'] ?? array();
@@ -253,7 +302,15 @@ class PromptsHandler {
 		);
 	}
 
-	/** Normalize object-shaped metadata on a content block and nested resource. */
+	/**
+	 * Normalize metadata on a content block and an embedded resource.
+	 *
+	 * @since 0.6.0
+	 *
+	 * @param array<string, mixed> $content Content block to normalize.
+	 *
+	 * @return array<string, mixed> Block with absent or invalid metadata removed.
+	 */
 	private function normalize_content_block( array $content ): array {
 		$block_meta = McpValidator::normalize_meta( $content['_meta'] ?? null );
 		if ( null === $block_meta ) {
@@ -276,7 +333,16 @@ class PromptsHandler {
 		return $content;
 	}
 
-	/** Validate a content type and degrade invalid values to text. */
+	/**
+	 * Keep a supported content type or convert the block to text.
+	 *
+	 * @since 0.5.0
+	 *
+	 * @param array<string, mixed> $content Candidate content block.
+	 * @param string $prompt_name Prompt identifier included in warnings.
+	 *
+	 * @return array<string, mixed> Original supported block or a text fallback.
+	 */
 	private function validate_content_type( array $content, string $prompt_name ): array {
 		$type = $content['type'] ?? null;
 		if ( is_string( $type ) && in_array( $type, self::$valid_content_types, true ) ) {
@@ -299,7 +365,16 @@ class PromptsHandler {
 		);
 	}
 
-	/** Validate a role and degrade invalid values to user. */
+	/**
+	 * Keep a supported role or fall back to the default user role.
+	 *
+	 * @since 0.5.0
+	 *
+	 * @param string $role Candidate message role.
+	 * @param string $prompt_name Prompt identifier included in warnings.
+	 *
+	 * @return string Supported role.
+	 */
 	private function validate_role( string $role, string $prompt_name ): string {
 		if ( in_array( $role, self::$valid_roles, true ) ) {
 			return $role;

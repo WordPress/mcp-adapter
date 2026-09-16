@@ -90,7 +90,11 @@ final class McpTool implements McpComponentInterface {
 	 */
 	private array $observability_context = array();
 
-	/** @var array<int, array{name: string, path: list<string>, type: string}>|null */
+	/**
+	 * Validated modern parameter-header mappings, or null before collection.
+	 *
+	 * @var array<int, array{name: string, path: list<string>, type: string}>|null
+	 */
 	private ?array $header_annotations = null;
 
 	// =========================================================================
@@ -259,8 +263,11 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Return validated modern HTTP header annotations.
 	 *
-	 * @return array<int, array{name: string, path: list<string>, type: string}>
 	 * @since n.e.x.t
+	 *
+	 * @param \WP\McpSchema\Schema $schema Selected schema used to validate the tool projection.
+	 *
+	 * @return array<int, array{name: string, path: list<string>, type: string}>
 	 */
 	public function get_header_annotations( Schema $schema ): array {
 		if ( '2026-07-28' !== $schema->version() ) {

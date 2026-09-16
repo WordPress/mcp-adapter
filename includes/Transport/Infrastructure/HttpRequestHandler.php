@@ -15,27 +15,56 @@ use WP\McpSchema\Record;
 
 defined( 'ABSPATH' ) || exit;
 
-/** Handles HTTP lifecycle, sessions, and raw-wire responses. */
+/**
+ * Coordinates HTTP methods, legacy sessions, and protocol response delivery.
+ *
+ * POST requests pass through the shared wire orchestrator. Legacy DELETE
+ * requests terminate a session; unsupported HTTP methods return 405.
+ */
 class HttpRequestHandler {
 
-	/** @var \WP\MCP\Transport\Infrastructure\McpTransportContext */
+	/**
+	 * Server and handler dependencies shared by HTTP processing.
+	 *
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
+	 */
 	public McpTransportContext $transport_context;
 
-	/** @var \WP\MCP\Transport\Infrastructure\McpWireOrchestrator */
+	/**
+	 * Revision selection, validation, and response projection boundary.
+	 *
+	 * @var \WP\MCP\Transport\Infrastructure\McpWireOrchestrator
+	 */
 	private McpWireOrchestrator $orchestrator;
 
-	/** Constructor. */
+	/**
+	 * Initialize HTTP processing with the server's transport dependencies.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context Server and handler dependencies.
+	 */
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->transport_context = $transport_context;
 		$this->orchestrator      = new McpWireOrchestrator( $transport_context );
 	}
 
-	/** Get transport context. */
+	/**
+	 * Get the dependency context used by this HTTP handler.
+	 *
+	 * @since 0.5.0
+	 *
+	 * @return \WP\MCP\Transport\Infrastructure\McpTransportContext Transport dependencies.
+	 */
 	public function get_transport_context(): McpTransportContext {
 		return $this->transport_context;
 	}
 
-	/** Route one HTTP request. */
+	/**
+	 * Dispatch an HTTP request to protocol processing or session termination.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context Request body, method, and header values.
+	 *
+	 * @return \WP_REST_Response Protocol response, session-termination response, or method rejection.
+	 */
 	public function handle_request( HttpRequestContext $context ): \WP_REST_Response {
 		$action = $this->orchestrator->http_method_action( $context->method, $context->protocol_version );
 		if ( 'process' === $action ) {
@@ -54,7 +83,17 @@ class HttpRequestHandler {
 		return new \WP_REST_Response( null, 405 );
 	}
 
-	/** Handle one raw POST body. */
+	/**
+	 * Decode and process an HTTP POST using its selected protocol lifecycle.
+	 *
+	 * Validates and restores legacy session context before dispatch, and creates
+	 * a session after successful legacy initialization. Modern requests use
+	 * per-request context without creating or restoring an MCP session.
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context Raw request and HTTP metadata.
+	 *
+	 * @return \WP_REST_Response Encoded protocol data, an early error, or an empty notification response.
+	 */
 	private function handle_post( HttpRequestContext $context ): \WP_REST_Response {
 		try {
 			$message = $this->orchestrator->decode( $context->raw_body );

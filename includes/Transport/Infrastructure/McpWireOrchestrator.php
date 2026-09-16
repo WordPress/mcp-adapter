@@ -56,16 +56,26 @@ use WP\McpSchema\Schemas;
  */
 final class McpWireOrchestrator {
 
-	/** @var \WP\MCP\Transport\Infrastructure\McpTransportContext */
+	/**
+	 * Server and handler dependencies used to dispatch validated requests.
+	 *
+	 * @var \WP\MCP\Transport\Infrastructure\McpTransportContext
+	 */
 	private McpTransportContext $transport_context;
 
-	/** @var \WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder */
+	/**
+	 * Raw JSON decoder preserving object/list identity and numeric safety.
+	 *
+	 * @var \WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder
+	 */
 	private JsonRpcRequestDecoder $decoder;
 
 	/**
-	 * Constructor.
+	 * Initialize the shared protocol boundary for a transport.
 	 *
 	 * @since n.e.x.t
+	 *
+	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context Server and handler dependencies.
 	 */
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->transport_context = $transport_context;
@@ -73,18 +83,31 @@ final class McpWireOrchestrator {
 	}
 
 	/**
-	 * Decode exactly one raw JSON object.
+	 * Decode one raw JSON request or notification object.
 	 *
 	 * @since n.e.x.t
+	 *
+	 * @param string $raw_json Raw JSON payload.
+	 *
+	 * @return \stdClass Decoded object preserving JSON object/list identity.
+	 *
+	 * @throws \InvalidArgumentException If the JSON is malformed.
+	 * @throws \UnexpectedValueException If the root is not one object.
+	 * @throws \RangeException If an integer token exceeds the native range or a decoded number is non-finite.
 	 */
 	public function decode( string $raw_json ): \stdClass {
 		return $this->decoder->decode( $raw_json );
 	}
 
 	/**
-	 * Return the revision-owned action for one HTTP method.
+	 * Choose protocol processing, legacy session termination, or method rejection.
 	 *
 	 * @since n.e.x.t
+	 *
+	 * @param string $method HTTP method.
+	 * @param string|null $header_revision Protocol-version header, if supplied.
+	 *
+	 * @return string One of process, terminate-session, or reject.
 	 */
 	public function http_method_action( string $method, ?string $header_revision ): string {
 		if ( 'POST' === $method ) {
@@ -96,9 +119,14 @@ final class McpWireOrchestrator {
 	}
 
 	/**
-	 * Whether MCP 2025-11-25 requires an established HTTP session.
+	 * Check whether this request needs an established legacy HTTP session.
 	 *
 	 * @since n.e.x.t
+	 *
+	 * @param \stdClass $message Decoded message before request-record hydration.
+	 * @param string|null $header_revision Protocol-version header, if supplied.
+	 *
+	 * @return bool True for legacy requests other than initialize; false for selection failures.
 	 */
 	public function requires_2025_11_25_http_session( \stdClass $message, ?string $header_revision ): bool {
 		$generic = $this->decoder->to_associative( $message );
@@ -122,8 +150,14 @@ final class McpWireOrchestrator {
 	/**
 	 * Map a processed response through the selected revision's HTTP policy.
 	 *
-	 * @param \WP\McpSchema\Record|array<string, mixed> $response Processed response.
 	 * @since n.e.x.t
+	 *
+	 * @param \WP\McpSchema\Record|array<string, mixed> $response Processed response.
+	 * @param \WP\MCP\Core\McpRequestContext|null $context Selected context, or null for an early failure.
+	 * @param \stdClass $message Decoded message used to recover revision selection when needed.
+	 * @param string|null $header_revision Protocol-version header, if supplied.
+	 *
+	 * @return int HTTP status selected for the response error code and revision.
 	 */
 	public function http_response_status( $response, ?McpRequestContext $context, \stdClass $message, ?string $header_revision ): int {
 		$code = $this->response_error_code( $response );
@@ -305,7 +339,15 @@ final class McpWireOrchestrator {
 		);
 	}
 
-	/** Whether one implemented request is available in the selected schema. */
+	/**
+	 * Whether one implemented request is available in the selected schema.
+	 *
+	 * @param string $revision Selected schema revision.
+	 * @param string $method Requested method name.
+	 * @param \WP\McpSchema\Schema $schema Catalog used to check protocol availability.
+	 *
+	 * @return bool Whether both the Adapter and catalog support the request.
+	 */
 	private function allows_request( string $revision, string $method, Schema $schema ): bool {
 		$shared = array(
 			'tools/list',
@@ -327,7 +369,15 @@ final class McpWireOrchestrator {
 		return $implemented && $schema->allowsClientRequest( $method );
 	}
 
-	/** Whether one implemented notification is available in the selected schema. */
+	/**
+	 * Whether one implemented notification is available in the selected schema.
+	 *
+	 * @param string $revision Selected schema revision.
+	 * @param string $method Notification method.
+	 * @param \WP\McpSchema\Schema $schema Catalog used to check notification availability.
+	 *
+	 * @return bool Whether both the Adapter and catalog support the notification.
+	 */
 	private function allows_notification( string $revision, string $method, Schema $schema ): bool {
 		return Schemas::V2025_11_25 === $revision
 			&& 'notifications/initialized' === $method
@@ -336,6 +386,11 @@ final class McpWireOrchestrator {
 
 	/**
 	 * Select one exact revision before context construction or hydration.
+	 *
+	 * @param array<string, mixed> $generic Associative view of the decoded message.
+	 * @param array<string, mixed> $metadata Transport metadata including the protocol-version header.
+	 * @param array<string, mixed>|null $client_params_2025_11_25 Stored legacy initialization parameters.
+	 * @param bool $enforce_lifecycle Whether requests must already have legacy initialization context.
 	 *
 	 * @return string|array<string, mixed>
 	 */
@@ -376,6 +431,13 @@ final class McpWireOrchestrator {
 	 * The negotiated identifier comes from the client's own proposal, so a
 	 * legacy revision is echoed while the 2025-11-25 schema serves it. See
 	 * {@see McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS}.
+	 *
+	 * @param array<string, mixed> $generic Associative request data.
+	 * @param string $transport Transport name.
+	 * @param array<string, mixed> $metadata Transport-owned metadata.
+	 * @param array<string, mixed>|null $client_params_2025_11_25 Stored legacy initialization parameters.
+	 *
+	 * @return \WP\MCP\Core\McpRequestContext Legacy context retaining the negotiated identifier.
 	 */
 	private function context_2025_11_25( array $generic, string $transport, array $metadata, ?array $client_params_2025_11_25 ): McpRequestContext {
 		$params       = 'initialize' === $generic['method'] ? ( $generic['params'] ?? array() ) : ( $client_params_2025_11_25 ?? array() );
@@ -399,7 +461,15 @@ final class McpWireOrchestrator {
 		return McpVersionNegotiator::negotiate( is_string( $proposed ) ? $proposed : '' );
 	}
 
-	/** Construct the 2026 per-request context. */
+	/**
+	 * Construct the 2026 per-request context.
+	 *
+	 * @param array<string, mixed> $generic Associative request data carrying modern metadata.
+	 * @param string $transport Transport name.
+	 * @param array<string, mixed> $metadata Transport-owned metadata.
+	 *
+	 * @return \WP\MCP\Core\McpRequestContext Context built from modern request metadata.
+	 */
 	private function context_2026_07_28( array $generic, string $transport, array $metadata ): McpRequestContext {
 		$params       = $generic['params'] ?? array();
 		$meta         = is_array( $params['_meta'] ?? null ) ? $params['_meta'] : array();
@@ -423,7 +493,11 @@ final class McpWireOrchestrator {
 		);
 	}
 
-	/** @return array<string, mixed> Logical server/discover result data. */
+	/**
+	 * Build logical discovery data from server configuration.
+	 *
+	 * @return array<string, mixed> Supported revisions, capabilities, and server instructions.
+	 */
 	private function create_discover_data(): array {
 		return array(
 			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
@@ -439,7 +513,11 @@ final class McpWireOrchestrator {
 	/**
 	 * Apply exact 2025-11-25 result projection and hydrate the result root.
 	 *
+	 * @param string $method Method determining the result record type.
 	 * @param mixed $result Logical handler result.
+	 * @param \WP\McpSchema\Schema $schema Selected legacy catalog.
+	 *
+	 * @return \WP\McpSchema\Record Projected result record.
 	 */
 	private function project_2025_11_25_result( string $method, $result, Schema $schema ): Record {
 		if (
@@ -457,7 +535,11 @@ final class McpWireOrchestrator {
 	/**
 	 * Apply exact 2026-07-28 result projection and hydrate the result root.
 	 *
+	 * @param string $method Method determining result type and cache defaults.
 	 * @param mixed $result Logical handler result.
+	 * @param \WP\McpSchema\Schema $schema Selected modern catalog.
+	 *
+	 * @return \WP\McpSchema\Record Result record including Adapter-supplied modern defaults.
 	 */
 	private function project_2026_07_28_result( string $method, $result, Schema $schema ): Record {
 		if ( ! is_array( $result ) ) {
@@ -488,7 +570,11 @@ final class McpWireOrchestrator {
 	/**
 	 * Hydrate logical handler output through one selected exact result root.
 	 *
+	 * @param string $method Method determining the result record type.
 	 * @param mixed $result Logical handler result.
+	 * @param \WP\McpSchema\Schema $schema Selected schema catalog.
+	 *
+	 * @return \WP\McpSchema\Record Method-specific result record.
 	 */
 	private function hydrate_result( string $method, $result, Schema $schema ): Record {
 		if ( $result instanceof Record ) {
@@ -529,7 +615,14 @@ final class McpWireOrchestrator {
 		}
 	}
 
-	/** @return array<string, mixed>|null */
+	/**
+	 * Extract legacy initialization parameters for later requests.
+	 *
+	 * @param string $method Dispatched method name.
+	 * @param \WP\McpSchema\Record $request Validated request record.
+	 *
+	 * @return array<string, mixed>|null Plain initialization parameters, or null for another request type.
+	 */
 	private function initialize_params( string $method, Record $request ): ?array {
 		if ( 'initialize' !== $method || ! $request instanceof InitializeRequest ) {
 			return null;
@@ -544,6 +637,10 @@ final class McpWireOrchestrator {
 	 * Hydrate one exact 2025-11-25 success envelope.
 	 *
 	 * @param string|int $id Request ID.
+	 * @param \WP\McpSchema\Record $result Validated result payload.
+	 * @param \WP\McpSchema\Schema $schema Selected legacy catalog.
+	 *
+	 * @return \WP\McpSchema\Record Legacy JSON-RPC result response.
 	 */
 	private function hydrate_2025_11_25_success( $id, Record $result, Schema $schema ): Record {
 		return $schema->fromArray(
@@ -559,7 +656,12 @@ final class McpWireOrchestrator {
 	/**
 	 * Hydrate one exact 2026-07-28 success envelope.
 	 *
+	 * @param string $method Method determining the response envelope type.
 	 * @param string|int|null $id Request ID.
+	 * @param \WP\McpSchema\Record $result Validated result payload.
+	 * @param \WP\McpSchema\Schema $schema Selected modern catalog.
+	 *
+	 * @return \WP\McpSchema\Record Method-specific modern result response.
 	 */
 	private function hydrate_2026_07_28_success( string $method, $id, Record $result, Schema $schema ): Record {
 		$data = array(
@@ -591,7 +693,16 @@ final class McpWireOrchestrator {
 		}
 	}
 
-	/** Hydrate one implemented inbound root without dynamic class strings. */
+	/**
+	 * Hydrate one implemented inbound root without dynamic class strings.
+	 *
+	 * @param string $method Request or notification method.
+	 * @param bool $notification Whether the message is a notification.
+	 * @param \WP\McpSchema\Schema $schema Selected catalog.
+	 * @param \stdClass $message Original decoded object to hydrate.
+	 *
+	 * @return \WP\McpSchema\Record Supported request or notification record.
+	 */
 	private function hydrate_inbound( string $method, bool $notification, Schema $schema, \stdClass $message ): Record {
 		if (
 			in_array( $method, array( 'initialize', 'ping', 'notifications/initialized' ), true )
@@ -636,6 +747,18 @@ final class McpWireOrchestrator {
 		}
 	}
 
+	/**
+	 * Hydrate a protocol error, falling back to a generic internal error.
+	 *
+	 * A failure to hydrate the fallback is allowed to propagate to the caller.
+	 *
+	 * @param array<string, mixed> $error Logical JSON-RPC error envelope.
+	 * @param \WP\McpSchema\Schema $schema Selected schema catalog.
+	 *
+	 * @return \WP\McpSchema\Record Error response record.
+	 *
+	 * @throws \Throwable If the fallback error cannot be represented by the selected schema.
+	 */
 	private function hydrate_error( array $error, Schema $schema ): Record {
 		$code = $error['error']['code'] ?? McpErrorFactory::INTERNAL_ERROR;
 		try {
@@ -654,7 +777,15 @@ final class McpWireOrchestrator {
 		}
 	}
 
-	/** Validate 2026-07-28 HTTP envelope headers before context hydration. */
+	/**
+	 * Validate 2026-07-28 HTTP envelope headers before context hydration.
+	 *
+	 * @param array<string, mixed> $message Associative decoded message.
+	 * @param string $transport Transport name; non-HTTP transports are ignored.
+	 * @param array<string, mixed> $metadata Transport metadata containing normalized headers.
+	 *
+	 * @return array<string, mixed>|null Header-mismatch error, or null when no mismatch applies.
+	 */
 	private function validate_2026_07_28_envelope_headers( array $message, string $transport, array $metadata ): ?array {
 		if ( 'HTTP' !== strtoupper( $transport ) ) {
 			return null;
@@ -688,7 +819,15 @@ final class McpWireOrchestrator {
 		return null;
 	}
 
-	/** Validate 2026-07-28 x-mcp-header argument mirrors after context selection. */
+	/**
+	 * Validate 2026-07-28 x-mcp-header argument mirrors after context selection.
+	 *
+	 * @param array<string, mixed> $message Associative decoded message.
+	 * @param \WP\MCP\Core\McpRequestContext $context Selected request context.
+	 * @param array<string, mixed> $metadata Transport metadata containing normalized headers.
+	 *
+	 * @return array<string, mixed>|null Parameter-header error, or null when no mismatch applies.
+	 */
 	private function validate_2026_07_28_parameter_headers( array $message, McpRequestContext $context, array $metadata ): ?array {
 		if ( 'HTTP' !== strtoupper( $context->transport() ) || 'tools/call' !== ( $message['method'] ?? null ) ) {
 			return null;
@@ -703,7 +842,12 @@ final class McpWireOrchestrator {
 	/**
 	 * Validate x-mcp-header argument mirrors for a selected tool.
 	 *
+	 * @param array<string, mixed> $params Tool-call parameters.
+	 * @param \WP\MCP\Core\McpRequestContext $context Context used to select the tool projection.
+	 * @param array<string, mixed> $headers Case-normalized HTTP headers.
 	 * @param string|int|float|null $id Request ID.
+	 *
+	 * @return array<string, mixed>|null Header-mismatch error, or null when validation succeeds or no tool applies.
 	 */
 	private function validate_tool_parameter_headers( array $params, McpRequestContext $context, array $headers, $id ): ?array {
 		$name = $params['name'] ?? null;
@@ -742,8 +886,13 @@ final class McpWireOrchestrator {
 	/**
 	 * Read one nested argument path.
 	 *
-	 * @return mixed
+	 * @param array<mixed> $arguments Nested argument data.
+	 * @param list<string> $path Property names to traverse.
+	 * @param bool $present Updated to indicate whether the complete path exists.
+	 *
 	 * @param-out bool $present Whether the path was present.
+	 *
+	 * @return mixed
 	 */
 	private function value_at_path( array $arguments, array $path, bool &$present ) {
 		$value   = $arguments;
@@ -759,7 +908,13 @@ final class McpWireOrchestrator {
 		return $value;
 	}
 
-	/** @param mixed $value Header value. Decode plain or MCP Base64-sentinel header values. */
+	/**
+	 * Decode a plain header value or an MCP Base64-sentinel value.
+	 *
+	 * @param mixed $value Supplied HTTP header value.
+	 *
+	 * @return string|null Decoded bytes, or null for invalid encoding or a non-string value.
+	 */
 	private function decode_header_value( $value ): ?string {
 		if ( ! is_string( $value ) ) {
 			return null;
@@ -772,7 +927,13 @@ final class McpWireOrchestrator {
 		return false === $decoded ? null : $decoded;
 	}
 
-	/** @param mixed $value Header value. Validate one non-encoded ASCII field value. */
+	/**
+	 * Accept a plain header value containing only printable ASCII.
+	 *
+	 * @param mixed $value Supplied HTTP header value.
+	 *
+	 * @return string|null Unchanged string, or null for invalid characters or a non-string value.
+	 */
 	private function plain_header_value( $value ): ?string {
 		return is_string( $value ) && 1 === preg_match( '/^[\x20-\x7E]*$/D', $value ) ? $value : null;
 	}
@@ -805,7 +966,13 @@ final class McpWireOrchestrator {
 		return is_string( $body_value ) && $body_value === $header_value;
 	}
 
-	/** @param mixed $value Object input. Convert associative input into one JSON object. */
+	/**
+	 * Copy object properties or associative input into a JSON object.
+	 *
+	 * @param mixed $value Object or array to copy; other values yield an empty object.
+	 *
+	 * @return \stdClass Object preserving nested JSON lists and objects.
+	 */
 	private function to_object( $value ): \stdClass {
 		$object     = new \stdClass();
 		$properties = $value instanceof \stdClass ? get_object_vars( $value ) : ( is_array( $value ) ? $value : array() );
@@ -836,12 +1003,24 @@ final class McpWireOrchestrator {
 		return $this->to_object( $value );
 	}
 
-	/** Whether an encoded record is a successful JSON-RPC result response. */
+	/**
+	 * Whether an encoded record is a successful JSON-RPC result response.
+	 *
+	 * @param \WP\McpSchema\Record $response Encoded response record.
+	 *
+	 * @return bool Whether the record has a result field and no error field.
+	 */
 	private function is_success_response( Record $response ): bool {
 		return $response->has( 'result' ) && ! $response->has( 'error' );
 	}
 
-	/** @param \WP\McpSchema\Record|array<string, mixed> $response Processed response. */
+	/**
+	 * Extract a native integer error code from a record or logical envelope.
+	 *
+	 * @param \WP\McpSchema\Record|array<string, mixed> $response Processed response.
+	 *
+	 * @return int Error code, or zero when no safely representable code exists.
+	 */
 	private function response_error_code( $response ): int {
 		$error = null;
 		if ( is_array( $response ) ) {
@@ -876,7 +1055,13 @@ final class McpWireOrchestrator {
 		return 0;
 	}
 
-	/** PHP 7.4-compatible list detection. */
+	/**
+	 * PHP 7.4-compatible list detection.
+	 *
+	 * @param array<mixed> $value Array to inspect.
+	 *
+	 * @return bool Whether the keys form a zero-based consecutive sequence.
+	 */
 	private static function is_list( array $value ): bool {
 		return array() === $value || array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
@@ -885,7 +1070,11 @@ final class McpWireOrchestrator {
 	 * Build a standard process failure result.
 	 *
 	 * @param \WP\McpSchema\Record|array<string, mixed> $response Response.
+	 * @param string|null $method Identified method, if available.
 	 * @param string|int|float|null $id Request ID.
+	 * @param bool $notification Whether the failed message was a notification.
+	 * @param \WP\MCP\Core\McpRequestContext|null $context Selected context, if available.
+	 *
 	 * @return array{
 	 *   context: \WP\MCP\Core\McpRequestContext|null,
 	 *   method: string|null,

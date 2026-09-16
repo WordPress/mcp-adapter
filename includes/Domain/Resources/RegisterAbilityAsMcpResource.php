@@ -18,7 +18,7 @@ use WP_Error;
 /**
  * Converts WordPress abilities to MCP Resource metadata.
  *
-	 * This class builds neutral Resource metadata for revision projection.
+ * This class builds neutral Resource metadata for revision projection.
  * It extracts metadata only (uri, name, title, description, mimeType, size, icons, annotations).
  * Resource content (text/blob) is resolved separately at resources/read time.
  *

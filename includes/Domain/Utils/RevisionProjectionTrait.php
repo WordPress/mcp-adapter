@@ -19,13 +19,25 @@ use WP\McpSchema\Schema;
  */
 trait RevisionProjectionTrait {
 
-	/** @var array<string, mixed> */
+	/**
+	 * Revision-neutral fields used to construct protocol records.
+	 *
+	 * @var array<string, mixed>
+	 */
 	private array $protocol_data = array();
 
-	/** @var array<string, \WP\McpSchema\Record> */
+	/**
+	 * Successful protocol projections cached by schema revision.
+	 *
+	 * @var array<string, \WP\McpSchema\Record>
+	 */
 	private array $protocol_records = array();
 
-	/** @var array<string, \Throwable> */
+	/**
+	 * Projection failures cached by schema revision.
+	 *
+	 * @var array<string, \Throwable>
+	 */
 	private array $projection_errors = array();
 
 	/**
@@ -94,9 +106,13 @@ trait RevisionProjectionTrait {
 	abstract public function get_protocol_record( Schema $schema ): Record;
 
 	/**
-	 * Check exact-revision projection availability.
+	 * Check whether this component projects successfully into the selected schema.
 	 *
 	 * @since n.e.x.t
+	 *
+	 * @param \WP\McpSchema\Schema $schema Selected revision catalog.
+	 *
+	 * @return bool Whether a protocol record can be produced.
 	 */
 	public function is_available_for( Schema $schema ): bool {
 		try {
@@ -118,7 +134,14 @@ trait RevisionProjectionTrait {
 		return $this->projection_errors[ $revision ] ?? null;
 	}
 
-	/** Cache an Adapter-owned projection failure. */
+	/**
+	 * Cache a projection failure produced by Adapter-owned validation.
+	 *
+	 * @param string $revision Schema revision that rejected the component.
+	 * @param \Throwable $throwable Failure retained for subsequent availability checks.
+	 *
+	 * @return void
+	 */
 	private function remember_projection_error( string $revision, \Throwable $throwable ): void {
 		$this->projection_errors[ $revision ] = $throwable;
 	}

@@ -135,7 +135,11 @@ class RequestRouter {
 	/**
 	 * Dispatch one validated concrete request to its handler.
 	 *
+	 * @param string $method Validated method name.
+	 * @param \WP\McpSchema\Record $request Concrete validated request record.
+	 * @param \WP\MCP\Core\McpRequestContext $context Selected request context.
 	 * @param string|int $request_id Validated JSON-RPC request ID.
+	 *
 	 * @return \WP\McpSchema\Record|array<string, mixed>
 	 */
 	private function dispatch( string $method, Record $request, McpRequestContext $context, $request_id ) {
@@ -181,7 +185,13 @@ class RequestRouter {
 		}
 	}
 
-	/** @return array<string, mixed> Safe request fields used for observability. */
+	/**
+	 * Collect limited request fields and argument names for observability.
+	 *
+	 * @param \WP\McpSchema\Record $request Validated request record.
+	 *
+	 * @return array<string, mixed> Selected fields with argument values replaced by null.
+	 */
 	private function observability_params( Record $request ): array {
 		$params = $request->get( 'params' );
 		if ( ! $params instanceof Record && ! $params instanceof \stdClass ) {
@@ -221,6 +231,8 @@ class RequestRouter {
 	 * Read one field from a generated record or JSON object.
 	 *
 	 * @param \WP\McpSchema\Record|\stdClass $record Record-like value.
+	 * @param string $field Field name to read.
+	 *
 	 * @return mixed
 	 */
 	private function record_field( $record, string $field ) {

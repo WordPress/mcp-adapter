@@ -70,7 +70,11 @@ class McpComponentRegistry {
 	 */
 	private McpObservabilityHandlerInterface $observability_handler;
 
-	/** @var \WP\McpSchema\Schemas */
+	/**
+	 * Schema catalogs used to validate component availability per revision.
+	 *
+	 * @var \WP\McpSchema\Schemas
+	 */
 	private Schemas $schemas;
 
 	/**
