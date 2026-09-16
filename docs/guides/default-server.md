@@ -432,7 +432,6 @@ add_filter('mcp_adapter_execute_ability_capability', function() {
 });
 ```
 
-
 ## Usage Examples
 
 ### Testing with WP-CLI

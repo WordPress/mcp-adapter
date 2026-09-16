@@ -1,12 +1,8 @@
 # Custom transports
 
-Use a custom transport when the built-in HTTP and WP-CLI STDIO transports do
-not fit the connection you need. For authentication or authorization changes on
-the built-in HTTP endpoint, use [transport permissions](transport-permissions.md)
-instead.
+Use a custom transport when the built-in HTTP and WP-CLI STDIO transports do not fit the connection you need. For authentication or authorization changes on the built-in HTTP endpoint, use [transport permissions](transport-permissions.md) instead.
 
-Custom transports implement `McpTransportInterface`. REST transports implement
-`McpRestTransportInterface`:
+Custom transports implement `McpTransportInterface`. REST transports implement `McpRestTransportInterface`:
 
 ```php
 interface McpTransportInterface {
@@ -22,9 +18,7 @@ interface McpRestTransportInterface extends McpTransportInterface {
 
 ## Custom REST transport
 
-Delegate MCP processing to `HttpRequestHandler`. It owns the exact 2025 session
-lifecycle, the sessionless 2026 lifecycle, revision selection,
-header validation, schema hydration, response encoding, and HTTP status.
+Delegate MCP processing to `HttpRequestHandler`. It owns the exact 2025 session lifecycle, the sessionless 2026 lifecycle, revision selection, header validation, schema hydration, response encoding, and HTTP status.
 
 ```php
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
@@ -88,8 +82,7 @@ add_action(
 
 ## Non-HTTP transports
 
-Use `McpWireOrchestrator` for a message queue, socket, or another transport that
-already supplies raw JSON:
+Use `McpWireOrchestrator` for a message queue, socket, or another transport that already supplies raw JSON:
 
 ```php
 use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
@@ -106,13 +99,9 @@ $outcome = $wire->process(
 $response = $outcome['response'];
 ```
 
-The transport owns authentication, delivery, and connection state. For a 2025
-connection, retain the successful initialize parameters and pass them as the
-fourth argument on later requests. A 2026 request carries its revision and
-client capabilities in `_meta`, so no connection-scoped MCP session is used.
+The transport owns authentication, delivery, and connection state. For a 2025 connection, retain the successful initialize parameters and pass them as the fourth argument on later requests. A 2026 request carries its revision and client capabilities in `_meta`, so no connection-scoped MCP session is used.
 
-Do not invoke `RequestRouter` with raw arrays. The orchestrator must select and
-validate the exact request record before dispatch.
+Do not invoke `RequestRouter` with raw arrays. The orchestrator must select and validate the exact request record before dispatch.
 
 ## See also
 
