@@ -82,7 +82,7 @@ The domain models retain revision-neutral protocol data alongside their Ability 
 - A projection failure prevents registration only if no supported revision remains available.
 - Other registration checks still apply, including valid registration inputs, Ability lookup, conversion, and unique component identifiers.
 
-Protocol-facing server getters require a selected `Schema`; component getters expose the underlying domain model. [McpCommand](../../includes/Cli/McpCommand.php) reports both registration counts and per-revision availability.
+Protocol-facing server getters require a selected `Schema`; component getters expose the underlying domain model. [McpCommand](../../includes/Cli/McpCommand.php) reports registration counts by default; `list --protocol=<revision>` reports counts available under the selected schema revision.
 
 For 2026 Tool projection, `McpTool` omits the removed `execution` field and validates `x-mcp-header` annotations. Although those annotations describe HTTP headers, their validation is part of the shared revision projection: an invalid annotation also makes the tool unavailable over 2026 STDIO.
 

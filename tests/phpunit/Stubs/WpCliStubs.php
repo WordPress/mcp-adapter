@@ -20,6 +20,14 @@ namespace WP\MCP\Tests\Stubs;
 class WpCliStubs {
 
 	/**
+	 * Last collection passed to the output formatter.
+	 *
+	 * @var array{format: string, items: array<mixed>, fields: array<string>|string}|null
+	 */
+	public static ?array $formatted_output = null;
+
+
+	/**
 	 * Initialize WP-CLI stubs for testing.
 	 *
 	 * This method loads all necessary WP-CLI classes and functions
