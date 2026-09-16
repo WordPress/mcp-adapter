@@ -149,7 +149,7 @@ The following remain stable unless exact protocol behavior requires otherwise:
 
 Direct consumers of the removed generated schema classes must migrate. There is
 no compatibility alias, wrapper, alternate serialization method, or validation
-toggle. See the [dual-revision migration guide](../migration/dual-revision-schema-runtime.md).
+toggle. See the [dual-revision migration guide](../migration/vx.y.z.md#migrating-to-the-dual-revision-schema-runtime).
 
 ## Verification
 

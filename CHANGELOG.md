@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 ### Breaking Changes
 - Schema-backed MCP revisions are exactly `2025-11-25` and `2026-07-28`. `2025-06-18` and `2024-11-05` no longer have their own DTOs; they are negotiated as legacy identifiers and served through the `2025-11-25` schema (see Added). `McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS` now lists only the schema-backed revisions; legacy identifiers moved to `McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`.
 - Protocol-facing server getters `get_tools()`, `get_resources()`, `get_prompts()`, and `get_prompt()` require a selected `Schema`. There is no implicit default revision.
-- The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/dual-revision-schema-runtime.md).
+- The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/vx.y.z.md#migrating-to-the-dual-revision-schema-runtime).
 - `McpToolValidator`, `McpResourceValidator`, `McpPromptValidator`, `McpErrorFactory::validate_jsonrpc_message()`, `McpServer::is_mcp_validation_enabled()`, and the `mcp_adapter_validation_enabled` filter have been removed. Wire validation always runs through the selected schema.
 - `RequestRouter::route_request()`, method handlers, `McpErrorFactory`, `ContentBlockHelper`, and `McpPromptBuilderInterface::build()` now exchange schema records and revision-neutral arrays instead of DTOs. `JsonRpcResponseBuilder` has been removed. Custom transports must delegate to `HttpRequestHandler` or `McpWireOrchestrator`.
 - `McpTool::fromArray()`, `McpResource::fromArray()`, and `McpPrompt::fromArray()` return `WP_Error` only for structural problems (missing name, URI, or handler; invalid resource URI). Schema and annotation problems no longer fail construction; they are reported per revision through `is_available_for()` and `get_projection_error()` and logged as warnings at registration.
@@ -26,7 +26,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - Raw-wire, architecture, and projection test coverage for both revisions.
 
 ### Changed
-- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
+- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](docs/migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
 - `initialize`, `notifications/initialized`, and `ping` are served only for `2025-11-25`; `server/discover` only for `2026-07-28`. The 2025 HTTP session lifecycle is unchanged.
 - Adapter-owned `2026-07-28` output omits `Tool.execution`, adds `resultType: "complete"` to completed results, and adds `ttlMs: 0` and `cacheScope: "private"` to discovery, list, and resource-read results.
 - Missing tools and prompts return Invalid Params (`-32602`) in both revisions. Missing resources return `-32002` in `2025-11-25` and `-32602` in `2026-07-28`. An unsupported per-request version returns `-32022`.
