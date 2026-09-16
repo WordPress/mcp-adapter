@@ -64,7 +64,7 @@ final class JsonRpcRequestDecoder {
 		}
 
 		$id = $message->id;
-		if ( floor( $id ) !== $id || $id < -( 2 ** 63 ) || $id >= 2 ** 63 ) {
+		if ( floor( $id ) !== $id || $id < (float) PHP_INT_MIN || $id >= (float) PHP_INT_MAX + 1 ) {
 			return;
 		}
 
