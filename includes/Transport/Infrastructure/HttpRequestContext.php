@@ -78,8 +78,20 @@ class HttpRequestContext {
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
 		$this->raw_body         = 'POST' === $this->method ? ( $request->get_body() ?? '' ) : '';
-		$this->headers          = array();
-		foreach ( $request->get_headers() as $name => $values ) {
+		$this->headers          = $this->prepare_headers( $request->get_headers() );
+	}
+
+	/**
+	 * Select MCP headers and normalize their names and values.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array<string, mixed> $headers Headers supplied by the REST request.
+	 * @return array<string, string> Normalized MCP headers retaining the first value only when it is a string.
+	 */
+	private function prepare_headers( array $headers ): array {
+		$prepared = array();
+		foreach ( $headers as $name => $values ) {
 			$key = str_replace( '_', '-', strtolower( (string) $name ) );
 			if (
 				! in_array( $key, array( 'mcp-protocol-version', 'mcp-method', 'mcp-name', 'mcp-session-id' ), true )
@@ -93,7 +105,9 @@ class HttpRequestContext {
 				continue;
 			}
 
-			$this->headers[ $key ] = $value;
+			$prepared[ $key ] = $value;
 		}
+
+		return $prepared;
 	}
 }
