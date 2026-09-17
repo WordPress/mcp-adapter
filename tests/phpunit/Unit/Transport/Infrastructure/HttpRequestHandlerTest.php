@@ -466,6 +466,150 @@ final class HttpRequestHandlerTest extends TestCase {
 		$this->assertArrayNotHasKey( 'error', $data );
 	}
 
+
+	public function test_handle_request_post_withNoOriginHeader_acceptsRequest(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		// No Origin header set.
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+	}
+
+	public function test_handle_request_post_withMatchingOrigin_acceptsRequest(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		$request->set_header( 'Origin', home_url() );
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+	}
+
+	public function test_handle_request_post_withNonMatchingOrigin_returnsForbidden(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(
+					'protocolVersion' => '2025-11-25',
+					'clientInfo'      => array(
+						'name'    => 'test-client',
+						'version' => '1.0.0',
+					),
+				),
+			)
+		);
+		$request->set_header( 'Origin', 'https://evil.example' );
+
+		$context  = new HttpRequestContext( $request );
+		$response = $this->handler->handle_request( $context );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 403, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertEquals( McpErrorFactory::PERMISSION_DENIED, $data['error']['code'] );
+		$this->assertStringContainsString( 'Invalid Origin header', $data['error']['message'] );
+	}
+
+	public function test_handle_request_post_withAllowlistedExtraOrigin_acceptsRequest(): void {
+		$allow = static function () {
+			return array( 'https://trusted.example' );
+		};
+		add_filter( 'mcp_adapter_allowed_http_origins', $allow );
+
+		try {
+			$request = $this->createPostRequest(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 1,
+					'method'  => 'initialize',
+					'params'  => array(
+						'protocolVersion' => '2025-11-25',
+						'clientInfo'      => array(
+							'name'    => 'test-client',
+							'version' => '1.0.0',
+						),
+					),
+				)
+			);
+			$request->set_header( 'Origin', 'https://trusted.example' );
+
+			$context  = new HttpRequestContext( $request );
+			$response = $this->handler->handle_request( $context );
+		} finally {
+			remove_filter( 'mcp_adapter_allowed_http_origins', $allow );
+		}
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+	}
+
+	public function test_handle_request_post_withInvalidOriginFilterValue_failsClosed(): void {
+		$invalid = static function () {
+			return 'https://trusted.example';
+		};
+		add_filter( 'mcp_adapter_allowed_http_origins', $invalid );
+
+		try {
+			$request = $this->createPostRequest(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 1,
+					'method'  => 'initialize',
+					'params'  => array(
+						'protocolVersion' => '2025-11-25',
+						'clientInfo'      => array(
+							'name'    => 'test-client',
+							'version' => '1.0.0',
+						),
+					),
+				)
+			);
+			$request->set_header( 'Origin', 'https://trusted.example' );
+
+			$context  = new HttpRequestContext( $request );
+			$response = $this->handler->handle_request( $context );
+		} finally {
+			remove_filter( 'mcp_adapter_allowed_http_origins', $invalid );
+		}
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 403, $response->get_status() );
+	}
+
 	// Helper methods
 
 	/**

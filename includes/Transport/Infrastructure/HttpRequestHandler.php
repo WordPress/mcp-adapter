@@ -60,6 +60,13 @@ class HttpRequestHandler {
 	 * @return \WP_REST_Response HTTP response.
 	 */
 	public function handle_request( HttpRequestContext $context ): \WP_REST_Response {
+		if ( ! $this->is_valid_origin( $context->origin_header ) ) {
+			return new \WP_REST_Response(
+				McpErrorFactory::permission_denied( null, 'Invalid Origin header' )->toArray(),
+				403
+			);
+		}
+
 		// Handle POST requests (sending MCP messages to server)
 		if ( 'POST' === $context->method ) {
 			return $this->handle_mcp_request( $context );
@@ -348,5 +355,104 @@ class HttpRequestHandler {
 		}
 
 		return new \WP_REST_Response( null, 200 );
+	}
+
+	/**
+	 * Validate a present browser Origin against this WordPress installation.
+	 *
+	 * A missing or empty Origin header is accepted, since non-browser clients
+	 * (CLI tools, server-to-server integrations) do not send one. A present
+	 * Origin must match the WordPress installation, or an origin explicitly
+	 * allowed through the {@see 'mcp_adapter_allowed_http_origins'} filter.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string|null $origin The Origin header value, if present.
+	 *
+	 * @return bool True when the request may proceed, false otherwise.
+	 */
+	private function is_valid_origin( ?string $origin ): bool {
+		if ( null === $origin || '' === $origin ) {
+			return true;
+		}
+
+		/**
+		 * Filters the exact HTTP origins allowed to call MCP HTTP endpoints.
+		 *
+		 * The MCP Streamable HTTP transport requires servers to validate the
+		 * `Origin` header on all incoming connections to prevent DNS rebinding
+		 * attacks. Origins are compared by scheme, host, and effective port only.
+		 *
+		 * The filtered value must be a list of strings. Any other return value
+		 * is treated as invalid and causes every non-empty Origin to be rejected
+		 * (fail closed).
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param list<string>           $origins Allowed origins. Defaults to the site's home,
+		 *                                        site, and REST API URLs.
+		 * @param \WP\MCP\Core\McpServer $server  The MCP server handling the request.
+		 */
+		$allowed = apply_filters(
+			'mcp_adapter_allowed_http_origins',
+			array( home_url(), site_url(), rest_url() ),
+			$this->transport_context->mcp_server
+		);
+
+		if ( ! is_array( $allowed ) ) {
+			return false;
+		}
+
+		$normalized_origin = $this->normalize_origin( $origin, true );
+		if ( null === $normalized_origin ) {
+			return false;
+		}
+
+		foreach ( $allowed as $candidate ) {
+			if ( is_string( $candidate ) && $normalized_origin === $this->normalize_origin( $candidate, false ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Normalize a URL to its scheme, host, and effective port for comparison.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $url           The URL to normalize.
+	 * @param bool   $strict_origin When true, reject URLs carrying userinfo, a path
+	 *                              beyond `/`, a query, or a fragment, as a valid
+	 *                              `Origin` header may never contain those parts.
+	 *
+	 * @return string|null The normalized `scheme://host:port` string, or null if the
+	 *                      URL cannot be parsed or fails strict validation.
+	 */
+	private function normalize_origin( string $url, bool $strict_origin ): ?string {
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || ! isset( $parts['scheme'], $parts['host'] ) ) {
+			return null;
+		}
+
+		if (
+			$strict_origin
+			&& (
+				isset( $parts['user'] )
+				|| isset( $parts['pass'] )
+				|| isset( $parts['query'] )
+				|| isset( $parts['fragment'] )
+				|| ( isset( $parts['path'] ) && '' !== $parts['path'] && '/' !== $parts['path'] )
+			)
+		) {
+			return null;
+		}
+
+		$scheme = strtolower( (string) $parts['scheme'] );
+		$host   = strtolower( (string) $parts['host'] );
+		$port   = isset( $parts['port'] ) ? (int) $parts['port'] : ( 'https' === $scheme ? 443 : 80 );
+
+		return sprintf( '%s://%s:%d', $scheme, $host, $port );
 	}
 }

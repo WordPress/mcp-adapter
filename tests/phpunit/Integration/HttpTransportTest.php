@@ -507,8 +507,7 @@ final class HttpTransportTest extends TestCase {
 	// ========== Security Tests ==========
 
 	public function test_origin_header_validation(): void {
-		// The current implementation allows all origins (returns true)
-		// This test documents the current behavior and can be updated when proper validation is implemented
+		// A non-matching Origin must be rejected with HTTP 403 to prevent DNS rebinding attacks.
 		$request = $this->createPostRequest(
 			array(
 				'jsonrpc' => '2.0',
@@ -521,7 +520,44 @@ final class HttpTransportTest extends TestCase {
 
 		$response = $this->transport->handle_request( $request );
 
-		// Currently allows all origins - this should be changed in the near future
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 403, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertArrayHasKey( 'error', $data );
+		$this->assertEquals( McpErrorFactory::PERMISSION_DENIED, $data['error']['code'] );
+	}
+
+	public function test_origin_header_validation_allows_matching_origin(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(),
+			)
+		);
+		$request->set_header( 'Origin', home_url() );
+
+		$response = $this->transport->handle_request( $request );
+
+		$this->assertInstanceOf( WP_REST_Response::class, $response );
+		$this->assertEquals( 200, $response->get_status() );
+	}
+
+	public function test_origin_header_validation_allows_missing_origin(): void {
+		$request = $this->createPostRequest(
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 1,
+				'method'  => 'initialize',
+				'params'  => array(),
+			)
+		);
+		// No Origin header set.
+
+		$response = $this->transport->handle_request( $request );
+
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
 		$this->assertEquals( 200, $response->get_status() );
 	}
