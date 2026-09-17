@@ -12,12 +12,6 @@ namespace WP\MCP\Domain\Utils;
 /**
  * Builds neutral arrays that are validated with the selected result schema.
  *
- * Every field is carried as given. The schema package decides whether the
- * block fits the selected revision. `mimeType` and `_meta` values are therefore
- * not typed here: a decoded JSON object arrives as stdClass and must reach the
- * schema unchanged, because casting it to an array turns numeric-string keys
- * into a list.
- *
  * @since 0.5.0
  */
 final class ContentBlockHelper {
