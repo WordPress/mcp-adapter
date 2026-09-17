@@ -12,7 +12,6 @@ namespace WP\MCP\Handlers\Tools;
 use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
-use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -255,9 +254,9 @@ class ToolsHandler {
 
 				if ( is_string( $uri ) && '' !== $uri && ( $has_text || $has_blob ) ) {
 					$block_meta    = $is_nested
-						? $this->content_metadata( $result['_meta'] ?? null )
+						? ( $result['_meta'] ?? null )
 						: null;
-					$resource_meta = $this->content_metadata( $resource_item['_meta'] ?? null );
+					$resource_meta = $resource_item['_meta'] ?? null;
 
 					if ( $has_text ) {
 						return array(
@@ -265,7 +264,7 @@ class ToolsHandler {
 								ContentBlockHelper::embedded_text_resource(
 									$uri,
 									$resource_item['text'],
-									is_string( $mime_type ) ? $mime_type : null,
+									$mime_type,
 									null,
 									$block_meta,
 									$resource_meta
@@ -281,7 +280,7 @@ class ToolsHandler {
 								ContentBlockHelper::embedded_blob_resource(
 									$uri,
 									$resource_item['blob'],
-									is_string( $mime_type ) ? $mime_type : null,
+									$mime_type,
 									null,
 									$block_meta,
 									$resource_meta
@@ -308,7 +307,7 @@ class ToolsHandler {
 							$image_data,
 							$mime_type,
 							null,
-							$this->content_metadata( $result['_meta'] ?? null )
+							$result['_meta'] ?? null
 						),
 					),
 					'isError' => false,
@@ -344,16 +343,6 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
-	}
-
-	/**
-	 * Project an explicit content metadata object to the helper's associative view.
-	 *
-	 * @param mixed $meta Content metadata.
-	 * @return array<string, mixed>|null
-	 */
-	private function content_metadata( $meta ): ?array {
-		return McpValidator::normalize_meta( $meta instanceof \stdClass ? (array) $meta : $meta );
 	}
 
 	/**
