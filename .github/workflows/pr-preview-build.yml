@@ -20,7 +20,7 @@ permissions: {}
 jobs:
   build:
     name: Build plugin zip for Playground preview
-    uses: WordPress/action-wp-playground-pr-preview/.github/workflows/preview-build.yml@43fc435558bc6cee69f5b214d6b8ca4f9f80c31d # v3
+    uses: WordPress/action-wp-playground-pr-preview/.github/workflows/preview-build.yml@1b15093d61b5e98cdfeb31466f34ade495762cd7 # v4.0.0
     permissions:
       contents: read
     with:
