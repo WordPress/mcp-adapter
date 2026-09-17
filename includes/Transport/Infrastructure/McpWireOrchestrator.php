@@ -208,7 +208,7 @@ final class McpWireOrchestrator {
 		$id           = $generic['id'] ?? null;
 		$safe_id      = is_string( $id ) || is_int( $id ) ? $id : null;
 		$method       = isset( $generic['method'] ) && is_string( $generic['method'] ) ? $generic['method'] : null;
-		$notification = null !== $method && ! array_key_exists( 'id', $generic );
+		$notification = '2.0' === ( $generic['jsonrpc'] ?? null ) && null !== $method && ! array_key_exists( 'id', $generic );
 		if ( '2.0' !== ( $generic['jsonrpc'] ?? null ) || null === $method ) {
 			return $this->failure( McpErrorFactory::invalid_request( $safe_id, 'Invalid JSON-RPC request envelope' ), $method, $safe_id, $notification );
 		}
@@ -216,12 +216,13 @@ final class McpWireOrchestrator {
 			return $this->failure( McpErrorFactory::invalid_request( null, 'Request id must be a string or integer' ), $method, null, false );
 		}
 
+		// Notification failures carry error data for transport status selection, not response-record hydration.
 		$selection = $this->select_revision( $generic, $transport_metadata, $client_params_2025_11_25 );
 		if ( is_array( $selection ) ) {
 			$schema   = McpErrorFactory::UNSUPPORTED_VERSION === ( $selection['error']['code'] ?? null )
 				? $this->transport_context->mcp_server->get_schemas()->forVersion( Schemas::V2026_07_28 )
 				: null;
-			$response = null === $schema ? $selection : $this->hydrate_error( $selection, $schema );
+			$response = $notification || null === $schema ? $selection : $this->hydrate_error( $selection, $schema );
 
 			return $this->failure( $response, $method, $id, $notification );
 		}
@@ -231,7 +232,7 @@ final class McpWireOrchestrator {
 			? $this->validate_2026_07_28_envelope_headers( $generic, $transport, $transport_metadata )
 			: null;
 		if ( null !== $header_error ) {
-			return $this->failure( $this->hydrate_error( $header_error, $schema ), $method, $id, $notification );
+			return $this->failure( $notification ? $header_error : $this->hydrate_error( $header_error, $schema ), $method, $id, $notification );
 		}
 
 		try {
@@ -241,7 +242,7 @@ final class McpWireOrchestrator {
 		} catch ( \Throwable $throwable ) {
 			$error = McpErrorFactory::invalid_params( $id, $throwable->getMessage() );
 
-			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, $notification );
+			return $this->failure( $notification ? $error : $this->hydrate_error( $error, $schema ), $method, $id, $notification );
 		}
 
 		$header_error = Schemas::V2026_07_28 === $selection
@@ -249,7 +250,7 @@ final class McpWireOrchestrator {
 			: null;
 		if ( null !== $header_error ) {
 			return $this->failure(
-				$this->hydrate_error( $header_error, $schema ),
+				$notification ? $header_error : $this->hydrate_error( $header_error, $schema ),
 				$method,
 				$id,
 				$notification,

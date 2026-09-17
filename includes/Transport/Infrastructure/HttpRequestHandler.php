@@ -104,6 +104,7 @@ class HttpRequestHandler {
 		}
 
 		$method                   = isset( $message->method ) && is_string( $message->method ) ? $message->method : null;
+		$notification             = '2.0' === ( $message->jsonrpc ?? null ) && null !== $method && ! property_exists( $message, 'id' );
 		$raw_id                   = $message->id ?? null;
 		$safe_id                  = is_string( $raw_id ) || is_int( $raw_id ) ? $raw_id : null;
 		$client_params_2025_11_25 = null;
@@ -115,19 +116,19 @@ class HttpRequestHandler {
 				$safe_id
 			);
 			if ( true !== $session_validation ) {
-				return new \WP_REST_Response( $session_validation, McpErrorFactory::get_http_status_for_error( $session_validation ) );
+				return new \WP_REST_Response( $notification ? null : $session_validation, McpErrorFactory::get_http_status_for_error( $session_validation ) );
 			}
 
 			$session = SessionManager::get_session( get_current_user_id(), (string) $context->session_id );
 			if ( ! is_array( $session ) || ! is_array( $session['client_params'] ?? null ) ) {
 				$error = McpErrorFactory::session_not_found( $safe_id, 'Session context is unavailable' );
-				return new \WP_REST_Response( $error, 404 );
+				return new \WP_REST_Response( $notification ? null : $error, 404 );
 			}
 			$client_params_2025_11_25 = $session['client_params'];
 
 			$header_error = $this->validate_session_protocol_version( $context->protocol_version, $client_params_2025_11_25, $safe_id );
 			if ( null !== $header_error ) {
-				return new \WP_REST_Response( $header_error, 400 );
+				return new \WP_REST_Response( $notification ? null : $header_error, 400 );
 			}
 		}
 
@@ -159,14 +160,15 @@ class HttpRequestHandler {
 			$new_session_id = $session;
 		}
 
-		$data     = $processed['response'] instanceof Record ? $processed['response']->jsonSerialize() : $processed['response'];
-		$status   = $this->orchestrator->http_response_status(
+		$data   = $processed['response'] instanceof Record ? $processed['response']->jsonSerialize() : $processed['response'];
+		$status = $this->orchestrator->http_response_status(
 			$processed['response'],
 			$processed['context'],
 			$message,
 			$context->protocol_version
 		);
-		$response = new \WP_REST_Response( $data, $status );
+		// Rejected notifications retain their HTTP error status without a JSON-RPC response body.
+		$response = new \WP_REST_Response( $processed['notification'] ? null : $data, $processed['notification'] ? max( 400, $status ) : $status );
 		if ( null !== $new_session_id ) {
 			$response->header( 'Mcp-Session-Id', $new_session_id );
 		}

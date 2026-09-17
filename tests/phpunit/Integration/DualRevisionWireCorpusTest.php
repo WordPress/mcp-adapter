@@ -41,6 +41,79 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->stdio = new StdioServerBridge( $server );
 	}
 
+	/**
+	 * Reject notifications without emitting JSON-RPC responses, while preserving request errors.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_http_notification_rejections_have_no_response_body(): void {
+		$notification = array( 'jsonrpc' => '2.0', 'method' => 'notifications/initialized' );
+		$session_id   = $this->initialize_http_session();
+		$headers      = array( 'Mcp-Session-Id' => $session_id, 'MCP-Protocol-Version' => Schemas::V2025_11_25 );
+
+		try {
+			$accepted = $this->http_post( $notification, $headers );
+			$this->assertSame( 202, $accepted['status'] );
+			$this->assertSame( 'null', $accepted['json'] );
+
+			$cases = array(
+				array( array( 'MCP-Protocol-Version' => Schemas::V2025_11_25 ), 400 ),
+				array( array( 'Mcp-Session-Id' => 'missing-session', 'MCP-Protocol-Version' => Schemas::V2025_11_25 ), 404 ),
+				array( array( 'Mcp-Session-Id' => $session_id, 'MCP-Protocol-Version' => '2025-06-18' ), 400 ),
+			);
+			foreach ( $cases as $case ) {
+				$response = $this->http_post( $notification, $case[0] );
+				$this->assertSame( $case[1], $response['status'] );
+				$this->assertSame( 'null', $response['json'] );
+			}
+
+			$request = $this->http_post( $notification + array( 'id' => 7 ), array( 'MCP-Protocol-Version' => Schemas::V2025_11_25 ) );
+			$this->assertSame( 400, $request['status'] );
+			$this->assertSame( 7, $request['data']['id'] );
+			$this->assertArrayHasKey( 'error', $request['data'] );
+
+			$invalid = $this->http_post( array( 'jsonrpc' => '1.0', 'method' => 'notifications/initialized' ), $headers );
+			$this->assertSame( 400, $invalid['status'] );
+			$this->assertSame( McpErrorFactory::INVALID_REQUEST, $invalid['data']['error']['code'] );
+
+			$malformed = $this->http_post_raw( '{"jsonrpc":' );
+			$this->assertSame( 400, $malformed['status'] );
+			$this->assertSame( McpErrorFactory::PARSE_ERROR, $malformed['data']['error']['code'] );
+		} finally {
+			SessionManager::delete_session( get_current_user_id(), $session_id );
+		}
+	}
+
+	/**
+	 * Keep modern notification rejection errors out of request-response schema hydration.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_modern_notification_validation_failures_are_empty_http_errors(): void {
+		$notification = array(
+			'jsonrpc' => '2.0',
+			'method'  => 'notifications/example',
+			'params'  => array(
+				'_meta' => array(
+					'io.modelcontextprotocol/protocolVersion' => Schemas::V2026_07_28,
+					'io.modelcontextprotocol/clientCapabilities' => new \stdClass(),
+				),
+			),
+		);
+		$headers  = array( 'MCP-Protocol-Version' => Schemas::V2026_07_28 );
+		$response = $this->http_post( $notification, $headers );
+		$this->assertSame( 400, $response['status'] );
+		$this->assertSame( 'null', $response['json'] );
+
+		$headers['Mcp-Method'] = 'notifications/example';
+		$notification['params']['_meta']['io.modelcontextprotocol/clientCapabilities'] = 'invalid';
+		$response = $this->http_post( $notification, $headers );
+		$this->assertSame( 400, $response['status'] );
+		$this->assertSame( 'null', $response['json'] );
+		$this->assertSame( '', $this->stdio_notification( $notification ) );
+		$this->assertSame( '', $this->stdio_notification( array( 'jsonrpc' => '2.0', 'method' => 'notifications/initialized' ) ) );
+	}
+
 	/** Prove initialization, session context, ping, and canonical list output. */
 	public function test_http_2025_lifecycle_and_tools(): void {
 		$initialize = $this->http_post(
