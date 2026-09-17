@@ -139,6 +139,24 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
 });
 ```
 
+## Origin Validation
+
+The built-in `HttpTransport` validates the `Origin` header on every request routed through `HttpRequestHandler`, as required by the MCP Streamable HTTP transport specification to prevent DNS rebinding attacks. A missing or empty `Origin` is accepted, since non-browser clients (CLI tools, server-to-server integrations) do not send one. A present `Origin` must match the site's `home_url()`, `site_url()`, or `rest_url()` (compared by scheme, host, and effective port only), or it is rejected with HTTP 403 before the request is dispatched.
+
+Use the `mcp_adapter_allowed_http_origins` filter to allow additional exact origins, for example when the site is embedded behind a different public domain:
+
+```php
+add_filter( 'mcp_adapter_allowed_http_origins', function ( array $origins, \WP\MCP\Core\McpServer $server ) {
+    $origins[] = 'https://app.example.com';
+
+    return $origins;
+}, 10, 2 );
+```
+
+The filtered value must be a list of strings. Returning anything else is treated as invalid and causes every non-empty `Origin` to be rejected (fail closed).
+
+Custom transports that bypass `HttpRequestHandler` (for example by talking to `request_router` directly, as in the example above) do not get this protection automatically and should implement their own `Origin` validation if they accept browser-originated requests.
+
 ## Transport Permissions vs Custom Transports
 
 ### Use Transport Permissions For:

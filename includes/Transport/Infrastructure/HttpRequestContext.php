@@ -60,6 +60,15 @@ class HttpRequestContext {
 	public ?string $accept_header;
 
 	/**
+	 * The Origin header from the request, used only for DNS-rebinding protection.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var string|null
+	 */
+	public ?string $origin_header;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param \WP_REST_Request<array<string, mixed>> $request The original request object.
@@ -70,6 +79,7 @@ class HttpRequestContext {
 		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
+		$this->origin_header    = $request->get_header( 'origin' );
 		$this->body             = 'POST' === $this->method ? $request->get_json_params() : null;
 	}
 }

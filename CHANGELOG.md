@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
+### Added
+- The HTTP transport now validates the `Origin` header on incoming requests, as required by the MCP Streamable HTTP transport specification, to prevent DNS rebinding attacks. A missing or empty `Origin` is still accepted, since non-browser clients do not send one. A present `Origin` must match the site's `home_url()`, `site_url()`, or `rest_url()`, or an origin explicitly allowed through the new `mcp_adapter_allowed_http_origins` filter; a non-matching origin now returns HTTP 403 before the request is dispatched ([#323](https://github.com/WordPress/mcp-adapter/issues/323)).
+
 ### Changed
 - Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
 
