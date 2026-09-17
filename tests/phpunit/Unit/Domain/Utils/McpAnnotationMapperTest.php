@@ -150,6 +150,30 @@ final class McpAnnotationMapperTest extends TestCase {
 		$this->assertTrue( $result['idempotentHint'] );
 	}
 
+	public function test_map_maps_open_world_to_openworldhint(): void {
+		$annotations = array(
+			'open_world' => false,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayHasKey( 'openWorldHint', $result );
+		$this->assertArrayNotHasKey( 'open_world', $result );
+		$this->assertFalse( $result['openWorldHint'] );
+	}
+
+	public function test_open_world_override_takes_precedence_over_openworldhint(): void {
+		$annotations = array(
+			'openWorldHint' => true,
+			'open_world'    => false,
+		);
+
+		$result = McpAnnotationMapper::map( $annotations, 'tool' );
+
+		$this->assertArrayHasKey( 'openWorldHint', $result );
+		$this->assertFalse( $result['openWorldHint'], 'WordPress-format open_world should override openWorldHint value' );
+	}
+
 	public function test_map_excludes_tool_fields_for_resource(): void {
 		$annotations = array(
 			'readonly'    => true,
@@ -232,15 +256,13 @@ final class McpAnnotationMapperTest extends TestCase {
 	public function test_map_with_null_ability_property_uses_mcp_field_name_for_tools(): void {
 		$annotations = array(
 			// Fields with null ability_property should map 1:1.
-			// For tools, only openWorldHint and title have null ability_property.
-			'openWorldHint' => true,
-			'title'         => 'Test',
+			// For tools, only title has null ability_property.
+			'title' => 'Test',
 		);
 
 		$result = McpAnnotationMapper::map( $annotations, 'tool' );
 
 		// These should map 1:1 (ability_property is null)
-		$this->assertArrayHasKey( 'openWorldHint', $result );
 		$this->assertArrayHasKey( 'title', $result );
 	}
 
