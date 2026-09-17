@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpAdapter;
+use WP\MCP\Core\McpVersionNegotiator;
 use function WP_CLI\Utils\format_items;
 
 /**
@@ -47,6 +48,11 @@ final class McpCommand extends \WP_CLI_Command {
 	 *
 	 * @when after_wp_load
 	 * @synopsis [--server=<server-id>]
+	 *
+	 * @param array $args Positional WP-CLI arguments.
+	 * @param array $assoc_args Named WP-CLI options.
+	 *
+	 * @return void
 	 */
 	public function serve( array $args, array $assoc_args ): void {
 
@@ -97,6 +103,9 @@ final class McpCommand extends \WP_CLI_Command {
 	 *
 	 * ## OPTIONS
 	 *
+	 * [--protocol=<revision>]
+	 * : Count components available for one supported schema revision. By default, count all registered components.
+	 *
 	 * [--format=<format>]
 	 * : Render output in a particular format.
 	 * ---
@@ -111,15 +120,34 @@ final class McpCommand extends \WP_CLI_Command {
 	 * ## EXAMPLES
 	 *
 	 *     # List all MCP servers
-	 *     wp mcp list
+	 *     wp mcp-adapter list
 	 *
 	 *     # List servers in JSON format
-	 *     wp mcp list --format=json
+	 *     wp mcp-adapter list --format=json
 	 *
+	 *     # Count components available under MCP 2026-07-28
+	 *     wp mcp-adapter list --protocol=2026-07-28
+	 *
+	 * @since n.e.x.t Supports selecting a schema revision for component counts.
 	 * @when after_wp_load
-	 * @synopsis [--format=<format>]
+	 * @synopsis [--format=<format>] [--protocol=<revision>]
+	 *
+	 * @param array $args Positional WP-CLI arguments.
+	 * @param array $assoc_args Named WP-CLI options.
+	 *
+	 * @return void
 	 */
 	public function list( array $args, array $assoc_args ): void {
+		$protocol = $assoc_args['protocol'] ?? null;
+		if ( null !== $protocol && ( ! is_string( $protocol ) || ! in_array( $protocol, McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, true ) ) ) {
+			\WP_CLI::error(
+				sprintf(
+					'Unsupported protocol revision. Supported revisions: %s.',
+					implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
+				)
+			);
+		}
+
 		$adapter = McpAdapter::instance();
 
 		$servers = $adapter->get_servers();
@@ -132,18 +160,30 @@ final class McpCommand extends \WP_CLI_Command {
 
 		$items = array();
 		foreach ( $servers as $server ) {
+			$schema  = null === $protocol ? null : $server->get_schemas()->forVersion( $protocol );
 			$items[] = array(
 				'ID'          => $server->get_server_id(),
 				'Name'        => $server->get_server_name(),
 				'Version'     => $server->get_server_version(),
-				'Tools'       => count( $server->get_tools() ),
-				'Resources'   => count( $server->get_resources() ),
-				'Prompts'     => count( $server->get_prompts() ),
+				'Tools'       => null === $schema ? $server->count_tools() : count( $server->get_tools( $schema ) ),
+				'Resources'   => null === $schema ? $server->count_resources() : count( $server->get_resources( $schema ) ),
+				'Prompts'     => null === $schema ? $server->count_prompts() : count( $server->get_prompts( $schema ) ),
 				'Description' => $server->get_server_description(),
 			);
 		}
 
 		$format = $assoc_args['format'] ?? 'table';
-		format_items( $format, $items, array( 'ID', 'Name', 'Version', 'Tools', 'Resources', 'Prompts' ) );
+		format_items(
+			$format,
+			$items,
+			array(
+				'ID',
+				'Name',
+				'Version',
+				'Tools',
+				'Resources',
+				'Prompts',
+			)
+		);
 	}
 }

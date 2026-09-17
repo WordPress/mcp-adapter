@@ -4,8 +4,40 @@ All notable changes to this project will be documented in this file, per [the Ke
 
 ## [Unreleased] - TBD
 
+### Breaking Changes
+- Schema-backed MCP revisions are exactly `2025-11-25` and `2026-07-28`. `2025-06-18` and `2024-11-05` no longer have their own DTOs; they are negotiated as legacy identifiers and served through the `2025-11-25` schema (see Added). `McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS` now lists only the schema-backed revisions; legacy identifiers moved to `McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`.
+- Protocol-facing server getters `get_tools()`, `get_resources()`, `get_prompts()`, and `get_prompt()` require a selected `Schema`. There is no implicit default revision.
+- The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/vx.y.z.md#migrating-to-the-dual-revision-schema-runtime).
+- `McpToolValidator`, `McpResourceValidator`, `McpPromptValidator`, `McpErrorFactory::validate_jsonrpc_message()`, `McpServer::is_mcp_validation_enabled()`, and the `mcp_adapter_validation_enabled` filter have been removed. Wire validation always runs through the selected schema.
+- `RequestRouter::route_request()`, method handlers, `McpErrorFactory`, `ContentBlockHelper`, and `McpPromptBuilderInterface::build()` now exchange schema records and revision-neutral arrays instead of DTOs. `JsonRpcResponseBuilder` has been removed. Custom transports must delegate to `HttpRequestHandler` or `McpWireOrchestrator`.
+- `McpTool::fromArray()`, `McpResource::fromArray()`, and `McpPrompt::fromArray()` return `WP_Error` only for structural problems (missing name, URI, or handler; invalid resource URI). Schema and annotation problems no longer fail construction; they are reported per revision through `is_available_for()` and `get_projection_error()` and logged as warnings at registration.
+- The non-canonical `tools/list/all` method and `ToolsHandler::list_all_tools()` have been removed.
+- JSON-RPC batch requests are rejected before dispatch.
+- `wp mcp-adapter list` adds per-revision tool, resource, and prompt columns.
+
+### Added
+- Legacy MCP identifiers `2025-06-18` and `2024-11-05` negotiate through `initialize` and are echoed back verbatim while the `2025-11-25` schema serves the session. Every server-emitted difference between those revisions and `2025-11-25` is an optional additive field, so the projection is unchanged. `MCP-Protocol-Version` must match the negotiated identifier when sent, and may be omitted only for sessions negotiated under `2024-11-05`, which predates the header. `2025-03-26` stays non-negotiable because it requires servers to receive JSON-RPC batches; a proposal receives `2025-11-25` as before. `server/discover` and the unsupported-version error list the same two schema-backed revisions.
+- `McpRequestContext::protocol_version()` returns the negotiated identifier; `revision()` continues to return the schema revision.
+- MCP `2026-07-28` support: the sessionless `server/discover` lifecycle, per-request protocol metadata in the request body, and the `MCP-Protocol-Version`, `Mcp-Method`, `Mcp-Name`, and `Mcp-Param-*` headers over HTTP. STDIO accepts either revision per line.
+- `McpRequestContext`, an immutable per-request context carrying the selected schema, transport, and session data.
+- `McpWireOrchestrator` and `JsonRpcRequestDecoder`, one decode, validate, dispatch, and encode boundary shared by the HTTP and STDIO transports.
+- `McpTool`, `McpResource`, and `McpPrompt` expose `get_protocol_record( Schema $schema )` and `is_available_for()`. A component is omitted from a revision whose schema cannot represent it.
+- The `mcp_adapter_tools_list`, `mcp_adapter_resources_list`, `mcp_adapter_prompts_list`, and `mcp_adapter_initialize_response` filters receive the selected schema as a third argument.
+- Raw-wire, architecture, and projection test coverage for both revisions.
+
 ### Changed
-- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
+- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](docs/migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
+- `initialize`, `notifications/initialized`, and `ping` are served only for `2025-11-25`; `server/discover` only for `2026-07-28`. The 2025 HTTP session lifecycle is unchanged.
+- Adapter-owned `2026-07-28` output omits `Tool.execution`, adds `resultType: "complete"` to completed results, and adds `ttlMs: 0` and `cacheScope: "private"` to discovery, list, and resource-read results.
+- Missing tools and prompts return Invalid Params (`-32602`) in both revisions. Missing resources return `-32002` in `2025-11-25` and `-32602` in `2026-07-28`. An unsupported per-request version returns `-32022`.
+- Session validation errors carry the JSON-RPC request ID of the failing request instead of `null`.
+- `tools/call` and `resources/read` look up the tool name and resource URI exactly as sent. Surrounding whitespace is no longer trimmed, so a padded name cannot bypass the `2026-07-28` `Mcp-Param-*` header check.
+- `resources/read` forwards only the protocol-defined parameters (`uri`, `_meta`, `inputResponses`, `requestState`) to permission callbacks, the `mcp_adapter_pre_resource_read` filter, and resource handlers. Unknown request keys are dropped.
+- `2025-11-25` `tools/call` responses omit `structuredContent` when a tool returns a JSON list, because that schema types the field as an object. The text block still carries the encoded list. `2026-07-28` responses keep the list.
+- `wordpress/php-mcp-schema` is temporarily pinned to a reviewed commit through a VCS repository until the dual-revision runtime is released.
+
+### Fixed
+- `mcp-adapter/get-ability-info` serializes an empty `input_schema` as `{}` instead of `[]`.
 
 ## [0.6.1] - 2026-08-13
 
@@ -56,7 +88,6 @@ No API, hook, or protocol behavior changed. Upgrading from 0.6.0 requires no mig
 - Reduced `SessionManager` write amplification to lower lock contention.
 - Packaging and dependency updates, including the `php-mcp-schema` v0.1.1 follow-up for cleaner Composer dist archives.
 - Improved observability for protocol errors and `isError` tool responses.
-
 
 Existing ability registration, `create_server()`, and WordPress hooks are unchanged. Custom handlers, transports, or code depending on internal component structures should review the [v0.5.0 migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/v0.5.0.md).
 

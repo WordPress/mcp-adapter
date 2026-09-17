@@ -47,12 +47,15 @@ Lists all available MCP servers and their configurations.
 #### Syntax
 
 ```bash
-wp mcp-adapter list [--format=<format>]
+wp mcp-adapter list [--format=<format>] [--protocol=<revision>]
 ```
 
 #### Options
 
 - `--format=<format>` - Output format (table, json, csv, yaml). Default: table.
+- `--protocol=<revision>` - Count components available for one supported schema revision: `2025-11-25` or `2026-07-28`. Unsupported revisions are rejected.
+
+By default, `Tools`, `Resources`, and `Prompts` count all registered components. With `--protocol`, the same columns count only components available under that revision. The option does not filter servers or change how they serve requests.
 
 #### Examples
 
@@ -62,6 +65,9 @@ wp mcp-adapter list
 
 # List servers in JSON format
 wp mcp-adapter list --format=json
+
+# Count components available under MCP 2026-07-28
+wp mcp-adapter list --protocol=2026-07-28
 ```
 
 ## STDIO Transport Protocol
