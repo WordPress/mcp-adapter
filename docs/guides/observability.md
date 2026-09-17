@@ -17,26 +17,19 @@ interface McpObservabilityHandlerInterface {
 }
 ```
 
-### Architecture: Metadata-Driven Observability
+### Request completion
 
-The observability system follows a **middleware pattern** where handlers return enriched metadata that flows up to the transport layer for centralized event recording:
+`RequestRouter` collects method, revision, transport, request ID, sanitized parameter summaries, and component context. HTTP and STDIO use `McpWireOrchestrator`, which supplies the final response projection as an internal completion step. The router emits one `mcp.request` event after that step, so status and duration include projection. A handler returning logical success is not recorded as successful if its result fails schema validation.
 
-1. **Handlers** (Business Logic Layer): Execute business logic and attach `_metadata` to responses
-2. **RequestRouter** (Transport Layer): Extracts `_metadata`, merges with request context, and records events
-3. **ObservabilityHandler**: Receives unified events with rich context from a single point
+Direct `RequestRouter::route_request()` calls keep their existing behavior: the event describes the handler outcome. Custom transports should use `McpWireOrchestrator` or `HttpRequestHandler` to include the protocol response boundary. Requests rejected before routing and notifications are outside these completion events.
 
-**Benefits:**
-- **Single source of truth**: All observability flows through RequestRouter
-- **Consistent timing**: Duration tracked at transport layer for ALL requests
-- **DRY principle**: No duplicate event recording in handlers
-- **Clean separation**: Handlers focus on business logic, not observability
+### Result projection failures
 
-### Event Emission Pattern
+When final response projection throws, `mcp.request` carries `status: error`, `error_code: -32603`, `failure_reason: invalid_handler_result`, and the exception class in `error_type`. Existing request and component tags identify the affected tool, resource, or prompt.
 
-- **MCP Adapter**: Handlers attach metadata to responses
-- **RequestRouter**: Extracts metadata and emits events with consistent structure
-- **Handlers**: Send events to external systems (logs, StatsD, Prometheus, etc.)
-- **External Systems**: Aggregate and analyze events
+The separately configured error handler receives an `Invalid handler result` log entry with the same correlation tags, `exception_message`, and `schema_pointer` when the exception provides one. The pointer can identify a containing union, such as `/content/0`, rather than the exact failing field. Request argument values and result payloads are not attached. The client receives only the generic `Internal error: The server produced an invalid result.` response.
+
+Configure an observability handler to collect events and an error handler to retain detailed diagnostics. `ErrorLogMcpObservabilityHandler` and `ErrorLogMcpErrorHandler` write to the PHP error log; custom implementations can forward them elsewhere. Custom servers passing `null` use no-op handlers. The Adapter's default server already uses `ErrorLogMcpErrorHandler` for diagnostics and `NullMcpObservabilityHandler` for events. Exceptions thrown by these handlers during request completion do not replace the protocol response.
 
 ## Built-in Handlers
 
@@ -75,19 +68,19 @@ All events use a **consistent naming pattern with status tags** for easier filte
 - `server_id`: MCP server ID
 - `request_id`: JSON-RPC request ID
 - `session_id`: MCP session ID (null if no session)
+- `revision`: Selected MCP schema revision
 - `params`: Sanitized request parameters (safe fields only)
 - `error_code`: JSON-RPC error code (only for errors)
 - `error_type`: Exception class name (only for exceptions)
 - `error_category`: Error category (validation, execution, logic, system, type, arguments, unknown)
 
-**Additional tags from handler metadata:**
+**Additional component and failure tags:**
 - `component_type`: `tool` | `resource` | `prompt` | `tools` | `resources` | `prompts`
 - `tool_name`: Tool name (for tool requests)
 - `ability_name`: WordPress ability name (when applicable)
 - `prompt_name`: Prompt name (for prompt requests)
 - `resource_uri`: Resource URI (for resource requests)
-- `failure_reason`: Specific failure reason (see below) - uses WP_Error code when available
-- `new_session_id`: Newly created session ID (only on initialize requests)
+- `failure_reason`: Failure description, or `invalid_handler_result` for a result-projection failure
 
 **Includes duration timing**: Yes (in milliseconds)
 
@@ -411,30 +404,48 @@ add_filter('mcp_adapter_default_server_config', function($config) {
 });
 ```
 
-### Configuring Observability for Custom Servers
+### Enabling error logging and request events
 
-When creating custom servers, you can specify the observability handler directly:
+The default server already logs diagnostics. To explicitly configure both diagnostics and request events, register this filter before the Adapter creates its servers:
 
 ```php
-// In your plugin's initialization
-add_action('mcp_adapter_init', function($adapter) {
+use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
+use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
+
+add_filter( 'mcp_adapter_default_server_config', static function ( array $config ): array {
+    $config['error_handler']         = ErrorLogMcpErrorHandler::class;
+    $config['observability_handler'] = ErrorLogMcpObservabilityHandler::class;
+    return $config;
+} );
+```
+
+For a custom server, pass both handler classes to `create_server()`. This example creates an HTTP server with empty tool, resource, and prompt lists; supply your components in those arrays:
+
+```php
+use WP\MCP\Core\McpAdapter;
+use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
+use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
+use WP\MCP\Transport\HttpTransport;
+
+add_action( 'mcp_adapter_init', static function ( McpAdapter $adapter ): void {
     $adapter->create_server(
         'my-custom-server',
         'my-namespace',
         'my-route',
         'My Custom Server',
-        'A custom MCP server with file-based observability',
+        'A custom MCP server with diagnostics and request events',
         '1.0.0',
-        [MyCustomTransport::class],
-        null, // Use default error handler
-        FileObservabilityHandler::class, // Custom observability handler
-        ['my-tool'], // tools
-        [], // resources
-        [], // prompts
-        null // transport permission callback
+        array( HttpTransport::class ),
+        ErrorLogMcpErrorHandler::class,
+        ErrorLogMcpObservabilityHandler::class,
+        array(), // Tools.
+        array(), // Resources.
+        array()  // Prompts.
     );
-});
+} );
 ```
+
+Both handlers write to the PHP error log; the destination depends on PHP and WordPress logging configuration. For a result validation failure, correlate the `Invalid handler result` diagnostic and the failed `mcp.request` event using `request_id`, `server_id`, and `revision`. The diagnostic includes `exception_message` and an available `schema_pointer`; the event includes `failure_reason: invalid_handler_result`. Enabling request events also logs successful requests.
 
 ## Querying Events
 

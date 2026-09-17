@@ -68,7 +68,7 @@ final class HandlerCompatibilityTest extends TestCase {
 		if ( ! $valid ) {
 			$this->assertObjectHasProperty( 'error', $wire );
 			$this->assertSame( -32603, $wire->error->code );
-			$this->assertSame( 'Internal error: Invalid handler result', $wire->error->message );
+			$this->assertSame( 'Internal error: The server produced an invalid result.', $wire->error->message );
 			$this->assertObjectNotHasProperty( 'result', $wire );
 			return;
 		}
@@ -126,7 +126,7 @@ final class HandlerCompatibilityTest extends TestCase {
 				}
 				$error = $this->wire_error( $server, 'prompts/get', 20, $params );
 				$this->assertSame( -32603, $error['code'] );
-				$this->assertSame( 'Internal error: Invalid handler result', $error['message'] );
+				$this->assertSame( 'Internal error: The server produced an invalid result.', $error['message'] );
 			}
 		}
 	}
@@ -338,7 +338,7 @@ final class HandlerCompatibilityTest extends TestCase {
 		// The list-shaped _meta is not repaired; the schema rejects the whole result on the wire.
 		$error = $this->wire_error( $server, 'resources/read', 5, array( 'uri' => 'fixture://Mixed/Resource' ) );
 		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $error['code'] );
-		$this->assertSame( 'Internal error: Invalid handler result', $error['message'] );
+		$this->assertSame( 'Internal error: The server produced an invalid result.', $error['message'] );
 	}
 
 	/** Invalid prompt roles, content types, and metadata are not repaired; the wire result fails. */
@@ -384,7 +384,7 @@ final class HandlerCompatibilityTest extends TestCase {
 
 		$error = $this->wire_error( $server, 'prompts/get', 6, array( 'name' => 'normalizing-prompt' ) );
 		$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $error['code'] );
-		$this->assertSame( 'Internal error: Invalid handler result', $error['message'] );
+		$this->assertSame( 'Internal error: The server produced an invalid result.', $error['message'] );
 	}
 
 	/**

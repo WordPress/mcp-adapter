@@ -254,9 +254,9 @@ class ToolsHandler {
 
 				if ( is_string( $uri ) && '' !== $uri && ( $has_text || $has_blob ) ) {
 					$block_meta    = $is_nested
-						? $this->content_metadata( $result['_meta'] ?? null )
+						? ( $result['_meta'] ?? null )
 						: null;
-					$resource_meta = $this->content_metadata( $resource_item['_meta'] ?? null );
+					$resource_meta = $resource_item['_meta'] ?? null;
 
 					if ( $has_text ) {
 						return array(
@@ -307,7 +307,7 @@ class ToolsHandler {
 							$image_data,
 							$mime_type,
 							null,
-							$this->content_metadata( $result['_meta'] ?? null )
+							$result['_meta'] ?? null
 						),
 					),
 					'isError' => false,
@@ -343,26 +343,6 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
-	}
-
-	/**
-	 * Carry explicit content metadata to the helper as given.
-	 *
-	 * A decoded JSON object (stdClass) and an array both reach the schema unchanged;
-	 * the object is not cast, because a cast would turn numeric-string keys into a
-	 * list the schema rejects. Any other value cannot be a JSON object, so it fails
-	 * the call.
-	 *
-	 * @param mixed $meta Content metadata.
-	 * @return array<string, mixed>|\stdClass|null
-	 * @throws \UnexpectedValueException When the value is neither an object nor an array.
-	 */
-	private function content_metadata( $meta ) {
-		if ( null === $meta || is_array( $meta ) || $meta instanceof \stdClass ) {
-			return $meta;
-		}
-
-		throw new \UnexpectedValueException( 'Tool result _meta must be a JSON object.' );
 	}
 
 	/**

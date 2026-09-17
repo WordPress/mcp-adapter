@@ -15,6 +15,7 @@ use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
+use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\HttpRequestHandler;
@@ -1409,24 +1410,104 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		);
 	}
 
-	/** Image blocks carry object _meta; list-shaped _meta fails final projection in both revisions. */
-	public function test_http_image_block_meta_is_emitted_only_as_an_object(): void {
-		$image = array(
-			'type'     => 'image',
-			'results'  => "\x89PNG\r\n",
-			'mimeType' => 'image/png',
+	/**
+	 * Content metadata reaches final schema projection without changing its shape.
+	 *
+	 * @dataProvider tool_content_metadata_provider
+	 * @param array<string, mixed> $shape Tool result shorthand.
+	 * @param bool $resource_metadata Whether metadata belongs to resource contents.
+	 * @since n.e.x.t
+	 */
+	public function test_http_tool_content_metadata_uses_schema_validation( array $shape, bool $resource_metadata ): void {
+		$values = array(
+			'string'         => array( 'bad', false ),
+			'boolean'        => array( false, false ),
+			'number'         => array( 0, false ),
+			'list'           => array( array( 'bad' ), false ),
+			'array'          => array( array( 'vendor' => true ), true ),
+			'numeric object' => array( (object) array( '0' => 'keep' ), true ),
+			'null'           => array( null, true ),
 		);
 
 		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $version ) {
-			$with_meta = $this->http_tool_result_fixture( $image + array( '_meta' => array( 'ui' => array( 'prefersBorder' => true ) ) ), $version );
-			$this->assertSame( 200, $with_meta['status'], $version );
-			$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $with_meta['data']['result']['content'][0]['_meta'], $version );
+			foreach ( $values as $label => list( $meta, $valid ) ) {
+				$result = $shape;
+				if ( $resource_metadata && isset( $result['resource'] ) ) {
+					$result['resource']['_meta'] = $meta;
+				} else {
+					$result['_meta'] = $meta;
+				}
+				DummyErrorHandler::reset();
+				DummyObservabilityHandler::reset();
+				$before   = wp_json_encode( $result );
+				$response = $this->http_tool_result_fixture( $result, $version );
+				$context  = $version . ' ' . $label;
+				$this->assertSame( $before, wp_json_encode( $result ), $context );
+				$events = array_values( array_filter( DummyObservabilityHandler::$events, static fn( array $event ): bool => 'mcp.request' === $event['event'] && 'tools/call' === $event['tags']['method'] ) );
+				$this->assertCount( 1, $events, $context );
+				$tags = $events[0]['tags'];
+				$this->assertSame( $valid ? 'success' : 'error', $tags['status'], $context );
+				$this->assertSame( $version, $tags['revision'], $context );
+				$this->assertSame( 42, $tags['request_id'], $context );
+				$this->assertSame( 'test-always-allowed', $tags['tool_name'], $context );
+				$this->assertNotNull( $events[0]['duration_ms'], $context );
 
-			$with_list = $this->http_tool_result_fixture( $image + array( '_meta' => array( 'a', 'b' ) ), $version );
-			$this->assertSame( 500, $with_list['status'], $version );
-			$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $with_list['data']['error']['code'], $version );
-			$this->assertStringContainsString( 'Invalid handler result', $with_list['data']['error']['message'], $version );
+
+				if ( ! $valid ) {
+					$this->assertSame( 500, $response['status'], $context );
+					$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $response['data']['error']['code'], $context );
+					$this->assertSame( 'Internal error: The server produced an invalid result.', $response['data']['error']['message'], $context );
+					$this->assertArrayNotHasKey( 'result', $response['data'], $context );
+					$this->assertSame( 'invalid_handler_result', $tags['failure_reason'], $context );
+					$this->assertSame( McpErrorFactory::INTERNAL_ERROR, $tags['error_code'], $context );
+					$this->assertCount( 1, DummyErrorHandler::$logs, $context );
+					$log = DummyErrorHandler::$logs[0];
+					$this->assertSame( 'Invalid handler result', $log['message'], $context );
+					$this->assertSame( 'error', $log['type'], $context );
+					$this->assertSame( '/content/0', $log['context']['schema_pointer'], $context );
+					$this->assertStringContainsString( 'Value does not match any allowed union member', $log['context']['exception_message'], $context );
+					$this->assertSame( $tags, array_intersect_key( $log['context'], $tags ), $context );
+					$this->assertArrayNotHasKey( 'result', $log['context'], $context );
+					$this->assertArrayNotHasKey( 'arguments', $log['context'], $context );
+
+					continue;
+				}
+
+				$this->assertSame( array(), DummyErrorHandler::$logs, $context );
+				$this->assertSame( 200, $response['status'], $context );
+				$wire    = json_decode( $response['json'], false, 512, JSON_THROW_ON_ERROR );
+				$content = $wire->result->content[0];
+				$owner   = $resource_metadata ? $content->resource : $content;
+				$this->assertFalse( $wire->result->isError, $context );
+				if ( null === $meta ) {
+					$this->assertObjectNotHasProperty( '_meta', $owner, $context );
+					continue;
+				}
+				$this->assertInstanceOf( \stdClass::class, $owner->_meta, $context );
+				$this->assertSame( wp_json_encode( $meta ), wp_json_encode( $owner->_meta ), $context );
+			}
 		}
+	}
+
+	/**
+	 * Every image and embedded-resource metadata position accepted by tool handlers.
+	 *
+	 * @return array<string, array{0: array<string, mixed>, 1: bool}>
+	 * @since n.e.x.t
+	 */
+	public static function tool_content_metadata_provider(): array {
+		$cases = array(
+			'image' => array( array( 'type' => 'image', 'results' => 'image bytes', 'mimeType' => 'image/png' ), false ),
+		);
+		foreach ( array( 'text' => 'body', 'blob' => 'Ym9keQ==' ) as $field => $value ) {
+			$resource                               = array( 'uri' => 'fixture://metadata', $field => $value );
+			$nested                                 = array( 'type' => 'resource', 'resource' => $resource );
+			$cases[ 'flat ' . $field ]               = array( array( 'type' => 'resource' ) + $resource, true );
+			$cases[ 'nested ' . $field . ' block' ]    = array( $nested, false );
+			$cases[ 'nested ' . $field . ' resource' ] = array( $nested, true );
+		}
+
+		return $cases;
 	}
 
 	/** Server capability containers serialize as JSON objects in initialize and server/discover. */

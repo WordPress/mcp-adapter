@@ -306,25 +306,26 @@ final class McpWireOrchestrator {
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
 		}
 
-		if ( 'server/discover' === $method ) {
-			$result = $this->create_discover_data();
-		} else {
-			$result = $this->transport_context->request_router->route_request( $request, $request_context, $transport );
-		}
+		$response = $this->transport_context->request_router->route_request_with_completion(
+			$request,
+			$request_context,
+			$transport,
+			function ( $result ) use ( $method, $id, $schema, $selection ): Record {
+				if ( is_array( $result ) && isset( $result['error'] ) ) {
+					return $this->hydrate_error( $result, $schema );
+				}
 
-		if ( is_array( $result ) && isset( $result['error'] ) ) {
-			$response = $this->hydrate_error( $result, $schema );
-		} else {
-			try {
 				$projected = Schemas::V2026_07_28 === $selection
 					? $this->project_2026_07_28_result( $method, $result, $schema )
 					: $this->project_2025_11_25_result( $method, $result, $schema );
-				$response  = Schemas::V2026_07_28 === $selection
+
+				return Schemas::V2026_07_28 === $selection
 					? $this->hydrate_2026_07_28_success( $method, $id, $projected, $schema )
 					: $this->hydrate_2025_11_25_success( $id, $projected, $schema );
-			} catch ( \Throwable $throwable ) {
-				$response = $this->hydrate_error( McpErrorFactory::internal_error( $id, 'Invalid handler result' ), $schema );
 			}
+		);
+		if ( ! $response instanceof Record ) {
+			$response = $this->hydrate_error( $response, $schema );
 		}
 
 		$initialize_params = Schemas::V2025_11_25 === $selection && $this->is_success_response( $response )
@@ -492,23 +493,6 @@ final class McpWireOrchestrator {
 			$client_info,
 			$transport,
 			$metadata
-		);
-	}
-
-	/**
-	 * Build logical discovery data from server configuration.
-	 *
-	 * @return array<string, mixed> Supported revisions, capabilities, and server instructions.
-	 */
-	private function create_discover_data(): array {
-		return array(
-			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
-			'capabilities'      => array(
-				'prompts'   => array( 'listChanged' => false ),
-				'resources' => array( 'listChanged' => false ),
-				'tools'     => array( 'listChanged' => false ),
-			),
-			'instructions'      => $this->transport_context->mcp_server->get_server_description(),
 		);
 	}
 

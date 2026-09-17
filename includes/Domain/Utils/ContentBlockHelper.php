@@ -28,7 +28,7 @@ final class ContentBlockHelper {
 	 * @param string $data Base64 image data.
 	 * @param mixed $mime_type MIME type, carried as given.
 	 * @param array<string, mixed>|null $annotations Optional annotations.
-	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param mixed $_meta Optional block metadata, carried as given.
 	 * @return array<string, mixed>
 	 */
 	public static function image( string $data, $mime_type, ?array $annotations = null, $_meta = null ): array {
@@ -52,8 +52,8 @@ final class ContentBlockHelper {
 	 * @param string $text Resource text.
 	 * @param mixed $mime_type MIME type, carried as given.
 	 * @param array<string, mixed>|null $annotations Optional block annotations.
-	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
-	 * @param array<string, mixed>|\stdClass|null $resource_meta Optional resource metadata, carried as given.
+	 * @param mixed $_meta Optional block metadata, carried as given.
+	 * @param mixed $resource_meta Optional resource metadata, carried as given.
 	 * @return array<string, mixed>
 	 */
 	public static function embedded_text_resource(
@@ -87,8 +87,8 @@ final class ContentBlockHelper {
 	 * @param string $blob Base64 resource data.
 	 * @param mixed $mime_type MIME type, carried as given.
 	 * @param array<string, mixed>|null $annotations Optional block annotations.
-	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
-	 * @param array<string, mixed>|\stdClass|null $resource_meta Optional resource metadata, carried as given.
+	 * @param mixed $_meta Optional block metadata, carried as given.
+	 * @param mixed $resource_meta Optional resource metadata, carried as given.
 	 * @return array<string, mixed>
 	 */
 	public static function embedded_blob_resource(
@@ -118,7 +118,7 @@ final class ContentBlockHelper {
 	 *
 	 * @param string $text Text.
 	 * @param array<string, mixed>|null $annotations Optional annotations.
-	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param mixed $_meta Optional block metadata, carried as given.
 	 * @return array<string, mixed>
 	 */
 	public static function text( string $text, ?array $annotations = null, $_meta = null ): array {
@@ -137,7 +137,7 @@ final class ContentBlockHelper {
 	 *
 	 * @param array<string, mixed> $resource_data Resource contents.
 	 * @param array<string, mixed>|null $annotations Optional block annotations.
-	 * @param array<string, mixed>|\stdClass|null $_meta Optional block metadata, carried as given.
+	 * @param mixed $_meta Optional block metadata, carried as given.
 	 * @return array<string, mixed>
 	 */
 	private static function embedded_resource( array $resource_data, ?array $annotations, $_meta ): array {
