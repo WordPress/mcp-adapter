@@ -10,10 +10,13 @@ declare( strict_types=1 );
 namespace WP\MCP\Transport\Infrastructure;
 
 use WP\MCP\Core\McpRequestContext;
+use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
+use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record;
 use WP\McpSchema\Record\CallToolRequest;
+use WP\McpSchema\Record\DiscoverRequest;
 use WP\McpSchema\Record\GetPromptRequest;
 use WP\McpSchema\Record\InitializeRequest;
 use WP\McpSchema\Record\ListPromptsRequest;
@@ -39,6 +42,68 @@ class RequestRouter {
 	private McpTransportContext $context;
 
 	/**
+	 * Captures the selected request's tags while its caller completes projection.
+	 *
+	 * @since n.e.x.t
+	 * @var (callable(array<string, mixed>): void)|null
+	 */
+	private $capture_observation = null;
+
+	/**
+	 * Request whose base-router event belongs to the active completion scope.
+	 *
+	 * @since n.e.x.t
+	 * @var \WP\McpSchema\Record|null
+	 */
+	private ?Record $capture_request = null;
+
+	/**
+	 * Include response projection in the request's single completion event.
+	 *
+	 * @internal
+	 * @since n.e.x.t
+	 * @param \WP\McpSchema\Record $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @param string $transport_name Transport name.
+	 * @param callable(\WP\McpSchema\Record|array<string, mixed>): \WP\McpSchema\Record $complete Response projector.
+	 * @return \WP\McpSchema\Record|array<string, mixed> Final response or contained routing error.
+	 */
+	public function route_request_with_completion( Record $request, McpRequestContext $request_context, string $transport_name, callable $complete ) {
+		$start_time                = microtime( true );
+		$tags                      = $this->request_observability_tags( $request, $request_context, $transport_name );
+		$previous                  = $this->capture_observation;
+		$previous_request          = $this->capture_request;
+		$this->capture_request     = $request;
+		$this->capture_observation = static function ( array $observed_tags ) use ( &$tags ): void {
+			$tags = $observed_tags;
+		};
+		$projecting                = false;
+		$projection_failure        = null;
+		try {
+			// Discovery has never passed through the overridable logical router.
+			$result     = $request instanceof DiscoverRequest
+				? $this->create_discover_data()
+				: $this->route_request( $request, $request_context, $transport_name );
+			$projecting = true;
+			$result     = $complete( $result );
+		} catch ( \Throwable $exception ) {
+			if ( $projecting ) {
+				$projection_failure = $exception;
+			} else {
+				$tags['error_type']     = get_class( $exception );
+				$tags['error_category'] = $this->categorize_error( $exception );
+			}
+			$result = McpErrorFactory::internal_error( $request->get( 'id' ), $projecting ? 'The server produced an invalid result.' : 'Handler error occurred' );
+		} finally {
+			$this->capture_observation = $previous;
+			$this->capture_request     = $previous_request;
+		}
+
+		$this->record_request_completion( $tags, $result, $start_time, $projection_failure );
+		return $result;
+	}
+
+	/**
 	 * Initialize the request router.
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $context The transport context.
@@ -58,77 +123,140 @@ class RequestRouter {
 	 * @return \WP\McpSchema\Record|array<string, mixed>
 	 */
 	public function route_request( Record $request, McpRequestContext $request_context, string $transport_name = 'unknown' ) {
+		$capture = $this->capture_request === $request ? $this->capture_observation : null;
+		if ( null !== $capture ) {
+			$this->capture_observation = null;
+			$this->capture_request     = null;
+		}
 		$method_value = $request->get( 'method' );
 		$request_id   = $request->get( 'id' );
 		if ( ! is_string( $method_value ) ) {
 			return McpErrorFactory::invalid_request( $request_id, 'Validated request has no method.' );
 		}
-		$method = $method_value;
-		$params = $this->observability_params( $request );
-
-		// Track request start time.
 		$start_time = microtime( true );
-
-		$component_tags = $this->resolve_component_observability_context( $method, $params );
-		$transport_meta = $request_context->transport_metadata();
-
-		// Common tags for all metrics.
-		$common_tags = array(
-			'method'     => $method,
-			'transport'  => $transport_name,
-			'server_id'  => $this->context->mcp_server->get_server_id(),
-			'params'     => $this->sanitize_params_for_logging( $params ),
-			'request_id' => $request_id,
-			'session_id' => $transport_meta['session_id'] ?? null,
-			'revision'   => $request_context->revision(),
-		);
-
+		$tags       = $this->request_observability_tags( $request, $request_context, $transport_name );
 		try {
-			$handler_result = $this->dispatch( $method, $request, $request_context, $request_id );
+			$result = $this->dispatch( $method_value, $request, $request_context, $request_id );
+		} catch ( \Throwable $exception ) {
+			$tags['error_type']     = get_class( $exception );
+			$tags['error_category'] = $this->categorize_error( $exception );
+			$result                 = McpErrorFactory::internal_error( $request_id, 'Handler error occurred' );
+		}
 
-			// Calculate request duration.
-			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
+		if ( null !== $capture ) {
+			$capture( $tags );
+		} else {
+			$this->record_request_completion( $tags, $result, $start_time );
+		}
+		return $result;
+	}
 
-			if ( is_array( $handler_result ) && isset( $handler_result['error'] ) ) {
-				$result                 = $handler_result;
-				$tags                   = array_merge( $common_tags, $component_tags, array( 'status' => 'error' ) );
-				$tags['error_code']     = $handler_result['error']['code'] ?? McpErrorFactory::INTERNAL_ERROR;
-				$tags['failure_reason'] = $handler_result['error']['message'] ?? 'Unknown error';
-				$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+	/**
+	 * Collect request and component identity without argument values.
+	 *
+	 * @since n.e.x.t
+	 * @param \WP\McpSchema\Record $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @param string $transport_name Transport name.
+	 * @return array<string, mixed> Correlation tags.
+	 */
+	private function request_observability_tags( Record $request, McpRequestContext $request_context, string $transport_name ): array {
+		$method         = $request->get( 'method' );
+		$params         = $this->observability_params( $request );
+		$transport_meta = $request_context->transport_metadata();
+		return array_merge(
+			array(
+				'method'     => $method,
+				'transport'  => $transport_name,
+				'server_id'  => $this->context->mcp_server->get_server_id(),
+				'params'     => $this->sanitize_params_for_logging( $params ),
+				'request_id' => $request->get( 'id' ),
+				'session_id' => $transport_meta['session_id'] ?? null,
+				'revision'   => $request_context->revision(),
+			),
+			is_string( $method ) ? $this->resolve_component_observability_context( $method, $params ) : array()
+		);
+	}
 
-				return $result;
-			}
+	/**
+	 * Record one final outcome and optional projection diagnostic.
+	 *
+	 * @since n.e.x.t
+	 * @param array<string, mixed> $tags Correlated request tags.
+	 * @param \WP\McpSchema\Record|array<string, mixed> $result Result or response.
+	 * @param float $start_time Request start time in seconds.
+	 * @param \Throwable|null $projection_failure Final projection failure.
+	 */
+	private function record_request_completion( array $tags, $result, float $start_time, ?\Throwable $projection_failure = null ): void {
+		$duration = ( microtime( true ) - $start_time ) * 1000;
+		$tags     = array_merge( $tags, $this->result_observability_tags( $result ) );
+		if ( null !== $projection_failure ) {
+			$tags['failure_reason'] = FailureReason::INVALID_HANDLER_RESULT;
+			$tags['error_type']     = get_class( $projection_failure );
+			$tags['error_category'] = 'validation';
+			$this->log_projection_failure( $projection_failure, $tags );
+		}
+		try {
+			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+		} catch ( \Throwable $exception ) {
+			// A telemetry failure must not replace the request's response.
+			return;
+		}
+	}
 
-			$status = is_array( $handler_result ) && true === ( $handler_result['isError'] ?? false ) ? 'error' : 'success';
-			if ( 'error' === $status && ! isset( $component_tags['failure_reason'] ) && is_array( $handler_result ) ) {
-				$content = $handler_result['content'][0] ?? null;
-				if ( is_array( $content ) && isset( $content['text'] ) && is_string( $content['text'] ) ) {
-					$component_tags['failure_reason'] = $content['text'];
+	/**
+	 * Derive status from either a direct handler result or a projected response.
+	 *
+	 * @since n.e.x.t
+	 * @param \WP\McpSchema\Record|array<string, mixed> $result Result or response.
+	 * @return array<string, mixed> Outcome tags.
+	 */
+	private function result_observability_tags( $result ): array {
+		$error = $this->record_field( $result, 'error' );
+		if ( $error instanceof Record || $error instanceof \stdClass || is_array( $error ) ) {
+			return array(
+				'status'         => 'error',
+				'error_code'     => $this->record_field( $error, 'code' ) ?? McpErrorFactory::INTERNAL_ERROR,
+				'failure_reason' => $this->record_field( $error, 'message' ) ?? 'Unknown error',
+			);
+		}
+
+		if ( $result instanceof Record && $result->has( 'result' ) ) {
+			$result = $result->get( 'result' );
+		}
+		$tags = array( 'status' => 'success' );
+		if ( ( $result instanceof Record || $result instanceof \stdClass || is_array( $result ) ) && true === $this->record_field( $result, 'isError' ) ) {
+			$tags['status'] = 'error';
+			$content        = $this->record_field( $result, 'content' );
+			$first          = is_array( $content ) ? ( $content[0] ?? null ) : null;
+			if ( $first instanceof Record || $first instanceof \stdClass || is_array( $first ) ) {
+				$text = $this->record_field( $first, 'text' );
+				if ( is_string( $text ) ) {
+					$tags['failure_reason'] = $text;
 				}
 			}
+		}
 
-			$tags = array_merge( $common_tags, $component_tags, array( 'status' => $status ) );
-			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
+		return $tags;
+	}
 
-			return $handler_result;
-		} catch ( \Throwable $exception ) {
-			// Calculate request duration.
-			$duration = ( microtime( true ) - $start_time ) * 1000; // Convert to milliseconds.
-
-			// Track exception with categorization.
-			$tags = array_merge(
-				$common_tags,
-				$component_tags,
-				array(
-					'status'         => 'error',
-					'error_type'     => get_class( $exception ),
-					'error_category' => $this->categorize_error( $exception ),
-				)
-			);
-			$this->context->observability_handler->record_event( 'mcp.request', $tags, $duration );
-
-			// Create error response from exception.
-			return McpErrorFactory::internal_error( $request_id, 'Handler error occurred' );
+	/**
+	 * Send projection diagnostics to the configured logger without result payloads.
+	 *
+	 * @since n.e.x.t
+	 * @param \Throwable $exception Projection failure.
+	 * @param array<string, mixed> $tags Correlated request tags.
+	 */
+	private function log_projection_failure( \Throwable $exception, array $tags ): void {
+		$tags['exception_message'] = $exception->getMessage();
+		if ( $exception instanceof \WP\McpSchema\Exception\ValidationException ) {
+			$tags['schema_pointer'] = $exception->getPointer();
+		}
+		try {
+			$this->context->error_handler->log( 'Invalid handler result', $tags );
+		} catch ( \Throwable $logging_error ) {
+			// Preserve the original failure when an integration's logger throws.
+			return;
 		}
 	}
 
@@ -186,6 +314,23 @@ class RequestRouter {
 	}
 
 	/**
+	 * Build logical discovery data from server configuration.
+	 *
+	 * @return array<string, mixed> Supported revisions, capabilities, and server instructions.
+	 */
+	private function create_discover_data(): array {
+		return array(
+			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
+			'capabilities'      => array(
+				'prompts'   => array( 'listChanged' => false ),
+				'resources' => array( 'listChanged' => false ),
+				'tools'     => array( 'listChanged' => false ),
+			),
+			'instructions'      => $this->context->mcp_server->get_server_description(),
+		);
+	}
+
+	/**
 	 * Collect limited request fields and argument names for observability.
 	 *
 	 * @param \WP\McpSchema\Record $request Validated request record.
@@ -230,12 +375,15 @@ class RequestRouter {
 	/**
 	 * Read one field from a generated record or JSON object.
 	 *
-	 * @param \WP\McpSchema\Record|\stdClass $record Record-like value.
+	 * @param \WP\McpSchema\Record|\stdClass|array<string, mixed> $record Record-like value.
 	 * @param string $field Field name to read.
 	 *
 	 * @return mixed
 	 */
 	private function record_field( $record, string $field ) {
+		if ( is_array( $record ) ) {
+			return $record[ $field ] ?? null;
+		}
 		if ( $record instanceof Record ) {
 			return $record->has( $field ) ? $record->get( $field ) : null;
 		}

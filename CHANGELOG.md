@@ -15,7 +15,6 @@ All notable changes to this project will be documented in this file, per [the Ke
 - JSON-RPC batch requests are rejected before dispatch.
 - `wp mcp-adapter list` adds per-revision tool, resource, and prompt columns.
 
-- Invalid protocol fields are no longer silently dropped or repaired. Components invalid in every supported schema revision are rejected. Handler values reach final schema projection, except that existing 2026 result assembly can still alter malformed result-level `_meta` before validation. This reverses the 0.6.0 omission of malformed `_meta`. See the [validation migration notes](docs/migration/vx.y.z.md#validation-and-rejected-components).
 - Invalid protocol fields are no longer silently dropped or repaired. Components invalid in every supported schema revision are rejected. Handler values reach final schema projection. In 2026 responses, result `_meta` is validated before server identification is added, so malformed metadata is rejected and valid object fields are preserved. This reverses the 0.6.0 omission of malformed `_meta`. See the [validation migration notes](docs/migration/vx.y.z.md#validation-and-rejected-components).
 - Removed validation and content helpers and the resource/prompt converter `make()` and getter layers are listed in the [migration guide](docs/migration/vx.y.z.md#removed-helpers-and-converter-methods).
 - Non-array Ability `meta.mcp` now returns `mcp_ability_invalid_meta`. Removed errors: `mcp_resource_missing_name`, `mcp_prompt_invalid_argument`, and `mcp_prompt_argument_missing_name`. Non-array prompt arguments return `mcp_prompt_invalid_arguments`; resource-name filters reject non-strings only.
@@ -32,6 +31,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - Components rejected by every supported schema revision raise `_doing_it_wrong` with schema error paths, in addition to error-handler logs.
 
 ### Changed
+- Request observability status and duration include final response projection, and `server/discover` emits a completion event. Invalid handler results return `-32603`, `Internal error: The server produced an invalid result.`, with one failed request event and a correlated diagnostic through the configured error handler. See the [observability migration notes](docs/migration/vx.y.z.md#request-observability).
 - Resource abilities support core's top-level `meta.annotations` without a deprecation notice. `meta.mcp.annotations` overrides it, and an empty array suppresses annotations instead of falling back.
 - Ability labels and descriptions preserve whitespace, and tool `title` is always emitted from the label. Resource names may be empty; absent names use the URI.
 - Resource URIs are no longer trimmed or limited to 2048 bytes; bare schemes such as `wordpress:` are accepted. Invalid `lastModified` timestamps reject resources on both registration paths.
