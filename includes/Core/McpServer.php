@@ -161,9 +161,9 @@ class McpServer {
 		 *
 		 * @since 0.3.0
 		 *
-		 * @param bool      $enabled   Whether validation is enabled. Default false.
-		 * @param string    $server_id The server ID being configured.
-		 * @param \WP\MCP\Core\McpServer $server    The McpServer instance being constructed.
+		 * @param bool                       $enabled   Whether validation is enabled. Default false.
+		 * @param string|null               $server_id The server ID being configured, or null when no server is in scope.
+		 * @param \WP\MCP\Core\McpServer|null $server    The McpServer instance, or null when no server is in scope.
 		 */
 		$this->mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false, $this->server_id, $this );
 

@@ -196,7 +196,7 @@ final class McpResource implements McpComponentInterface {
 		}
 
 		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
+		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false, null, null );
 		if ( $mcp_validation_enabled ) {
 			$validation_result = McpResourceValidator::validate_resource_dto( $resource );
 			if ( is_wp_error( $validation_result ) ) {
