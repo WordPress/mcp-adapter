@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Core\McpRequestContext;
+use WP\McpSchema\Schemas;
 
 /**
  * Keeps untrusted client input separate from ordinary tool arguments.
@@ -64,6 +65,26 @@ final class McpToolCallContext {
 	 */
 	public function client_capabilities(): \stdClass {
 		return $this->request->client_capabilities();
+	}
+
+	/**
+	 * Whether this tool call can request elicitation in the given mode.
+	 *
+	 * Requires the Adapter's MRTR revision and the client's declared support.
+	 * An empty elicitation capability object declares form support only.
+	 *
+	 * @param string $mode Elicitation mode: 'form' or 'url'. Other values return false.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function client_supports_elicitation( string $mode = 'form' ): bool {
+		if ( Schemas::V2026_07_28 !== $this->revision() || ! in_array( $mode, array( 'form', 'url' ), true ) ) {
+			return false;
+		}
+
+		$elicitation = $this->client_capabilities()->elicitation ?? null;
+		return $elicitation instanceof \stdClass
+			&& ( isset( $elicitation->{$mode} ) || ( 'form' === $mode && array() === get_object_vars( $elicitation ) ) );
 	}
 
 	/**
