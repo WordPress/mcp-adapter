@@ -43,6 +43,8 @@ that a human approved anything.
 
 ## Confirm post creation before calling an Ability
 
+> **Example scope:** This is one way to wrap an Ability with confirmation. The Adapter provides and validates the MCP interaction. Your application chooses the identity, state storage, expiry, cleanup, recovery, and idempotency mechanisms. Adapt the example to those choices.
+
 Assume your plugin already registers `my-plugin/create-post`. It accepts
 `title` and `content`, creates a draft, and returns its normal result. Substitute
 your existing Ability name and input fields; its definition is not repeated here.
@@ -234,11 +236,11 @@ and output validation. This is confirmation reported by the MCP client, not
 independent proof that a human approved the request. Use a separately authenticated
 approval page if your application requires that stronger guarantee.
 
-The example consumes the stored approval before execution and checks deletion
-success so concurrent retries cannot both use the same approval. If execution
-fails after consumption, start a new approval; this is not transactional or an
-exactly-once delivery system. It prevents reuse of this approval, not submission
-of a new create request. Use your existing operation-idempotency system if needed.
+The example deletes the stored approval before calling the Ability and proceeds only if deletion succeeds. Concurrent retries cannot both execute with the same approval. The approval remains consumed even if execution fails. This limits execution to at most once per approval; a new approval can still create another post.
+
+A retry after completed execution returns `approval_unavailable` instead of the previous result. A competing request that reaches deletion after another request consumed the approval returns `approval_used`. Neither error proves that the post was not created. After a lost response or an error after consumption, establish the operation's outcome before requesting a new approval.
+
+The [MCP transport changes](https://modelcontextprotocol.io/specification/2026-07-28/changelog#major-changes) require clients to reissue requests after a broken response stream, but do not require servers to replay completed results. If your application needs retries to return the earlier result, use an operation-idempotency mechanism that preserves exclusive execution and defines recovery after failures. Saving a result after execution alone leaves a crash window between the operation succeeding and its result being stored. These guarantees belong to your application's workflow, beyond this example's single-use approval.
 
 For brevity, this uses non-autoloaded options. Add cleanup for abandoned/expired
 records in your plugin, or use your existing workflow store with an atomic
@@ -275,15 +277,9 @@ Use your existing workflow store or a protected token when correlation matters.
 The Adapter does not prescribe storage, token encoding, expiry, replay handling,
 or a signing key. It does not parse or verify `requestState`.
 
-Treat both state and answers as attacker-controlled input. Before using state to
-influence authorization, resource access, or business logic, verify its integrity
-and its association with the authenticated principal and intended operation.
-Bind elicitation to the authenticated client and user, not unverified client
-metadata or a claimed user ID in an answer. A database identifier must resolve
-only to records the authenticated caller may use. A client-carried state payload
-needs integrity protection such as HMAC or AEAD; signing alone does not hide it.
-Choose an appropriate expiry and enforce one-time consumption server-side when
-an operation must execute at most once.
+Treat both state and answers as attacker-controlled input. Before using state to influence authorization, resource access, or business logic, verify its integrity and its association with the authenticated principal and intended operation. Bind elicitation to the authenticated client and user, not unverified client metadata or a claimed user ID in an answer. A database identifier must resolve only to records the authenticated caller may use. A client-carried state payload needs integrity protection such as HMAC or AEAD; signing alone does not hide it.
+
+Choose an appropriate expiry and enforce any at-most-once execution requirement server-side. Decide separately whether a retry after execution receives an error or a stored result; single-use approval does not provide result replay.
 
 Validate answer types and values against the issued question and your domain
 rules. Protocol schema validation does not enforce a form's `requestedSchema`
