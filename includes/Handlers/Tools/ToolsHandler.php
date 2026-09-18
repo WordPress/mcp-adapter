@@ -206,7 +206,7 @@ class ToolsHandler {
 			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp );
 
 			if ( $result instanceof McpInputRequired ) {
-				if ( $mcp_tool->is_ability_backed() || Schemas::V2026_07_28 !== $request_context->revision() ) {
+				if ( null === $call_context || Schemas::V2026_07_28 !== $request_context->revision() ) {
 					return McpErrorFactory::internal_error( $request_id, 'Input-required results require a direct MCP 2026-07-28 tool.' );
 				}
 				$requests = $request_context->schema()->fromArray( InputRequests::class, $result->input_requests() );
@@ -215,8 +215,9 @@ class ToolsHandler {
 					if ( 'elicitation/create' !== $input_request->method ) {
 						return McpErrorFactory::internal_error( $request_id, 'Only elicitation input requests are supported.' );
 					}
-					$required = $this->missing_elicitation_capability( $input_request, $request_context->client_capabilities() );
-					if ( null !== $required ) {
+					$mode = $input_request->params->mode ?? 'form';
+					if ( ! $call_context->client_supports_elicitation( $mode ) ) {
+						$required = (object) array( 'elicitation' => (object) array( $mode => new \stdClass() ) );
 						return McpErrorFactory::create_error_response( $request_id, McpErrorFactory::MISSING_CAPABILITY, 'The client has not declared the capabilities required for this input request.', array( 'requiredCapabilities' => $required ) );
 					}
 				}
@@ -405,27 +406,5 @@ class ToolsHandler {
 			'content' => array( ContentBlockHelper::text( $message ) ),
 			'isError' => true,
 		);
-	}
-
-	/**
-	 * Return the required elicitation capability if this client cannot answer.
-	 *
-	 * An empty elicitation object declares form mode only.
-	 *
-	 * @param \stdClass $request      One validated elicitation request.
-	 * @param \stdClass $capabilities The client capabilities declared on this request.
-	 *
-	 * @return \stdClass|null The missing capability declaration, or null when the client can answer.
-	 *
-	 * @since n.e.x.t
-	 */
-	private function missing_elicitation_capability( \stdClass $request, \stdClass $capabilities ): ?\stdClass {
-		$mode        = $request->params->mode ?? 'form';
-		$elicitation = $capabilities->elicitation ?? null;
-		if ( $elicitation instanceof \stdClass
-			&& ( isset( $elicitation->{$mode} ) || ( 'form' === $mode && array() === get_object_vars( $elicitation ) ) ) ) {
-			return null;
-		}
-		return (object) array( 'elicitation' => (object) array( $mode => new \stdClass() ) );
 	}
 }

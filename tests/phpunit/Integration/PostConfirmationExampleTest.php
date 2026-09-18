@@ -116,6 +116,32 @@ final class PostConfirmationExampleTest extends TestCase {
 		$this->assertSame( 0, $this->executions );
 	}
 
+	/** Explicit form support works on its own and alongside URL support. */
+	public function test_explicit_form_clients_can_complete_confirmation(): void {
+		foreach ( array(
+			array( 'form' => new \stdClass() ),
+			array(
+				'form' => new \stdClass(),
+				'url'  => new \stdClass(),
+			),
+		) as $index => $modes ) {
+			$capabilities = array( 'elicitation' => $modes );
+			$first        = $this->call( array(), $capabilities )['result'];
+			$this->assertSame( 'input_required', $first['resultType'] );
+			$this->assertSame( $index, $this->executions );
+			$completed = $this->call( $this->answer( $first['requestState'] ), $capabilities )['result'];
+			$this->assertFalse( $completed['isError'] );
+			$this->assertSame(
+				array(
+					'post_id' => 123,
+					'title'   => 'Hello',
+				),
+				$completed['structuredContent']
+			);
+			$this->assertSame( $index + 1, $this->executions );
+		}
+	}
+
 	/** Ability permission denial precedes the question and any approval storage. */
 	public function test_denied_initial_request_creates_no_approval(): void {
 		$this->allowed = false;

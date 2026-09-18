@@ -33,6 +33,7 @@ data. Normal values and `WP_Error` follow the existing result handling.
 | --- | --- |
 | `revision()` | The selected MCP revision. |
 | `client_capabilities()` | Capabilities declared for this request. |
+| `client_supports_elicitation( $mode = 'form' )` | Whether this call can request `'form'` or `'url'` elicitation. Checks the Adapter's supported MRTR revision and the client's declaration; returns `false` for other modes. |
 | `input_responses()` | A defensive copy of this request's schema-valid response map. No history is accumulated. |
 | `request_state()` | The untrusted, opaque string supplied by the client, or `null`. |
 | `is_continuation()` | The client supplied continuation fields. This does not prove a previous interaction. |
@@ -64,7 +65,6 @@ of whether your transport uses OAuth, application passwords, or another scheme.
 use WP\MCP\Domain\Tools\McpInputRequired;
 use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\McpToolCallContext;
-use WP\McpSchema\Schemas;
 
 $make_create_post_tool = static function ( callable $authenticated_client_id ) {
     return McpTool::fromArray(
@@ -128,10 +128,7 @@ $make_create_post_tool = static function ( callable $authenticated_client_id ) {
                         return new WP_Error( 'missing_approval', 'Restart the request to obtain an approval ID.' );
                     }
                     // Check before saving state: the Adapter checks returned requests later.
-                    $elicitation = $context->client_capabilities()->elicitation ?? null;
-                    if ( Schemas::V2026_07_28 !== $context->revision()
-                        || ! $elicitation instanceof \stdClass
-                        || ( ! isset( $elicitation->form ) && array() !== get_object_vars( $elicitation ) ) ) {
+                    if ( ! $context->client_supports_elicitation() ) {
                         return new WP_Error( 'confirmation_unavailable', 'Post creation requires MCP 2026-07-28 with form elicitation.' );
                     }
                     $state = bin2hex( random_bytes( 16 ) );

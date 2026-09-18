@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Integration;
 
+use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Tools\McpInputRequired;
 use WP\MCP\Domain\Tools\McpTool;
@@ -194,6 +195,135 @@ final class MrtrToolsTest extends TestCase {
 			4
 		);
 		$this->assertSame( -32021, $response['error']['code'] );
+	}
+
+	/** The helper reports only the modes declared for the current request. */
+	public function test_elicitation_support_is_checked_inside_each_callback(): void {
+		$tool   = $this->tool(
+			static function ( array $args, McpToolCallContext $context ): array {
+				return array(
+					'default'      => $context->client_supports_elicitation(),
+					'form'         => $context->client_supports_elicitation( 'form' ),
+					'url'          => $context->client_supports_elicitation( 'url' ),
+					'unknown'      => $context->client_supports_elicitation( 'extension' ),
+					'continuation' => $context->is_continuation(),
+				);
+			}
+		);
+		$server = $this->makeServer( array( $tool ) );
+		$cases  = array(
+			'absent'    => array( array(), false, false ),
+			'empty'     => array( array( 'elicitation' => new \stdClass() ), true, false ),
+			'form'      => array( array( 'elicitation' => array( 'form' => new \stdClass() ) ), true, false ),
+			'url'       => array( array( 'elicitation' => array( 'url' => new \stdClass() ) ), false, true ),
+			'both'      => array(
+				array(
+					'elicitation' => array(
+						'form' => new \stdClass(),
+						'url'  => new \stdClass(),
+					),
+				),
+				true,
+				true,
+			),
+			'extension' => array( array( 'elicitation' => array( 'extension' => new \stdClass() ) ), false, false ),
+		);
+		foreach ( $cases as $name => $case ) {
+			$result = $this->call( $server, array( '_meta' => $this->meta( $case[0] ) ), 1 )['result'];
+			$this->assertSame(
+				array(
+					'default'      => $case[1],
+					'form'         => $case[1],
+					'url'          => $case[2],
+					'unknown'      => false,
+					'continuation' => false,
+				),
+				$result['structuredContent'],
+				$name
+			);
+		}
+		foreach ( array( 'both', 'absent' ) as $name ) {
+			$case   = $cases[ $name ];
+			$result = $this->call(
+				$server,
+				array(
+					'_meta'          => $this->meta( $case[0] ),
+					'inputResponses' => array( 'choice' => self::answer() ),
+				),
+				2
+			)['result'];
+			$this->assertSame(
+				array(
+					'default'      => $case[1],
+					'form'         => $case[1],
+					'url'          => $case[2],
+					'unknown'      => false,
+					'continuation' => true,
+				),
+				$result['structuredContent'],
+				$name
+			);
+		}
+	}
+
+	/** A legacy client cannot use MRTR even when it advertises elicitation. */
+	public function test_legacy_context_does_not_report_elicitation_support(): void {
+		$request = new McpRequestContext(
+			Schemas::create()->forVersion( Schemas::V2025_11_25 ),
+			(object) array(
+				'elicitation' => (object) array(
+					'form' => new \stdClass(),
+					'url'  => new \stdClass(),
+				),
+			),
+			null,
+			'STDIO'
+		);
+		$context = new McpToolCallContext( $request, new \stdClass(), null, false );
+		$this->assertFalse( $context->client_supports_elicitation() );
+		$this->assertFalse( $context->client_supports_elicitation( 'form' ) );
+		$this->assertFalse( $context->client_supports_elicitation( 'url' ) );
+	}
+
+	/** URL and mixed requests require each mode actually sent to the client. */
+	public function test_url_and_mixed_requests_enforce_their_capabilities(): void {
+		$url = array(
+			'method' => 'elicitation/create',
+			'params' => array(
+				'mode'    => 'url',
+				'message' => 'Confirm in the browser.',
+				'url'     => 'https://example.com/confirm',
+			),
+		);
+		foreach ( array(
+			array( 'browser' => $url ),
+			array(
+				'choice'  => self::question(),
+				'browser' => $url,
+			),
+		) as $requests ) {
+			$tool     = $this->tool(
+				static function () use ( $requests ) {
+					return new McpInputRequired( $requests );
+				}
+			);
+			$server   = $this->makeServer( array( $tool ) );
+			$modes    = isset( $requests['choice'] ) ? array(
+				'form' => new \stdClass(),
+				'url'  => new \stdClass(),
+			) : array( 'url' => new \stdClass() );
+			$response = $this->call( $server, array( '_meta' => $this->meta( array( 'elicitation' => $modes ) ) ), 1 );
+			$this->assertSame( 'input_required', $response['result']['resultType'] );
+			$this->assertSame( $requests, $response['result']['inputRequests'] );
+			foreach ( array_keys( $modes ) as $missing_mode ) {
+				$remaining_modes = $modes;
+				unset( $remaining_modes[ $missing_mode ] );
+				$caps     = array() === $remaining_modes ? array() : array( 'elicitation' => $remaining_modes );
+				$response = $this->call( $server, array( '_meta' => $this->meta( $caps ) ), 2 );
+				$this->assertSame( -32021, $response['error']['code'] );
+				$this->assertSame( array( 'elicitation' => array( $missing_mode => array() ) ), $response['error']['data']['requiredCapabilities'] );
+			}
+		}
 	}
 
 	/** Ordinary results and legacy completed calls retain their existing meaning. */
