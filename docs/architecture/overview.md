@@ -106,7 +106,9 @@ See the [migration guide](../migration/vx.y.z.md#migrating-to-the-dual-revision-
 
 ## Result mapping, errors, and observability
 
-The orchestrator's 2026 result projection adds `resultType: "complete"` and `io.modelcontextprotocol/serverInfo` metadata. This includes tool results containing `isError: true`: a completed protocol result does not necessarily mean the underlying operation succeeded. The Adapter does not implement the optional `input_required` flow.
+The orchestrator's 2026 result projection adds `resultType: "complete"` to completed results and `io.modelcontextprotocol/serverInfo` metadata. This includes tool results containing `isError: true`: a completed protocol result does not necessarily mean the underlying operation succeeded.
+
+Direct callable tools can return `input_required` under `2026-07-28`. The callback receives the current request's answers and opaque state separately from ordinary arguments. The Adapter validates protocol structure and client capabilities; the tool author owns state protection, answer validation, and workflow decisions. Existing Ability execution and ordinary result shapes remain unchanged. See [MRTR tools](../guides/mrtr.md).
 
 For discovery, list, and resource-read results, the Adapter selects `ttlMs: 0` and `cacheScope: "private"`. The schema requires these fields on cacheable results, but those particular values are Adapter choices. Server information is recommended metadata rather than a schema-required field. See [result projection](../../includes/Transport/Infrastructure/McpWireOrchestrator.php) and the [2026 schema](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2026-07-28/schema.json).
 
