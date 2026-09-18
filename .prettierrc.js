@@ -14,6 +14,7 @@ const config = {
 			options: {
 				tabWidth: 2,
 				useTabs: false,
+				proseWrap: 'never',
 			},
 		},
 		{
