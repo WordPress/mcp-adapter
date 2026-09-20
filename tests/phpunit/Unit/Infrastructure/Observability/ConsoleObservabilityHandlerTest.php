@@ -20,6 +20,8 @@ final class ConsoleObservabilityHandlerTest extends TestCase {
 
 	private string $original_error_log;
 
+	private string $temp_log = '';
+
 	public function setUp(): void {
 		parent::setUp();
 
@@ -37,13 +39,20 @@ final class ConsoleObservabilityHandlerTest extends TestCase {
 			return;
 		}
 
-		ini_set( 'error_log', $temp_log );
+		$this->temp_log = $temp_log;
+		ini_set( 'error_log', $this->temp_log );
 	}
 
 	public function tearDown(): void {
 		// Restore original error log setting.
 		if ( $this->original_error_log ) {
 			ini_set( 'error_log', $this->original_error_log );
+		}
+
+		// Clean up temporary log file.
+		if ( '' !== $this->temp_log && file_exists( $this->temp_log ) ) {
+			unlink( $this->temp_log );
+			$this->temp_log = '';
 		}
 
 		parent::tearDown();
