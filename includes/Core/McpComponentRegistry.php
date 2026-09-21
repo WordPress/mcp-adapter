@@ -672,6 +672,7 @@ class McpComponentRegistry {
 	 */
 	private function has_any_projection( McpComponentInterface $component, string $type, string $name ): bool {
 		$available = false;
+		$errors    = array();
 		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
 			$schema = $this->schemas->forVersion( $revision );
 			if ( $component->is_available_for( $schema ) ) {
@@ -680,14 +681,16 @@ class McpComponentRegistry {
 			}
 
 			$throwable = $component->get_projection_error( $revision );
+			$message   = sprintf(
+				'%1$s "%2$s" is unavailable for MCP revision %3$s: %4$s',
+				ucfirst( $type ),
+				$name,
+				$revision,
+				$throwable instanceof \Throwable ? $throwable->getMessage() : 'schema projection failed'
+			);
+			$errors[]  = $message;
 			$this->error_handler->log(
-				sprintf(
-					'%1$s "%2$s" is unavailable for MCP revision %3$s: %4$s',
-					ucfirst( $type ),
-					$name,
-					$revision,
-					$throwable instanceof \Throwable ? $throwable->getMessage() : 'schema projection failed'
-				),
+				$message,
 				array(
 					'component_type' => $type,
 					'component_name' => $name,
@@ -695,6 +698,10 @@ class McpComponentRegistry {
 				),
 				'warning'
 			);
+		}
+
+		if ( ! $available ) {
+			_doing_it_wrong( __METHOD__, esc_html( implode( ' ', $errors ) ), 'n.e.x.t' );
 		}
 
 		return $available;

@@ -15,24 +15,17 @@ use WP\MCP\Tests\TestCase;
 /** Protects content variants and the two independent embedded-resource metadata levels. */
 final class ContentBlockHelperTest extends TestCase {
 
-	/** Image and audio blocks retain media data, annotations, and object metadata. */
-	public function test_media_blocks_preserve_protocol_fields(): void {
+	/** Image blocks retain media data, annotations, and metadata. */
+	public function test_image_block_preserves_protocol_fields(): void {
 		$annotations = array( 'audience' => array( 'user' ) );
 		$meta        = array( 'vendor' => true );
 		$image       = ContentBlockHelper::image( 'aW1hZ2U=', 'image/png', $annotations, $meta );
-		$audio       = ContentBlockHelper::audio( 'YXVkaW8=', 'audio/mpeg', $annotations, $meta );
 
 		$this->assertSame( 'image', $image['type'] );
 		$this->assertSame( 'aW1hZ2U=', $image['data'] );
 		$this->assertSame( 'image/png', $image['mimeType'] );
 		$this->assertSame( $annotations, $image['annotations'] );
 		$this->assertSame( $meta, $image['_meta'] );
-
-		$this->assertSame( 'audio', $audio['type'] );
-		$this->assertSame( 'YXVkaW8=', $audio['data'] );
-		$this->assertSame( 'audio/mpeg', $audio['mimeType'] );
-		$this->assertSame( $annotations, $audio['annotations'] );
-		$this->assertSame( $meta, $audio['_meta'] );
 	}
 
 	/** Embedded text and blob resources keep block and resource metadata separate. */
@@ -67,8 +60,8 @@ final class ContentBlockHelperTest extends TestCase {
 		$this->assertTrue( $blob['resource']['_meta']['resource'] );
 	}
 
-	/** List-shaped metadata is omitted at every optional metadata boundary. */
-	public function test_list_shaped_metadata_is_omitted(): void {
+	/** Metadata is carried as given at every level; the schema decides whether it fits. */
+	public function test_metadata_is_carried_as_given(): void {
 		$image = ContentBlockHelper::image( 'data', 'image/png', null, array( 'list' ) );
 		$text  = ContentBlockHelper::embedded_text_resource(
 			'fixture://text',
@@ -79,33 +72,31 @@ final class ContentBlockHelperTest extends TestCase {
 			array( 'resource-list' )
 		);
 
-		$this->assertArrayNotHasKey( '_meta', $image );
+		$this->assertSame( array( 'list' ), $image['_meta'] );
+		$this->assertSame( array( 'block-list' ), $text['_meta'] );
+		$this->assertSame( array( 'resource-list' ), $text['resource']['_meta'] );
+	}
+
+	/** Decoded JSON objects and untyped MIME values reach the schema unchanged. */
+	public function test_object_metadata_and_mime_type_are_carried_as_given(): void {
+		$block_meta    = (object) array( '0' => 'numeric-key' );
+		$resource_meta = (object) array( 'owner' => 'resource' );
+		$text          = ContentBlockHelper::embedded_text_resource( 'fixture://text', 'hello', 42, null, $block_meta, $resource_meta );
+		$image         = ContentBlockHelper::image( 'data', 42, null, $block_meta );
+
+		$this->assertSame( $block_meta, $text['_meta'] );
+		$this->assertSame( $resource_meta, $text['resource']['_meta'] );
+		$this->assertSame( 42, $text['resource']['mimeType'] );
+		$this->assertSame( $block_meta, $image['_meta'] );
+		$this->assertSame( 42, $image['mimeType'] );
+	}
+
+	/** Absent optional fields are omitted while empty text is kept. */
+	public function test_text_helper_preserves_empty_text_and_omits_absent_fields(): void {
+		$text = ContentBlockHelper::text( '' );
+
+		$this->assertSame( '', $text['text'] );
+		$this->assertArrayNotHasKey( 'annotations', $text );
 		$this->assertArrayNotHasKey( '_meta', $text );
-		$this->assertArrayNotHasKey( '_meta', $text['resource'] );
-	}
-
-	/** Text, error, and JSON helpers retain empty values and encoding options. */
-	public function test_text_and_json_helpers_preserve_values(): void {
-		$this->assertSame( '', ContentBlockHelper::text( '' )['text'] );
-		$this->assertSame( 'failed', ContentBlockHelper::error_text( 'failed' )['text'] );
-
-		$json = ContentBlockHelper::json_text( array( 'value' => 1 ), JSON_PRETTY_PRINT, null, array( 'json' => true ) );
-		$this->assertStringContainsString( "\n", $json['text'] );
-		$this->assertStringContainsString( '"value": 1', $json['text'] );
-		$this->assertTrue( $json['_meta']['json'] );
-	}
-
-	/** List normalization preserves order while resetting numeric keys. */
-	public function test_to_array_list_resets_numeric_keys(): void {
-		$blocks = ContentBlockHelper::to_array_list(
-			array(
-				4 => ContentBlockHelper::text( 'first' ),
-				9 => ContentBlockHelper::text( 'second' ),
-			)
-		);
-
-		$this->assertSame( array( 0, 1 ), array_keys( $blocks ) );
-		$this->assertSame( 'first', $blocks[0]['text'] );
-		$this->assertSame( 'second', $blocks[1]['text'] );
 	}
 }

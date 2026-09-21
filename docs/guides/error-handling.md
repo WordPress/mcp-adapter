@@ -60,6 +60,14 @@ Handlers receive a validated generated request record and `WP\MCP\Core\McpReques
 
 Custom HTTP transports should delegate to `HttpRequestHandler`. Other transports should call `McpWireOrchestrator::decode()` and `process()` before serializing the returned record. Do not route unvalidated method and parameter arrays directly.
 
+## Invalid handler results
+
+If a handler returns output that fails final schema validation, the client receives JSON-RPC error `-32603` with the message `Internal error: The server produced an invalid result.` This identifies a server-side response failure. It is separate from invalid client parameters and ordinary tool execution failures represented by `isError: true`.
+
+The configured error handler receives an `Invalid handler result` diagnostic with the request ID, revision, component context, exception message, and schema pointer when available. The pointer may identify a containing structure such as `/content/0`. Request argument values and result payloads are not attached. The observability handler receives one failed `mcp.request` event with `failure_reason: invalid_handler_result`.
+
+For custom servers, passing `null` for either handler discards that handler's output. The Adapter's default server uses `ErrorLogMcpErrorHandler` for diagnostics and a no-op observability handler. See [enabling error logging and request events](observability.md#enabling-error-logging-and-request-events) to configure both. The built-in logging handlers write to the PHP error log; its location depends on the site's PHP and WordPress logging configuration.
+
 ## HTTP status
 
 The built-in HTTP path uses the selected revision when mapping protocol errors. For example, Invalid Params remains a JSON-RPC response with HTTP 200 in the 2025 revision and uses HTTP 400 in the 2026 revision. Custom HTTP transports that delegate to `HttpRequestHandler` inherit the same behavior.

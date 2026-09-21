@@ -139,6 +139,13 @@ final class FailureReason {
 	 */
 	public const INVALID_PARAMETER = 'invalid_parameter';
 
+	/**
+	 * Handler output could not be projected into a valid protocol response.
+	 *
+	 * @since n.e.x.t
+	 */
+	public const INVALID_HANDLER_RESULT = 'invalid_handler_result';
+
 	// =========================================================================
 	// Helper Methods
 	// =========================================================================
@@ -168,6 +175,7 @@ final class FailureReason {
 			// Validation.
 			self::MISSING_PARAMETER,
 			self::INVALID_PARAMETER,
+			self::INVALID_HANDLER_RESULT,
 		);
 	}
 
