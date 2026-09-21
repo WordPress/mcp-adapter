@@ -1,8 +1,8 @@
 <?php
 /**
- * Tests for ContentBlockHelper factory class.
+ * Revision-neutral content block helper contracts.
  *
- * @package WP\MCP\Tests\Unit\Domain\Utils
+ * @package WP\MCP\Tests
  */
 
 declare( strict_types=1 );
@@ -11,380 +11,101 @@ namespace WP\MCP\Tests\Unit\Domain\Utils;
 
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Tests\TestCase;
-use WP\McpSchema\Common\Content\DTO\AudioContent;
-use WP\McpSchema\Common\Content\DTO\ImageContent;
-use WP\McpSchema\Common\Content\DTO\TextContent;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
-use WP\McpSchema\Common\Protocol\DTO\BlobResourceContents;
-use WP\McpSchema\Common\Protocol\DTO\EmbeddedResource;
-use WP\McpSchema\Common\Protocol\DTO\TextResourceContents;
-use WP\McpSchema\Common\Protocol\Union\ContentBlockInterface;
 
-/**
- * Test class for ContentBlockHelper.
- */
+/** Protects content variants and the two independent embedded-resource metadata levels. */
 final class ContentBlockHelperTest extends TestCase {
 
-	/**
-	 * Test that text() creates a TextContent DTO.
-	 */
-	public function test_text_creates_text_content_dto(): void {
-		$content = ContentBlockHelper::text( 'Hello, World!' );
+	/** Image and audio blocks retain media data, annotations, and object metadata. */
+	public function test_media_blocks_preserve_protocol_fields(): void {
+		$annotations = array( 'audience' => array( 'user' ) );
+		$meta        = array( 'vendor' => true );
+		$image       = ContentBlockHelper::image( 'aW1hZ2U=', 'image/png', $annotations, $meta );
+		$audio       = ContentBlockHelper::audio( 'YXVkaW8=', 'audio/mpeg', $annotations, $meta );
 
-		$this->assertInstanceOf( TextContent::class, $content );
-		$this->assertInstanceOf( ContentBlockInterface::class, $content );
-		$this->assertSame( 'text', $content->getType() );
-		$this->assertSame( 'Hello, World!', $content->getText() );
-		$this->assertNull( $content->getAnnotations() );
-		$this->assertNull( $content->get_meta() );
+		$this->assertSame( 'image', $image['type'] );
+		$this->assertSame( 'aW1hZ2U=', $image['data'] );
+		$this->assertSame( 'image/png', $image['mimeType'] );
+		$this->assertSame( $annotations, $image['annotations'] );
+		$this->assertSame( $meta, $image['_meta'] );
+
+		$this->assertSame( 'audio', $audio['type'] );
+		$this->assertSame( 'YXVkaW8=', $audio['data'] );
+		$this->assertSame( 'audio/mpeg', $audio['mimeType'] );
+		$this->assertSame( $annotations, $audio['annotations'] );
+		$this->assertSame( $meta, $audio['_meta'] );
 	}
 
-	/**
-	 * Test that text() creates a TextContent with empty string.
-	 */
-	public function test_text_accepts_empty_string(): void {
-		$content = ContentBlockHelper::text( '' );
-
-		$this->assertInstanceOf( TextContent::class, $content );
-		$this->assertSame( '', $content->getText() );
-	}
-
-	/**
-	 * Test that text() creates a TextContent with annotations.
-	 */
-	public function test_text_with_annotations(): void {
-		$annotations = new Annotations( array( 'user' ), 0.8 );
-		$content     = ContentBlockHelper::text( 'Test message', $annotations );
-
-		$this->assertInstanceOf( TextContent::class, $content );
-		$this->assertSame( 'Test message', $content->getText() );
-		$this->assertSame( $annotations, $content->getAnnotations() );
-	}
-
-	/**
-	 * Test that text() creates a TextContent with _meta.
-	 */
-	public function test_text_with_meta(): void {
-		$meta    = array( 'key' => 'value' );
-		$content = ContentBlockHelper::text( 'Test message', null, $meta );
-
-		$this->assertInstanceOf( TextContent::class, $content );
-		$this->assertSame( $meta, $content->get_meta() );
-	}
-
-	/**
-	 * Test that text() toArray produces valid structure.
-	 */
-	public function test_text_to_array_produces_valid_structure(): void {
-		$content = ContentBlockHelper::text( 'Hello' );
-		$array   = $content->toArray();
-
-		$this->assertArrayHasKey( 'type', $array );
-		$this->assertArrayHasKey( 'text', $array );
-		$this->assertSame( 'text', $array['type'] );
-		$this->assertSame( 'Hello', $array['text'] );
-	}
-
-	/**
-	 * Test that image() creates an ImageContent DTO.
-	 */
-	public function test_image_creates_image_content_dto(): void {
-		$content = ContentBlockHelper::image( 'base64data', 'image/png' );
-
-		$this->assertInstanceOf( ImageContent::class, $content );
-		$this->assertInstanceOf( ContentBlockInterface::class, $content );
-		$this->assertSame( 'image', $content->getType() );
-		$this->assertSame( 'base64data', $content->getData() );
-		$this->assertSame( 'image/png', $content->getMimeType() );
-		$this->assertNull( $content->getAnnotations() );
-		$this->assertNull( $content->get_meta() );
-	}
-
-	/**
-	 * Test that image() creates an ImageContent with annotations.
-	 */
-	public function test_image_with_annotations(): void {
-		$annotations = new Annotations( array( 'user' ), 1.0 );
-		$content     = ContentBlockHelper::image( 'data', 'image/jpeg', $annotations );
-
-		$this->assertInstanceOf( ImageContent::class, $content );
-		$this->assertSame( $annotations, $content->getAnnotations() );
-	}
-
-	/**
-	 * Test that image() toArray produces valid structure.
-	 */
-	public function test_image_to_array_produces_valid_structure(): void {
-		$content = ContentBlockHelper::image( 'base64data', 'image/png' );
-		$array   = $content->toArray();
-
-		$this->assertArrayHasKey( 'type', $array );
-		$this->assertArrayHasKey( 'data', $array );
-		$this->assertArrayHasKey( 'mimeType', $array );
-		$this->assertSame( 'image', $array['type'] );
-		$this->assertSame( 'base64data', $array['data'] );
-		$this->assertSame( 'image/png', $array['mimeType'] );
-	}
-
-	/**
-	 * Test that audio() creates an AudioContent DTO.
-	 */
-	public function test_audio_creates_audio_content_dto(): void {
-		$content = ContentBlockHelper::audio( 'base64audiodata', 'audio/mp3' );
-
-		$this->assertInstanceOf( AudioContent::class, $content );
-		$this->assertInstanceOf( ContentBlockInterface::class, $content );
-		$this->assertSame( 'audio', $content->getType() );
-		$this->assertSame( 'base64audiodata', $content->getData() );
-		$this->assertSame( 'audio/mp3', $content->getMimeType() );
-		$this->assertNull( $content->getAnnotations() );
-		$this->assertNull( $content->get_meta() );
-	}
-
-	/**
-	 * Test that audio() creates an AudioContent with annotations.
-	 */
-	public function test_audio_with_annotations(): void {
-		$annotations = new Annotations( array( 'assistant' ), 0.5 );
-		$content     = ContentBlockHelper::audio( 'data', 'audio/wav', $annotations );
-
-		$this->assertInstanceOf( AudioContent::class, $content );
-		$this->assertSame( $annotations, $content->getAnnotations() );
-	}
-
-	/**
-	 * Test that audio() toArray produces valid structure.
-	 */
-	public function test_audio_to_array_produces_valid_structure(): void {
-		$content = ContentBlockHelper::audio( 'audiodata', 'audio/ogg' );
-		$array   = $content->toArray();
-
-		$this->assertArrayHasKey( 'type', $array );
-		$this->assertArrayHasKey( 'data', $array );
-		$this->assertArrayHasKey( 'mimeType', $array );
-		$this->assertSame( 'audio', $array['type'] );
-		$this->assertSame( 'audiodata', $array['data'] );
-		$this->assertSame( 'audio/ogg', $array['mimeType'] );
-	}
-
-	/**
-	 * Test that embeddedTextResource() creates an EmbeddedResource with TextResourceContents.
-	 */
-	public function test_embedded_text_resource_creates_embedded_resource_dto(): void {
-		$content = ContentBlockHelper::embedded_text_resource( 'file:///test.txt', 'Hello content' );
-
-		$this->assertInstanceOf( EmbeddedResource::class, $content );
-		$this->assertInstanceOf( ContentBlockInterface::class, $content );
-		$this->assertSame( 'resource', $content->getType() );
-
-		$resource = $content->getResource();
-		$this->assertInstanceOf( TextResourceContents::class, $resource );
-		$this->assertSame( 'file:///test.txt', $resource->getUri() );
-		$this->assertSame( 'Hello content', $resource->getText() );
-	}
-
-	/**
-	 * Test that embeddedTextResource() accepts optional mimeType.
-	 */
-	public function test_embedded_text_resource_with_mime_type(): void {
-		$content  = ContentBlockHelper::embedded_text_resource( 'file:///test.json', '{}', 'application/json' );
-		$resource = $content->getResource();
-
-		$this->assertSame( 'application/json', $resource->getMimeType() );
-	}
-
-	/**
-	 * Test that embeddedTextResource() with annotations.
-	 */
-	public function test_embedded_text_resource_with_annotations(): void {
-		$annotations = new Annotations( array( 'user' ) );
-		$content     = ContentBlockHelper::embedded_text_resource( 'file:///test.txt', 'content', null, $annotations );
-
-		$this->assertSame( $annotations, $content->getAnnotations() );
-	}
-
-	/**
-	 * Test that embeddedBlobResource() creates an EmbeddedResource with BlobResourceContents.
-	 */
-	public function test_embedded_blob_resource_creates_embedded_resource_dto(): void {
-		$content = ContentBlockHelper::embedded_blob_resource( 'file:///image.png', 'base64blob', 'image/png' );
-
-		$this->assertInstanceOf( EmbeddedResource::class, $content );
-		$this->assertInstanceOf( ContentBlockInterface::class, $content );
-		$this->assertSame( 'resource', $content->getType() );
-
-		$resource = $content->getResource();
-		$this->assertInstanceOf( BlobResourceContents::class, $resource );
-		$this->assertSame( 'file:///image.png', $resource->getUri() );
-		$this->assertSame( 'base64blob', $resource->getBlob() );
-		$this->assertSame( 'image/png', $resource->getMimeType() );
-	}
-
-	/**
-	 * Test that embeddedBlobResource() with annotations.
-	 */
-	public function test_embedded_blob_resource_with_annotations(): void {
-		$annotations = new Annotations( array( 'assistant' ), 0.9 );
-		$content     = ContentBlockHelper::embedded_blob_resource( 'file:///doc.pdf', 'data', 'application/pdf', $annotations );
-
-		$this->assertSame( $annotations, $content->getAnnotations() );
-	}
-
-	/**
-	 * Test that embeddedTextResource() puts each _meta on its own level of the DTO tree.
-	 */
-	public function test_embedded_text_resource_sets_block_and_resource_meta_independently(): void {
-		$content = ContentBlockHelper::embedded_text_resource(
-			'ui://example/app',
-			'<!doctype html>',
-			'text/html;profile=mcp-app',
+	/** Embedded text and blob resources keep block and resource metadata separate. */
+	public function test_embedded_resources_preserve_independent_metadata(): void {
+		$text = ContentBlockHelper::embedded_text_resource(
+			'fixture://text',
+			'hello',
+			'text/plain',
+			array( 'priority' => 1 ),
+			array( 'block' => true ),
+			array( 'resource' => true )
+		);
+		$blob = ContentBlockHelper::embedded_blob_resource(
+			'fixture://blob',
+			'YmxvYg==',
+			'application/octet-stream',
 			null,
-			array( 'block' => 'level' ),
-			array( 'ui' => array( 'prefersBorder' => true ) )
+			array( 'block' => true ),
+			array( 'resource' => true )
 		);
 
-		$this->assertSame( array( 'block' => 'level' ), $content->get_meta() );
+		$this->assertSame( 'resource', $text['type'] );
+		$this->assertSame( 'hello', $text['resource']['text'] );
+		$this->assertSame( 'text/plain', $text['resource']['mimeType'] );
+		$this->assertTrue( $text['_meta']['block'] );
+		$this->assertTrue( $text['resource']['_meta']['resource'] );
+		$this->assertSame( array( 'priority' => 1 ), $text['annotations'] );
 
-		$resource = $content->getResource();
-		$this->assertSame( array( 'ui' => array( 'prefersBorder' => true ) ), $resource->get_meta() );
+		$this->assertSame( 'YmxvYg==', $blob['resource']['blob'] );
+		$this->assertSame( 'application/octet-stream', $blob['resource']['mimeType'] );
+		$this->assertTrue( $blob['_meta']['block'] );
+		$this->assertTrue( $blob['resource']['_meta']['resource'] );
 	}
 
-	/**
-	 * Test that embeddedBlobResource() puts each _meta on its own level of the DTO tree.
-	 */
-	public function test_embedded_blob_resource_sets_block_and_resource_meta_independently(): void {
-		$content = ContentBlockHelper::embedded_blob_resource(
-			'file:///doc.pdf',
-			'data',
-			'application/pdf',
+	/** List-shaped metadata is omitted at every optional metadata boundary. */
+	public function test_list_shaped_metadata_is_omitted(): void {
+		$image = ContentBlockHelper::image( 'data', 'image/png', null, array( 'list' ) );
+		$text  = ContentBlockHelper::embedded_text_resource(
+			'fixture://text',
+			'hello',
 			null,
-			array( 'block' => 'level' ),
-			array( 'pages' => 3 )
-		);
-
-		$this->assertSame( array( 'block' => 'level' ), $content->get_meta() );
-
-		$resource = $content->getResource();
-		$this->assertSame( array( 'pages' => 3 ), $resource->get_meta() );
-	}
-
-	/**
-	 * Test that a list-shaped _meta is treated as absent by text().
-	 *
-	 * A list serializes to a JSON array, and MCP declares `_meta` a JSON object.
-	 */
-	public function test_text_with_list_shaped_meta_omits_meta(): void {
-		$content = ContentBlockHelper::text( 'Test message', null, array( 'first', 'second' ) );
-
-		$this->assertNull( $content->get_meta() );
-	}
-
-	/**
-	 * Test that embeddedTextResource() drops a list-shaped _meta on both levels of the DTO tree.
-	 */
-	public function test_embedded_text_resource_with_list_shaped_meta_omits_meta_on_both_levels(): void {
-		$content = ContentBlockHelper::embedded_text_resource(
-			'ui://example/app',
-			'<!doctype html>',
-			'text/html;profile=mcp-app',
 			null,
-			array( 'block', 'level' ),
-			array( 'resource', 'level' )
+			array( 'block-list' ),
+			array( 'resource-list' )
 		);
 
-		$this->assertNull( $content->get_meta() );
-		$this->assertNull( $content->getResource()->get_meta() );
+		$this->assertArrayNotHasKey( '_meta', $image );
+		$this->assertArrayNotHasKey( '_meta', $text );
+		$this->assertArrayNotHasKey( '_meta', $text['resource'] );
 	}
 
-	/**
-	 * Test that errorText() creates a TextContent for error messages.
-	 */
-	public function test_error_text_creates_text_content_dto(): void {
-		$content = ContentBlockHelper::error_text( 'Something went wrong' );
+	/** Text, error, and JSON helpers retain empty values and encoding options. */
+	public function test_text_and_json_helpers_preserve_values(): void {
+		$this->assertSame( '', ContentBlockHelper::text( '' )['text'] );
+		$this->assertSame( 'failed', ContentBlockHelper::error_text( 'failed' )['text'] );
 
-		$this->assertInstanceOf( TextContent::class, $content );
-		$this->assertSame( 'text', $content->getType() );
-		$this->assertSame( 'Something went wrong', $content->getText() );
+		$json = ContentBlockHelper::json_text( array( 'value' => 1 ), JSON_PRETTY_PRINT, null, array( 'json' => true ) );
+		$this->assertStringContainsString( "\n", $json['text'] );
+		$this->assertStringContainsString( '"value": 1', $json['text'] );
+		$this->assertTrue( $json['_meta']['json'] );
 	}
 
-	/**
-	 * Test that jsonText() creates a TextContent with JSON-encoded data.
-	 */
-	public function test_json_text_creates_text_content_with_json(): void {
-		$data    = array(
-			'key'    => 'value',
-			'nested' => array( 'a' => 1 ),
-		);
-		$content = ContentBlockHelper::json_text( $data );
-
-		$this->assertInstanceOf( TextContent::class, $content );
-		$this->assertSame( 'text', $content->getType() );
-		$this->assertSame( '{"key":"value","nested":{"a":1}}', $content->getText() );
-	}
-
-	/**
-	 * Test that jsonText() handles encoding options.
-	 */
-	public function test_json_text_with_pretty_print(): void {
-		$data    = array( 'key' => 'value' );
-		$content = ContentBlockHelper::json_text( $data, JSON_PRETTY_PRINT );
-
-		$this->assertInstanceOf( TextContent::class, $content );
-		$expected = "{\n    \"key\": \"value\"\n}";
-		$this->assertSame( $expected, $content->getText() );
-	}
-
-	/**
-	 * Test that toArrayList() converts array of DTOs to array format.
-	 */
-	public function test_to_array_list_converts_dtos_to_arrays(): void {
-		$blocks = array(
-			ContentBlockHelper::text( 'First' ),
-			ContentBlockHelper::text( 'Second' ),
-		);
-
-		$arrays = ContentBlockHelper::to_array_list( $blocks );
-
-		$this->assertCount( 2, $arrays );
-		$this->assertSame(
+	/** List normalization preserves order while resetting numeric keys. */
+	public function test_to_array_list_resets_numeric_keys(): void {
+		$blocks = ContentBlockHelper::to_array_list(
 			array(
-				'type' => 'text',
-				'text' => 'First',
-			),
-			$arrays[0]
-		);
-		$this->assertSame(
-			array(
-				'type' => 'text',
-				'text' => 'Second',
-			),
-			$arrays[1]
-		);
-	}
-
-	/**
-	 * Test that toArrayList() handles empty array.
-	 */
-	public function test_to_array_list_handles_empty_array(): void {
-		$arrays = ContentBlockHelper::to_array_list( array() );
-
-		$this->assertIsArray( $arrays );
-		$this->assertEmpty( $arrays );
-	}
-
-	/**
-	 * Test that toArrayList() handles mixed content types.
-	 */
-	public function test_to_array_list_handles_mixed_content_types(): void {
-		$blocks = array(
-			ContentBlockHelper::text( 'Message' ),
-			ContentBlockHelper::image( 'imgdata', 'image/png' ),
+				4 => ContentBlockHelper::text( 'first' ),
+				9 => ContentBlockHelper::text( 'second' ),
+			)
 		);
 
-		$arrays = ContentBlockHelper::to_array_list( $blocks );
-
-		$this->assertCount( 2, $arrays );
-		$this->assertSame( 'text', $arrays[0]['type'] );
-		$this->assertSame( 'image', $arrays[1]['type'] );
+		$this->assertSame( array( 0, 1 ), array_keys( $blocks ) );
+		$this->assertSame( 'first', $blocks[0]['text'] );
+		$this->assertSame( 'second', $blocks[1]['text'] );
 	}
 }
