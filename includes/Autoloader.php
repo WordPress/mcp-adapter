@@ -87,8 +87,9 @@ final class Autoloader {
 	 * Rechecks on plugins_loaded whether another copy of the plugin registered the classes.
 	 *
 	 * By then this plugin has loaded its own classes, so class_exists() alone would report itself.
-	 * Only a class file from outside this plugin's directory counts as another copy.
-	 * If the class file cannot be resolved, no copy can be identified, so no notice is shown.
+	 * Each copy of McpAdapter records its directory in McpAdapter::PLUGIN_DIR, and only a directory
+	 * outside this plugin counts as another copy. A copy without the constant predates it, so it is
+	 * always another copy.
 	 *
 	 * @since n.e.x.t
 	 */
@@ -97,7 +98,9 @@ final class Autoloader {
 			return;
 		}
 
-		if ( ! self::is_other_copy_file( ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName() ) ) {
+		$class_dir = defined( Core\McpAdapter::class . '::PLUGIN_DIR' ) ? Core\McpAdapter::PLUGIN_DIR : null;
+
+		if ( ! self::is_other_copy_dir( $class_dir ) ) {
 			return;
 		}
 
@@ -105,17 +108,17 @@ final class Autoloader {
 	}
 
 	/**
-	 * Checks if a class file belongs to a copy of the plugin outside this plugin's directory.
+	 * Checks if a McpAdapter class directory belongs to a copy of the plugin outside this plugin's directory.
+	 *
+	 * Both directories come from __DIR__, which PHP resolves through symlinks, so they compare as plain strings.
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @param string|false $class_file The class file path, or false if it is unknown.
-	 * @return bool True if the file resolves to a path outside this plugin's directory.
+	 * @param string|null $class_dir The class directory, or null if that copy does not record it.
+	 * @return bool True if the directory is outside this plugin's directory or unknown.
 	 */
-	private static function is_other_copy_file( $class_file ): bool {
-		$class_file = false !== $class_file ? realpath( $class_file ) : false;
-
-		return false !== $class_file && 0 !== strpos( $class_file, dirname( __DIR__ ) . DIRECTORY_SEPARATOR );
+	private static function is_other_copy_dir( ?string $class_dir ): bool {
+		return null === $class_dir || ! str_starts_with( $class_dir, __DIR__ . DIRECTORY_SEPARATOR );
 	}
 
 	/**

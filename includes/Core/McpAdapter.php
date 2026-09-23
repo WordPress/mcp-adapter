@@ -31,6 +31,17 @@ final class McpAdapter {
 	public const VERSION = '0.6.1';
 
 	/**
+	 * Directory of this copy of the class.
+	 *
+	 * The autoloader compares it with its own directory to tell this plugin's classes apart from a copy that another plugin bundles.
+	 *
+	 * @internal
+	 *
+	 * @since n.e.x.t
+	 */
+	public const PLUGIN_DIR = __DIR__;
+
+	/**
 	 * Registry instance
 	 *
 	 * @var \WP\MCP\Core\McpAdapter

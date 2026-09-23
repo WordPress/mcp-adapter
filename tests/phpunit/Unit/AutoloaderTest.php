@@ -80,38 +80,41 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
-	 * A class file outside the plugin directory belongs to another copy of the plugin.
+	 * A class directory outside the plugin directory belongs to another copy of the plugin.
 	 *
 	 * @since n.e.x.t
 	 */
-	public function test_is_other_copy_file_returns_true_for_file_outside_plugin(): void {
-		$class_file = get_temp_dir() . uniqid( 'mcp-other-copy-', true ) . '.php';
-		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Test-owned file under the system temporary directory.
-		file_put_contents( $class_file, '<?php' );
-
-		$this->assertTrue( self::is_other_copy_file( $class_file ) );
-
-		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_unlink -- Test-owned file under the system temporary directory.
-		unlink( $class_file );
+	public function test_is_other_copy_dir_returns_true_for_directory_outside_plugin(): void {
+		$this->assertTrue( self::is_other_copy_dir( get_temp_dir() . 'other-plugin/vendor/wordpress/mcp-adapter/includes/Core' ) );
 	}
 
 	/**
-	 * The plugin's own class file does not belong to another copy.
+	 * A directory whose name only starts with this plugin's path is still outside the plugin.
 	 *
 	 * @since n.e.x.t
 	 */
-	public function test_is_other_copy_file_returns_false_for_own_file(): void {
-		$this->assertFalse( self::is_other_copy_file( ( new \ReflectionClass( McpAdapter::class ) )->getFileName() ) );
+	public function test_is_other_copy_dir_returns_true_for_sibling_directory_with_same_prefix(): void {
+		$includes_dir = dirname( ( new \ReflectionClass( Autoloader::class ) )->getFileName() );
+
+		$this->assertTrue( self::is_other_copy_dir( $includes_dir . '-copy/Core' ) );
 	}
 
 	/**
-	 * A class file that cannot be resolved cannot be identified as another copy.
+	 * The plugin's own class directory does not belong to another copy.
 	 *
 	 * @since n.e.x.t
 	 */
-	public function test_is_other_copy_file_returns_false_for_unresolved_file(): void {
-		$this->assertFalse( self::is_other_copy_file( false ) );
-		$this->assertFalse( self::is_other_copy_file( get_temp_dir() . uniqid( 'mcp-missing-', true ) . '/McpAdapter.php' ) );
+	public function test_is_other_copy_dir_returns_false_for_own_directory(): void {
+		$this->assertFalse( self::is_other_copy_dir( McpAdapter::PLUGIN_DIR ) );
+	}
+
+	/**
+	 * A copy without McpAdapter::PLUGIN_DIR predates the constant, so it is another copy.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_is_other_copy_dir_returns_true_for_copy_without_directory(): void {
+		$this->assertTrue( self::is_other_copy_dir( null ) );
 	}
 
 	/**
@@ -163,18 +166,18 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
-	 * Invokes the private Autoloader::is_other_copy_file() method.
+	 * Invokes the private Autoloader::is_other_copy_dir() method.
 	 *
-	 * @param string|false $class_file The class file path, or false if it is unknown.
-	 * @return bool Whether the file belongs to another copy of the plugin.
+	 * @param string|null $class_dir The class directory, or null if it is unknown.
+	 * @return bool Whether the directory belongs to another copy of the plugin.
 	 */
-	private static function is_other_copy_file( $class_file ): bool {
-		$method = new \ReflectionMethod( Autoloader::class, 'is_other_copy_file' );
+	private static function is_other_copy_dir( ?string $class_dir ): bool {
+		$method = new \ReflectionMethod( Autoloader::class, 'is_other_copy_dir' );
 		if ( PHP_VERSION_ID < 80100 ) {
 			$method->setAccessible( true );
 		}
 
-		return (bool) $method->invoke( null, $class_file );
+		return (bool) $method->invoke( null, $class_dir );
 	}
 
 	/**
