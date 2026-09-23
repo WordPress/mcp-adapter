@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests;
 
-use WP\MCP\Core\McpAdapter;
 use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyAbility;
@@ -39,13 +38,6 @@ abstract class TestCase extends WP_UnitTestCase {
 	 */
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
-
-		// Register plugin's default category and abilities via the same methods
-		// the production code uses. We hook them the same way McpAdapter::maybe_create_default_server()
-		// does, so if the hooks haven't fired yet they'll be picked up automatically.
-		$adapter = McpAdapter::instance();
-		add_action( 'wp_abilities_api_categories_init', array( $adapter, 'register_default_category' ) );
-		add_action( 'wp_abilities_api_init', array( $adapter, 'register_default_abilities' ) );
 
 		// Use DummyAbility to register test category and abilities.
 		add_action( 'wp_abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
