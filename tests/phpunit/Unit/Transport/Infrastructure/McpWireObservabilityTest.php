@@ -25,7 +25,7 @@ use WP\McpSchema\Record;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Schemas;
 
-/** @since n.e.x.t */
+/** @since 0.7.0 */
 final class McpWireObservabilityTest extends TestCase {
 
 	/** Completed results, execution errors, and projection errors each emit one final event. */

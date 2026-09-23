@@ -28,7 +28,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class McpAdapter {
 
-	public const VERSION = '0.6.1';
+	public const VERSION = '0.7.0';
 
 	/**
 	 * Directory of this copy of the class.
@@ -37,7 +37,7 @@ final class McpAdapter {
 	 *
 	 * @internal
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public const DIR = __DIR__;
 
@@ -128,7 +128,7 @@ final class McpAdapter {
 
 		_deprecated_function(
 			self::class,
-			'x.y.z',
+			'0.7.0',
 			sprintf(
 				// translators: %s: class name
 				esc_html__( '%s is currently loaded as a bundled dependency instead of via the canonical MCP Adapter plugin. This is not recommended and may not be supported in future versions. Please install the MCP Adapter plugin and migrate accordingly.', 'mcp-adapter' ),

@@ -54,7 +54,7 @@ use WP\McpSchema\Schemas;
 /**
  * Selects one exact revision before schema hydration and dispatch.
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 final class McpWireOrchestrator {
 
@@ -75,7 +75,7 @@ final class McpWireOrchestrator {
 	/**
 	 * Initialize the shared protocol boundary for a transport.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param \WP\MCP\Transport\Infrastructure\McpTransportContext $transport_context Server and handler dependencies.
 	 */
@@ -87,7 +87,7 @@ final class McpWireOrchestrator {
 	/**
 	 * Decode one raw JSON request or notification object.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param string $raw_json Raw JSON payload.
 	 *
@@ -104,7 +104,7 @@ final class McpWireOrchestrator {
 	/**
 	 * Choose protocol processing, legacy session termination, or method rejection.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param string $method HTTP method.
 	 * @param string|null $header_revision Protocol-version header, if supplied.
@@ -123,7 +123,7 @@ final class McpWireOrchestrator {
 	/**
 	 * Check whether this request needs an established legacy HTTP session.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param \stdClass $message Decoded message before request-record hydration.
 	 * @param string|null $header_revision Protocol-version header, if supplied.
@@ -152,7 +152,7 @@ final class McpWireOrchestrator {
 	/**
 	 * Map a processed response through the selected revision's HTTP policy.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param \WP\McpSchema\Record|array<string, mixed> $response Processed response.
 	 * @param \WP\MCP\Core\McpRequestContext|null $context Selected context, or null for an early failure.
@@ -199,7 +199,7 @@ final class McpWireOrchestrator {
 	 *   response: \WP\McpSchema\Record|array<string, mixed>|null,
 	 *   initializeParams: array<string, mixed>|null
 	 * }
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function process( \stdClass $message, string $transport, array $transport_metadata = array(), ?array $client_params_2025_11_25 = null ): array {
 		$generic = $this->decoder->to_associative( $message );
@@ -464,7 +464,7 @@ final class McpWireOrchestrator {
 	 * Resolve the protocol version negotiated from stored or inbound 2025 initialize params.
 	 *
 	 * @param array<string, mixed> $client_params Initialize params.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public static function negotiated_protocol_version( array $client_params ): string {
 		$proposed = $client_params['protocolVersion'] ?? null;

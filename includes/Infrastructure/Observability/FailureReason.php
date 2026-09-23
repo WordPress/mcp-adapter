@@ -142,7 +142,7 @@ final class FailureReason {
 	/**
 	 * Handler output could not be projected into a valid protocol response.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public const INVALID_HANDLER_RESULT = 'invalid_handler_result';
 

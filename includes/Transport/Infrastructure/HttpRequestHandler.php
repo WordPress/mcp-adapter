@@ -187,7 +187,7 @@ class HttpRequestHandler {
 	 * @param array<string, mixed> $client_params  Stored initialize params.
 	 * @param string|int|null      $request_id     Readable JSON-RPC request ID.
 	 * @return array<string, mixed>|null Error payload, or null when the header is acceptable.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	private function validate_session_protocol_version( ?string $header_version, array $client_params, $request_id ): ?array {
 		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );

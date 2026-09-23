@@ -38,7 +38,7 @@ class InitializeHandler {
 	 * Handles the initialize request.
 	 *
 	 * @since 0.5.0
-	 * @since n.e.x.t Accepts an exact validated request record and Core context.
+	 * @since 0.7.0 Accepts an exact validated request record and Core context.
 	 *
 	 * @param \WP\McpSchema\Record\InitializeRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.

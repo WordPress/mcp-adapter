@@ -4,7 +4,7 @@ Tags:              mcp, ai, abilities-api, model-context-protocol
 Requires at least: 6.9
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        0.6.1
+Stable tag:        0.7.0
 License:           GPL-2.0-or-later
 License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
 
@@ -65,6 +65,33 @@ Plugin developers should depend on MCP Adapter by adding `Requires Plugins: mcp-
 
 == Changelog ==
 
+= 0.7.0 - 2026-09-23 =
+
+**Breaking Changes**
+
+- The adapter serves exactly two MCP schema revisions, `2025-11-25` and `2026-07-28`. Clients that propose `2025-06-18` or `2024-11-05` still connect and are served through the `2025-11-25` schema.
+- The generated DTO classes, the `McpToolValidator`, `McpResourceValidator`, and `McpPromptValidator` classes, and the `mcp_adapter_validation_enabled` filter have been removed. Wire validation always runs through the selected schema.
+- Invalid protocol fields are no longer silently dropped or repaired. Components that no supported revision can represent are rejected.
+- Custom transports must delegate to `HttpRequestHandler` or `McpWireOrchestrator`. JSON-RPC batch requests are rejected.
+- `WP\MCP\Cli` classes are `final`.
+
+**Added**
+
+- MCP `2026-07-28` support, including the sessionless `server/discover` lifecycle and the new HTTP headers.
+- Direct callable tools can request elicitation input under `2026-07-28` by returning `McpInputRequired`.
+- `McpRequestContext`, an immutable per-request context with the selected schema, transport, and session data.
+
+**Changed**
+
+- Using MCP Adapter as a bundled library is deprecated. Install the MCP Adapter plugin instead.
+
+**Fixed**
+
+- `mcp-adapter/get-ability-info` serializes an empty `input_schema` as `{}` instead of `[]`.
+- Default abilities register when another plugin initializes the Abilities API before the MCP server initializes.
+
+See the [0.7.0 migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/v0.7.0.md) and [CHANGELOG.md](https://github.com/WordPress/mcp-adapter/blob/trunk/CHANGELOG.md) for the full list of changes.
+
 = 0.6.1 - 2026-08-13 =
 
 **Fixed**
@@ -110,10 +137,10 @@ For older releases, see [CHANGELOG.md](https://github.com/WordPress/mcp-adapter/
 
 == Upgrade Notice ==
 
-= x.y.z =
-Using MCP Adapter as a bundled library is deprecated and not recommended, as it may conflict with the MCP Adapter plugin or other bundled copies.
+= 0.7.0 =
+Breaking changes for code that extends the adapter: DTO and validator classes and a filter were removed, and custom transports have a new contract. Using MCP Adapter as a bundled library is now deprecated.
 
-See the [vx.y.z migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/vx.y.z.md) for how to migrate.
+See the [v0.7.0 migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/v0.7.0.md) for how to migrate.
 
 = 0.6.1 =
 Repairs the release ZIP so that class_exists( 'WP_CLI' ) no longer risks a fatal error on normal web requests. Anyone running 0.6.0 from the release asset should upgrade.

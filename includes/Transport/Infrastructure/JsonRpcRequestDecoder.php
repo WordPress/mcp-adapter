@@ -12,7 +12,7 @@ namespace WP\MCP\Transport\Infrastructure;
 /**
  * Decodes raw JSON once and protects PHP's native integer boundary.
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 final class JsonRpcRequestDecoder {
 
@@ -22,7 +22,7 @@ final class JsonRpcRequestDecoder {
 	/**
 	 * Decode one JSON-RPC object while preserving JSON value types.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param string $json Raw JSON request or notification.
 	 *
@@ -76,7 +76,7 @@ final class JsonRpcRequestDecoder {
 	 *
 	 * @param mixed $value Decoded value or validated schema record.
 	 * @return mixed
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function to_associative( $value ) {
 		if ( $value instanceof \WP\McpSchema\Record ) {

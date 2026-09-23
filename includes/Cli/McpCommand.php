@@ -128,7 +128,7 @@ final class McpCommand extends \WP_CLI_Command {
 	 *     # Count components available under MCP 2026-07-28
 	 *     wp mcp-adapter list --protocol=2026-07-28
 	 *
-	 * @since n.e.x.t Supports selecting a schema revision for component counts.
+	 * @since 0.7.0 Supports selecting a schema revision for component counts.
 	 * @when after_wp_load
 	 * @synopsis [--format=<format>] [--protocol=<revision>]
 	 *

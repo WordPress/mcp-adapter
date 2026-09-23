@@ -14,7 +14,7 @@ use WP\McpSchema\Schema;
 /**
  * Carries revision, peer, and transport state for one request.
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 final class McpRequestContext {
 
@@ -69,7 +69,7 @@ final class McpRequestContext {
 	 * @param string               $transport           Transport name.
 	 * @param array<string, mixed> $transport_metadata  Transport-owned metadata.
 	 * @param string|null          $protocol_version    Negotiated protocol version when it differs from the schema revision.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function __construct(
 		Schema $schema,
@@ -90,7 +90,7 @@ final class McpRequestContext {
 	/**
 	 * Get the exact revision.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function revision(): string {
 		return $this->schema->version();
@@ -103,7 +103,7 @@ final class McpRequestContext {
 	 * 2025-11-25 schema, in which case this is the identifier the peer negotiated
 	 * and expects on the wire.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function protocol_version(): string {
 		return $this->protocol_version;
@@ -112,7 +112,7 @@ final class McpRequestContext {
 	/**
 	 * Get the selected schema.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function schema(): Schema {
 		return $this->schema;
@@ -121,7 +121,7 @@ final class McpRequestContext {
 	/**
 	 * Get a defensive copy of client capabilities.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function client_capabilities(): \stdClass {
 		return self::copy_object( $this->client_capabilities );
@@ -130,7 +130,7 @@ final class McpRequestContext {
 	/**
 	 * Get a defensive copy of client identity.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function client_info(): ?\stdClass {
 		return null === $this->client_info ? null : self::copy_object( $this->client_info );
@@ -139,7 +139,7 @@ final class McpRequestContext {
 	/**
 	 * Get the transport name.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function transport(): string {
 		return $this->transport;
@@ -149,7 +149,7 @@ final class McpRequestContext {
 	 * Get transport metadata.
 	 *
 	 * @return array<string, mixed>
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function transport_metadata(): array {
 		return self::copy_array( $this->transport_metadata );

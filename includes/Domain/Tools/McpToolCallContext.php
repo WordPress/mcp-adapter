@@ -15,7 +15,7 @@ use WP\McpSchema\Schemas;
 /**
  * Keeps untrusted client input separate from ordinary tool arguments.
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 final class McpToolCallContext {
 
@@ -40,7 +40,7 @@ final class McpToolCallContext {
 	 * @throws \JsonException If the responses cannot be encoded.
 	 *
 	 * @internal Constructed by the Adapter after protocol schema validation.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function __construct( McpRequestContext $request, \stdClass $responses, ?string $request_state, bool $continuation ) {
 		$this->request       = $request;
@@ -52,7 +52,7 @@ final class McpToolCallContext {
 	/**
 	 * Get the exact request revision.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function revision(): string {
 		return $this->request->revision();
@@ -61,7 +61,7 @@ final class McpToolCallContext {
 	/**
 	 * Get this request's declared client capabilities.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function client_capabilities(): \stdClass {
 		return $this->request->client_capabilities();
@@ -75,7 +75,7 @@ final class McpToolCallContext {
 	 *
 	 * @param string $mode Elicitation mode: 'form' or 'url'. Other values return false.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function client_supports_elicitation( string $mode = 'form' ): bool {
 		if ( Schemas::V2026_07_28 !== $this->revision() || ! in_array( $mode, array( 'form', 'url' ), true ) ) {
@@ -92,7 +92,7 @@ final class McpToolCallContext {
 	 *
 	 * @throws \JsonException If the stored responses cannot be decoded.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function input_responses(): \stdClass {
 		return json_decode( $this->responses, false, 512, JSON_THROW_ON_ERROR );
@@ -101,7 +101,7 @@ final class McpToolCallContext {
 	/**
 	 * Get the opaque client-supplied state. Verify it before trusting it.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function request_state(): ?string {
 		return $this->request_state;
@@ -110,7 +110,7 @@ final class McpToolCallContext {
 	/**
 	 * Whether the client supplied continuation fields; this is not proof of a prior request.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function is_continuation(): bool {
 		return $this->continuation;

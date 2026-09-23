@@ -12,7 +12,7 @@ namespace WP\MCP\Domain\Tools;
 /**
  * Carries input requests and optional opaque state owned by the tool author.
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 final class McpInputRequired {
 
@@ -28,7 +28,7 @@ final class McpInputRequired {
 	 *
 	 * @throws \InvalidArgumentException If neither input requests nor request state is supplied.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function __construct( array $input_requests = array(), ?string $request_state = null ) {
 		if ( array() === $input_requests && null === $request_state ) {
@@ -43,7 +43,7 @@ final class McpInputRequired {
 	 *
 	 * @return array<string, mixed>
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function input_requests(): array {
 		return $this->requests;
@@ -52,7 +52,7 @@ final class McpInputRequired {
 	/**
 	 * Get author-supplied state without encoding or interpreting it.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function request_state(): ?string {
 		return $this->request_state;

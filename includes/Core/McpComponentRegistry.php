@@ -639,7 +639,7 @@ class McpComponentRegistry {
 	/**
 	 * Get the neutral tool count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function count_tools(): int {
 		return count( $this->mcp_tools );
@@ -648,7 +648,7 @@ class McpComponentRegistry {
 	/**
 	 * Get the neutral resource count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function count_resources(): int {
 		return count( $this->mcp_resources );
@@ -657,7 +657,7 @@ class McpComponentRegistry {
 	/**
 	 * Get the neutral prompt count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function count_prompts(): int {
 		return count( $this->mcp_prompts );
@@ -701,7 +701,7 @@ class McpComponentRegistry {
 		}
 
 		if ( ! $available ) {
-			_doing_it_wrong( __METHOD__, esc_html( implode( ' ', $errors ) ), 'n.e.x.t' );
+			_doing_it_wrong( __METHOD__, esc_html( implode( ' ', $errors ) ), '0.7.0' );
 		}
 
 		return $available;
