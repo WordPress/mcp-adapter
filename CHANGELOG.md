@@ -48,6 +48,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 - `wordpress/php-mcp-schema` is temporarily pinned to a reviewed commit through a VCS repository until the dual-revision runtime is released.
 
 ### Fixed
+- Default abilities register when another plugin initializes the Abilities API before the MCP server initializes.
 - `mcp-adapter/get-ability-info` serializes an empty `input_schema` as `{}` instead of `[]`.
 
 ## [0.6.1] - 2026-08-13
