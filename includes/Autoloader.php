@@ -73,7 +73,7 @@ final class Autoloader {
 			add_action(
 				'plugins_loaded',
 				static function () {
-					self::is_loaded_elsewhere();
+					self::recheck_loaded_elsewhere();
 				}
 			);
 			return false;
@@ -81,6 +81,30 @@ final class Autoloader {
 
 		self::loaded_elsewhere_notice();
 		return true;
+	}
+
+	/**
+	 * Rechecks on plugins_loaded whether another copy of the plugin registered the classes.
+	 *
+	 * By then this plugin has loaded its own classes, so class_exists() alone would report itself.
+	 * Only a class file from outside this plugin's directory counts as another copy.
+	 * If the class file cannot be resolved, no copy can be identified, so no notice is shown.
+	 *
+	 * @since n.e.x.t
+	 */
+	private static function recheck_loaded_elsewhere(): void {
+		if ( ! class_exists( Core\McpAdapter::class ) ) {
+			return;
+		}
+
+		$class_file = ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName();
+		$class_file = false !== $class_file ? realpath( $class_file ) : false;
+
+		if ( false === $class_file || 0 === strpos( $class_file, dirname( __DIR__ ) . DIRECTORY_SEPARATOR ) ) {
+			return;
+		}
+
+		self::loaded_elsewhere_notice();
 	}
 
 	/**

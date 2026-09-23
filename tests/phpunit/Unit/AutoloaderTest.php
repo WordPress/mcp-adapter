@@ -63,6 +63,23 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
+	 * The plugins_loaded recheck must not report the plugin's own classes, which the plugin loads itself before that hook fires.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_plugins_loaded_recheck_does_not_report_own_classes(): void {
+		$init_callbacks = count( $GLOBALS['wp_filter']['init']->callbacks[10] );
+
+		$method = new \ReflectionMethod( Autoloader::class, 'recheck_loaded_elsewhere' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
+		$method->invoke( null );
+
+		$this->assertCount( $init_callbacks, $GLOBALS['wp_filter']['init']->callbacks[10], 'No notice should be queued for the plugin\'s own classes.' );
+	}
+
+	/**
 	 * Requiring a readable autoloader file succeeds.
 	 */
 	public function test_require_autoloader_returns_true_for_readable_file(): void {
