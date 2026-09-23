@@ -50,7 +50,7 @@ class PromptsHandler {
 	 * @param \WP\McpSchema\Record\ListPromptsRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @return array<string, mixed> Logical prompts-list result.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function list_prompts( ListPromptsRequest $request, McpRequestContext $request_context ): array {
 		unset( $request );
@@ -82,7 +82,7 @@ class PromptsHandler {
 	 * @param \WP\McpSchema\Record\GetPromptRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact context.
 	 * @return array<string, mixed>
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_prompt( GetPromptRequest $request, McpRequestContext $request_context ): array {
 		$request_params = $request->getParams();

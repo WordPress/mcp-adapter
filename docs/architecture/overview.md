@@ -102,7 +102,7 @@ An unsupported version proposed in legacy `initialize` parameters receives `2025
 
 Legacy identifiers `2025-06-18` and `2024-11-05` are echoed during initialization but use the `2025-11-25` schema. `McpRequestContext::protocol_version()` exposes the negotiated identifier; `revision()` exposes the schema revision. This mapping does not provide a feature-by-feature legacy projection: newer content variants such as audio and resource links can be emitted but are not accepted by the `2024-11-05` content schema. It is not a guarantee that every older client accepts every response.
 
-See the [migration guide](../migration/vx.y.z.md#migrating-to-the-dual-revision-schema-runtime) for changed APIs and revision-specific behavior, and [Custom transports](../guides/custom-transports.md) for integration examples.
+See the [migration guide](../migration/v0.7.0.md#migrating-to-the-dual-revision-schema-runtime) for changed APIs and revision-specific behavior, and [Custom transports](../guides/custom-transports.md) for integration examples.
 
 ## Result mapping, errors, and observability
 
@@ -129,6 +129,6 @@ Tool permission and execution failures are represented as tool results with `isE
 
 Custom HTTP integrations can delegate processing to `HttpRequestHandler`; other transports can use `McpWireOrchestrator`. Calling the router with unvalidated method/parameter arrays bypasses the required boundary and does not match its current API. Transport authentication and delivery remain the custom transport's responsibility. See [Custom transports](../guides/custom-transports.md) and [Transport permissions](../guides/transport-permissions.md).
 
-Tool, resource, and prompt list filters keep the component list as the first argument and the server as the second, and add the selected `Schema` as the third argument. The list now contains generated records rather than the removed DTO classes. A non-array filter result falls back to the original list; array contents are checked during final schema projection. Direct consumers must follow the [migration guide](../migration/vx.y.z.md#migrating-to-the-dual-revision-schema-runtime).
+Tool, resource, and prompt list filters keep the component list as the first argument and the server as the second, and add the selected `Schema` as the third argument. The list now contains generated records rather than the removed DTO classes. A non-array filter result falls back to the original list; array contents are checked during final schema projection. Direct consumers must follow the [migration guide](../migration/v0.7.0.md#migrating-to-the-dual-revision-schema-runtime).
 
 For development commands and verification, see [CONTRIBUTING.md](../../CONTRIBUTING.md) and the [Testing guide](../guides/testing.md).

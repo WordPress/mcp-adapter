@@ -15,7 +15,7 @@ use WP\McpSchema\Schema;
 /**
  * Caches successful and failed immutable schema projections by exact revision.
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 trait RevisionProjectionTrait {
 
@@ -108,7 +108,7 @@ trait RevisionProjectionTrait {
 	/**
 	 * Check whether this component projects successfully into the selected schema.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param \WP\McpSchema\Schema $schema Selected revision catalog.
 	 *
@@ -128,7 +128,7 @@ trait RevisionProjectionTrait {
 	 * Return a cached projection error for diagnostics.
 	 *
 	 * @param string $revision Exact revision.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_projection_error( string $revision ): ?\Throwable {
 		return $this->projection_errors[ $revision ] ?? null;

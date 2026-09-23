@@ -48,7 +48,7 @@ class ResourcesHandler {
 	 * @param \WP\McpSchema\Record\ListResourcesRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @return array<string, mixed> Logical resources-list result.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function list_resources( ListResourcesRequest $request, McpRequestContext $request_context ): array {
 		unset( $request );
@@ -88,7 +88,7 @@ class ResourcesHandler {
 	 * @param \WP\McpSchema\Record\ListResourceTemplatesRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @return array<string, mixed> Logical empty resource-templates result.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function list_resource_templates( ListResourceTemplatesRequest $request, McpRequestContext $request_context ): array {
 		unset( $request, $request_context );
@@ -108,7 +108,7 @@ class ResourcesHandler {
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 *
 	 * @return array<string, mixed>
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function read_resource( ReadResourceRequest $request, McpRequestContext $request_context ): array {
 		$params         = $request->getParams();

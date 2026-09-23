@@ -58,7 +58,7 @@ final class McpVersionNegotiator {
 	 * transport, which this Adapter does not implement; that identifier is only
 	 * reachable over STDIO or from newer clients that still send it.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @var array<int, string>
 	 */
@@ -71,7 +71,7 @@ final class McpVersionNegotiator {
 	/**
 	 * First revision that requires the `MCP-Protocol-Version` header on HTTP requests after initialization.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @var string
 	 */
@@ -85,7 +85,7 @@ final class McpVersionNegotiator {
 	 * receive 2025-11-25 as the counter-proposal.
 	 *
 	 * @since 0.5.0
-	 * @since n.e.x.t Echoes legacy identifiers served through the 2025-11-25 schema.
+	 * @since 0.7.0 Echoes legacy identifiers served through the 2025-11-25 schema.
 	 *
 	 * @param string $client_version The protocol version requested by the client.
 	 *
@@ -111,7 +111,7 @@ final class McpVersionNegotiator {
 	/**
 	 * Check whether a given version string can be negotiated through `initialize`.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param string $version The protocol version to check.
 	 *
@@ -124,7 +124,7 @@ final class McpVersionNegotiator {
 	/**
 	 * Resolve the schema revision that serves a negotiated protocol version.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param string $negotiated_version A negotiated protocol version.
 	 *
@@ -139,7 +139,7 @@ final class McpVersionNegotiator {
 	/**
 	 * Whether a negotiated version requires the `MCP-Protocol-Version` header after initialization.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param string $negotiated_version A negotiated protocol version.
 	 *

@@ -102,7 +102,7 @@ final class Autoloader {
 				_doing_it_wrong(
 					Core\McpAdapter::class,
 					esc_html( $error_message ),
-					'x.y.z'
+					'0.7.0'
 				);
 
 				// Log an admin notice.
@@ -157,7 +157,7 @@ final class Autoloader {
 				_doing_it_wrong(
 					self::class,
 					esc_html( $error_message ),
-					'x.y.z'
+					'0.7.0'
 				);
 
 				// Log an admin notice.

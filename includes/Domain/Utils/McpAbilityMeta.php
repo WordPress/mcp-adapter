@@ -22,7 +22,7 @@ use WP_Error;
  *
  * @internal
  *
- * @since n.e.x.t
+ * @since 0.7.0
  */
 final class McpAbilityMeta {
 

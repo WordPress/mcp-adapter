@@ -366,7 +366,7 @@ class McpServer {
 	/**
 	 * Get the neutral registered tool count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function count_tools(): int {
 		return $this->component_registry->count_tools();
@@ -375,7 +375,7 @@ class McpServer {
 	/**
 	 * Get the neutral registered resource count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function count_resources(): int {
 		return $this->component_registry->count_resources();
@@ -384,7 +384,7 @@ class McpServer {
 	/**
 	 * Get the neutral registered prompt count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function count_prompts(): int {
 		return $this->component_registry->count_prompts();
@@ -473,7 +473,7 @@ class McpServer {
 	/**
 	 * Get the server-owned exact schemas.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_schemas(): Schemas {
 		return $this->schemas;

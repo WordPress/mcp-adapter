@@ -36,7 +36,7 @@ interface McpComponentInterface {
 	 *
 	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
 	 * @return \WP\McpSchema\Record Protocol-only record.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 */
 	public function get_protocol_record( Schema $schema ): Record;
@@ -46,7 +46,7 @@ interface McpComponentInterface {
 	 *
 	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
 	 * @return bool
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function is_available_for( Schema $schema ): bool;
 
@@ -55,7 +55,7 @@ interface McpComponentInterface {
 	 *
 	 * @param string $revision Exact revision.
 	 * @return \Throwable|null
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_projection_error( string $revision ): ?\Throwable;
 

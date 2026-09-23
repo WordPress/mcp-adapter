@@ -46,7 +46,7 @@ final class AutoloaderTest extends TestCase {
 	 *
 	 * This covers the plugins_loaded recheck, which runs after the plugin has loaded its own classes.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function test_is_loaded_elsewhere_does_not_report_own_classes(): void {
 		$this->assertTrue( class_exists( McpAdapter::class ), 'Precondition: the plugin classes are registered.' );
