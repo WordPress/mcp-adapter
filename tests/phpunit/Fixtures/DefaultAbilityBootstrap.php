@@ -19,6 +19,10 @@ if ( 'cli' === $wp_mcp_test_configuration['context'] ) {
 	define( 'WP_CLI', true );
 }
 
+// The test bootstrap loads the Composer autoloader. The plugin's Jetpack Autoloader would map WP_CLI to a partial test stub.
+// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Plugin constant.
+define( 'WP_MCP_AUTOLOAD', false );
+
 // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile.UsingVariable -- Test library path supplied by the parent PHPUnit process.
 require_once $argv[1] . '/includes/functions.php';
 

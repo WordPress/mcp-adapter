@@ -79,6 +79,11 @@ final class Autoloader {
 			return false;
 		}
 
+		// A class from this plugin's directory is not another copy. A copy without the constant predates it, so it is always another copy.
+		if ( defined( Core\McpAdapter::class . '::DIR' ) && str_starts_with( Core\McpAdapter::DIR, dirname( __DIR__ ) . DIRECTORY_SEPARATOR ) ) {
+			return false;
+		}
+
 		self::loaded_elsewhere_notice();
 		return true;
 	}
