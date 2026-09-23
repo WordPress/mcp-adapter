@@ -73,52 +73,19 @@ final class Autoloader {
 			add_action(
 				'plugins_loaded',
 				static function () {
-					self::recheck_loaded_elsewhere();
+					self::is_loaded_elsewhere();
 				}
 			);
 			return false;
 		}
 
+		// A class from this plugin's directory is not another copy. A copy without the constant predates it, so it is always another copy.
+		if ( defined( Core\McpAdapter::class . '::DIR' ) && str_starts_with( Core\McpAdapter::DIR, dirname( __DIR__ ) . DIRECTORY_SEPARATOR ) ) {
+			return false;
+		}
+
 		self::loaded_elsewhere_notice();
 		return true;
-	}
-
-	/**
-	 * Rechecks on plugins_loaded whether another copy of the plugin registered the classes.
-	 *
-	 * By then this plugin has loaded its own classes, so class_exists() alone would report itself.
-	 * Each copy of McpAdapter records its directory in McpAdapter::PLUGIN_DIR, and only a directory
-	 * outside this plugin counts as another copy. A copy without the constant predates it, so it is
-	 * always another copy.
-	 *
-	 * @since n.e.x.t
-	 */
-	private static function recheck_loaded_elsewhere(): void {
-		if ( ! class_exists( Core\McpAdapter::class ) ) {
-			return;
-		}
-
-		$class_dir = defined( Core\McpAdapter::class . '::PLUGIN_DIR' ) ? Core\McpAdapter::PLUGIN_DIR : null;
-
-		if ( ! self::is_other_copy_dir( $class_dir ) ) {
-			return;
-		}
-
-		self::loaded_elsewhere_notice();
-	}
-
-	/**
-	 * Checks if a McpAdapter class directory belongs to a copy of the plugin outside this plugin's directory.
-	 *
-	 * Both directories come from __DIR__, which PHP resolves through symlinks, so they compare as plain strings.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @param string|null $class_dir The class directory, or null if that copy does not record it.
-	 * @return bool True if the directory is outside this plugin's directory or unknown.
-	 */
-	private static function is_other_copy_dir( ?string $class_dir ): bool {
-		return null === $class_dir || ! str_starts_with( $class_dir, __DIR__ . DIRECTORY_SEPARATOR );
 	}
 
 	/**

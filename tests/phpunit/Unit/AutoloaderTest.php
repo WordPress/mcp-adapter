@@ -42,14 +42,26 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
-	 * A copy of the plugin whose classes are already registered by another autoloader must not fail: the existing registration is reused.
+	 * Classes loaded from this plugin's own directory are not another copy, so no notice is queued.
+	 *
+	 * This covers the plugins_loaded recheck, which runs after the plugin has loaded its own classes.
+	 *
+	 * @since n.e.x.t
 	 */
-	public function test_autoload_returns_true_when_classes_are_already_registered_elsewhere(): void {
-		$this->assertTrue( class_exists( McpAdapter::class ), 'Precondition: the classes are registered.' );
+	public function test_is_loaded_elsewhere_does_not_report_own_classes(): void {
+		$this->assertTrue( class_exists( McpAdapter::class ), 'Precondition: the plugin classes are registered.' );
 
-		self::reset_is_loaded();
+		$init_callbacks = count( $GLOBALS['wp_filter']['init']->callbacks[10] );
 
-		$this->assertTrue( Autoloader::autoload() );
+		$this->assertFalse( self::invoke_private( 'is_loaded_elsewhere' ) );
+		$this->assertCount( $init_callbacks, $GLOBALS['wp_filter']['init']->callbacks[10], 'No notice should be queued for the plugin\'s own classes.' );
+	}
+
+	/**
+	 * The notice for another copy is logged and rendered as an admin notice.
+	 */
+	public function test_loaded_elsewhere_notice_logs_and_renders_admin_notice(): void {
+		self::invoke_private( 'loaded_elsewhere_notice' );
 
 		$this->setExpectedIncorrectUsage( McpAdapter::class );
 		self::run_deferred_init_notice();
@@ -60,61 +72,6 @@ final class AutoloaderTest extends TestCase {
 		$this->expectOutputRegex( '/Another version of MCP Adapter is already loaded/' );
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Rendering the notice registered on the core hook.
 		do_action( 'admin_notices' );
-	}
-
-	/**
-	 * The plugins_loaded recheck must not report the plugin's own classes, which the plugin loads itself before that hook fires.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function test_plugins_loaded_recheck_does_not_report_own_classes(): void {
-		$init_callbacks = count( $GLOBALS['wp_filter']['init']->callbacks[10] );
-
-		$method = new \ReflectionMethod( Autoloader::class, 'recheck_loaded_elsewhere' );
-		if ( PHP_VERSION_ID < 80100 ) {
-			$method->setAccessible( true );
-		}
-		$method->invoke( null );
-
-		$this->assertCount( $init_callbacks, $GLOBALS['wp_filter']['init']->callbacks[10], 'No notice should be queued for the plugin\'s own classes.' );
-	}
-
-	/**
-	 * A class directory outside the plugin directory belongs to another copy of the plugin.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function test_is_other_copy_dir_returns_true_for_directory_outside_plugin(): void {
-		$this->assertTrue( self::is_other_copy_dir( get_temp_dir() . 'other-plugin/vendor/wordpress/mcp-adapter/includes/Core' ) );
-	}
-
-	/**
-	 * A directory whose name only starts with this plugin's path is still outside the plugin.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function test_is_other_copy_dir_returns_true_for_sibling_directory_with_same_prefix(): void {
-		$includes_dir = dirname( ( new \ReflectionClass( Autoloader::class ) )->getFileName() );
-
-		$this->assertTrue( self::is_other_copy_dir( $includes_dir . '-copy/Core' ) );
-	}
-
-	/**
-	 * The plugin's own class directory does not belong to another copy.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function test_is_other_copy_dir_returns_false_for_own_directory(): void {
-		$this->assertFalse( self::is_other_copy_dir( McpAdapter::PLUGIN_DIR ) );
-	}
-
-	/**
-	 * A copy without McpAdapter::PLUGIN_DIR predates the constant, so it is another copy.
-	 *
-	 * @since n.e.x.t
-	 */
-	public function test_is_other_copy_dir_returns_true_for_copy_without_directory(): void {
-		$this->assertTrue( self::is_other_copy_dir( null ) );
 	}
 
 	/**
@@ -166,18 +123,18 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
-	 * Invokes the private Autoloader::is_other_copy_dir() method.
+	 * Invokes a private Autoloader method that takes no arguments.
 	 *
-	 * @param string|null $class_dir The class directory, or null if it is unknown.
-	 * @return bool Whether the directory belongs to another copy of the plugin.
+	 * @param string $method_name The method name.
+	 * @return mixed The method's return value.
 	 */
-	private static function is_other_copy_dir( ?string $class_dir ): bool {
-		$method = new \ReflectionMethod( Autoloader::class, 'is_other_copy_dir' );
+	private static function invoke_private( string $method_name ) {
+		$method = new \ReflectionMethod( Autoloader::class, $method_name );
 		if ( PHP_VERSION_ID < 80100 ) {
 			$method->setAccessible( true );
 		}
 
-		return (bool) $method->invoke( null, $class_dir );
+		return $method->invoke( null );
 	}
 
 	/**
