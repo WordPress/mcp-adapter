@@ -42,14 +42,26 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
-	 * A copy of the plugin whose classes are already registered by another autoloader must not fail: the existing registration is reused.
+	 * Classes loaded from this plugin's own directory are not another copy, so no notice is queued.
+	 *
+	 * This covers the plugins_loaded recheck, which runs after the plugin has loaded its own classes.
+	 *
+	 * @since 0.7.0
 	 */
-	public function test_autoload_returns_true_when_classes_are_already_registered_elsewhere(): void {
-		$this->assertTrue( class_exists( McpAdapter::class ), 'Precondition: the classes are registered.' );
+	public function test_is_loaded_elsewhere_does_not_report_own_classes(): void {
+		$this->assertTrue( class_exists( McpAdapter::class ), 'Precondition: the plugin classes are registered.' );
 
-		self::reset_is_loaded();
+		$init_callbacks = count( $GLOBALS['wp_filter']['init']->callbacks[10] );
 
-		$this->assertTrue( Autoloader::autoload() );
+		$this->assertFalse( self::invoke_private( 'is_loaded_elsewhere' ) );
+		$this->assertCount( $init_callbacks, $GLOBALS['wp_filter']['init']->callbacks[10], 'No notice should be queued for the plugin\'s own classes.' );
+	}
+
+	/**
+	 * The notice for another copy is logged and rendered as an admin notice.
+	 */
+	public function test_loaded_elsewhere_notice_logs_and_renders_admin_notice(): void {
+		self::invoke_private( 'loaded_elsewhere_notice' );
 
 		$this->setExpectedIncorrectUsage( McpAdapter::class );
 		self::run_deferred_init_notice();
@@ -108,6 +120,21 @@ final class AutoloaderTest extends TestCase {
 		}
 
 		return (bool) $method->invoke( null, $autoloader_file );
+	}
+
+	/**
+	 * Invokes a private Autoloader method that takes no arguments.
+	 *
+	 * @param string $method_name The method name.
+	 * @return mixed The method's return value.
+	 */
+	private static function invoke_private( string $method_name ) {
+		$method = new \ReflectionMethod( Autoloader::class, $method_name );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
+
+		return $method->invoke( null );
 	}
 
 	/**

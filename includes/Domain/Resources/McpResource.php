@@ -228,7 +228,7 @@ final class McpResource implements McpComponentInterface {
 	 * Get the clean protocol record for one revision.
 	 *
 	 * @param \WP\McpSchema\Schema $schema Selected schema.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_protocol_record( Schema $schema ): Resource {
 		return $this->project_record( $schema, Resource::class, $this->protocol_data() );
@@ -237,7 +237,7 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Get the neutral resource URI.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_uri(): string {
 		return (string) ( $this->protocol_data()['uri'] ?? '' );

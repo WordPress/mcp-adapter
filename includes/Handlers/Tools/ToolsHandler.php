@@ -61,7 +61,7 @@ class ToolsHandler {
 	 * @param \WP\McpSchema\Record\ListToolsRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @return array<string, mixed> Logical tools-list result.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function list_tools( ListToolsRequest $request, McpRequestContext $request_context ): array {
 		unset( $request );
@@ -106,7 +106,7 @@ class ToolsHandler {
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 *
 	 * @return array<string, mixed>
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function call_tool( CallToolRequest $request, McpRequestContext $request_context ): array {
 		$request_params = $request->getParams();
@@ -195,7 +195,7 @@ class ToolsHandler {
 			 * audit logging, or content enrichment.
 			 *
 			 * @since 0.5.0
-			 * @since n.e.x.t `$result` may be a `McpInputRequired` when a direct tool requests more client input.
+			 * @since 0.7.0 `$result` may be a `McpInputRequired` when a direct tool requests more client input.
 			 *
 			 * @param mixed|\WP_Error|\WP\MCP\Domain\Tools\McpInputRequired $result The raw execution result (may be WP_Error or McpInputRequired).
 			 * @param array                        $args      The tool arguments used.

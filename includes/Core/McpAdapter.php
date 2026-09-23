@@ -28,7 +28,18 @@ defined( 'ABSPATH' ) || exit;
  */
 final class McpAdapter {
 
-	public const VERSION = '0.6.1';
+	public const VERSION = '0.7.0';
+
+	/**
+	 * Directory of this copy of the class.
+	 *
+	 * The autoloader checks it to tell this plugin's classes apart from a copy that another plugin bundles.
+	 *
+	 * @internal
+	 *
+	 * @since 0.7.0
+	 */
+	public const DIR = __DIR__;
 
 	/**
 	 * Registry instance
@@ -57,6 +68,10 @@ final class McpAdapter {
 	public static function instance(): self {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
+
+			// Subscribe before `init`, the earliest point the Abilities API registries can initialize.
+			add_action( 'wp_abilities_api_categories_init', array( self::$instance, 'register_default_category' ) );
+			add_action( 'wp_abilities_api_init', array( self::$instance, 'register_default_abilities' ) );
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
@@ -113,7 +128,7 @@ final class McpAdapter {
 
 		_deprecated_function(
 			self::class,
-			'x.y.z',
+			'0.7.0',
 			sprintf(
 				// translators: %s: class name
 				esc_html__( '%s is currently loaded as a bundled dependency instead of via the canonical MCP Adapter plugin. This is not recommended and may not be supported in future versions. Please install the MCP Adapter plugin and migrate accordingly.', 'mcp-adapter' ),
@@ -133,6 +148,19 @@ final class McpAdapter {
 	 * @internal For use by adapter initialization only.
 	 */
 	private function maybe_create_default_server(): void {
+		if ( ! $this->is_default_server_enabled() ) {
+			return;
+		}
+
+		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+	}
+
+	/**
+	 * Whether the default server and its abilities are enabled.
+	 *
+	 * @internal For use by adapter initialization only.
+	 */
+	private function is_default_server_enabled(): bool {
 		/**
 		 * Filters whether the default MCP server should be created.
 		 *
@@ -143,15 +171,7 @@ final class McpAdapter {
 		 *
 		 * @param bool $create_default Whether to create the default server. Default true.
 		 */
-		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
-			return;
-		}
-
-		// Register category before abilities
-		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
-		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
-
-		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+		return (bool) apply_filters( 'mcp_adapter_create_default_server', true );
 	}
 
 	/**
@@ -360,6 +380,10 @@ final class McpAdapter {
 	 * @return void
 	 */
 	public function register_default_category(): void {
+		if ( ! $this->is_default_server_enabled() ) {
+			return;
+		}
+
 		wp_register_ability_category(
 			'mcp-adapter',
 			array(
@@ -375,6 +399,10 @@ final class McpAdapter {
 	 * @return void
 	 */
 	public function register_default_abilities(): void {
+		if ( ! $this->is_default_server_enabled() ) {
+			return;
+		}
+
 		// Register the three core MCP abilities
 		DiscoverAbilitiesAbility::register();
 		GetAbilityInfoAbility::register();

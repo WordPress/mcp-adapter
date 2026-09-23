@@ -79,6 +79,11 @@ final class Autoloader {
 			return false;
 		}
 
+		// A class from this plugin's directory is not another copy. A copy without the constant predates it, so it is always another copy.
+		if ( defined( Core\McpAdapter::class . '::DIR' ) && str_starts_with( Core\McpAdapter::DIR, dirname( __DIR__ ) . DIRECTORY_SEPARATOR ) ) {
+			return false;
+		}
+
 		self::loaded_elsewhere_notice();
 		return true;
 	}
@@ -97,7 +102,7 @@ final class Autoloader {
 				_doing_it_wrong(
 					Core\McpAdapter::class,
 					esc_html( $error_message ),
-					'x.y.z'
+					'0.7.0'
 				);
 
 				// Log an admin notice.
@@ -152,7 +157,7 @@ final class Autoloader {
 				_doing_it_wrong(
 					self::class,
 					esc_html( $error_message ),
-					'x.y.z'
+					'0.7.0'
 				);
 
 				// Log an admin notice.

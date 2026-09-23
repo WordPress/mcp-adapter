@@ -221,7 +221,7 @@ final class McpTool implements McpComponentInterface {
 	 * Get the clean protocol record for one revision.
 	 *
 	 * @param \WP\McpSchema\Schema $schema Selected schema.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_protocol_record( Schema $schema ): Tool {
 		$data = $this->protocol_data();
@@ -247,7 +247,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Get the neutral tool name.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function get_name(): string {
 		return (string) ( $this->protocol_data()['name'] ?? '' );
@@ -256,7 +256,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Return validated modern HTTP header annotations.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param \WP\McpSchema\Schema $schema Selected schema used to validate the tool projection.
 	 *
@@ -280,7 +280,7 @@ final class McpTool implements McpComponentInterface {
 	 *
 	 * @return mixed
 	 *
-	 * @since n.e.x.t Added the `$call_context` parameter.
+	 * @since 0.7.0 Added the `$call_context` parameter.
 	 */
 	public function execute( $arguments, ?McpToolCallContext $call_context = null ) {
 		$args = $this->unwrap_input_if_needed( $arguments );
@@ -315,7 +315,7 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Whether this tool delegates execution to a WordPress Ability.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function is_ability_backed(): bool {
 		return null !== $this->ability;

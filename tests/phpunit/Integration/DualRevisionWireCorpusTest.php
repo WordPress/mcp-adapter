@@ -46,7 +46,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 	/**
 	 * Reject notifications without emitting JSON-RPC responses, while preserving request errors.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function test_http_notification_rejections_have_no_response_body(): void {
 		$notification = array( 'jsonrpc' => '2.0', 'method' => 'notifications/initialized' );
@@ -89,7 +89,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 	/**
 	 * Keep modern notification rejection errors out of request-response schema hydration.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function test_modern_notification_validation_failures_are_empty_http_errors(): void {
 		$notification = array(
@@ -1552,7 +1552,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 	 * @dataProvider tool_content_metadata_provider
 	 * @param array<string, mixed> $shape Tool result shorthand.
 	 * @param bool $resource_metadata Whether metadata belongs to resource contents.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function test_http_tool_content_metadata_uses_schema_validation( array $shape, bool $resource_metadata ): void {
 		$values = array(
@@ -1629,7 +1629,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 	 * Every image and embedded-resource metadata position accepted by tool handlers.
 	 *
 	 * @return array<string, array{0: array<string, mixed>, 1: bool}>
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public static function tool_content_metadata_provider(): array {
 		$cases = array(

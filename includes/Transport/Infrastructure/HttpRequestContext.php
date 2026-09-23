@@ -84,7 +84,7 @@ class HttpRequestContext {
 	/**
 	 * Select MCP headers and normalize their names and values.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 *
 	 * @param array<string, mixed> $headers Headers supplied by the REST request.
 	 * @return array<string, string> Normalized MCP headers retaining the first value only when it is a string.

@@ -22,7 +22,7 @@ class SystemHandler {
 	 * @param \WP\McpSchema\Record\PingRequest $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @return array<string, mixed> Logical empty result.
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 */
 	public function ping( PingRequest $request, McpRequestContext $request_context ): array {
 		unset( $request, $request_context );

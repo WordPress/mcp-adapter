@@ -2,21 +2,22 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - TBD
+## [0.7.0] - 2026-09-23
 
 ### Breaking Changes
 - Schema-backed MCP revisions are exactly `2025-11-25` and `2026-07-28`. `2025-06-18` and `2024-11-05` no longer have their own DTOs; they are negotiated as legacy identifiers and served through the `2025-11-25` schema (see Added). `McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS` now lists only the schema-backed revisions; legacy identifiers moved to `McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`.
 - Protocol-facing server getters `get_tools()`, `get_resources()`, `get_prompts()`, and `get_prompt()` require a selected `Schema`. There is no implicit default revision.
-- The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/vx.y.z.md#migrating-to-the-dual-revision-schema-runtime).
+- The generated DTO classes, `get_protocol_dto()`, and the alternate array serializers have been replaced by exact-revision schema records from `wordpress/php-mcp-schema`. See the [dual-revision migration guide](docs/migration/v0.7.0.md#migrating-to-the-dual-revision-schema-runtime).
 - `McpToolValidator`, `McpResourceValidator`, `McpPromptValidator`, `McpErrorFactory::validate_jsonrpc_message()`, `McpServer::is_mcp_validation_enabled()`, and the `mcp_adapter_validation_enabled` filter have been removed. Wire validation always runs through the selected schema.
 - `RequestRouter::route_request()`, method handlers, `McpErrorFactory`, `ContentBlockHelper`, and `McpPromptBuilderInterface::build()` now exchange schema records and revision-neutral arrays instead of DTOs. `JsonRpcResponseBuilder` has been removed. Custom transports must delegate to `HttpRequestHandler` or `McpWireOrchestrator`.
 - `McpTool::fromArray()`, `McpResource::fromArray()`, and `McpPrompt::fromArray()` return `WP_Error` only for structural problems (missing name, URI, or handler; invalid resource URI). Schema and annotation problems no longer fail construction; they are reported per revision through `is_available_for()` and `get_projection_error()` and logged as warnings at registration.
 - The non-canonical `tools/list/all` method and `ToolsHandler::list_all_tools()` have been removed.
 - JSON-RPC batch requests are rejected before dispatch.
 - `wp mcp-adapter list` adds per-revision tool, resource, and prompt columns.
+- `WP\MCP\Cli` classes are `final` and can no longer be extended ([#306](https://github.com/WordPress/mcp-adapter/pull/306)).
 
-- Invalid protocol fields are no longer silently dropped or repaired. Components invalid in every supported schema revision are rejected. Handler values reach final schema projection. In 2026 responses, result `_meta` is validated before server identification is added, so malformed metadata is rejected and valid object fields are preserved. This reverses the 0.6.0 omission of malformed `_meta`. See the [validation migration notes](docs/migration/vx.y.z.md#validation-and-rejected-components).
-- Removed validation and content helpers and the resource/prompt converter `make()` and getter layers are listed in the [migration guide](docs/migration/vx.y.z.md#removed-helpers-and-converter-methods).
+- Invalid protocol fields are no longer silently dropped or repaired. Components invalid in every supported schema revision are rejected. Handler values reach final schema projection. In 2026 responses, result `_meta` is validated before server identification is added, so malformed metadata is rejected and valid object fields are preserved. This reverses the 0.6.0 omission of malformed `_meta`. See the [validation migration notes](docs/migration/v0.7.0.md#validation-and-rejected-components).
+- Removed validation and content helpers and the resource/prompt converter `make()` and getter layers are listed in the [migration guide](docs/migration/v0.7.0.md#removed-helpers-and-converter-methods).
 - Non-array Ability `meta.mcp` now returns `mcp_ability_invalid_meta`. Removed errors: `mcp_resource_missing_name`, `mcp_prompt_invalid_argument`, and `mcp_prompt_argument_missing_name`. Non-array prompt arguments return `mcp_prompt_invalid_arguments`; resource-name filters reject non-strings only.
 
 ### Added
@@ -29,15 +30,16 @@ All notable changes to this project will be documented in this file, per [the Ke
 - The `mcp_adapter_tools_list`, `mcp_adapter_resources_list`, `mcp_adapter_prompts_list`, and `mcp_adapter_initialize_response` filters receive the selected schema as a third argument.
 - Raw-wire, architecture, and projection test coverage for both revisions.
 - Components rejected by every supported schema revision raise `_doing_it_wrong` with schema error paths, in addition to error-handler logs.
+- Direct callable tools can return `McpInputRequired` under MCP `2026-07-28` to request elicitation input, and receive the client's answers through `McpToolCallContext` on retry ([#316](https://github.com/WordPress/mcp-adapter/pull/316)).
 
 ### Changed
-- Request observability status and duration include final response projection, and `server/discover` emits a completion event. Invalid handler results return `-32603`, `Internal error: The server produced an invalid result.`, with one failed request event and a correlated diagnostic through the configured error handler. See the [observability migration notes](docs/migration/vx.y.z.md#request-observability).
+- Request observability status and duration include final response projection, and `server/discover` emits a completion event. Invalid handler results return `-32603`, `Internal error: The server produced an invalid result.`, with one failed request event and a correlated diagnostic through the configured error handler. See the [observability migration notes](docs/migration/v0.7.0.md#request-observability).
 - Resource abilities support core's top-level `meta.annotations` without a deprecation notice. `meta.mcp.annotations` overrides it, and an empty array suppresses annotations instead of falling back.
 - Ability labels and descriptions preserve whitespace, and tool `title` is always emitted from the label. Resource names may be empty; absent names use the URI.
 - Resource URIs are no longer trimmed or limited to 2048 bytes; bare schemes such as `wordpress:` are accepted. Invalid `lastModified` timestamps reject resources on both registration paths.
 - Prompt results preserve supplied descriptions, metadata, message keys, and empty message lists. Malformed recognized shapes reach schema validation; JSON fallback encoding failures return execution errors.
 - Direct tool factories default `inputSchema` only when absent. Prompt fallback arguments include boolean property schemas and preserve supplied titles and descriptions.
-- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [vx.y.z migration guide](docs/migration/vx.y.z.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
+- Usage of MCP Adapter as a bundled library has been deprecated in favor of using the canonical MCP Adapter plugin. See the [v0.7.0 migration guide](docs/migration/v0.7.0.md) for instructions on how to migrate away from a bundled copy of MCP Adapter.
 - `initialize`, `notifications/initialized`, and `ping` are served only for `2025-11-25`; `server/discover` only for `2026-07-28`. The 2025 HTTP session lifecycle is unchanged.
 - Adapter-owned `2026-07-28` output omits `Tool.execution`, adds `resultType: "complete"` to completed results, and adds `ttlMs: 0` and `cacheScope: "private"` to discovery, list, and resource-read results.
 - Missing tools and prompts return Invalid Params (`-32602`) in both revisions. Missing resources return `-32002` in `2025-11-25` and `-32602` in `2026-07-28`. An unsupported per-request version returns `-32022`.
@@ -45,9 +47,9 @@ All notable changes to this project will be documented in this file, per [the Ke
 - `tools/call` and `resources/read` look up the tool name and resource URI exactly as sent. Surrounding whitespace is no longer trimmed, so a padded name cannot bypass the `2026-07-28` `Mcp-Param-*` header check.
 - `resources/read` forwards only the protocol-defined parameters (`uri`, `_meta`, `inputResponses`, `requestState`) to permission callbacks, the `mcp_adapter_pre_resource_read` filter, and resource handlers. Unknown request keys are dropped.
 - `2025-11-25` `tools/call` responses omit `structuredContent` when a tool returns a JSON list, because that schema types the field as an object. The text block still carries the encoded list. `2026-07-28` responses keep the list.
-- `wordpress/php-mcp-schema` is temporarily pinned to a reviewed commit through a VCS repository until the dual-revision runtime is released.
 
 ### Fixed
+- Default abilities register when another plugin initializes the Abilities API before the MCP server initializes.
 - `mcp-adapter/get-ability-info` serializes an empty `input_schema` as `{}` instead of `[]`.
 
 ## [0.6.1] - 2026-08-13

@@ -44,7 +44,7 @@ class RequestRouter {
 	/**
 	 * Captures the selected request's tags while its caller completes projection.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @var (callable(array<string, mixed>): void)|null
 	 */
 	private $capture_observation = null;
@@ -52,7 +52,7 @@ class RequestRouter {
 	/**
 	 * Request whose base-router event belongs to the active completion scope.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @var \WP\McpSchema\Record|null
 	 */
 	private ?Record $capture_request = null;
@@ -61,7 +61,7 @@ class RequestRouter {
 	 * Include response projection in the request's single completion event.
 	 *
 	 * @internal
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @param \WP\McpSchema\Record $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @param string $transport_name Transport name.
@@ -154,7 +154,7 @@ class RequestRouter {
 	/**
 	 * Collect request and component identity without argument values.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @param \WP\McpSchema\Record $request Validated request.
 	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
 	 * @param string $transport_name Transport name.
@@ -181,7 +181,7 @@ class RequestRouter {
 	/**
 	 * Record one final outcome and optional projection diagnostic.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @param array<string, mixed> $tags Correlated request tags.
 	 * @param \WP\McpSchema\Record|array<string, mixed> $result Result or response.
 	 * @param float $start_time Request start time in seconds.
@@ -207,7 +207,7 @@ class RequestRouter {
 	/**
 	 * Derive status from either a direct handler result or a projected response.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @param \WP\McpSchema\Record|array<string, mixed> $result Result or response.
 	 * @return array<string, mixed> Outcome tags.
 	 */
@@ -243,7 +243,7 @@ class RequestRouter {
 	/**
 	 * Send projection diagnostics to the configured logger without result payloads.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.0
 	 * @param \Throwable $exception Projection failure.
 	 * @param array<string, mixed> $tags Correlated request tags.
 	 */
