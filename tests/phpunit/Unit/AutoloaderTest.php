@@ -80,6 +80,41 @@ final class AutoloaderTest extends TestCase {
 	}
 
 	/**
+	 * A class file outside the plugin directory belongs to another copy of the plugin.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_is_other_copy_file_returns_true_for_file_outside_plugin(): void {
+		$class_file = get_temp_dir() . uniqid( 'mcp-other-copy-', true ) . '.php';
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Test-owned file under the system temporary directory.
+		file_put_contents( $class_file, '<?php' );
+
+		$this->assertTrue( self::is_other_copy_file( $class_file ) );
+
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_unlink -- Test-owned file under the system temporary directory.
+		unlink( $class_file );
+	}
+
+	/**
+	 * The plugin's own class file does not belong to another copy.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_is_other_copy_file_returns_false_for_own_file(): void {
+		$this->assertFalse( self::is_other_copy_file( ( new \ReflectionClass( McpAdapter::class ) )->getFileName() ) );
+	}
+
+	/**
+	 * A class file that cannot be resolved cannot be identified as another copy.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_is_other_copy_file_returns_false_for_unresolved_file(): void {
+		$this->assertFalse( self::is_other_copy_file( false ) );
+		$this->assertFalse( self::is_other_copy_file( get_temp_dir() . uniqid( 'mcp-missing-', true ) . '/McpAdapter.php' ) );
+	}
+
+	/**
 	 * Requiring a readable autoloader file succeeds.
 	 */
 	public function test_require_autoloader_returns_true_for_readable_file(): void {
@@ -125,6 +160,21 @@ final class AutoloaderTest extends TestCase {
 		}
 
 		return (bool) $method->invoke( null, $autoloader_file );
+	}
+
+	/**
+	 * Invokes the private Autoloader::is_other_copy_file() method.
+	 *
+	 * @param string|false $class_file The class file path, or false if it is unknown.
+	 * @return bool Whether the file belongs to another copy of the plugin.
+	 */
+	private static function is_other_copy_file( $class_file ): bool {
+		$method = new \ReflectionMethod( Autoloader::class, 'is_other_copy_file' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
+
+		return (bool) $method->invoke( null, $class_file );
 	}
 
 	/**

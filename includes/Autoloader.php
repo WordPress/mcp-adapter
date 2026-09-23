@@ -97,14 +97,25 @@ final class Autoloader {
 			return;
 		}
 
-		$class_file = ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName();
-		$class_file = false !== $class_file ? realpath( $class_file ) : false;
-
-		if ( false === $class_file || 0 === strpos( $class_file, dirname( __DIR__ ) . DIRECTORY_SEPARATOR ) ) {
+		if ( ! self::is_other_copy_file( ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName() ) ) {
 			return;
 		}
 
 		self::loaded_elsewhere_notice();
+	}
+
+	/**
+	 * Checks if a class file belongs to a copy of the plugin outside this plugin's directory.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string|false $class_file The class file path, or false if it is unknown.
+	 * @return bool True if the file resolves to a path outside this plugin's directory.
+	 */
+	private static function is_other_copy_file( $class_file ): bool {
+		$class_file = false !== $class_file ? realpath( $class_file ) : false;
+
+		return false !== $class_file && 0 !== strpos( $class_file, dirname( __DIR__ ) . DIRECTORY_SEPARATOR );
 	}
 
 	/**
