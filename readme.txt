@@ -1,5 +1,5 @@
 === MCP Adapter ===
-Contributors:      wordpressdotorg, ovidiu-galatan
+Contributors:      wordpressdotorg, ovidiu-galatan, justlevine
 Tags:              mcp, ai, abilities-api, model-context-protocol
 Requires at least: 6.9
 Tested up to:      7.1
