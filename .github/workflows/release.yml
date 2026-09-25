@@ -81,6 +81,7 @@ jobs:
         run: unzip -o mcp-adapter.zip -d build
 
       - name: Deploy to WordPress.org
+        if: ${{ !github.event.release.prerelease }}
         uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # v2.3.0
         env:
           BUILD_DIR: build/mcp-adapter
