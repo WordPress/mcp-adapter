@@ -31,7 +31,7 @@
 	},
 	"devDependencies": {
 		"@wordpress/env": "^11.15.0",
-		"@wordpress/scripts": "^34.2.0",
+		"@wordpress/scripts": "^36.0.0",
 		"@wordpress/prettier-config": "^4.55.0"
 	},
 	"overrides": {
