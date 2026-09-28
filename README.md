@@ -44,5 +44,9 @@ Connect via WP-CLI over STDIO, or point an HTTP client at `/wp-json/mcp/mcp-adap
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, coding standards, and the contribution workflow, and the [Testing Guide](docs/guides/testing.md) for running the test suite.
 
+## Logo Origin
+
+The WordPress.org plugin directory icon and banners in [`.wordpress-org/`](.wordpress-org) use the Model Context Protocol logo unmodified, from [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg), where it is listed as public domain. Model Context Protocol® and MCP™ are trademarks of LF Projects, LLC; see the [LF Projects Trademark Policy](https://lfprojects.org/policies/trademark-policy/).
+
 ## License
 [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html)
