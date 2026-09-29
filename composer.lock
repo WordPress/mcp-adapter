@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "11dd4ddec289b516a856e6a7f90c129d",
+    "content-hash": "9980838eddb438311f4bb1b58bad7f51",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -1123,16 +1123,16 @@
         },
         {
             "name": "phpstan/php-8-stubs",
-            "version": "0.4.39",
+            "version": "0.4.41",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/php-8-stubs.git",
-                "reference": "2c3468206b2c52000a698c84ad6dbd946669edf0"
+                "reference": "6657d2a27dd948f80546a7d6a71c9460fdb34e88"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/php-8-stubs/zipball/2c3468206b2c52000a698c84ad6dbd946669edf0",
-                "reference": "2c3468206b2c52000a698c84ad6dbd946669edf0",
+                "url": "https://api.github.com/repos/phpstan/php-8-stubs/zipball/6657d2a27dd948f80546a7d6a71c9460fdb34e88",
+                "reference": "6657d2a27dd948f80546a7d6a71c9460fdb34e88",
                 "shasum": ""
             },
             "type": "library",
@@ -1149,9 +1149,9 @@
             "description": "PHP stubs extracted from php-src",
             "support": {
                 "issues": "https://github.com/phpstan/php-8-stubs/issues",
-                "source": "https://github.com/phpstan/php-8-stubs/tree/0.4.39"
+                "source": "https://github.com/phpstan/php-8-stubs/tree/0.4.41"
             },
-            "time": "2026-09-15T00:34:58+00:00"
+            "time": "2026-09-18T00:33:31+00:00"
         },
         {
             "name": "phpstan/phpdoc-parser",
