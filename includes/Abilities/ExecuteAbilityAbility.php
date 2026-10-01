@@ -114,7 +114,7 @@ final class ExecuteAbilityAbility {
 			);
 		}
 
-		$ability = wp_get_ability( $ability_name );
+		$ability = wp_has_ability( $ability_name ) ? wp_get_ability( $ability_name ) : null;
 
 		if ( ! $ability ) {
 			return array(
