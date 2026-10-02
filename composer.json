@@ -56,7 +56,7 @@
 	},
 	"require": {
 		"php": "^7.4 || ^8.0",
-		"automattic/jetpack-autoloader": "^5.0",
+		"automattic/jetpack-autoloader": "^6.0",
 		"wordpress/php-mcp-schema": "^0.2.0",
 		"ext-json": "*"
 	},
