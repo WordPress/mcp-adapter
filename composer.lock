@@ -8,16 +8,16 @@
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
-            "version": "v6.0.0",
+            "version": "v6.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Automattic/jetpack-autoloader.git",
-                "reference": "5e7e2179fb6f955029d048eb3c3e8ebc50287ef1"
+                "reference": "a399be1b3e6eb198abbb5bea481161d7a6c09b1e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Automattic/jetpack-autoloader/zipball/5e7e2179fb6f955029d048eb3c3e8ebc50287ef1",
-                "reference": "5e7e2179fb6f955029d048eb3c3e8ebc50287ef1",
+                "url": "https://api.github.com/repos/Automattic/jetpack-autoloader/zipball/a399be1b3e6eb198abbb5bea481161d7a6c09b1e",
+                "reference": "a399be1b3e6eb198abbb5bea481161d7a6c09b1e",
                 "shasum": ""
             },
             "require": {
@@ -25,7 +25,7 @@
                 "php": ">=7.4"
             },
             "require-dev": {
-                "automattic/phpunit-select-config": "^1.0.10",
+                "automattic/phpunit-select-config": "^1.0.11",
                 "composer/composer": "^2.2",
                 "yoast/phpunit-polyfills": "^4.0.0"
             },
@@ -66,9 +66,9 @@
                 "wordpress"
             ],
             "support": {
-                "source": "https://github.com/Automattic/jetpack-autoloader/tree/v6.0.0"
+                "source": "https://github.com/Automattic/jetpack-autoloader/tree/v6.0.1"
             },
-            "time": "2026-08-26T20:01:54+00:00"
+            "time": "2026-09-23T19:25:11+00:00"
         },
         {
             "name": "wordpress/php-mcp-schema",
