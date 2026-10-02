@@ -70,6 +70,12 @@ jobs:
         run: |
           npm run plugin-zip
 
+      - name: Extract plugin ZIP for verification and deployment
+        run: unzip -o mcp-adapter.zip -d build
+
+      - name: Verify autoloader manifests against the ZIP
+        run: php bin/verify-release-manifests.php build/mcp-adapter
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -83,9 +89,6 @@ jobs:
           tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract plugin ZIP for deployment
-        run: unzip -o mcp-adapter.zip -d build
 
       - name: Deploy to WordPress.org
         if: ${{ !github.event.release.prerelease }}
