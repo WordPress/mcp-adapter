@@ -13,6 +13,7 @@
 	"files": [
 		"includes",
 		"vendor",
+		"composer.json",
 		"LICENSE.md",
 		"README.md",
 		"readme.txt",
