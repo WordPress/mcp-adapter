@@ -65,7 +65,7 @@ Plugin developers should depend on MCP Adapter by adding `Requires Plugins: mcp-
 
 == Changelog ==
 
-= 0.7.0 - 2026-09-23 =
+= 0.7.0 - 2026-10-02 =
 
 **Breaking Changes**
 
