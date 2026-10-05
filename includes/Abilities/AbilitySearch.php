@@ -200,7 +200,7 @@ final class AbilitySearch {
 	 *
 	 * @param string $phrase The lowercase query.
 	 *
-	 * @return list<string> The query terms. Empty for an empty query.
+	 * @return list<string> The query terms. Empty when the query has no term left, which browses like an empty query.
 	 */
 	private static function terms( string $phrase ): array {
 		$words = preg_split( '/[^a-z0-9]+/', $phrase, -1, PREG_SPLIT_NO_EMPTY );
@@ -212,11 +212,6 @@ final class AbilitySearch {
 			}
 
 			$terms[] = self::singular( $word );
-		}
-
-		// A query of only short words or stopwords still has something to match on.
-		if ( array() === $terms ) {
-			$terms = array_map( array( self::class, 'singular' ), $words );
 		}
 
 		return array_values( array_unique( $terms ) );
@@ -364,6 +359,26 @@ final class AbilitySearch {
 	}
 
 	/**
+	 * Renders one enum value, with booleans and null in their JSON spelling.
+	 *
+	 * Strings stay unquoted to keep the signature short.
+	 *
+	 * @param mixed $value The enum value.
+	 *
+	 * @return string The value token, for example `draft`, `3`, `true`, or `null`.
+	 */
+	private static function enum_token( $value ): string {
+		if ( is_bool( $value ) ) {
+			return $value ? 'true' : 'false';
+		}
+		if ( null === $value ) {
+			return 'null';
+		}
+
+		return is_scalar( $value ) ? (string) $value : gettype( $value );
+	}
+
+	/**
 	 * Renders one property schema as a short type token.
 	 *
 	 * @param array<string, mixed> $property The property schema.
@@ -373,7 +388,7 @@ final class AbilitySearch {
 	private static function type_token( array $property ): string {
 		if ( isset( $property['enum'] ) && is_array( $property['enum'] ) && array() !== $property['enum'] ) {
 			$values = array_map(
-				static fn ( $value ): string => is_scalar( $value ) ? (string) $value : gettype( $value ),
+				static fn ( $value ): string => self::enum_token( $value ),
 				array_slice( $property['enum'], 0, self::SIGNATURE_ENUM_CAP )
 			);
 

@@ -37,7 +37,7 @@ final class ExecuteAbilityAbility {
 			'mcp-adapter/execute-ability',
 			array(
 				'label'               => 'Execute Ability',
-				'description'         => 'Runs one ability that this site exposes through MCP and returns its result. The effect is the effect of the target ability, which can read, create, change, or delete site data; its annotations show which applies. Before it runs, the parameters are validated against its input schema and the permission check of the ability applies to the current user; a failure there returns a tool error. A failure while the ability runs returns success false with an error message.',
+				'description'         => 'Runs one ability that this site exposes through MCP and returns its result. The effect is the effect of the target ability, which can read, create, change, or delete site data; its annotations show which applies. Before it runs, the parameters are validated against its input schema and the permission check of the ability applies to the current user. A failed check or a failure while the ability runs returns a tool error with a message.',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
 					'type'       => 'object',

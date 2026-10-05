@@ -64,6 +64,18 @@ final class AbilitySearchTest extends TestCase {
 		$this->assertArrayNotHasKey( 'partial_matches', $result );
 	}
 
+	public function test_query_of_only_ignored_words_browses_like_an_empty_query(): void {
+		$this->register( 'test/list-zebra', 'List Zebra', 'Lists zebra records.' );
+
+		$result = AbilitySearch::search( array( 'query' => 'the io' ) );
+		$browse = AbilitySearch::search( array( 'query' => '' ) );
+
+		$this->assertSame( $browse['total'], $result['total'] );
+		$this->assertSame( $browse['abilities'], $result['abilities'] );
+		$this->assertArrayHasKey( 'categories', $result );
+		$this->assertArrayNotHasKey( 'partial_matches', $result );
+	}
+
 	public function test_falls_back_to_partial_matches_and_names_missed_terms(): void {
 		$this->register( 'test/list-zebra', 'List Zebra', 'Lists zebra records.' );
 
@@ -146,6 +158,7 @@ final class AbilitySearchTest extends TestCase {
 				'properties' => array(
 					'id'     => array( 'type' => 'integer' ),
 					'order'  => array( 'enum' => array( 'asc', 'desc' ) ),
+					'flag'   => array( 'enum' => array( true, false, null, 3 ) ),
 					'tags'   => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'string' ),
@@ -158,7 +171,7 @@ final class AbilitySearchTest extends TestCase {
 
 		$hit = AbilitySearch::search( array( 'query' => 'zebra signature' ) )['abilities'][0];
 
-		$this->assertSame( 'id* (integer), order (enum: asc|desc), tags (string[]), parent (integer|null)', $hit['input'] );
+		$this->assertSame( 'id* (integer), order (enum: asc|desc), flag (enum: true|false|null|3), tags (string[]), parent (integer|null)', $hit['input'] );
 		$this->assertSame( array( 'readonly' ), $hit['annotations'] );
 		$this->assertSame( 'test', $hit['category'] );
 	}
