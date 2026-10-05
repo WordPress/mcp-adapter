@@ -55,7 +55,7 @@ tests_add_filter(
 	'pre_option_active_plugins',
 	static function () use ( $wp_mcp_test_canonical, $wp_mcp_test_scenario, $wp_mcp_test_bundler ) {
 		$plugins = array( $wp_mcp_test_bundler . '/plugin.php' );
-		if ( 'discoverable' === $wp_mcp_test_scenario ) {
+		if ( in_array( $wp_mcp_test_scenario, array( 'discoverable', 'newer' ), true ) ) {
 			$plugins[] = $wp_mcp_test_canonical . '/mcp-adapter.php';
 		}
 		return $plugins;
@@ -99,6 +99,13 @@ tests_add_filter(
 		file_put_contents( $wp_mcp_test_bundler . '/plugin.php', '<?php' );
 		// Only the legacy class identity is needed: its version predates the DIR constant.
 		file_put_contents( $wp_mcp_test_bundler . '/McpAdapter.php', '<?php namespace WP\\MCP\\Core; final class McpAdapter { public const VERSION = "0.6.1"; }' );
+		$bundled_version = '0.6.1';
+		if ( 'newer' === $wp_mcp_test_scenario ) {
+			// A newer copy that wins arbitration ships its own Plugin, which defines WP_MCP_DIR only if it is still undefined.
+			$bundled_version = '9.9.9';
+			file_put_contents( $wp_mcp_test_bundler . '/McpAdapter.php', '<?php namespace WP\\MCP\\Core; final class McpAdapter { public const VERSION = "9.9.9"; public const DIR = __DIR__; public static function instance() {} }' );
+			file_put_contents( $wp_mcp_test_bundler . '/Plugin.php', '<?php namespace WP\\MCP; final class Plugin { public static function instance() { if ( ! defined( "WP_MCP_DIR" ) ) { define( "WP_MCP_DIR", __DIR__ . "/" ); } } }' );
+		}
 
 		// Copy the production entry point and loader classes; give their manifest release-build versions.
 		foreach ( array( 'mcp-adapter.php', 'includes/Autoloader.php', 'includes/Core/McpAdapter.php', 'includes/Plugin.php' ) as $file ) {
@@ -125,10 +132,16 @@ tests_add_filter(
 		$bundled_manifest = array(
 			'Automattic\\Jetpack\\Autoloader\\AutoloadGenerator' => $canonical_manifest['Automattic\\Jetpack\\Autoloader\\AutoloadGenerator'],
 			McpAdapter::class => array(
-				'version' => '0.6.1',
+				'version' => $bundled_version,
 				'path'    => $wp_mcp_test_bundler . '/McpAdapter.php',
 			),
 		);
+		if ( 'newer' === $wp_mcp_test_scenario ) {
+			$bundled_manifest['WP\\MCP\\Plugin'] = array(
+				'version' => $bundled_version,
+				'path'    => $wp_mcp_test_bundler . '/Plugin.php',
+			);
+		}
 		file_put_contents( $wp_mcp_test_bundler . '/vendor/composer/jetpack_autoload_classmap.php', '<?php return ' . var_export( $bundled_manifest, true ) . ';' );
 
 		// The canonical Composer fallback must not mask a plugin that fails to register its own manifest.
@@ -162,6 +175,7 @@ $wp_mcp_test_result = array(
 	'class_file'          => ( new ReflectionClass( McpAdapter::class ) )->getFileName(),
 	'directory'           => defined( 'WP_MCP_DIR' ) ? WP_MCP_DIR : null,
 	'plugin_loaded'       => class_exists( 'WP\\MCP\\Plugin', false ),
+	'plugin_file'         => class_exists( 'WP\\MCP\\Plugin', false ) ? ( new ReflectionClass( 'WP\\MCP\\Plugin' ) )->getFileName() : null,
 	'canonical_directory' => $wp_mcp_test_canonical . '/',
 	'notices'             => $wp_mcp_test_notices,
 );

@@ -52,6 +52,23 @@ final class AutoloaderBootstrapTest extends TestCase {
 	}
 
 	/**
+	 * A newer bundled copy that wins arbitration keeps its own directory and is reported.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_newer_bundled_copy_wins_and_is_reported(): void {
+		$result = $this->bootstrap_wordpress( 'newer' );
+
+		$this->assertFalse( $result['before_class_loaded'] );
+		$this->assertSame( '9.9.9', $result['version'] );
+		$this->assertStringContainsString( '/mcp-adapter-bundler-', $result['class_file'] );
+		$this->assertStringContainsString( '/mcp-adapter-bundler-', $result['plugin_file'] );
+		$this->assertSame( dirname( $result['class_file'] ) . '/', $result['directory'] );
+		$this->assertCount( 1, $result['notices'] );
+		$this->assertStringContainsString( 'Another version of MCP Adapter is already loaded', $result['notices'][0] );
+	}
+
+	/**
 	 * A class that PHP has already loaded cannot be replaced by version arbitration.
 	 *
 	 * @since n.e.x.t
