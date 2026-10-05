@@ -54,7 +54,7 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertNotNull( $ability );
 		$this->assertEquals( 'mcp-adapter/discover-abilities', $ability->get_name() );
 		$this->assertEquals( 'Discover Abilities', $ability->get_label() );
-		$this->assertStringContainsString( 'Discover all available WordPress abilities', $ability->get_description() );
+		$this->assertStringContainsString( 'Searches the abilities that this site exposes through MCP', $ability->get_description() );
 	}
 
 	public function test_check_permission_with_logged_in_user(): void {
@@ -410,12 +410,27 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertNotEmpty( $result['abilities'] );
 	}
 
+	public function test_registered_ability_searches_within_its_schemas(): void {
+		$ability = wp_get_ability( 'mcp-adapter/discover-abilities' );
+
+		$result = $ability->execute( array( 'query' => 'always allowed' ) );
+		$this->assertIsArray( $result, 'The result must pass output schema validation.' );
+		$this->assertSame( 'test/always-allowed', $result['abilities'][0]['name'] );
+
+		$browse = $ability->execute( array() );
+		$this->assertIsArray( $browse, 'A browse result must pass output schema validation.' );
+		$this->assertArrayHasKey( 'categories', $browse );
+
+		$this->assertInstanceOf( WP_Error::class, $ability->execute( array( 'limit' => 0 ) ) );
+	}
+
 	public function test_ability_has_correct_schema(): void {
 		$ability = wp_get_ability( 'mcp-adapter/discover-abilities' );
 
 		$input_schema = $ability->get_input_schema();
 		$this->assertIsArray( $input_schema );
-		$this->assertEmpty( $input_schema );
+		$this->assertSame( array( 'query', 'category', 'limit', 'offset' ), array_keys( $input_schema['properties'] ) );
+		$this->assertArrayNotHasKey( 'required', $input_schema );
 
 		$output_schema = $ability->get_output_schema();
 		$this->assertIsArray( $output_schema );

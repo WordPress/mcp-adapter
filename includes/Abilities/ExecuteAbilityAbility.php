@@ -37,18 +37,18 @@ final class ExecuteAbilityAbility {
 			'mcp-adapter/execute-ability',
 			array(
 				'label'               => 'Execute Ability',
-				'description'         => 'Execute a WordPress ability with the provided parameters. This is the primary execution layer that can run any registered ability.',
+				'description'         => 'Runs one ability that this site exposes through MCP and returns its result. The effect is the effect of the target ability, which can read, create, change, or delete site data; its annotations show which applies. Before it runs, the parameters are validated against its input schema and the permission check of the ability applies to the current user; a failure there returns a tool error. A failure while the ability runs returns success false with an error message.',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
 						'ability_name' => array(
 							'type'        => 'string',
-							'description' => 'The full name of the ability to execute',
+							'description' => 'Ability name with its namespace, for example "core/get-site-info", as returned by mcp-adapter-discover-abilities. Only abilities exposed through MCP are accepted.',
 						),
 						'parameters'   => array(
 							'type'        => 'object',
-							'description' => 'Parameters to pass to the ability',
+							'description' => 'Arguments for the target ability, as an object that matches its input schema. An empty object means no input.',
 						),
 					),
 					'required'   => array( 'ability_name', 'parameters' ),
@@ -56,7 +56,10 @@ final class ExecuteAbilityAbility {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success' => array( 'type' => 'boolean' ),
+						'success' => array(
+							'type'        => 'boolean',
+							'description' => 'Whether the ability ran without an error.',
+						),
 						'data'    => array(
 							'type'        => array(
 								'object',
@@ -67,11 +70,11 @@ final class ExecuteAbilityAbility {
 								'boolean',
 								'null',
 							),
-							'description' => 'The result data from the ability execution',
+							'description' => 'The result of the ability. Present when success is true.',
 						),
 						'error'   => array(
 							'type'        => 'string',
-							'description' => 'Error message if execution failed',
+							'description' => 'The error message. Present when success is false.',
 						),
 					),
 					'required'   => array( 'success' ),

@@ -10,7 +10,7 @@ The MCP Adapter supports two approaches for exposing WordPress abilities to AI a
 
 The default server is created automatically when the plugin loads. It exposes three meta-tools that let AI agents dynamically discover and execute abilities with `meta.public=true` or an explicit `meta.mcp.public=true`. An explicit `meta.mcp.public=false` opts an otherwise public ability out of MCP:
 
-1. **`mcp-adapter-discover-abilities`** — Lists all publicly available abilities
+1. **`mcp-adapter-discover-abilities`** — Searches the publicly available abilities and returns a ranked, paged result
 2. **`mcp-adapter-get-ability-info`** — Retrieves the full schema for a specific ability
 3. **`mcp-adapter-execute-ability`** — Executes an ability with provided parameters
 
@@ -245,7 +245,7 @@ The MCP Adapter uses a **layered tooling approach** where a small set of meta-ab
 
 **The Solution**: Rather than exposing each WordPress ability as a separate MCP tool, the default server exposes just **three strategic meta-abilities** that act as a gateway:
 
-1. **Discover** (`mcp-adapter/discover-abilities`) - Lists all available WordPress abilities
+1. **Discover** (`mcp-adapter/discover-abilities`) - Searches the available WordPress abilities
 2. **Get Info** (`mcp-adapter/get-ability-info`) - Retrieves detailed schema for any specific ability
 3. **Execute** (`mcp-adapter/execute-ability`) - Executes any ability with provided parameters
 
@@ -261,29 +261,44 @@ The AI agent uses these three tools in combination to systematically explore and
 
 ### 1. Discover Abilities (`mcp-adapter/discover-abilities`)
 
-**Purpose**: Lists all WordPress abilities that are publicly available via MCP.
+**Purpose**: Searches the WordPress abilities that are publicly available via MCP. The response size depends on `limit`, not on how many abilities the site registers.
 
-**MCP Method**: `tools/list`
+**MCP Method**: `tools/call` with tool name `mcp-adapter-discover-abilities`
 
-**Security**: 
+**Input Parameters** (all optional):
+- `query`: Words that describe the operation, for example `create post`. Each word matches literally against names, labels, categories, and descriptions, so synonyms do not match. Empty or omitted lists all exposed abilities.
+- `category`: A category slug. A browse response lists the slugs in `categories`.
+- `limit`: Results per page, from 1 to 50. Default 20.
+- `offset`: Number of results to skip. Default 0.
+
+**Security**:
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_discover_abilities_capability` filter)
-- Only returns abilities with effective MCP public exposure
+- Only returns abilities with effective MCP public exposure and MCP type `tool`
 
 **Behavior**:
-- Scans all registered WordPress abilities
-- Excludes abilities starting with `mcp-adapter/` (prevents self-referencing)
-- Filters to only include abilities exposed by `meta.public=true` or `meta.mcp.public=true`
-- Returns ability name, label, and description for each public ability
+- Splits the query into terms, drops words shorter than 3 characters and common stopwords, and removes plural suffixes.
+- Matches each term by substring against the name, label, category, and description. A name match scores highest, then label, category, and description. The whole query in the name or label adds a bonus.
+- Returns the abilities that match every term. When no ability matches every term, it returns the abilities that match at least one term and lists the missed terms in `partial_matches`.
+- An empty query, or a query with no match, adds a `categories` overview with the ability count per category.
+- Each result has an `input` signature (parameter names and types; `*` marks required) and the `annotations` that are `true`. An agent can often call execute without a get-info call.
 
 **Output Format**:
 ```json
 {
+  "query": "create post",
+  "total": 1,
+  "offset": 0,
+  "limit": 20,
+  "has_more": false,
   "abilities": [
     {
       "name": "my-plugin/create-post",
-      "label": "Create Post", 
-      "description": "Creates a new WordPress post"
+      "label": "Create Post",
+      "description": "Creates a new WordPress post",
+      "category": "content",
+      "input": "title* (string), status (enum: draft|publish)",
+      "annotations": []
     }
   ]
 }
@@ -293,7 +308,6 @@ The AI agent uses these three tools in combination to systematically explore and
 - `readOnlyHint`: `true` (does not modify data)
 - `destructiveHint`: `false` (safe operation)
 - `idempotentHint`: `true` (consistent results)
-- `openWorldHint`: `false` (works with known abilities only)
 
 ### 2. Get Ability Info (`mcp-adapter/get-ability-info`)
 

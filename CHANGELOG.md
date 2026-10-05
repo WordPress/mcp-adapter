@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `mcp-adapter/discover-abilities` (tool `mcp-adapter-discover-abilities`) searches instead of listing every ability. It accepts optional `query`, `category`, `limit` (default 20, at most 50), and `offset`, and returns ranked results with `total`, `has_more`, an `input` signature, and true annotations per result. An empty query, or a query with no match, adds a per-category count. Before, it took no input and returned every public ability in one response; callers that rely on the full list must page with `offset`.
+- Clearer tool, parameter, and output field descriptions for `mcp-adapter/get-ability-info` and `mcp-adapter/execute-ability`. Their behavior is unchanged.
+
 ## [0.7.0] - 2026-10-02
 
 ### Breaking Changes
