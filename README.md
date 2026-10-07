@@ -44,5 +44,8 @@ Connect via WP-CLI over STDIO, or point an HTTP client at `/wp-json/mcp/mcp-adap
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, coding standards, and the contribution workflow, and the [Testing Guide](docs/guides/testing.md) for running the test suite.
 
+## Attribution
+
+Model Context Protocol, MCP, and the [MCP logo](https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg) are [trademarks of LF Projects, LLC](https://lfprojects.org/policies/trademark-policy/), and are used here solely for informational purposes. 
 ## License
 [GPL-2.0-or-later](https://spdx.org/licenses/GPL-2.0-or-later.html)

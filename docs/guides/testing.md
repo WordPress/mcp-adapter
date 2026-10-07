@@ -4,7 +4,7 @@ This guide explains how to run and write tests for the MCP Adapter using `wp-env
 
 ## Prerequisites
 
-- Node.js 22.x (NVM recommended)
+- Node.js 24.15+ (NVM recommended)
 - Docker
 - Git
 

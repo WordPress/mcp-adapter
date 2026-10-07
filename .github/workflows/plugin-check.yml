@@ -66,5 +66,6 @@ jobs:
           exclude-directories: |
             .github
             .wordpress-org
+            bin
             docs
             tests
