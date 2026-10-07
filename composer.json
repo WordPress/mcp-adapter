@@ -56,7 +56,7 @@
 	},
 	"require": {
 		"php": "^7.4 || ^8.0",
-		"automattic/jetpack-autoloader": "^5.0",
+		"automattic/jetpack-autoloader": "^6.0",
 		"wordpress/php-mcp-schema": "^0.2.0",
 		"ext-json": "*"
 	},
@@ -66,8 +66,8 @@
 		"php-stubs/wp-cli-stubs": "^2.12",
 		"phpcompatibility/phpcompatibility-wp": "^3.0.0-alpha",
 		"phpstan/extension-installer": "^1.3",
-		"phpstan/php-8-stubs": "^0.4.41",
-		"phpstan/phpstan": "^2.2.14",
+		"phpstan/php-8-stubs": "^0.4.43",
+		"phpstan/phpstan": "^2.2.16",
 		"phpstan/phpstan-deprecation-rules": "^2.0.5",
 		"phpunit/phpunit": "^9.6",
 		"slevomat/coding-standard": "^8.0",

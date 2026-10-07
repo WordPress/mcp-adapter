@@ -37,6 +37,13 @@ jobs:
           coverage: none
           tools: composer:v2
 
+      # The Jetpack Autoloader adds autoload-dev paths to its manifest even
+      # with --no-dev, and ignores exclude-from-classmap since 5.0.23. The
+      # ZIP omits tests/, so any test class left in the manifest is a fatal
+      # require on lookup (#283). Removing tests/ leaves nothing to map.
+      - name: Remove test sources from the release build
+        run: rm -rf tests
+
       - name: Install Composer dependencies
         uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
         with:
@@ -63,6 +70,12 @@ jobs:
         run: |
           npm run plugin-zip
 
+      - name: Extract plugin ZIP for verification and deployment
+        run: unzip -o mcp-adapter.zip -d build
+
+      - name: Verify autoloader manifests against the ZIP
+        run: php bin/verify-release-manifests.php build/mcp-adapter
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -76,9 +89,6 @@ jobs:
           tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract plugin ZIP for deployment
-        run: unzip -o mcp-adapter.zip -d build
 
       - name: Deploy to WordPress.org
         if: ${{ !github.event.release.prerelease }}

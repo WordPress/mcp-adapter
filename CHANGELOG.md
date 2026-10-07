@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.7.0] - 2026-09-23
+## [0.7.0] - 2026-10-02
 
 ### Breaking Changes
 - Schema-backed MCP revisions are exactly `2025-11-25` and `2026-07-28`. `2025-06-18` and `2024-11-05` no longer have their own DTOs; they are negotiated as legacy identifiers and served through the `2025-11-25` schema (see Added). `McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS` now lists only the schema-backed revisions; legacy identifiers moved to `McpVersionNegotiator::LEGACY_PROTOCOL_VERSIONS`.
