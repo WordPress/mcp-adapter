@@ -21,8 +21,8 @@ trait McpAbilityHelperTrait {
 	/**
 	 * Checks if ability is publicly exposed via MCP.
 	 *
-	 * Validates against the ability's mcp.public metadata flag.
-	 * Only abilities with mcp.public=true are accessible via default MCP server.
+	 * Validates against the ability's resolved mcp.public metadata flag.
+	 * Only abilities with effective MCP public exposure are accessible via default MCP server.
 	 *
 	 * @param string $ability_name The ability name to check.
 	 *
@@ -35,10 +35,7 @@ trait McpAbilityHelperTrait {
 			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
 		}
 
-		$meta          = $ability->get_meta();
-		$is_public_mcp = $meta['mcp']['public'] ?? false;
-
-		if ( ! $is_public_mcp ) {
+		if ( ! McpAbilityExposure::is_public( $ability ) ) {
 			return new WP_Error(
 				'ability_not_public_mcp',
 				sprintf( 'Ability "%s" is not exposed via MCP (mcp.public!=true)', $ability_name )
@@ -59,9 +56,7 @@ trait McpAbilityHelperTrait {
 	 * @return bool True if publicly exposed, false otherwise.
 	 */
 	protected static function is_ability_mcp_public( \WP_Ability $ability ): bool {
-		$meta = $ability->get_meta();
-
-		return (bool) ( $meta['mcp']['public'] ?? false );
+		return McpAbilityExposure::is_public( $ability );
 	}
 
 	/**

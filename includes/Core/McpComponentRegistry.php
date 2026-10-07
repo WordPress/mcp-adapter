@@ -10,16 +10,17 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Core;
 
+use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
+use WP\McpSchema\Schema;
+use WP\McpSchema\Schemas;
 use WP_Error;
 
 /**
@@ -70,6 +71,13 @@ class McpComponentRegistry {
 	private McpObservabilityHandlerInterface $observability_handler;
 
 	/**
+	 * Schema catalogs used to validate component availability per revision.
+	 *
+	 * @var \WP\McpSchema\Schemas
+	 */
+	private Schemas $schemas;
+
+	/**
 	 * Whether to record component registration.
 	 *
 	 * @var bool
@@ -82,15 +90,18 @@ class McpComponentRegistry {
 	 * @param \WP\MCP\Core\McpServer $mcp_server MCP server instance.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface $error_handler Error handler instance.
 	 * @param \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface $observability_handler Observability handler instance.
+	 * @param \WP\McpSchema\Schemas $schemas Server-owned exact schemas.
 	 */
 	public function __construct(
 		McpServer $mcp_server,
 		McpErrorHandlerInterface $error_handler,
-		McpObservabilityHandlerInterface $observability_handler
+		McpObservabilityHandlerInterface $observability_handler,
+		Schemas $schemas
 	) {
 		$this->mcp_server            = $mcp_server;
 		$this->error_handler         = $error_handler;
 		$this->observability_handler = $observability_handler;
+		$this->schemas               = $schemas;
 
 		/**
 		 * Filters whether component registration events should be recorded for observability.
@@ -136,11 +147,8 @@ class McpComponentRegistry {
 	private function register_single_tool( $tool_item ): void {
 		// Case 0: McpTool instance.
 		if ( $tool_item instanceof McpTool ) {
-			$this->add_mcp_tool( $tool_item );
-
-			/** @var \WP\McpSchema\Server\Tools\DTO\Tool $tool_dto */
-			$tool_dto = $tool_item->get_protocol_dto();
-			$this->track_registration( 'tool', $tool_dto->getName(), 'success' );
+			$added = $this->add_mcp_tool( $tool_item );
+			$this->track_registration( 'tool', $tool_item->get_name(), $added ? 'success' : 'failed' );
 
 			return;
 		}
@@ -167,14 +175,15 @@ class McpComponentRegistry {
 	 *
 	 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool McpTool instance.
 	 *
-	 * @return void
+	 * @return bool True when the tool was registered.
 	 * @since 0.3.0
 	 *
 	 */
-	private function add_mcp_tool( McpTool $mcp_tool ): void {
-		/** @var \WP\McpSchema\Server\Tools\DTO\Tool $tool_dto */
-		$tool_dto  = $mcp_tool->get_protocol_dto();
-		$tool_name = $tool_dto->getName();
+	private function add_mcp_tool( McpTool $mcp_tool ): bool {
+		$tool_name = $mcp_tool->get_name();
+		if ( ! $this->has_any_projection( $mcp_tool, 'tool', $tool_name ) ) {
+			return false;
+		}
 
 		if ( isset( $this->mcp_tools[ $tool_name ] ) ) {
 			$this->error_handler->log(
@@ -183,10 +192,12 @@ class McpComponentRegistry {
 				'warning'
 			);
 
-			return;
+			return false;
 		}
 
 		$this->mcp_tools[ $tool_name ] = $mcp_tool;
+
+		return true;
 	}
 
 	/**
@@ -248,8 +259,8 @@ class McpComponentRegistry {
 			return;
 		}
 
-		$this->add_mcp_tool( $mcp_tool );
-		$this->track_registration( 'ability_tool', $ability_name, 'success' );
+		$added = $this->add_mcp_tool( $mcp_tool );
+		$this->track_registration( 'ability_tool', $ability_name, $added ? 'success' : 'failed' );
 	}
 
 	/**
@@ -275,11 +286,8 @@ class McpComponentRegistry {
 	private function register_single_resource( $resource_item ): void {
 		// Case 0: McpResource instance.
 		if ( $resource_item instanceof McpResource ) {
-			$this->add_mcp_resource( $resource_item );
-
-			/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
-			$resource_dto = $resource_item->get_protocol_dto();
-			$this->track_registration( 'resource', $resource_dto->getUri(), 'success' );
+			$added = $this->add_mcp_resource( $resource_item );
+			$this->track_registration( 'resource', $resource_item->get_uri(), $added ? 'success' : 'failed' );
 
 			return;
 		}
@@ -312,9 +320,10 @@ class McpComponentRegistry {
 	 *
 	 */
 	private function add_mcp_resource( McpResource $mcp_resource ): bool {
-		/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
-		$resource_dto = $mcp_resource->get_protocol_dto();
-		$uri          = $resource_dto->getUri();
+		$uri = $mcp_resource->get_uri();
+		if ( ! $this->has_any_projection( $mcp_resource, 'resource', $uri ) ) {
+			return false;
+		}
 
 		if ( isset( $this->mcp_resources[ $uri ] ) ) {
 			$this->error_handler->log(
@@ -370,15 +379,13 @@ class McpComponentRegistry {
 		if ( $added ) {
 			$this->track_registration( 'resource', $ability_name, 'success' );
 		} else {
-			/** @var \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto */
-			$resource_dto = $mcp_resource->get_protocol_dto();
 			$this->track_registration(
 				'resource',
 				$ability_name,
 				'failed',
 				array(
 					'failure_reason' => FailureReason::DUPLICATE_URI,
-					'duplicate_uri'  => $resource_dto->getUri(),
+					'duplicate_uri'  => $mcp_resource->get_uri(),
 				)
 			);
 		}
@@ -414,11 +421,8 @@ class McpComponentRegistry {
 	private function register_single_prompt( $prompt_item ): void {
 		// Case 0: McpPrompt instance.
 		if ( $prompt_item instanceof McpPrompt ) {
-			$this->add_mcp_prompt( $prompt_item );
-
-			/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt_dto */
-			$prompt_dto = $prompt_item->get_protocol_dto();
-			$this->track_registration( 'prompt', $prompt_dto->getName(), 'success' );
+			$added = $this->add_mcp_prompt( $prompt_item );
+			$this->track_registration( 'prompt', $prompt_item->get_name(), $added ? 'success' : 'failed' );
 
 			return;
 		}
@@ -461,14 +465,15 @@ class McpComponentRegistry {
 	 *
 	 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt McpPrompt instance.
 	 *
-	 * @return void
+	 * @return bool True when the prompt was registered.
 	 * @since 0.3.0
 	 *
 	 */
-	private function add_mcp_prompt( McpPrompt $mcp_prompt ): void {
-		/** @var \WP\McpSchema\Server\Prompts\DTO\Prompt $prompt */
-		$prompt      = $mcp_prompt->get_protocol_dto();
-		$prompt_name = $prompt->getName();
+	private function add_mcp_prompt( McpPrompt $mcp_prompt ): bool {
+		$prompt_name = $mcp_prompt->get_name();
+		if ( ! $this->has_any_projection( $mcp_prompt, 'prompt', $prompt_name ) ) {
+			return false;
+		}
 
 		if ( isset( $this->mcp_prompts[ $prompt_name ] ) ) {
 			$this->error_handler->log(
@@ -477,10 +482,12 @@ class McpComponentRegistry {
 				'warning'
 			);
 
-			return;
+			return false;
 		}
 
 		$this->mcp_prompts[ $prompt_name ] = $mcp_prompt;
+
+		return true;
 	}
 
 	/**
@@ -507,9 +514,9 @@ class McpComponentRegistry {
 			return;
 		}
 
-		$this->add_mcp_prompt( $mcp_prompt );
+		$added = $this->add_mcp_prompt( $mcp_prompt );
 
-		$this->track_registration( 'prompt', $prompt_name, 'success' );
+		$this->track_registration( 'prompt', $prompt_name, $added ? 'success' : 'failed' );
 	}
 
 	/**
@@ -564,45 +571,140 @@ class McpComponentRegistry {
 			return;
 		}
 
-		$this->add_mcp_prompt( $mcp_prompt );
+		$added = $this->add_mcp_prompt( $mcp_prompt );
 
-		$this->track_registration( 'prompt', $ability_name, 'success' );
+		$this->track_registration( 'prompt', $ability_name, $added ? 'success' : 'failed' );
 	}
 
 	/**
 	 * Get all tools registered to the server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Tools\DTO\Tool>
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return array<string, \WP\McpSchema\Record\Tool>
 	 */
-	public function get_tools(): array {
-		return array_map(
-			static fn( McpTool $mcp_tool ): ToolDto => $mcp_tool->get_protocol_dto(),
-			$this->mcp_tools
-		);
+	public function get_tools( Schema $schema ): array {
+		$tools = array();
+		foreach ( $this->mcp_tools as $name => $mcp_tool ) {
+			if ( ! $mcp_tool->is_available_for( $schema ) ) {
+				continue;
+			}
+
+			$tool           = $mcp_tool->get_protocol_record( $schema );
+			$tools[ $name ] = $tool;
+		}
+
+		return $tools;
 	}
 
 	/**
 	 * Get all resources registered to the server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Resources\DTO\Resource>
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return array<string, \WP\McpSchema\Record\Resource>
 	 */
-	public function get_resources(): array {
-		return array_map(
-			static fn( McpResource $mcp_resource ): ResourceDto => $mcp_resource->get_protocol_dto(),
-			$this->mcp_resources
-		);
+	public function get_resources( Schema $schema ): array {
+		$resources = array();
+		foreach ( $this->mcp_resources as $uri => $mcp_resource ) {
+			if ( ! $mcp_resource->is_available_for( $schema ) ) {
+				continue;
+			}
+
+			$resource          = $mcp_resource->get_protocol_record( $schema );
+			$resources[ $uri ] = $resource;
+		}
+
+		return $resources;
 	}
 
 	/**
 	 * Get all prompts registered to the server.
 	 *
-	 * @return array<string, \WP\McpSchema\Server\Prompts\DTO\Prompt>
+	 * @param \WP\McpSchema\Schema $schema Selected exact schema.
+	 * @return array<string, \WP\McpSchema\Record\Prompt>
 	 */
-	public function get_prompts(): array {
-		return array_map(
-			static fn( McpPrompt $mcp_prompt ): PromptDto => $mcp_prompt->get_protocol_dto(),
-			$this->mcp_prompts
-		);
+	public function get_prompts( Schema $schema ): array {
+		$prompts = array();
+		foreach ( $this->mcp_prompts as $name => $mcp_prompt ) {
+			if ( ! $mcp_prompt->is_available_for( $schema ) ) {
+				continue;
+			}
+
+			$prompt           = $mcp_prompt->get_protocol_record( $schema );
+			$prompts[ $name ] = $prompt;
+		}
+
+		return $prompts;
+	}
+
+	/**
+	 * Get the neutral tool count.
+	 *
+	 * @since 0.7.0
+	 */
+	public function count_tools(): int {
+		return count( $this->mcp_tools );
+	}
+
+	/**
+	 * Get the neutral resource count.
+	 *
+	 * @since 0.7.0
+	 */
+	public function count_resources(): int {
+		return count( $this->mcp_resources );
+	}
+
+	/**
+	 * Get the neutral prompt count.
+	 *
+	 * @since 0.7.0
+	 */
+	public function count_prompts(): int {
+		return count( $this->mcp_prompts );
+	}
+
+	/**
+	 * Project one component through all supported revisions.
+	 *
+	 * @param \WP\MCP\Domain\Contracts\McpComponentInterface $component Component.
+	 * @param string $type Component type.
+	 * @param string $name Component identifier.
+	 */
+	private function has_any_projection( McpComponentInterface $component, string $type, string $name ): bool {
+		$available = false;
+		$errors    = array();
+		foreach ( McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS as $revision ) {
+			$schema = $this->schemas->forVersion( $revision );
+			if ( $component->is_available_for( $schema ) ) {
+				$available = true;
+				continue;
+			}
+
+			$throwable = $component->get_projection_error( $revision );
+			$message   = sprintf(
+				'%1$s "%2$s" is unavailable for MCP revision %3$s: %4$s',
+				ucfirst( $type ),
+				$name,
+				$revision,
+				$throwable instanceof \Throwable ? $throwable->getMessage() : 'schema projection failed'
+			);
+			$errors[]  = $message;
+			$this->error_handler->log(
+				$message,
+				array(
+					'component_type' => $type,
+					'component_name' => $name,
+					'revision'       => $revision,
+				),
+				'warning'
+			);
+		}
+
+		if ( ! $available ) {
+			_doing_it_wrong( __METHOD__, esc_html( implode( ' ', $errors ) ), '0.7.0' );
+		}
+
+		return $available;
 	}
 
 	/**
@@ -629,7 +731,20 @@ class McpComponentRegistry {
 	 *
 	 */
 	public function get_mcp_resource( string $resource_uri ): ?McpResource {
-		return $this->mcp_resources[ $resource_uri ] ?? null;
+		if ( isset( $this->mcp_resources[ $resource_uri ] ) ) {
+			return $this->mcp_resources[ $resource_uri ];
+		}
+
+		// URI schemes are case-insensitive (RFC 3986 §3.1): clients that lowercase
+		// the scheme would otherwise miss a resource advertised with mixed case.
+		$folded = McpValidator::fold_uri_scheme( $resource_uri );
+		foreach ( $this->mcp_resources as $stored_uri => $mcp_resource ) {
+			if ( McpValidator::fold_uri_scheme( (string) $stored_uri ) === $folded ) {
+				return $mcp_resource;
+			}
+		}
+
+		return null;
 	}
 
 	/**

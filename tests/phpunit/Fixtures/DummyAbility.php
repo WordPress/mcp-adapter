@@ -511,7 +511,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Prompt with invalid annotations (should be filtered)
+		// Prompt with invalid annotations (prompt templates carry no annotations, so none reach the wire)
 		wp_register_ability(
 			'test/prompt-invalid-annotations',
 			array(
@@ -751,7 +751,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Tool with some invalid icons (should filter out invalid, keep valid)
+		// Tool with one icon missing src (fails projection, so the tool is rejected at registration)
 		wp_register_ability(
 			'test/with-mixed-icons',
 			array(
@@ -913,12 +913,12 @@ final class DummyAbility {
 			)
 		);
 
-		// Resource with invalid mimeType - should silently skip mimeType
+		// Resource with a parameterized mimeType - should emit it as declared.
 		wp_register_ability(
-			'test/resource-invalid-mimetype',
+			'test/resource-parameterized-mimetype',
 			array(
-				'label'               => 'Resource Invalid MimeType',
-				'description'         => 'A resource with invalid mimeType for testing validation',
+				'label'               => 'Resource Parameterized MimeType',
+				'description'         => 'A resource with a parameterized mimeType for testing pass-through behavior',
 				'category'            => 'test',
 				'execute_callback'    => static function () {
 					return 'content';
@@ -930,8 +930,8 @@ final class DummyAbility {
 					'mcp' => array(
 						'public'   => true,
 						'type'     => 'resource',
-						'uri'      => 'WordPress://local/resource-invalid-mimetype',
-						'mimeType' => 'not//valid',  // Invalid mime type.
+						'uri'      => 'WordPress://local/resource-parameterized-mimetype',
+						'mimeType' => 'text/html;profile=mcp-app',
 					),
 				),
 			)
@@ -1194,7 +1194,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Prompt with some invalid icons (should filter out invalid, keep valid).
+		// Prompt with an invalid icon; schema projection rejects the whole prompt.
 		wp_register_ability(
 			'test/prompt-with-mixed-icons',
 			array(
@@ -1210,7 +1210,7 @@ final class DummyAbility {
 				},
 				'meta'                => array(
 					'mcp' => array(
-						'public' => true,
+						'public' => false, // Register explicitly in rejection tests, not default-server discovery.
 						'type'   => 'prompt',
 						'icons'  => array(
 							array(
@@ -1407,7 +1407,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Prompt with invalid mcp.arguments (missing name) - should return WP_Error.
+		// Prompt with an argument missing its name; schema projection rejects it.
 		wp_register_ability(
 			'test/prompt-invalid-explicit-args-no-name',
 			array(
@@ -1422,7 +1422,7 @@ final class DummyAbility {
 				},
 				'meta'                => array(
 					'mcp' => array(
-						'public'    => true,
+						'public'    => false, // Register explicitly in rejection tests.
 						'type'      => 'prompt',
 						'arguments' => array(
 							array(
@@ -1436,7 +1436,7 @@ final class DummyAbility {
 			)
 		);
 
-		// Prompt with invalid mcp.arguments (non-array argument) - should return WP_Error.
+		// Prompt with a non-array argument; schema projection rejects it.
 		wp_register_ability(
 			'test/prompt-invalid-explicit-args-not-array',
 			array(
@@ -1451,7 +1451,7 @@ final class DummyAbility {
 				},
 				'meta'                => array(
 					'mcp' => array(
-						'public'    => true,
+						'public'    => false, // Register explicitly in rejection tests.
 						'type'      => 'prompt',
 						'arguments' => array(
 							'not-an-array', // Invalid - should be an array.

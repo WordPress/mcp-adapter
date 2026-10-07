@@ -39,8 +39,8 @@ final class McpTransportContextTest extends TestCase {
 	/**
 	 * Set up before each test.
 	 */
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 		$this->server = $this->makeServer();
 	}
 

@@ -22,8 +22,8 @@ final class McpObservabilityHelperTraitTest extends TestCase {
 	 */
 	private $trait_user;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		// Create an anonymous class that uses the trait
 		$this->trait_user = new class() {

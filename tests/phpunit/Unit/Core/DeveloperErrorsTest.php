@@ -16,14 +16,16 @@ final class DeveloperErrorsTest extends TestCase {
 
 	private McpAdapter $adapter;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 		$this->adapter = McpAdapter::instance();
 
 		// Clear any existing servers
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 	}
 

@@ -19,6 +19,10 @@ if ( ! function_exists( __NAMESPACE__ . '\format_items' ) ) {
 	 * @param array<string>|string $fields Named fields for each item of data. Can be array or comma-separated list.
 	 */
 	function format_items( $format, $items, $fields ) {
-		// Stub implementation for testing
+		\WP\MCP\Tests\Stubs\WpCliStubs::$formatted_output = array(
+			'format' => $format,
+			'items'  => $items,
+			'fields' => $fields,
+		);
 	}
 }

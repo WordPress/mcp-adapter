@@ -9,22 +9,19 @@ The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, al
 ## Prerequisites
 
 - **PHP 7.4 or higher**
-- **WordPress 6.9 or higher**
-- **Composer** (recommended)
+- **WordPress 6.9 or higher** (Abilities API is built into core — no separate plugin)
 
 ## Quick Start
 
 ### Step 1: Install MCP Adapter
 
-**Recommended: Composer Package**
-```bash
-composer require wordpress/mcp-adapter
-```
+MCP Adapter is a WordPress plugin. Install and activate it:
 
-**Alternative: WordPress Plugin**
 ```bash
 wp plugin install https://github.com/WordPress/mcp-adapter/releases/latest/download/mcp-adapter.zip --activate
 ```
+
+Or download the latest release from [GitHub](https://github.com/WordPress/mcp-adapter/releases/latest) and install it like any other plugin. See the [Installation Guide](installation.md) for more options.
 
 ### Step 2: Register a Simple Ability
 
@@ -36,6 +33,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/get-site-info', [
         'label' => 'Get Site Information',
         'description' => 'Retrieves basic information about the current WordPress site',
+        'category' => 'site',
         'input_schema' => [
             'type' => 'object',
             'properties' => [
@@ -69,36 +67,7 @@ add_action( 'wp_abilities_api_init', function() {
 });
 ```
 
-### Step 3: Initialize MCP Adapter
-
-**If using Composer with Jetpack Autoloader (Recommended):**
-```php
-<?php
-// Load Jetpack autoloader (handles version conflicts)
-require_once __DIR__ . '/vendor/autoload_packages.php';
-
-use WP\MCP\Core\McpAdapter;
-
-// Initialize the adapter
-McpAdapter::instance();
-```
-
-**If using standard Composer autoloader:**
-```php
-<?php
-// Load standard Composer autoloader
-require_once __DIR__ . '/vendor/autoload.php';
-
-use WP\MCP\Core\McpAdapter;
-
-// Initialize the adapter
-McpAdapter::instance();
-```
-
-**If using WordPress Plugin:**
-The adapter initializes automatically when the plugin is activated.
-
-### Step 4: Create Your MCP Server (Optional)
+### Step 3: Create Your MCP Server (Optional)
 
 The adapter creates a default server automatically, but you can create custom servers:
 
@@ -119,7 +88,7 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
 });
 ```
 
-### Step 5: Test Your Setup
+### Step 4: Test Your Setup
 
 Test your MCP server:
 
@@ -145,8 +114,8 @@ curl -X POST "https://yoursite.com/wp-json/mcp/mcp-adapter-default-server" \
 
 ## Next Steps
 
+- **[Installation Guide](./installation.md)** - Detailed installation options
 - **[Creating Abilities](../guides/creating-abilities.md)** - Build tools, resources, and prompts
-- **[Installation Guide](installation.md)** - Detailed installation options
 - **[Architecture Overview](../architecture/overview.md)** - Understand system design
 - **[Error Handling](../guides/error-handling.md)** - Custom logging and monitoring
 - **[Transport Permissions](../guides/transport-permissions.md)** - Authentication and authorization

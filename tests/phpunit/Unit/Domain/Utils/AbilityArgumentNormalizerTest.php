@@ -93,9 +93,13 @@ final class AbilityArgumentNormalizerTest extends TestCase {
 	}
 
 	/**
-	 * Test that null parameters remain null even with input schema.
+	 * Test that null parameters normalize to an empty array when the ability has an input schema.
+	 *
+	 * A schema-defining ability validates its input against the schema. null is
+	 * rejected as "not of type object"; an empty array is a valid empty object.
+	 * See issue #229.
 	 */
-	public function test_null_parameters_remain_null_with_schema(): void {
+	public function test_null_parameters_normalized_to_empty_array_with_schema(): void {
 		$ability = $this->create_ability_mock(
 			array(
 				'type'       => 'object',
@@ -107,7 +111,98 @@ final class AbilityArgumentNormalizerTest extends TestCase {
 
 		$result = AbilityArgumentNormalizer::normalize( $ability, null );
 
+		$this->assertIsArray( $result );
+		$this->assertEmpty( $result );
+	}
+
+	/**
+	 * Test that null is preserved when the schema's type explicitly permits null.
+	 *
+	 * A schema typed ["null","object"] declares null as a valid value. Forcing []
+	 * would discard the author's intent, so null must pass through unchanged.
+	 * See issue #229 discussion.
+	 */
+	public function test_null_parameters_preserved_when_schema_permits_null(): void {
+		$ability = $this->create_ability_mock(
+			array(
+				'type'       => array( 'null', 'object' ),
+				'properties' => array(
+					'name' => array( 'type' => 'string' ),
+				),
+			)
+		);
+
+		$result = AbilityArgumentNormalizer::normalize( $ability, null );
+
 		$this->assertNull( $result );
+	}
+
+	/**
+	 * Test that null is preserved when the schema declares a top-level default.
+	 *
+	 * WP_Ability::normalize_input() fills a top-level default only when input is
+	 * null. Forcing [] would skip the default, so null must pass through for the
+	 * Abilities API to apply it. See issue #229 discussion.
+	 */
+	public function test_null_parameters_preserved_when_schema_has_default(): void {
+		$ability = $this->create_ability_mock(
+			array(
+				'type'    => 'array',
+				'items'   => array( 'type' => 'string' ),
+				'default' => array( 'a', 'b' ),
+			)
+		);
+
+		$result = AbilityArgumentNormalizer::normalize( $ability, null );
+
+		$this->assertNull( $result );
+	}
+
+	/**
+	 * Test that an empty {} is kept as null when the schema declares a default.
+	 *
+	 * WP_Ability::normalize_input() applies a top-level default only when input
+	 * is null. An MCP client sends {} to mean "no arguments", so {} (decoded as
+	 * []) must also return null here, otherwise the default is skipped and a
+	 * schema with required fields fails. Issue #229's title covers "empty {} /
+	 * omitted parameters" alike.
+	 */
+	public function test_empty_array_preserved_as_null_when_schema_has_default(): void {
+		$ability = $this->create_ability_mock(
+			array(
+				'type'       => 'object',
+				'required'   => array( 'x' ),
+				'default'    => array( 'x' => 1 ),
+				'properties' => array(
+					'x' => array( 'type' => 'integer' ),
+				),
+			)
+		);
+
+		$result = AbilityArgumentNormalizer::normalize( $ability, array() );
+
+		$this->assertNull( $result );
+	}
+
+	/**
+	 * Test that an empty array still normalizes to [] even when the schema permits null.
+	 *
+	 * Only a null value is preserved; an explicit empty {} from the client stays [].
+	 */
+	public function test_empty_array_normalized_to_empty_array_when_schema_permits_null(): void {
+		$ability = $this->create_ability_mock(
+			array(
+				'type'       => array( 'null', 'object' ),
+				'properties' => array(
+					'name' => array( 'type' => 'string' ),
+				),
+			)
+		);
+
+		$result = AbilityArgumentNormalizer::normalize( $ability, array() );
+
+		$this->assertIsArray( $result );
+		$this->assertEmpty( $result );
 	}
 
 	/**

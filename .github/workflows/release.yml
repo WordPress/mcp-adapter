@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           show-progress: ${{ runner.debug == '1' && 'true' || 'false' }}
           persist-credentials: false
@@ -33,17 +33,30 @@ jobs:
       - name: Set up PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
-          php-version: '8.3'
+          php-version: '8.5'
           coverage: none
           tools: composer:v2
+
+      # The Jetpack Autoloader adds autoload-dev paths to its manifest even
+      # with --no-dev, and ignores exclude-from-classmap since 5.0.23. The
+      # ZIP omits tests/, so any test class left in the manifest is a fatal
+      # require on lookup (#283). Removing tests/ leaves nothing to map.
+      - name: Remove test sources from the release build
+        run: rm -rf tests
 
       - name: Install Composer dependencies
         uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # v4.0.0
         with:
           composer-options: '--no-dev'
+        env:
+          # Give the Jetpack Autoloader the real plugin version for its class
+          # manifest, so "newest copy wins" works when another plugin (e.g.
+          # WooCommerce) bundles an older copy of the WP\MCP\ classes. Without
+          # this, Composer guesses a dev-* version from the git ref.
+          COMPOSER_ROOT_VERSION: ${{ github.event.release.tag_name }}
 
       - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           cache: 'npm'
           node-version-file: '.nvmrc'
@@ -57,6 +70,12 @@ jobs:
         run: |
           npm run plugin-zip
 
+      - name: Extract plugin ZIP for verification and deployment
+        run: unzip -o mcp-adapter.zip -d build
+
+      - name: Verify autoloader manifests against the ZIP
+        run: php bin/verify-release-manifests.php build/mcp-adapter
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -64,8 +83,17 @@ jobs:
           path: mcp-adapter.zip
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: mcp-adapter.zip
+          tag_name: ${{ github.event.release.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to WordPress.org
+        if: ${{ !github.event.release.prerelease }}
+        uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # v2.3.0
+        env:
+          BUILD_DIR: build/mcp-adapter
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}

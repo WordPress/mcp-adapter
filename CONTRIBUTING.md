@@ -10,10 +10,7 @@ Join the `#core-ai` channel [on WordPress Slack](http://wordpress.slack.com) ([s
 
 ## Coding standards
 
-In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/). All code in the MCP Adapter must follow these requirements:
-
-- **WordPress**: 6.9+
-- **PHP**: 7.4+
+In general, all code must follow the [WordPress Coding Standards and best practices](https://developer.wordpress.org/coding-standards/).
 
 We include [several tools](#useful-commands) to help ensure your code meets these standards.
 
@@ -31,10 +28,10 @@ Please see [SECURITY.md](SECURITY.md).
 
 ### Prerequisites
 
-- Node.js: 22.x (NVM recommended)
+- Node.js 24.15+ (NVM recommended)
 - Docker
 - Git
-- Composer: (if you prefer to run the Composer tools locally)
+- Composer (if you prefer to run the Composer tools locally)
 
 You can use Docker and the `wp-env` tool to set up a local development environment, instead of manually installing the specific testing versions of WordPress, PHP, and Composer. For more information, see the [wp-env documentation](https://developer.wordpress.org/block-editor/packages/packages-env/).
 

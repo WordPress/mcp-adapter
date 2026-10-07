@@ -12,10 +12,11 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
-use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Domain\Utils\RevisionProjectionTrait;
+use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Server\Tools\DTO\Tool as ToolDto;
-use WP\McpSchema\Server\Tools\DTO\ToolAnnotations;
+use WP\McpSchema\Record\Tool;
+use WP\McpSchema\Schema;
 use WP_Error;
 
 /**
@@ -41,25 +42,19 @@ use WP_Error;
  * $tool = McpTool::fromAbility($ability);
  * ```
  *
- * McpTool wraps a protocol-only ToolDto for MCP serialization. Internal
+ * McpTool stores revision-neutral configuration for MCP projection. Internal
  * adapter metadata and execution wiring live on this class and are never
- * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ * exposed to MCP clients. Use get_protocol_record() for protocol responses.
  *
  * @since 0.5.0
  */
 final class McpTool implements McpComponentInterface {
-
+	use RevisionProjectionTrait;
+	use ThrowableGuardTrait;
 
 	// =========================================================================
 	// Runtime Properties
 	// =========================================================================
-
-	/**
-	 * Clean Tool DTO (protocol-only).
-	 *
-	 * @var \WP\McpSchema\Server\Tools\DTO\Tool
-	 */
-	private ToolDto $tool;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed tools).
@@ -96,6 +91,13 @@ final class McpTool implements McpComponentInterface {
 	 */
 	private array $observability_context = array();
 
+	/**
+	 * Validated modern parameter-header mappings, or null before collection.
+	 *
+	 * @var array<int, array{name: string, path: list<string>, type: string}>|null
+	 */
+	private ?array $header_annotations = null;
+
 	// =========================================================================
 	// Constructor
 	// =========================================================================
@@ -103,10 +105,10 @@ final class McpTool implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Tools\DTO\Tool $tool The Tool DTO.
+	 * @param array<string, mixed> $tool_data Revision-neutral tool data.
 	 */
-	private function __construct( ToolDto $tool ) {
-		$this->tool = $tool;
+	private function __construct( array $tool_data ) {
+		$this->initialize_protocol_data( $tool_data );
 	}
 
 	// =========================================================================
@@ -129,16 +131,12 @@ final class McpTool implements McpComponentInterface {
 			return new WP_Error( 'mcp_tool_missing_handler', 'Tool configuration must include a callable "handler" field.' );
 		}
 
-		// Prepare input schema - ensure it's an object type for MCP compliance.
-		$input_schema = $config['inputSchema'] ?? array( 'type' => 'object' );
-		if ( ! isset( $input_schema['type'] ) ) {
-			$input_schema['type'] = 'object';
-		}
-
-		// Build tool data array.
+		// A tool without an input schema gets the empty object schema the official SDK
+		// emits for that case. A schema that is set is carried as given; the MCP schema
+		// decides whether it fits.
 		$tool_data = array(
 			'name'        => $config['name'],
-			'inputSchema' => $input_schema,
+			'inputSchema' => $config['inputSchema'] ?? array( 'type' => 'object' ),
 		);
 
 		// Optional fields.
@@ -150,53 +148,29 @@ final class McpTool implements McpComponentInterface {
 			$tool_data['description'] = $config['description'];
 		}
 
-		if ( isset( $config['outputSchema'] ) && is_array( $config['outputSchema'] ) ) {
+		// outputSchema, icons, _meta, annotations, and execution are carried as given;
+		// the schema decides whether they fit.
+		if ( isset( $config['outputSchema'] ) ) {
 			$tool_data['outputSchema'] = $config['outputSchema'];
 		}
 
-		// Validate and prepare icons if set.
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$tool_data['icons'] = $icons_result['valid'];
-			}
+		if ( isset( $config['icons'] ) ) {
+			$tool_data['icons'] = $config['icons'];
 		}
 
-		// Preserve user-provided _meta as-is.
-		if ( isset( $config['meta'] ) && is_array( $config['meta'] ) && ! empty( $config['meta'] ) ) {
+		if ( isset( $config['meta'] ) ) {
 			$tool_data['_meta'] = $config['meta'];
 		}
 
-		// Create the Tool DTO - wrap in try-catch since ToolAnnotations::fromArray() and ToolDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since ToolAnnotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$tool_data['annotations'] = ToolAnnotations::fromArray( $config['annotations'] );
-			}
-
-			$tool = ToolDto::fromArray( $tool_data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_tool_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Tool DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
+		if ( isset( $config['annotations'] ) ) {
+			$tool_data['annotations'] = $config['annotations'];
 		}
 
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpToolValidator::validate_tool_dto( $tool );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
+		if ( isset( $config['execution'] ) ) {
+			$tool_data['execution'] = $config['execution'];
 		}
 
-		$instance          = new self( $tool );
+		$instance          = new self( $tool_data );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
@@ -225,13 +199,13 @@ final class McpTool implements McpComponentInterface {
 			return $tool_data;
 		}
 
-		$instance               = new self( $tool_data['tool'] );
+		$instance               = new self( $tool_data['tool_data'] );
 		$instance->adapter_meta = $tool_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'tool',
-			'tool_name'      => $tool_data['tool']->getName(),
+			'tool_name'      => $tool_data['tool_data']['name'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -244,51 +218,88 @@ final class McpTool implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol record for one revision.
 	 *
-	 * @return \WP\McpSchema\Server\Tools\DTO\Tool
+	 * @param \WP\McpSchema\Schema $schema Selected schema.
+	 * @since 0.7.0
 	 */
-	public function get_protocol_dto(): ToolDto {
-		return $this->tool;
+	public function get_protocol_record( Schema $schema ): Tool {
+		$data = $this->protocol_data();
+		if ( '2026-07-28' === $schema->version() ) {
+			unset( $data['execution'] );
+			$projection_error = $this->get_projection_error( $schema->version() );
+			if ( $projection_error instanceof \Throwable ) {
+				throw $projection_error;
+			}
+			if ( null === $this->header_annotations ) {
+				try {
+					$this->header_annotations = $this->collect_header_annotations( $data['inputSchema'] ?? array() );
+				} catch ( \Throwable $throwable ) {
+					$this->remember_projection_error( $schema->version(), $throwable );
+					throw $throwable;
+				}
+			}
+		}
+
+		return $this->project_record( $schema, Tool::class, $data );
+	}
+
+	/**
+	 * Get the neutral tool name.
+	 *
+	 * @since 0.7.0
+	 */
+	public function get_name(): string {
+		return (string) ( $this->protocol_data()['name'] ?? '' );
+	}
+
+	/**
+	 * Return validated modern HTTP header annotations.
+	 *
+	 * @since 0.7.0
+	 *
+	 * @param \WP\McpSchema\Schema $schema Selected schema used to validate the tool projection.
+	 *
+	 * @return array<int, array{name: string, path: list<string>, type: string}>
+	 */
+	public function get_header_annotations( Schema $schema ): array {
+		if ( '2026-07-28' !== $schema->version() ) {
+			return array();
+		}
+
+		$this->get_protocol_record( $schema );
+
+		return $this->header_annotations ?? array();
 	}
 
 	/**
 	 * Execute the tool.
 	 *
 	 * @param mixed $arguments Tool arguments.
+	 * @param \WP\MCP\Domain\Tools\McpToolCallContext|null $call_context Request context for direct callable handlers; not passed to Abilities.
 	 *
 	 * @return mixed
+	 *
+	 * @since 0.7.0 Added the `$call_context` parameter.
 	 */
-	public function execute( $arguments ) {
+	public function execute( $arguments, ?McpToolCallContext $call_context = null ) {
 		$args = $this->unwrap_input_if_needed( $arguments );
 
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
-
-			try {
-				$result = $this->ability->execute( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
+			$result  = self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		} elseif ( null !== $this->handler ) {
-			try {
-				$result = call_user_func( $this->handler, $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$handler = $this->handler;
+			$result  = self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $args, $call_context ) );
 		} else {
 			return new WP_Error( 'mcp_tool_no_handler', 'No tool execution strategy configured.' );
 		}
 
 		if ( $result instanceof WP_Error ) {
+			return $result;
+		}
+		if ( $result instanceof McpInputRequired ) {
 			return $result;
 		}
 
@@ -299,6 +310,15 @@ final class McpTool implements McpComponentInterface {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Whether this tool delegates execution to a WordPress Ability.
+	 *
+	 * @since 0.7.0
+	 */
+	public function is_ability_backed(): bool {
+		return null !== $this->ability;
 	}
 
 	/**
@@ -353,32 +373,18 @@ final class McpTool implements McpComponentInterface {
 
 		// Ability-backed tools delegate to the ability's permission system.
 		if ( null !== $this->ability ) {
-			$args = AbilityArgumentNormalizer::normalize( $this->ability, $args );
+			$ability = $this->ability;
+			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
 
-			try {
-				return $this->ability->check_permissions( $args );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
 		}
 
 		// Callable-backed tools use their required permission callback.
 		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $args );
+			$callback = $this->permission_callback;
+			$result   = self::guard( 'mcp_permission_check_failed', static fn() => call_user_func( $callback, $args ) );
 
-				return $result instanceof WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return $result instanceof WP_Error ? $result : (bool) $result;
 		}
 
 		// Defensive fallback: should never reach here if factories are used correctly.
@@ -387,7 +393,7 @@ final class McpTool implements McpComponentInterface {
 			'Access denied.',
 			array(
 				'failure_reason' => FailureReason::NO_PERMISSION_STRATEGY,
-				'tool_name'      => $this->tool->getName(),
+				'tool_name'      => $this->get_name(),
 			)
 		);
 	}
@@ -412,5 +418,81 @@ final class McpTool implements McpComponentInterface {
 	 */
 	public function get_observability_context(): array {
 		return $this->observability_context;
+	}
+
+	/**
+	 * Collect and validate the 2026 x-mcp-header definitions.
+	 *
+	 * @param mixed $schema Tool input schema.
+	 * @return array<int, array{name: string, path: list<string>, type: string}>
+	 */
+	private function collect_header_annotations( $schema ): array {
+		$names       = array();
+		$annotations = array();
+		$this->scan_header_annotations( $schema, false, true, array(), $names, $annotations );
+
+		return $annotations;
+	}
+
+	/**
+	 * Scan header annotations and fail a revision projection on invalid placement.
+	 *
+	 * @param mixed $node Schema node.
+	 * @param bool $property_schema Whether this node is a property schema.
+	 * @param bool $reachable Whether its path contains only properties keys.
+	 * @param list<string> $path Property path.
+	 * @param array<string, true> $names Case-insensitive header names.
+	 * @param array<int, array{name: string, path: list<string>, type: string}> $annotations Valid annotations.
+	 */
+	private function scan_header_annotations( $node, bool $property_schema, bool $reachable, array $path, array &$names, array &$annotations ): void {
+		// JSON-decoded schemas may carry objects as stdClass. Scan them like arrays.
+		if ( $node instanceof \stdClass ) {
+			$node = get_object_vars( $node );
+		}
+		if ( ! is_array( $node ) ) {
+			return;
+		}
+
+		if ( array_key_exists( 'x-mcp-header', $node ) ) {
+			$name = $node['x-mcp-header'];
+			$type = $node['type'] ?? null;
+			if ( ! $property_schema || ! $reachable || ! is_string( $name ) || ! preg_match( "/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/", $name ) ) {
+				throw new \InvalidArgumentException( 'Invalid x-mcp-header annotation placement or name.' );
+			}
+			if ( ! in_array( $type, array( 'string', 'integer', 'boolean' ), true ) ) {
+				throw new \InvalidArgumentException( 'x-mcp-header annotations require string, integer, or boolean properties.' );
+			}
+
+			$folded = strtolower( $name );
+			if ( isset( $names[ $folded ] ) ) {
+				throw new \InvalidArgumentException( 'x-mcp-header names must be case-insensitively unique.' );
+			}
+			$names[ $folded ] = true;
+			$annotations[]    = array(
+				'name' => $name,
+				'path' => $path,
+				'type' => $type,
+			);
+		}
+
+		foreach ( $node as $keyword => $value ) {
+			if ( $value instanceof \stdClass ) {
+				$value = get_object_vars( $value );
+			}
+			if ( 'properties' === $keyword && is_array( $value ) ) {
+				foreach ( $value as $property_name => $property ) {
+					$property_path   = $path;
+					$property_path[] = (string) $property_name;
+					$this->scan_header_annotations( $property, true, $reachable, $property_path, $names, $annotations );
+				}
+				continue;
+			}
+
+			if ( ! is_array( $value ) ) {
+				continue;
+			}
+
+			$this->scan_header_annotations( $value, false, false, $path, $names, $annotations );
+		}
 	}
 }

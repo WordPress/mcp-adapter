@@ -74,6 +74,7 @@ final class FailureReasonTest extends TestCase {
 		$this->assertSame( 'execution_exception', FailureReason::EXECUTION_EXCEPTION );
 		$this->assertSame( 'missing_parameter', FailureReason::MISSING_PARAMETER );
 		$this->assertSame( 'invalid_parameter', FailureReason::INVALID_PARAMETER );
+		$this->assertSame( 'invalid_handler_result', FailureReason::INVALID_HANDLER_RESULT );
 	}
 
 	/**
@@ -90,7 +91,7 @@ final class FailureReasonTest extends TestCase {
 	 * Test all() returns consistent count.
 	 */
 	public function test_all_returns_expected_count(): void {
-		// Currently 12 failure reasons defined.
-		$this->assertCount( 12, FailureReason::all() );
+		// Currently 13 failure reasons defined.
+		$this->assertCount( 13, FailureReason::all() );
 	}
 }

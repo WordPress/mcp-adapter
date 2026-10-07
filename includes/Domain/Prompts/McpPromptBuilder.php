@@ -10,9 +10,6 @@ declare( strict_types=1 );
 namespace WP\MCP\Domain\Prompts;
 
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
-use WP\MCP\Domain\Utils\McpValidator;
-use WP\McpSchema\Server\Prompts\DTO\Prompt as PromptDto;
-use WP\McpSchema\Server\Prompts\DTO\PromptArgument;
 
 /**
  * Abstract base class for building MCP prompts.
@@ -85,10 +82,12 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	protected ?array $icons = null;
 
 	/**
-	 * Additional metadata passed through to MCP clients.
+	 * Additional metadata for MCP clients.
 	 *
 	 * Use this to attach purpose-specific metadata that MCP clients can consume.
-	 * Keys are passed through unchanged.
+	 * Key names are kept as written. {@see self::build()} emits this unless it is still
+	 * the empty default; MCP declares `_meta` an object, so a list makes the prompt
+	 * unavailable.
 	 *
 	 * @since 0.5.0
 	 *
@@ -121,58 +120,47 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	abstract protected function configure(): void;
 
 	/**
-	 * Build and return the Prompt DTO instance.
+	 * Build and return revision-neutral Prompt data.
 	 *
-	 * This method converts the configured state into an MCP Prompt DTO.
-	 * Safe to call multiple times - always returns a fresh DTO based on
+	 * This method converts the configured state into MCP Prompt data.
+	 * Safe to call multiple times - always returns fresh data based on
 	 * the current (immutable after construction) state.
 	 *
-	 * @return \WP\McpSchema\Server\Prompts\DTO\Prompt The built prompt DTO.
+	 * @return array<string, mixed> The built prompt data.
 	 */
-	public function build(): PromptDto {
-		$argument_dtos = null;
+	public function build(): array {
+		$argument_data = null;
 		if ( ! empty( $this->arguments ) ) {
-			$argument_dtos = array_map(
-				static function ( array $arg ): PromptArgument {
-					return PromptArgument::fromArray(
+			$argument_data = array_map(
+				static function ( array $arg ): array {
+					return array_filter(
 						array(
 							'name'        => $arg['name'],
 							'title'       => $arg['title'] ?? null,
 							'description' => $arg['description'] ?? null,
 							'required'    => $arg['required'] ?? null,
-						)
+						),
+						static fn( $value ): bool => null !== $value
 					);
 				},
 				$this->arguments
 			);
 		}
 
-		// Validate and prepare icons if set.
-		$valid_icons = null;
-		if ( ! empty( $this->icons ) ) {
-			$icons_result = McpValidator::validate_icons_array( $this->icons );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$valid_icons = $icons_result['valid'];
-			}
-		}
-
+		// Icons and _meta are carried as given; the schema decides whether they fit.
 		$prompt_data = array(
 			'name'        => $this->name,
 			'title'       => $this->title,
 			'description' => $this->description,
-			'arguments'   => $argument_dtos,
+			'arguments'   => $argument_data,
+			'icons'       => $this->icons,
 		);
 
-		if ( ! empty( $this->meta ) ) {
+		if ( array() !== $this->meta ) {
 			$prompt_data['_meta'] = $this->meta;
 		}
 
-		// Only include icons if valid ones exist.
-		if ( null !== $valid_icons ) {
-			$prompt_data['icons'] = $valid_icons;
-		}
-
-		return PromptDto::fromArray( $prompt_data );
+		return array_filter( $prompt_data, static fn( $value ): bool => null !== $value );
 	}
 
 	/**
@@ -225,8 +213,8 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Set the prompt icons for UI display.
 	 *
-	 * Icons are validated during build() using McpValidator::validate_icons_array().
-	 * Invalid icons are filtered out with warnings (graceful degradation).
+	 * Icons are carried into the prompt record as given. A list that does not fit
+	 * the selected MCP revision makes the prompt unavailable for that revision.
 	 *
 	 * Per MCP 2025-11-25:
 	 * - MUST support: image/png, image/jpeg, image/jpg
@@ -258,7 +246,9 @@ abstract class McpPromptBuilder implements McpPromptBuilderInterface {
 	/**
 	 * Set additional metadata.
 	 *
-	 * This metadata is passed through to MCP clients unchanged.
+	 * Key names are kept as written. {@see self::build()} emits this unless it is still
+	 * the empty default; MCP declares `_meta` an object, so a list makes the prompt
+	 * unavailable.
 	 *
 	 * @param array<string, mixed> $meta Additional metadata key-value pairs.
 	 *

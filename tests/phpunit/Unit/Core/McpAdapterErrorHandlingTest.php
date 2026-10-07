@@ -21,7 +21,9 @@ final class McpAdapterErrorHandlingTest extends TestCase {
 		// Clear any existing servers to ensure clean state
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 	}
 
@@ -34,12 +36,16 @@ final class McpAdapterErrorHandlingTest extends TestCase {
 		// Clean up any registered servers
 		$reflection       = new \ReflectionClass( $this->adapter );
 		$servers_property = $reflection->getProperty( 'servers' );
-		$servers_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$servers_property->setAccessible( true );
+		}
 		$servers_property->setValue( $this->adapter, array() );
 
 		// Reset the initialized flag to allow re-initialization
 		$initialized_property = $reflection->getProperty( 'initialized' );
-		$initialized_property->setAccessible( true );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$initialized_property->setAccessible( true );
+		}
 		$initialized_property->setValue( null, false );
 	}
 

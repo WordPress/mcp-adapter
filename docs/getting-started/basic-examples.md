@@ -2,6 +2,8 @@
 
 This guide provides simple, working examples for creating MCP tools, resources, and prompts using the WordPress MCP Adapter.
 
+> **Every ability needs a `category`.** It must be a registered category, or `wp_register_ability()` returns `null` and the ability never appears (no `WP_Error`, just a `_doing_it_wrong()` notice you'll miss unless `WP_DEBUG` is on). Core provides `site` and `user`; register custom categories on the `wp_abilities_api_categories_init` hook first. See [Ability categories](../guides/creating-abilities.md#ability-categories-required).
+
 ## Example 1: Tool - Create Post
 
 Tools execute actions and return results. Here's a simple post creation tool:
@@ -13,6 +15,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/create-post', [
         'label' => 'Create Post',
         'description' => 'Creates a new WordPress post with the specified content',
+        'category' => 'site',
         'input_schema' => [
             'type' => 'object',
             'properties' => [
@@ -97,13 +100,11 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'publish_posts' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'annotations' => [
                 'priority' => 2.0,
                 'readOnlyHint' => false,
                 'destructiveHint' => false
-            ],
-            'mcp' => [
-                'public' => true  // Expose this ability via MCP
             ]
         ]
     ]);
@@ -111,6 +112,8 @@ add_action( 'wp_abilities_api_init', function() {
 ```
 
 The ability is automatically available via the default MCP server at `/wp-json/mcp/mcp-adapter-default-server`.
+
+> **Note**: How far `meta.public` reaches depends on the WordPress version. WordPress core starts applying `meta.public` to the REST API (`meta.show_in_rest`) in version 7.1. On WordPress 6.9 and 7.0, the MCP Adapter honors `meta.public` for MCP exposure, but REST API access still requires setting `meta.show_in_rest` to `true`.
 
 ### Testing the Tool
 
@@ -130,6 +133,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/site-config', [
         'label' => 'Site Configuration',
         'description' => 'WordPress site configuration and settings',
+        'category' => 'site',
         'execute_callback' => function() {
             return [
                 'site_name' => get_bloginfo( 'name' ),
@@ -144,6 +148,7 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'manage_options' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'uri' => 'wordpress://site/config',  // Required for resources
             'annotations' => [
                 'readOnlyHint' => true,
@@ -152,7 +157,6 @@ add_action( 'wp_abilities_api_init', function() {
                 'priority' => 0.8
             ],
             'mcp' => [
-                'public' => true,      // Expose this ability via MCP
                 'type'   => 'resource' // Mark as resource for auto-discovery
             ]
         ]
@@ -183,6 +187,7 @@ add_action( 'wp_abilities_api_init', function() {
     wp_register_ability( 'my-plugin/code-review', [
         'label' => 'Code Review Prompt',
         'description' => 'Generate a code review prompt with specific focus areas',
+        'category' => 'site',
         'execute_callback' => function( $input ) {
             $code = $input['code'] ?? '';
             $focus = $input['focus'] ?? ['security', 'performance'];
@@ -207,6 +212,7 @@ add_action( 'wp_abilities_api_init', function() {
             return current_user_can( 'edit_posts' );
         },
         'meta' => [
+            'public' => true, // Expose to clients, including MCP
             'arguments' => [
                 [
                     'name' => 'code',
@@ -224,7 +230,6 @@ add_action( 'wp_abilities_api_init', function() {
                 'idempotentHint' => true
             ],
             'mcp' => [
-                'public' => true,   // Expose this ability via MCP
                 'type'   => 'prompt' // Mark as prompt for auto-discovery
             ]
         ]
@@ -258,8 +263,7 @@ The MCP Adapter automatically creates a default server that exposes all register
 - **Prompts**: Generate messages (like `prompts/get`) - return `messages` array
 
 ### Annotations
-All MCP components may include metadata in `meta.annotations`, which hint at how clients should treat them.
-For full details on annotations, their semantics, and usage guidelines, see the Annotations section of the MCP schema spec: https://modelcontextprotocol.io/specification/2025-06-18/schema#annotations
+All MCP components may include metadata in `meta.annotations`, which hint at how clients should treat them. For full details on annotations, their semantics, and usage guidelines, see the Annotations section of the MCP schema spec: https://modelcontextprotocol.io/specification/2025-06-18/schema#annotations
 
 ### Testing
 Use WP-CLI with the default server:

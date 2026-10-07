@@ -19,7 +19,7 @@ use WP_Error;
  *
  * SECURITY CONSIDERATIONS:
  * - This ability exposes detailed schemas and metadata about abilities
- * - Only abilities with mcp.public=true metadata can be queried via default MCP server.
+ * - Only abilities with effective MCP public exposure can be queried via default MCP server.
  * - Requires proper WordPress capability checks for secure operation
  *
  * @see https://developer.wordpress.org/apis/security/ for detailed security guidance
@@ -112,7 +112,7 @@ final class GetAbilityInfoAbility {
 			'name'         => $ability->get_name(),
 			'label'        => $ability->get_label(),
 			'description'  => $ability->get_description(),
-			'input_schema' => $ability->get_input_schema(),
+			'input_schema' => $ability->get_input_schema() ?: new \stdClass(),
 		);
 
 		// Add output schema if available

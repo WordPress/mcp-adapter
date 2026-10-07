@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpAdapter;
+use WP\MCP\Core\McpVersionNegotiator;
 use function WP_CLI\Utils\format_items;
 
 /**
@@ -18,7 +19,7 @@ use function WP_CLI\Utils\format_items;
  * Provides commands to serve MCP servers over STDIO transport for
  * communication with MCP clients via subprocess.
  */
-class McpCommand extends \WP_CLI_Command { // phpcs:ignore
+final class McpCommand extends \WP_CLI_Command {
 
 	/**
 	 * Serve an MCP server via STDIO transport.
@@ -27,14 +28,12 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 * using the JSON-RPC 2.0 protocol. It's designed to be launched as a subprocess
 	 * by MCP clients.
 	 *
+	 * Use the global `--user` flag to specify the user context for the server. If not provided, runs as unauthenticated (limited capabilities).
+	 *
 	 * ## OPTIONS
 	 *
 	 * [--server=<server-id>]
 	 * : The ID of the MCP server to serve. If not specified, uses the first available server.
-	 *
-	 * [--user=<id|login|email>]
-	 * : Run as a specific WordPress user for permission checks.
-	 * : Without this, runs as unauthenticated (limited capabilities).
 	 *
 	 * ## EXAMPLES
 	 *
@@ -48,7 +47,12 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 *     wp mcp serve --server=public-server
 	 *
 	 * @when after_wp_load
-	 * @synopsis [--server=<server-id>] [--user=<id|login|email>]
+	 * @synopsis [--server=<server-id>]
+	 *
+	 * @param array $args Positional WP-CLI arguments.
+	 * @param array $assoc_args Named WP-CLI options.
+	 *
+	 * @return void
 	 */
 	public function serve( array $args, array $assoc_args ): void {
 
@@ -78,19 +82,6 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 			\WP_CLI::debug( sprintf( 'Using server: %s', $server_id ) );
 		}
 
-		// Set user context if specified
-		if ( isset( $assoc_args['user'] ) ) {
-			$user = $this->get_user( $assoc_args['user'] );
-			if ( ! $user ) {
-				\WP_CLI::error( sprintf( 'User "%s" not found.', $assoc_args['user'] ) );
-			}
-
-			wp_set_current_user( $user->ID );
-			\WP_CLI::debug( sprintf( 'Running as user: %s (ID: %d)', $user->user_login, $user->ID ) );
-		} else {
-			\WP_CLI::debug( 'Running without authentication. Some capabilities may be limited.' );
-		}
-
 		// Create and start STDIO server bridge
 		try {
 			\WP_CLI::debug( sprintf( 'Starting STDIO bridge for server: %s', $server_id ) );
@@ -108,32 +99,12 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	}
 
 	/**
-	 * Get a user by ID, login, or email.
-	 *
-	 * @param string $user User identifier (ID, login, or email).
-	 *
-	 * @return \WP_User|false User object or false if not found.
-	 */
-	private function get_user( string $user ) {
-		// Try as ID first
-		if ( is_numeric( $user ) ) {
-			return get_user_by( 'id', (int) $user );
-		}
-
-		// Try as login
-		$user_obj = get_user_by( 'login', $user );
-		if ( $user_obj ) {
-			return $user_obj;
-		}
-
-		// Try as email
-		return get_user_by( 'email', $user );
-	}
-
-	/**
 	 * List all registered MCP servers.
 	 *
 	 * ## OPTIONS
+	 *
+	 * [--protocol=<revision>]
+	 * : Count components available for one supported schema revision. By default, count all registered components.
 	 *
 	 * [--format=<format>]
 	 * : Render output in a particular format.
@@ -149,15 +120,34 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 	 * ## EXAMPLES
 	 *
 	 *     # List all MCP servers
-	 *     wp mcp list
+	 *     wp mcp-adapter list
 	 *
 	 *     # List servers in JSON format
-	 *     wp mcp list --format=json
+	 *     wp mcp-adapter list --format=json
 	 *
+	 *     # Count components available under MCP 2026-07-28
+	 *     wp mcp-adapter list --protocol=2026-07-28
+	 *
+	 * @since 0.7.0 Supports selecting a schema revision for component counts.
 	 * @when after_wp_load
-	 * @synopsis [--format=<format>]
+	 * @synopsis [--format=<format>] [--protocol=<revision>]
+	 *
+	 * @param array $args Positional WP-CLI arguments.
+	 * @param array $assoc_args Named WP-CLI options.
+	 *
+	 * @return void
 	 */
 	public function list( array $args, array $assoc_args ): void {
+		$protocol = $assoc_args['protocol'] ?? null;
+		if ( null !== $protocol && ( ! is_string( $protocol ) || ! in_array( $protocol, McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS, true ) ) ) {
+			\WP_CLI::error(
+				sprintf(
+					'Unsupported protocol revision. Supported revisions: %s.',
+					implode( ', ', McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS )
+				)
+			);
+		}
+
 		$adapter = McpAdapter::instance();
 
 		$servers = $adapter->get_servers();
@@ -170,18 +160,30 @@ class McpCommand extends \WP_CLI_Command { // phpcs:ignore
 
 		$items = array();
 		foreach ( $servers as $server ) {
+			$schema  = null === $protocol ? null : $server->get_schemas()->forVersion( $protocol );
 			$items[] = array(
 				'ID'          => $server->get_server_id(),
 				'Name'        => $server->get_server_name(),
 				'Version'     => $server->get_server_version(),
-				'Tools'       => count( $server->get_tools() ),
-				'Resources'   => count( $server->get_resources() ),
-				'Prompts'     => count( $server->get_prompts() ),
+				'Tools'       => null === $schema ? $server->count_tools() : count( $server->get_tools( $schema ) ),
+				'Resources'   => null === $schema ? $server->count_resources() : count( $server->get_resources( $schema ) ),
+				'Prompts'     => null === $schema ? $server->count_prompts() : count( $server->get_prompts( $schema ) ),
 				'Description' => $server->get_server_description(),
 			);
 		}
 
 		$format = $assoc_args['format'] ?? 'table';
-		format_items( $format, $items, array( 'ID', 'Name', 'Version', 'Tools', 'Resources', 'Prompts' ) );
+		format_items(
+			$format,
+			$items,
+			array(
+				'ID',
+				'Name',
+				'Version',
+				'Tools',
+				'Resources',
+				'Prompts',
+			)
+		);
 	}
 }

@@ -30,8 +30,8 @@ final class McpTransportFactoryTest extends TestCase {
 	private McpTransportFactory $transport_factory;
 	private McpServer $server;
 
-	public function set_up(): void {
-		parent::set_up();
+	public function setUp(): void {
+		parent::setUp();
 
 		$this->server = new McpServer(
 			'test-server',

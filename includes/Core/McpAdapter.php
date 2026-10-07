@@ -28,7 +28,18 @@ defined( 'ABSPATH' ) || exit;
  */
 final class McpAdapter {
 
-	public const VERSION = '0.5.0';
+	public const VERSION = '0.7.0';
+
+	/**
+	 * Directory of this copy of the class.
+	 *
+	 * The autoloader checks it to tell this plugin's classes apart from a copy that another plugin bundles.
+	 *
+	 * @internal
+	 *
+	 * @since 0.7.0
+	 */
+	public const DIR = __DIR__;
 
 	/**
 	 * Registry instance
@@ -58,6 +69,10 @@ final class McpAdapter {
 		if ( ! isset( self::$instance ) ) {
 			self::$instance = new self();
 
+			// Subscribe before `init`, the earliest point the Abilities API registries can initialize.
+			add_action( 'wp_abilities_api_categories_init', array( self::$instance, 'register_default_category' ) );
+			add_action( 'wp_abilities_api_init', array( self::$instance, 'register_default_abilities' ) );
+
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
 				add_action( 'init', array( self::$instance, 'init' ), 20 );
@@ -80,6 +95,8 @@ final class McpAdapter {
 			return;
 		}
 
+		$this->check_plugin_loaded();
+
 		$this->maybe_create_default_server();
 
 		/**
@@ -99,11 +116,51 @@ final class McpAdapter {
 	}
 
 	/**
+	 * Checks whether the MCP Adapter plugin is loaded and logs a deprecation notice if not.
+	 *
+	 * @internal
+	 */
+	private function check_plugin_loaded(): void {
+		// The constant is defined in Plugin::constants() and will not exist if McpAdapter is only loaded as a library.
+		if ( defined( 'WP_MCP_VERSION' ) ) {
+			return;
+		}
+
+		_deprecated_function(
+			self::class,
+			'0.7.0',
+			sprintf(
+				// translators: %s: class name
+				esc_html__( '%s is currently loaded as a bundled dependency instead of via the canonical MCP Adapter plugin. This is not recommended and may not be supported in future versions. Please install the MCP Adapter plugin and migrate accordingly.', 'mcp-adapter' ),
+				self::class
+			)
+		);
+
+		// @todo Add an admin notice with an installation link once the plugin is on w.org.
+
+		// Redefine the version constant so bad plugins don't break those that follow best practices.
+		define( 'WP_MCP_VERSION', self::VERSION );
+	}
+
+	/**
 	 * Conditionally create the default server based on filter.
 	 *
 	 * @internal For use by adapter initialization only.
 	 */
 	private function maybe_create_default_server(): void {
+		if ( ! $this->is_default_server_enabled() ) {
+			return;
+		}
+
+		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+	}
+
+	/**
+	 * Whether the default server and its abilities are enabled.
+	 *
+	 * @internal For use by adapter initialization only.
+	 */
+	private function is_default_server_enabled(): bool {
 		/**
 		 * Filters whether the default MCP server should be created.
 		 *
@@ -114,15 +171,7 @@ final class McpAdapter {
 		 *
 		 * @param bool $create_default Whether to create the default server. Default true.
 		 */
-		if ( ! apply_filters( 'mcp_adapter_create_default_server', true ) ) {
-			return;
-		}
-
-		// Register category before abilities
-		add_action( 'wp_abilities_api_categories_init', array( $this, 'register_default_category' ) );
-		add_action( 'wp_abilities_api_init', array( $this, 'register_default_abilities' ) );
-
-		add_action( 'mcp_adapter_init', array( DefaultServerFactory::class, 'create' ) );
+		return (bool) apply_filters( 'mcp_adapter_create_default_server', true );
 	}
 
 	/**
@@ -154,17 +203,17 @@ final class McpAdapter {
 	 * Create and register a new MCP server.
 	 *
 	 * @param string $server_id Unique identifier for the server.
-	 * @param string $server_route_namespace Server route namespace.
-	 * @param string $server_route Server route.
+	 * @param non-falsy-string $server_route_namespace Server route namespace.
+	 * @param non-falsy-string $server_route Server route.
 	 * @param string $server_name Server name.
 	 * @param string $server_description Server description.
 	 * @param string $server_version Server version.
 	 * @param array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>> $mcp_transports Array of MCP transport class names to initialize.
 	 * @param class-string<\WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface>|null $error_handler The error handler class name. If null, NullMcpErrorHandler will be used.
 	 * @param class-string<\WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface>|null $observability_handler The observability handler class name. If null, NullMcpObservabilityHandler will be used.
-	 * @param list<string> $tools Ability names to register as tools.
-	 * @param list<string> $resources Resources to register.
-	 * @param list<string> $prompts Prompts to register.
+	 * @param list<string|\WP\MCP\Domain\Tools\McpTool> $tools Ability names or MCP tools to register.
+	 * @param list<string|\WP\MCP\Domain\Resources\McpResource> $resources Ability names or MCP resources to register.
+	 * @param list<string|\WP\MCP\Domain\Prompts\McpPrompt|\WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface> $prompts Ability names, MCP prompts, or prompt builders to register.
 	 * @param callable|null $transport_permission_callback Optional custom permission callback for transport-level authentication. If null, defaults to is_user_logged_in().
 	 *
 	 * @return \WP\MCP\Core\McpAdapter|\WP_Error McpAdapter instance on success, WP_Error on failure.
@@ -331,6 +380,10 @@ final class McpAdapter {
 	 * @return void
 	 */
 	public function register_default_category(): void {
+		if ( ! $this->is_default_server_enabled() ) {
+			return;
+		}
+
 		wp_register_ability_category(
 			'mcp-adapter',
 			array(
@@ -346,6 +399,10 @@ final class McpAdapter {
 	 * @return void
 	 */
 	public function register_default_abilities(): void {
+		if ( ! $this->is_default_server_enabled() ) {
+			return;
+		}
+
 		// Register the three core MCP abilities
 		DiscoverAbilitiesAbility::register();
 		GetAbilityInfoAbility::register();

@@ -1,4 +1,4 @@
-<!-- Thanks for contributing to the AI plugin! Please follow the AI Plugin Contributing Guidelines:
+<!-- Thanks for contributing to the MCP Adapter plugin! Please follow the Contributing Guidelines:
 https://github.com/WordPress/mcp-adapter/blob/trunk/CONTRIBUTING.md -->
 
 ## What?
