@@ -12,10 +12,12 @@ namespace WP\MCP\Domain\Resources;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\McpValidator;
+use WP\MCP\Domain\Utils\RevisionProjectionTrait;
+use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\FailureReason;
-use WP\McpSchema\Common\Protocol\DTO\Annotations;
-use WP\McpSchema\Server\Resources\DTO\Resource as ResourceDto;
+use WP\McpSchema\Record\Resource;
+use WP\McpSchema\Schema;
 use WP_Error;
 
 /**
@@ -39,25 +41,19 @@ use WP_Error;
  * $resource = McpResource::fromAbility($ability);
  * ```
  *
- * McpResource wraps a protocol-only ResourceDto for MCP serialization. Internal
+ * McpResource stores revision-neutral configuration for MCP projection. Internal
  * adapter metadata and execution wiring live on this class and are never
- * exposed to MCP clients. Use get_protocol_dto() for protocol responses.
+ * exposed to MCP clients. Use get_protocol_record() for protocol responses.
  *
  * @since 0.5.0
  */
 final class McpResource implements McpComponentInterface {
-
+	use RevisionProjectionTrait;
+	use ThrowableGuardTrait;
 
 	// =========================================================================
 	// Runtime Properties
 	// =========================================================================
-
-	/**
-	 * Clean Resource DTO (protocol-only).
-	 *
-	 * @var \WP\McpSchema\Server\Resources\DTO\Resource
-	 */
-	private ResourceDto $mcp_resource_dto;
 
 	/**
 	 * Ability used for execution/permission checks (ability-backed resources).
@@ -101,10 +97,10 @@ final class McpResource implements McpComponentInterface {
 	/**
 	 * Private constructor - use factory methods.
 	 *
-	 * @param \WP\McpSchema\Server\Resources\DTO\Resource $resource_dto The Resource DTO.
+	 * @param array<string, mixed> $resource_data Revision-neutral Resource data.
 	 */
-	private function __construct( ResourceDto $resource_dto ) {
-		$this->mcp_resource_dto = $resource_dto;
+	private function __construct( array $resource_data ) {
+		$this->initialize_protocol_data( $resource_data );
 	}
 
 	// =========================================================================
@@ -117,7 +113,7 @@ final class McpResource implements McpComponentInterface {
 	 * @return self|\WP_Error
 	 */
 	public static function fromArray( array $config ) {
-		if ( empty( $config['uri'] ) ) {
+		if ( ! isset( $config['uri'] ) ) {
 			return new WP_Error( 'mcp_resource_missing_uri', 'Resource configuration must include a "uri" field.' );
 		}
 
@@ -125,19 +121,15 @@ final class McpResource implements McpComponentInterface {
 			return new WP_Error( 'mcp_resource_missing_handler', 'Resource configuration must include a callable "handler" field.' );
 		}
 
-		$uri = trim( $config['uri'] );
-
-		if ( ! McpValidator::validate_resource_uri( $uri ) ) {
+		// The URI is the registry key, so it is matched as given: no trimming.
+		$uri = $config['uri'];
+		if ( ! is_string( $uri ) || ! McpValidator::validate_resource_uri( $uri ) ) {
 			return new WP_Error( 'mcp_resource_invalid_uri', 'Resource "uri" must be a valid RFC 3986 URI with a scheme.' );
 		}
 
-		$name = isset( $config['name'] ) ? trim( $config['name'] ) : $uri;
-		if ( '' === $name ) {
-			return new WP_Error( 'mcp_resource_missing_name', 'Resource "name" cannot be empty.' );
-		}
-
+		// The name is carried as given; the URI stands in only when no name is set.
 		$resource_data = array(
-			'name' => $name,
+			'name' => $config['name'] ?? $uri,
 			'uri'  => $uri,
 		);
 
@@ -149,62 +141,42 @@ final class McpResource implements McpComponentInterface {
 			$resource_data['description'] = $config['description'];
 		}
 
-		// Include mimeType when non-empty. The value itself is not checked.
+		// mimeType and size are carried as given; the schema decides whether they fit.
 		if ( isset( $config['mimeType'] ) ) {
-			$mime_type = trim( $config['mimeType'] );
-			if ( '' !== $mime_type ) {
-				$resource_data['mimeType'] = $mime_type;
-			}
+			$resource_data['mimeType'] = $config['mimeType'];
 		}
 
-		// Include size only when > 0.
-		if ( isset( $config['size'] ) && $config['size'] > 0 ) {
+		if ( isset( $config['size'] ) ) {
 			$resource_data['size'] = $config['size'];
 		}
 
-		// Validate and include icons if set.
-		if ( isset( $config['icons'] ) && is_array( $config['icons'] ) && ! empty( $config['icons'] ) ) {
-			$icons_result = McpValidator::validate_icons_array( $config['icons'] );
-			if ( ! empty( $icons_result['valid'] ) ) {
-				$resource_data['icons'] = $icons_result['valid'];
+		// Icons and _meta are carried as given; the schema decides whether they fit.
+		if ( isset( $config['icons'] ) ) {
+			$resource_data['icons'] = $config['icons'];
+		}
+
+		if ( isset( $config['meta'] ) ) {
+			$resource_data['_meta'] = $config['meta'];
+		}
+
+		// Annotations are carried as given. The one adapter check is lastModified, which
+		// the official client requires as an ISO timestamp with a time zone; it runs only
+		// when the value is an array, and a failure rejects the resource.
+		if ( isset( $config['annotations'] ) ) {
+			$annotation_errors = is_array( $config['annotations'] )
+				? McpValidator::get_annotation_validation_errors( $config['annotations'] )
+				: array();
+			if ( ! empty( $annotation_errors ) ) {
+				return new WP_Error(
+					'mcp_resource_invalid_annotations',
+					sprintf( 'Resource "%s" has invalid annotations: %s', $uri, implode( '; ', $annotation_errors ) )
+				);
 			}
+
+			$resource_data['annotations'] = $config['annotations'];
 		}
 
-		$resource_meta = McpValidator::normalize_meta( $config['meta'] ?? null );
-		if ( null !== $resource_meta ) {
-			$resource_data['_meta'] = $resource_meta;
-		}
-
-		// Create the Resource DTO - wrap in try-catch since Annotations::fromArray() and ResourceDto::fromArray() can throw.
-		try {
-			// Process annotations inside try-catch since Annotations::fromArray() can throw.
-			if ( isset( $config['annotations'] ) && is_array( $config['annotations'] ) && ! empty( $config['annotations'] ) ) {
-				$resource_data['annotations'] = Annotations::fromArray( $config['annotations'] );
-			}
-
-			$resource = ResourceDto::fromArray( $resource_data );
-		} catch ( \Throwable $e ) {
-			return new WP_Error(
-				'mcp_resource_dto_creation_failed',
-				sprintf(
-				/* translators: %s: error message */
-					__( 'Failed to create Resource DTO: %s', 'mcp-adapter' ),
-					$e->getMessage()
-				),
-				array( 'exception' => $e )
-			);
-		}
-
-		// Optional deep validation if enabled.
-		$mcp_validation_enabled = apply_filters( 'mcp_adapter_validation_enabled', false );
-		if ( $mcp_validation_enabled ) {
-			$validation_result = McpResourceValidator::validate_resource_dto( $resource );
-			if ( is_wp_error( $validation_result ) ) {
-				return $validation_result;
-			}
-		}
-
-		$instance          = new self( $resource );
+		$instance          = new self( $resource_data );
 		$instance->handler = $config['handler'];
 
 		if ( isset( $config['permission'] ) && is_callable( $config['permission'] ) ) {
@@ -234,13 +206,13 @@ final class McpResource implements McpComponentInterface {
 			return $resource_data;
 		}
 
-		$instance               = new self( $resource_data['resource'] );
+		$instance               = new self( $resource_data['resource_data'] );
 		$instance->adapter_meta = $resource_data['adapter_meta'];
 		$instance->ability      = $ability;
 
 		$instance->observability_context = array(
 			'component_type' => 'resource',
-			'resource_uri'   => $resource_data['resource']->getUri(),
+			'resource_uri'   => $resource_data['resource_data']['uri'],
 			'ability_name'   => $ability->get_name(),
 			'source'         => 'ability',
 		);
@@ -253,12 +225,22 @@ final class McpResource implements McpComponentInterface {
 	// =========================================================================
 
 	/**
-	 * Get the clean protocol DTO for MCP responses.
+	 * Get the clean protocol record for one revision.
 	 *
-	 * @return \WP\McpSchema\Server\Resources\DTO\Resource
+	 * @param \WP\McpSchema\Schema $schema Selected schema.
+	 * @since 0.7.0
 	 */
-	public function get_protocol_dto(): ResourceDto {
-		return $this->mcp_resource_dto;
+	public function get_protocol_record( Schema $schema ): Resource {
+		return $this->project_record( $schema, Resource::class, $this->protocol_data() );
+	}
+
+	/**
+	 * Get the neutral resource URI.
+	 *
+	 * @since 0.7.0
+	 */
+	public function get_uri(): string {
+		return (string) ( $this->protocol_data()['uri'] ?? '' );
 	}
 
 	/**
@@ -271,27 +253,15 @@ final class McpResource implements McpComponentInterface {
 	public function execute( $arguments ) {
 		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
-			try {
-				return $this->ability->execute();
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+
+			return self::guard( 'mcp_execution_failed', static fn() => $ability->execute() );
 		}
 
 		if ( null !== $this->handler ) {
-			try {
-				return call_user_func( $this->handler, $arguments );
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_execution_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$handler = $this->handler;
+
+			return self::guard( 'mcp_execution_failed', static fn() => call_user_func( $handler, $arguments ) );
 		}
 
 		return new WP_Error( 'mcp_resource_no_handler', 'No resource execution strategy configured.' );
@@ -307,29 +277,16 @@ final class McpResource implements McpComponentInterface {
 	public function check_permission( $arguments ) {
 		// Ability-backed resources match existing behavior: no args passed to abilities.
 		if ( null !== $this->ability ) {
-			try {
-				return $this->ability->check_permissions();
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			$ability = $this->ability;
+
+			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions() );
 		}
 
 		if ( null !== $this->permission_callback ) {
-			try {
-				$result = call_user_func( $this->permission_callback, $arguments );
+			$callback = $this->permission_callback;
+			$result   = self::guard( 'mcp_permission_check_failed', static fn() => call_user_func( $callback, $arguments ) );
 
-				return $result instanceof WP_Error ? $result : (bool) $result;
-			} catch ( \Throwable $throwable ) {
-				return new WP_Error(
-					'mcp_permission_check_failed',
-					$throwable->getMessage(),
-					array( 'error_type' => get_class( $throwable ) )
-				);
-			}
+			return $result instanceof WP_Error ? $result : (bool) $result;
 		}
 
 		return new WP_Error(

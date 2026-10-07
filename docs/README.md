@@ -12,6 +12,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 - **[Default Server](guides/default-server.md)** - Understanding the built-in MCP server and core abilities
 - **[Creating Abilities](guides/creating-abilities.md)** - Build tools, resources, and prompts with annotations
+- **[MRTR Tools](guides/mrtr.md)** - Gather client input before completing a direct tool call
 - **[Transport Permissions](guides/transport-permissions.md)** - Custom authentication and access control
 - **[Custom Transports](guides/custom-transports.md)** - Specialized communication protocols
 - **[Error Handling](guides/error-handling.md)** - Custom error logging and monitoring
@@ -24,7 +25,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ## Migration guides
 
-- **[Migrating to vx.y.z](migration/vx.y.z.md)**
+- **[Migrating to v0.7.0](migration/v0.7.0.md)**
 - **[Migrating to v0.5.0](migration/v0.5.0.md)**
 - **[Migrating to v0.3.0](migration/v0.3.0.md)**
 

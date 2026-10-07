@@ -80,7 +80,7 @@ final class DefaultServerFactoryTest extends TestCase {
 
 		// Check that test/resource ability was discovered and registered
 		// The test/resource ability has mcp.public=true and mcp.type='resource'
-		$resources      = $server->get_resources();
+		$resources      = $server->get_resources( $server->get_schemas()->forVersion( \WP\McpSchema\Schemas::V2025_11_25 ) );
 		$resource_names = array_map(
 			static function ( $resource ) {
 				return $resource->getName();
@@ -108,7 +108,7 @@ final class DefaultServerFactoryTest extends TestCase {
 
 		// Check that test/prompt ability was discovered and registered
 		// The test/prompt ability has mcp.public=true and mcp.type='prompt'
-		$prompts      = $server->get_prompts();
+		$prompts      = $server->get_prompts( $server->get_schemas()->forVersion( \WP\McpSchema\Schemas::V2025_11_25 ) );
 		$prompt_names = array_map(
 			static function ( $prompt ) {
 				return $prompt->getName();
@@ -136,8 +136,9 @@ final class DefaultServerFactoryTest extends TestCase {
 
 		// Verify that abilities without mcp.public=true are not discovered
 		// This is tested indirectly by checking that only expected abilities are present
-		$resources = $server->get_resources();
-		$prompts   = $server->get_prompts();
+		$schema    = $server->get_schemas()->forVersion( \WP\McpSchema\Schemas::V2025_11_25 );
+		$resources = $server->get_resources( $schema );
+		$prompts   = $server->get_prompts( $schema );
 
 		// Both should be arrays (empty or populated)
 		$this->assertIsArray( $resources );
@@ -162,7 +163,7 @@ final class DefaultServerFactoryTest extends TestCase {
 		$server = $this->adapter->get_server( 'mcp-adapter-default-server' );
 		$this->assertNotNull( $server );
 
-		$tools      = $server->get_tools();
+		$tools      = $server->get_tools( $server->get_schemas()->forVersion( \WP\McpSchema\Schemas::V2025_11_25 ) );
 		$tool_names = array_map(
 			static function ( $tool ) {
 				return $tool->getName();

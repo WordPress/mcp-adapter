@@ -28,7 +28,7 @@ jobs:
       # blueprint via the {{ARTIFACT_URL:mcp-adapter}} placeholder.
       artifacts: mcp-adapter=mcp-adapter.zip
       php-version: '8.5'
-      node-version: '22'
+      node-version: '24'
       build-command: |
         composer install --no-dev --prefer-dist --no-interaction --no-progress
         npm ci

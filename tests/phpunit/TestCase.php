@@ -9,11 +9,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests;
 
-use WP\MCP\Core\McpAdapter;
+use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Tests\Fixtures\DummyAbility;
 use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\Fixtures\DummyObservabilityHandler;
+use WP\McpSchema\Record;
+use WP\McpSchema\Schema;
+use WP\McpSchema\Schemas;
 use WP_UnitTestCase;
 
 abstract class TestCase extends WP_UnitTestCase {
@@ -35,13 +38,6 @@ abstract class TestCase extends WP_UnitTestCase {
 	 */
 	public static function setUpBeforeClass(): void {
 		parent::setUpBeforeClass();
-
-		// Register plugin's default category and abilities via the same methods
-		// the production code uses. We hook them the same way McpAdapter::maybe_create_default_server()
-		// does, so if the hooks haven't fired yet they'll be picked up automatically.
-		$adapter = McpAdapter::instance();
-		add_action( 'wp_abilities_api_categories_init', array( $adapter, 'register_default_category' ) );
-		add_action( 'wp_abilities_api_init', array( $adapter, 'register_default_abilities' ) );
 
 		// Use DummyAbility to register test category and abilities.
 		add_action( 'wp_abilities_api_categories_init', array( DummyAbility::class, 'register_category' ) );
@@ -84,6 +80,28 @@ abstract class TestCase extends WP_UnitTestCase {
 			$resources,
 			$prompts,
 		);
+	}
+
+	/** Select one exact schema from a fresh provider. */
+	protected function schema( string $revision = Schemas::V2025_11_25 ): Schema {
+		return Schemas::create()->forVersion( $revision );
+	}
+
+	/** Build a minimal exact request context. */
+	protected function request_context( McpServer $server, string $revision = Schemas::V2025_11_25, string $transport = 'test' ): McpRequestContext {
+		return new McpRequestContext(
+			$server->get_schemas()->forVersion( $revision ),
+			new \stdClass(),
+			null,
+			$transport
+		);
+	}
+
+	/** Convert a record to an assertion-friendly associative array. */
+	protected function record_array( Record $record ): array {
+		$data = json_decode( (string) wp_json_encode( $record ), true );
+
+		return is_array( $data ) ? $data : array();
 	}
 
 	/**
