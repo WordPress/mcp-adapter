@@ -84,7 +84,7 @@ final class HttpOriginValidationTest extends TestCase {
 	public function test_default_port_and_case_are_normalized(): void {
 		$this->set_url( 'home', 'https://example.org' );
 
-		foreach ( array( 'https://example.org', 'https://example.org:443', 'HTTPS://Example.ORG', 'https://example.org/' ) as $origin ) {
+		foreach ( array( 'https://example.org', 'https://example.org:443', 'HTTPS://Example.ORG' ) as $origin ) {
 			$this->assertSame( 200, $this->tools_list_2026( $origin )['status'], $origin );
 		}
 
@@ -124,6 +124,7 @@ final class HttpOriginValidationTest extends TestCase {
 			'different port'          => array( 'http://example.org:8080' ),
 			'opaque null origin'      => array( 'null' ),
 			'origin with path'        => array( 'http://example.org/wp-admin' ),
+			'origin with trailing /'  => array( 'http://example.org/' ),
 			'origin with query'       => array( 'http://example.org?x=1' ),
 			'origin with fragment'    => array( 'http://example.org#x' ),
 			'origin with userinfo'    => array( 'http://user@example.org' ),

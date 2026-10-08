@@ -120,7 +120,8 @@ final class HttpOriginValidator {
 				|| isset( $parts['pass'] )
 				|| isset( $parts['query'] )
 				|| isset( $parts['fragment'] )
-				|| ( isset( $parts['path'] ) && '' !== $parts['path'] && '/' !== $parts['path'] )
+				// A serialized origin has no path at all, not even "/" (RFC 6454).
+				|| ( isset( $parts['path'] ) && '' !== $parts['path'] )
 			)
 		) {
 			return null;
