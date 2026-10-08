@@ -118,6 +118,13 @@ class McpServer {
 	 */
 	private $transport_permission_callback;
 
+	/**
+	 * Transport class names the server was created with.
+	 *
+	 * @var array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>>
+	 */
+	private array $mcp_transports;
+
 
 	/**
 	 * Constructor.
@@ -161,6 +168,7 @@ class McpServer {
 		$this->server_description            = $server_description;
 		$this->server_version                = $server_version;
 		$this->transport_permission_callback = $transport_permission_callback;
+		$this->mcp_transports                = $mcp_transports;
 
 		$this->schemas = Schemas::create();
 
@@ -311,6 +319,17 @@ class McpServer {
 	 */
 	public function get_transport_permission_callback(): ?callable {
 		return $this->transport_permission_callback;
+	}
+
+	/**
+	 * Get the transport class names the server was created with.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @return array<class-string<\WP\MCP\Transport\Contracts\McpTransportInterface>>
+	 */
+	public function get_mcp_transports(): array {
+		return $this->mcp_transports;
 	}
 
 	/**
