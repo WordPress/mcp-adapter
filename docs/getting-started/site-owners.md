@@ -8,7 +8,7 @@ It takes about ten minutes: create an Application Password, add your site to you
 
 MCP Adapter is the connection between your site and an AI client. On its own it adds no AI features and no new screens in wp-admin.
 
-- **It adds one address to your site.** AI clients connect to `https://example.com/wp-json/mcp/mcp-adapter-default-server`, with your own domain in place of `example.com`.
+- **It adds one address to your site.** AI clients connect to your site's address followed by `/wp-json/mcp/mcp-adapter-default-server`. Use the **Site Address (URL)** from **Settings > General**, so a site at `https://example.com/blog` becomes `https://example.com/blog/wp-json/mcp/mcp-adapter-default-server`. The examples below use `https://example.com`.
 - **What the assistant can do comes from abilities.** An ability is one action registered by WordPress or by a plugin, such as "get site info" or "create a draft post". Only abilities marked as public can be reached over MCP. MCP Adapter does not decide which abilities your site has; your plugins do.
 - **The assistant acts as a WordPress user.** You connect with a username and an Application Password, and every action runs with that user's role and permissions. An assistant connected as an Editor cannot do what an Editor cannot do.
 
@@ -60,10 +60,10 @@ Save the file and restart the app. [`@automattic/mcp-wordpress-remote`](https://
 
 ### Clients that connect over HTTP directly (Claude Code and others)
 
-Clients that accept a URL and a custom header can skip the helper. The header is `Authorization: Basic` followed by your username and Application Password, joined by a colon and encoded in base64. On macOS or Linux:
+Clients that accept a URL and a custom header can skip the helper. The header is `Authorization: Basic` followed by your username and Application Password, joined by a colon and encoded in base64 as one line. On macOS or Linux:
 
 ```bash
-printf 'your-username:xxxx xxxx xxxx xxxx xxxx xxxx' | base64
+printf 'your-username:xxxx xxxx xxxx xxxx xxxx xxxx' | base64 | tr -d '\n'
 ```
 
 Then, for example in Claude Code:
