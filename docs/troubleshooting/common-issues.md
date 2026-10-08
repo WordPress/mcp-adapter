@@ -10,7 +10,7 @@ Go to **Tools > Site Health > Info** and open the **MCP Adapter** section. It is
 
 - the adapter version and whether the default server is enabled
 - each registered MCP server with its ID, full endpoint URL, transports, and number of tools, resources and prompts
-- the abilities the default server exposes, and how many registered abilities it does not expose and why (not marked public, or `mcp.public` set to `false`)
+- the abilities the default server exposes, and how many registered abilities it does not expose and why (not marked public, `mcp.public` set to `false`, or invalid `mcp` metadata)
 - whether Application Passwords are available, and if not, whether the site lacks HTTPS or a filter turned them off
 
 Use the endpoint URL shown there when you configure a client. It already accounts for subdirectory installs and plain permalinks. **Copy site info to clipboard** includes this section, so you can paste it into a support request or a GitHub issue.

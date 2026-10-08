@@ -127,6 +127,23 @@ final class SiteHealthTest extends TestCase {
 		$this->assertSame( $before['mcp.public false'] + 1, $after['mcp.public false'] );
 	}
 
+	public function test_ability_fields_are_omitted_when_the_default_server_was_not_created(): void {
+		// An error handler that is not a valid class makes create_server() return a WP_Error.
+		$filter = static function ( array $config ): array {
+			$config['error_handler'] = 'Not\\A\\Real\\Handler';
+			return $config;
+		};
+		add_filter( 'mcp_adapter_default_server_config', $filter );
+		$this->setExpectedIncorrectUsage( 'WP\\MCP\\Servers\\DefaultServerFactory::create' );
+
+		$fields = SiteHealth::get_section()['fields'];
+
+		remove_filter( 'mcp_adapter_default_server_config', $filter );
+		$this->assertSame( 'enabled, not created', $fields['default_server']['debug'] );
+		$this->assertArrayNotHasKey( 'abilities_exposed', $fields );
+		$this->assertArrayNotHasKey( 'abilities_not_exposed', $fields );
+	}
+
 	public function test_ability_fields_are_omitted_when_the_default_server_is_disabled(): void {
 		add_filter( 'mcp_adapter_create_default_server', '__return_false' );
 
@@ -254,5 +271,11 @@ final class SiteHealthTest extends TestCase {
 			$initialized->setAccessible( true );
 		}
 		$initialized->setValue( null, false );
+
+		$created = new \ReflectionProperty( DefaultServerFactory::class, 'created_server_id' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$created->setAccessible( true );
+		}
+		$created->setValue( null, null );
 	}
 }

@@ -12,6 +12,7 @@ namespace WP\MCP\Admin;
 use WP\MCP\Abilities\McpAbilityExposure;
 use WP\MCP\Core\McpAdapter;
 use WP\MCP\Core\McpServer;
+use WP\MCP\Servers\DefaultServerFactory;
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
 
 // Exit if accessed directly.
@@ -119,7 +120,20 @@ final class SiteHealth {
 			$fields[ 'server_' . $server->get_server_id() ] = self::get_server_field( $server );
 		}
 
-		if ( $default_enabled ) {
+		// Enabled is not the same as created: a filtered config can make creation
+		// fail. Only report what the default server exposes when it exists.
+		$default_id     = DefaultServerFactory::get_created_server_id();
+		$default_exists = null !== $default_id && null !== $adapter->get_server( $default_id );
+
+		if ( $default_enabled && ! $default_exists ) {
+			$fields['default_server'] = array(
+				'label' => __( 'Default server', 'mcp-adapter' ),
+				'value' => __( 'Enabled, but it was not created. Check the PHP error log for "Failed to create default server".', 'mcp-adapter' ),
+				'debug' => 'enabled, not created',
+			);
+		}
+
+		if ( $default_exists ) {
 			$fields = array_merge( $fields, self::get_ability_fields() );
 		}
 
