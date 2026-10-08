@@ -12,10 +12,10 @@ namespace WP\MCP\Abilities;
 use WP_Error;
 
 /**
- * Discover Abilities - Lists all available WordPress abilities in the system.
+ * Discover Abilities - Searches the WordPress abilities exposed through MCP.
  *
- * This ability provides discovery functionality for the MCP protocol.
- * It discovers all registered WordPress abilities in the system.
+ * This ability provides discovery functionality for the MCP protocol. It returns a
+ * ranked, paged result set, so the response size does not grow with the catalog.
  *
  * SECURITY CONSIDERATIONS:
  * - This ability exposes information about all registered abilities in the system
@@ -25,8 +25,6 @@ use WP_Error;
  * @see https://developer.wordpress.org/apis/security/ for detailed security guidance
  */
 final class DiscoverAbilitiesAbility {
-	use McpAbilityHelperTrait;
-
 	/**
 	 * Register the ability.
 	 */
@@ -35,23 +33,84 @@ final class DiscoverAbilitiesAbility {
 			'mcp-adapter/discover-abilities',
 			array(
 				'label'               => 'Discover Abilities',
-				'description'         => 'Discover all available WordPress abilities in the system. Returns a list of all registered abilities with their basic information.',
+				'description'         => 'Searches the abilities that this site exposes through MCP, by keyword, and returns a ranked page of matches. Each match includes a short input signature and the safety annotations of the ability. An empty query lists all exposed abilities in name order. Matching compares words literally with ability names, labels, categories, and descriptions, so synonyms do not match. When no ability matches every word, the results are the abilities that match some of the words. Results are not filtered by the permissions of the current user. The returned names are the identifiers that mcp-adapter-get-ability-info and mcp-adapter-execute-ability accept.',
 				'category'            => 'mcp-adapter',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'query'    => array(
+							'type'        => 'string',
+							'description' => 'Words that describe the operation, for example "create post" or "list plugins". Each word matches literally: WordPress terms such as post, page, user, comment, and plugin match, but synonyms such as article or website do not. Words shorter than 3 characters and common words such as "the" are ignored, and plural endings are removed. Empty or omitted lists all exposed abilities.',
+						),
+						'category' => array(
+							'type'        => 'string',
+							'description' => 'Category slug, for example "site". Limits the results to abilities in this category. The categories field of an empty-query response lists the slugs.',
+						),
+						'limit'    => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'maximum'     => AbilitySearch::MAX_LIMIT,
+							'description' => sprintf( 'Maximum number of matches in the page. Default %d.', AbilitySearch::DEFAULT_LIMIT ),
+						),
+						'offset'   => array(
+							'type'        => 'integer',
+							'minimum'     => 0,
+							'description' => 'Number of ranked matches to skip, for paging. Default 0.',
+						),
+					),
+				),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'abilities' => array(
-							'type'  => 'array',
-							'items' => array(
+						'query'           => array(
+							'type'        => 'string',
+							'description' => 'The query, without leading and trailing spaces.',
+						),
+						'total'           => array(
+							'type'        => 'integer',
+							'description' => 'Number of matching abilities before paging.',
+						),
+						'offset'          => array( 'type' => 'integer' ),
+						'limit'           => array( 'type' => 'integer' ),
+						'has_more'        => array(
+							'type'        => 'boolean',
+							'description' => 'Whether more matches exist after this page.',
+						),
+						'abilities'       => array(
+							'type'        => 'array',
+							'description' => 'The matches in this page, best match first.',
+							'items'       => array(
 								'type'       => 'object',
 								'properties' => array(
 									'name'        => array( 'type' => 'string' ),
 									'label'       => array( 'type' => 'string' ),
 									'description' => array( 'type' => 'string' ),
+									'category'    => array(
+										'type'        => 'string',
+										'description' => 'Category slug.',
+									),
+									'input'       => array(
+										'type'        => 'string',
+										'description' => 'Top-level input parameters as "name (type)"; "*" marks a required parameter, and "no input" means the ability takes none. Nested shapes, constraints, and parameter descriptions are in the input schema from mcp-adapter-get-ability-info.',
+									),
+									'annotations' => array(
+										'type'        => 'array',
+										'items'       => array( 'type' => 'string' ),
+										'description' => 'The annotations that the ability sets to true, for example readonly, destructive, or idempotent. An empty list means that none is set to true.',
+									),
 								),
 								'required'   => array( 'name', 'label', 'description' ),
 							),
 						),
+						'partial_matches' => array(
+							'type'        => 'array',
+							'description' => 'The matches in this page that miss some query words, with the missed words. Present only when no ability matches every word.',
+						),
+						'categories'      => array(
+							'type'        => 'array',
+							'description' => 'Number of exposed abilities per category, with the category slug and label. Present for an empty query and when nothing matches.',
+						),
+						'next_step'       => array( 'type' => 'string' ),
 					),
 					'required'   => array( 'abilities' ),
 				),
@@ -74,41 +133,15 @@ final class DiscoverAbilitiesAbility {
 	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
 	 * before this callback is invoked.
 	 *
+	 * @see \WP\MCP\Abilities\AbilitySearch::search()
 	 * @see \WP_Ability::execute()
 	 *
-	 * @param array $input Input parameters (unused for this ability).
+	 * @param array|null $input Search arguments: query, category, limit, offset.
 	 *
-	 * @return array Array containing public MCP abilities.
+	 * @return array|\WP_Error The ranked, paged search result, or an error for invalid arguments.
 	 */
-	// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- Required by the ability callback.
-	public static function execute( $input = array() ): array {
-		// Get all abilities and filter for publicly exposed ones
-		$abilities = wp_get_abilities();
-
-		$ability_list = array();
-		foreach ( $abilities as $ability ) {
-			$ability_name = $ability->get_name();
-
-			// Check if ability is publicly exposed via MCP
-			if ( ! self::is_ability_mcp_public( $ability ) ) {
-				continue;
-			}
-
-			// Only discover abilities with type='tool' (default type)
-			if ( self::get_ability_mcp_type( $ability ) !== 'tool' ) {
-				continue;
-			}
-
-			$ability_list[] = array(
-				'name'        => $ability_name,
-				'label'       => $ability->get_label(),
-				'description' => $ability->get_description(),
-			);
-		}
-
-		return array(
-			'abilities' => $ability_list,
-		);
+	public static function execute( $input = array() ) {
+		return AbilitySearch::search( is_array( $input ) ? $input : array() );
 	}
 
 	/**

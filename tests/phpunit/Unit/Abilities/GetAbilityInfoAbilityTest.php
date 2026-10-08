@@ -55,7 +55,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 		$this->assertNotNull( $ability );
 		$this->assertEquals( 'mcp-adapter/get-ability-info', $ability->get_name() );
 		$this->assertEquals( 'Get Ability Info', $ability->get_label() );
-		$this->assertStringContainsString( 'Get detailed information about a specific WordPress ability', $ability->get_description() );
+		$this->assertStringContainsString( 'Returns the complete definition of one ability', $ability->get_description() );
 	}
 
 	public function test_check_permission_with_logged_in_user(): void {

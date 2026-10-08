@@ -35,14 +35,14 @@ final class GetAbilityInfoAbility {
 			'mcp-adapter/get-ability-info',
 			array(
 				'label'               => 'Get Ability Info',
-				'description'         => 'Get detailed information about a specific WordPress ability including its input/output schema, description, and usage examples.',
+				'description'         => 'Returns the complete definition of one ability that this site exposes through MCP: its full input schema, its output schema when it declares one, and its metadata, including annotations. The input schema shows more than the input signature from mcp-adapter-discover-abilities: nested shapes, constraints, and parameter descriptions. This does not run the ability or check whether the current user may run it.',
 				'category'            => 'mcp-adapter',
 				'input_schema'        => array(
 					'type'       => 'object',
 					'properties' => array(
 						'ability_name' => array(
 							'type'        => 'string',
-							'description' => 'The full name of the ability to get information about',
+							'description' => 'Ability name with its namespace, for example "core/get-site-info", as returned by mcp-adapter-discover-abilities. Only abilities exposed through MCP are accepted.',
 						),
 					),
 					'required'   => array( 'ability_name' ),
@@ -59,11 +59,11 @@ final class GetAbilityInfoAbility {
 						),
 						'output_schema' => array(
 							'type'        => 'object',
-							'description' => 'JSON Schema for the ability output structure',
+							'description' => 'JSON Schema for the ability output structure. Present only when the ability declares one.',
 						),
 						'meta'          => array(
 							'type'        => 'object',
-							'description' => 'Additional metadata about the ability',
+							'description' => 'Additional metadata about the ability, including its annotations. Present only when not empty.',
 						),
 					),
 					'required'   => array( 'name', 'label', 'description', 'input_schema' ),

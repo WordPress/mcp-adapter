@@ -52,7 +52,7 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertNotNull( $ability );
 		$this->assertEquals( 'mcp-adapter/execute-ability', $ability->get_name() );
 		$this->assertEquals( 'Execute Ability', $ability->get_label() );
-		$this->assertStringContainsString( 'Execute a WordPress ability with the provided parameters', $ability->get_description() );
+		$this->assertStringContainsString( 'Runs one ability that this site exposes through MCP', $ability->get_description() );
 	}
 
 	public function test_check_permission_with_valid_ability(): void {
