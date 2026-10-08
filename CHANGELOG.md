@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - TBD
+
+### Security
+- The HTTP transport now validates the `Origin` header on every request for both MCP revisions, as the Streamable HTTP transport requires to prevent DNS rebinding. Requests without an `Origin` header are unaffected. A present `Origin` must match the scheme, host, and port of `home_url()` or `site_url()`; any other value, including `null`, returns HTTP 403 with a JSON-RPC permission error before session or method handling ([#323](https://github.com/WordPress/mcp-adapter/issues/323)).
+
+### Added
+- The `mcp_adapter_allowed_http_origins` filter adds exact origins allowed to call MCP endpoints, such as a headless front end. A return value that is not an array of strings rejects every request that carries an `Origin` header ([#323](https://github.com/WordPress/mcp-adapter/issues/323)).
+
 ## [0.7.0] - 2026-10-02
 
 ### Breaking Changes
