@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Abilities;
 
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Infrastructure\ErrorHandling\ExecutionErrorSanitizer;
 use WP_Error;
 
 /**
@@ -56,8 +57,8 @@ final class ExecuteAbilityAbility {
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
-						'success' => array( 'type' => 'boolean' ),
-						'data'    => array(
+						'success'    => array( 'type' => 'boolean' ),
+						'data'       => array(
 							'type'        => array(
 								'object',
 								'array',
@@ -69,9 +70,25 @@ final class ExecuteAbilityAbility {
 							),
 							'description' => 'The result data from the ability execution',
 						),
-						'error'   => array(
+						'error'      => array(
 							'type'        => 'string',
 							'description' => 'Error message if execution failed',
+						),
+						'error_code' => array(
+							'type'        => 'string',
+							'description' => 'Stable error code if execution failed',
+						),
+						'error_data' => array(
+							'type'        => array(
+								'object',
+								'array',
+								'string',
+								'number',
+								'integer',
+								'boolean',
+								'null',
+							),
+							'description' => 'Additional error context if execution failed',
 						),
 					),
 					'required'   => array( 'success' ),
@@ -108,18 +125,23 @@ final class ExecuteAbilityAbility {
 		$parameters = $input['parameters'] ?? null;
 
 		if ( empty( $ability_name ) ) {
-			return array(
-				'success' => false,
-				'error'   => 'Ability name is required',
+			return self::error_result(
+				new WP_Error( 'missing_ability_name', __( 'Ability name is required', 'mcp-adapter' ) )
 			);
 		}
 
 		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
-			return array(
-				'success' => false,
-				'error'   => "Ability '{$ability_name}' not found",
+			return self::error_result(
+				new WP_Error(
+					'ability_not_found',
+					sprintf(
+						/* translators: %s: ability name */
+						__( "Ability '%s' not found", 'mcp-adapter' ),
+						$ability_name
+					)
+				)
 			);
 		}
 
@@ -133,10 +155,7 @@ final class ExecuteAbilityAbility {
 
 			// Check if the result is a WP_Error
 			if ( is_wp_error( $result ) ) {
-				return array(
-					'success' => false,
-					'error'   => $result->get_error_message(),
-				);
+				return self::error_result( $result );
 			}
 
 			return array(
@@ -144,11 +163,40 @@ final class ExecuteAbilityAbility {
 				'data'    => $result,
 			);
 		} catch ( \Throwable $e ) {
-			return array(
-				'success' => false,
-				'error'   => $e->getMessage(),
+			return self::error_result(
+				new WP_Error(
+					'mcp_execution_failed',
+					$e->getMessage(),
+					array( 'error_type' => get_class( $e ) )
+				)
 			);
 		}
+	}
+
+	/**
+	 * Build a failure envelope preserving the WP_Error code and data.
+	 *
+	 * Error data is sanitized to JSON-safe values so direct callers of this
+	 * ability (outside the MCP tool machinery) never see raw internals.
+	 * The `mcp_adapter_tool_error_data` filter is intentionally not applied
+	 * here: when this ability is invoked as the `execute-ability` MCP tool,
+	 * ToolsHandler re-wraps this envelope into a WP_Error and runs it through
+	 * `create_error_result()`, which is the single place that filter fires.
+	 * Applying it here too would run it twice per failure.
+	 *
+	 * @since 0.7.0
+	 *
+	 * @param \WP_Error $error The execution failure.
+	 *
+	 * @return array Array containing the failure envelope.
+	 */
+	private static function error_result( WP_Error $error ): array {
+		return array(
+			'success'    => false,
+			'error'      => $error->get_error_message(),
+			'error_code' => ExecutionErrorSanitizer::sanitize_code( $error->get_error_code() ),
+			'error_data' => ExecutionErrorSanitizer::sanitize_data( $error->get_error_data() ),
+		);
 	}
 
 	/**
@@ -164,7 +212,7 @@ final class ExecuteAbilityAbility {
 		$ability_name = $input['ability_name'] ?? '';
 
 		if ( empty( $ability_name ) ) {
-			return new WP_Error( 'missing_ability_name', 'Ability name is required' );
+			return new WP_Error( 'missing_ability_name', __( 'Ability name is required', 'mcp-adapter' ) );
 		}
 
 		// Validate user authentication and capabilities
@@ -182,7 +230,14 @@ final class ExecuteAbilityAbility {
 		// Get the target ability
 		$ability = wp_get_ability( $ability_name );
 		if ( ! $ability ) {
-			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
+			return new WP_Error(
+				'ability_not_found',
+				sprintf(
+					/* translators: %s: ability name */
+					__( "Ability '%s' not found", 'mcp-adapter' ),
+					$ability_name
+				)
+			);
 		}
 
 		// Normalize parameters for ability's schema requirements
@@ -207,7 +262,7 @@ final class ExecuteAbilityAbility {
 	private static function validate_user_access() {
 		// Verify caller identity - ensure the user is authenticated
 		if ( ! is_user_logged_in() ) {
-			return new WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
+			return new WP_Error( 'authentication_required', __( 'User must be authenticated to access this ability', 'mcp-adapter' ) );
 		}
 
 		/**
@@ -228,7 +283,11 @@ final class ExecuteAbilityAbility {
 		if ( ! current_user_can( $required_capability ) ) {
 			return new WP_Error(
 				'insufficient_capability',
-				sprintf( 'User lacks required capability: %s', $required_capability )
+				sprintf(
+					/* translators: %s: required WordPress capability */
+					__( 'User lacks required capability: %s', 'mcp-adapter' ),
+					$required_capability
+				)
 			);
 		}
 

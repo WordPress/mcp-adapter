@@ -15,12 +15,14 @@ use WP\MCP\Domain\Tools\McpInputRequired;
 use WP\MCP\Domain\Tools\McpToolCallContext;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
+use WP\MCP\Infrastructure\ErrorHandling\ExecutionErrorSanitizer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Record\InputRequests;
 use WP\McpSchema\Record\ListToolsRequest;
 use WP\McpSchema\Schemas;
+use WP_Error;
 
 /**
  * Handles tools-related MCP methods.
@@ -147,10 +149,7 @@ class ToolsHandler {
 
 			$permission = $mcp_tool->check_permission( $args );
 			if ( true !== $permission ) {
-				$error_message = __( 'Permission denied', 'mcp-adapter' );
 				if ( is_wp_error( $permission ) ) {
-					$error_message = $permission->get_error_message();
-
 					$this->mcp->get_error_handler()->log(
 						'Tool permission check failed',
 						array(
@@ -161,9 +160,13 @@ class ToolsHandler {
 							'failure_reason' => FailureReason::PERMISSION_CHECK_FAILED,
 						)
 					);
+
+					return $this->create_error_result( $permission );
 				}
 
-				return $this->create_error_result( $error_message );
+				return $this->create_error_result(
+					new WP_Error( 'mcp_permission_denied', __( 'Permission denied', 'mcp-adapter' ) )
+				);
 			}
 
 			/**
@@ -183,7 +186,7 @@ class ToolsHandler {
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
-				return $this->create_error_result( $args->get_error_message() );
+				return $this->create_error_result( $args );
 			}
 
 			$result = $mcp_tool->execute( $args, $call_context );
@@ -242,7 +245,7 @@ class ToolsHandler {
 					)
 				);
 
-				return $this->create_error_result( $result->get_error_message() );
+				return $this->create_error_result( $result );
 			}
 
 			// Expose top-level content markers before handling binary image data.
@@ -258,6 +261,9 @@ class ToolsHandler {
 			}
 
 			// Backward compatibility: treat `{ success: false, error: string }` as tool execution error.
+			// `error_code`/`error_data` are optional extensions some abilities (e.g.
+			// ExecuteAbilityAbility) add to this shape; create_error_result() validates
+			// and defaults the code, so no pre-validation is needed here.
 			if (
 				array_key_exists( 'success', $result )
 				&& false === $result['success']
@@ -265,7 +271,15 @@ class ToolsHandler {
 				&& is_string( $result['error'] )
 				&& '' !== trim( $result['error'] )
 			) {
-				return $this->create_error_result( $result['error'] );
+				$error_code = ExecutionErrorSanitizer::sanitize_code( $result['error_code'] ?? null );
+
+				return $this->create_error_result(
+					new WP_Error(
+						$error_code,
+						$result['error'],
+						$result['error_data'] ?? null
+					)
+				);
 			}
 
 			// Successful tool execution - build logical result data.
@@ -393,18 +407,47 @@ class ToolsHandler {
 	}
 
 	/**
-	 * Create logical tool-execution error data from a message string.
+	 * Create an error result from a WP_Error.
 	 *
-	 * @since 0.5.0
+	 * The human-readable message stays in the text content block for backward
+	 * compatibility, while the machine-readable code/message/data triple is
+	 * exposed via structuredContent so clients can branch on failure classes
+	 * without parsing localized prose.
 	 *
-	 * @param string $message The error message.
+	 * @since 0.7.0
+	 *
+	 * @param \WP_Error $error The error to report.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function create_error_result( string $message ): array {
+	private function create_error_result( WP_Error $error ): array {
+		$code    = ExecutionErrorSanitizer::sanitize_code( $error->get_error_code() );
+		$message = $error->get_error_message();
+		$data    = ExecutionErrorSanitizer::sanitize_data( $error->get_error_data() );
+
+		/**
+		 * Filters structured error data exported to MCP clients.
+		 *
+		 * Return only data that is safe to expose to the caller. The default
+		 * sanitizer keeps JSON-safe scalars and arrays and drops objects,
+		 * resources, and oversized values.
+		 *
+		 * @since 0.7.0
+		 *
+		 * @param mixed  $data    The sanitized error data. Default null.
+		 * @param string $code    The sanitized error code.
+		 * @param string $message The human-readable error message.
+		 */
+		$data = apply_filters( 'mcp_adapter_tool_error_data', $data, $code, $message );
+
 		return array(
-			'content' => array( ContentBlockHelper::text( $message ) ),
-			'isError' => true,
+			'content'           => array( ContentBlockHelper::text( $message ) ),
+			'structuredContent' => array(
+				'code'    => $code,
+				'message' => $message,
+				'data'    => $data,
+			),
+			'isError'           => true,
 		);
 	}
 }

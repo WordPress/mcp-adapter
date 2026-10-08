@@ -245,9 +245,9 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	public function test_execute_with_missing_ability_name(): void {
 		$result = GetAbilityInfoAbility::execute( array() );
 
-		$this->assertIsArray( $result );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertEquals( 'Ability name is required', $result['error'] );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
+		$this->assertEquals( 'Ability name is required', $result->get_error_message() );
 	}
 
 	public function test_execute_with_empty_ability_name(): void {
@@ -257,9 +257,9 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertIsArray( $result );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertEquals( 'Ability name is required', $result['error'] );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertEquals( 'missing_ability_name', $result->get_error_code() );
+		$this->assertEquals( 'Ability name is required', $result->get_error_message() );
 	}
 
 	public function test_execute_with_nonexistent_ability(): void {
@@ -270,10 +270,10 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 			)
 		);
 
-		$this->assertIsArray( $result );
-		$this->assertArrayHasKey( 'error', $result );
-		$this->assertStringContainsString( 'nonexistent/ability', $result['error'] );
-		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
+		$this->assertStringContainsString( 'nonexistent/ability', $result->get_error_message() );
+		$this->assertStringContainsString( 'not found', $result->get_error_message() );
 	}
 
 	public function test_ability_has_correct_input_schema(): void {

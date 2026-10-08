@@ -52,6 +52,14 @@ All notable changes to this project will be documented in this file, per [the Ke
 - Default abilities register when another plugin initializes the Abilities API before the MCP server initializes.
 - `mcp-adapter/get-ability-info` serializes an empty `input_schema` as `{}` instead of `[]`.
 
+### Added
+- Filter `mcp_adapter_tool_error_data` to inspect, customize, or redact structured error data exported to MCP clients.
+
+### Fixed
+- Tool execution errors now expose the stable `WP_Error` code and sanitized error data in `structuredContent` (`{code, message, data}`) instead of returning message-only text with `structuredContent: null`, allowing MCP clients to distinguish failure classes programmatically without parsing localized prose.
+- `mcp-adapter/execute-ability` failures now preserve and include `error_code` and `error_data` alongside `error`.
+- `mcp-adapter/get-ability-info` failures now return `WP_Error` with stable codes (`missing_ability_name`, `ability_not_found`) instead of returning an unclassified array with a plain `error` string, ensuring reasons survive core output schema validation.
+
 ## [0.6.1] - 2026-08-13
 
 ### Fixed

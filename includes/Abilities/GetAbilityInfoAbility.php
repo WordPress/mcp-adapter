@@ -87,24 +87,32 @@ final class GetAbilityInfoAbility {
 	 * Note: Permission checks are handled by the WP_Ability::execute() framework method
 	 * before this callback is invoked (see WP_Ability::execute() line 605).
 	 *
+	 * Failures are returned as WP_Error (with stable codes) rather than
+	 * `array( 'error' => ... )` so the code survives core output validation —
+	 * which would reject an error-shaped array against the info output schema
+	 * as `ability_invalid_output` — and reaches MCP clients intact.
+	 *
 	 * @param array $input Input parameters containing ability_name.
 	 *
-	 * @return array Array containing detailed ability information.
+	 * @return array|\WP_Error Array containing detailed ability information, or WP_Error on failure.
 	 */
-	public static function execute( $input = array() ): array {
+	public static function execute( $input = array() ) {
 		$ability_name = $input['ability_name'] ?? '';
 
 		if ( empty( $ability_name ) ) {
-			return array(
-				'error' => 'Ability name is required',
-			);
+			return new WP_Error( 'missing_ability_name', __( 'Ability name is required', 'mcp-adapter' ) );
 		}
 
 		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
-			return array(
-				'error' => "Ability '{$ability_name}' not found",
+			return new WP_Error(
+				'ability_not_found',
+				sprintf(
+					/* translators: %s: ability name */
+					__( "Ability '%s' not found", 'mcp-adapter' ),
+					$ability_name
+				)
 			);
 		}
 
@@ -143,7 +151,7 @@ final class GetAbilityInfoAbility {
 		$ability_name = $input['ability_name'] ?? '';
 
 		if ( empty( $ability_name ) ) {
-			return new WP_Error( 'missing_ability_name', 'Ability name is required' );
+			return new WP_Error( 'missing_ability_name', __( 'Ability name is required', 'mcp-adapter' ) );
 		}
 
 		// Validate user authentication and capabilities
@@ -164,7 +172,7 @@ final class GetAbilityInfoAbility {
 	private static function validate_user_access() {
 		// Verify caller identity - ensure user is authenticated
 		if ( ! is_user_logged_in() ) {
-			return new WP_Error( 'authentication_required', 'User must be authenticated to access this ability' );
+			return new WP_Error( 'authentication_required', __( 'User must be authenticated to access this ability', 'mcp-adapter' ) );
 		}
 
 		/**
@@ -182,7 +190,11 @@ final class GetAbilityInfoAbility {
 		if ( ! current_user_can( $required_capability ) ) {
 			return new WP_Error(
 				'insufficient_capability',
-				sprintf( 'User lacks required capability: %s', $required_capability )
+				sprintf(
+					/* translators: %s: required WordPress capability */
+					__( 'User lacks required capability: %s', 'mcp-adapter' ),
+					$required_capability
+				)
 			);
 		}
 

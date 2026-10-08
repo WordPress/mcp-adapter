@@ -285,6 +285,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertFalse( $result['success'] );
 		$this->assertEquals( 'Ability name is required', $result['error'] );
+		$this->assertEquals( 'missing_ability_name', $result['error_code'] );
+		$this->assertNull( $result['error_data'] );
 	}
 
 	public function test_execute_with_empty_ability_name(): void {
@@ -300,6 +302,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertFalse( $result['success'] );
 		$this->assertEquals( 'Ability name is required', $result['error'] );
+		$this->assertEquals( 'missing_ability_name', $result['error_code'] );
+		$this->assertNull( $result['error_data'] );
 	}
 
 	public function test_execute_with_nonexistent_ability(): void {
@@ -317,6 +321,8 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'nonexistent/ability', $result['error'] );
 		$this->assertStringContainsString( 'not found', $result['error'] );
+		$this->assertEquals( 'ability_not_found', $result['error_code'] );
+		$this->assertNull( $result['error_data'] );
 	}
 
 	public function test_execute_with_ability_returning_wp_error(): void {
@@ -352,13 +358,15 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertFalse( $result['success'] );
 		$this->assertEquals( 'Custom execution error', $result['error'] );
+		$this->assertEquals( 'execution_failed', $result['error_code'] );
+		$this->assertNull( $result['error_data'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/wp-error-execution' );
 	}
 
 	public function test_execute_with_ability_throwing_exception(): void {
-		// Create a mock ability that throws exception
+		// Core converts this to WP_Error( 'ability_callback_exception' ) before it reaches our own catch block.
 		$this->register_ability_in_hook(
 			'test/exception-execution',
 			array(
@@ -390,9 +398,47 @@ final class ExecuteAbilityAbilityTest extends TestCase {
 		$this->assertArrayHasKey( 'error', $result );
 		$this->assertFalse( $result['success'] );
 		$this->assertStringContainsString( 'Test execution exception', $result['error'] );
+		$this->assertIsString( $result['error_code'] );
+		$this->assertNotEmpty( $result['error_code'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/exception-execution' );
+	}
+
+	public function test_execute_with_ability_throwing_error(): void {
+		// Same as above: core catches Throwable (Error and Exception alike).
+		$this->register_ability_in_hook(
+			'test/error-execution',
+			array(
+				'label'               => 'Error Execution Test',
+				'description'         => 'Throws native Error for execution',
+				'category'            => 'test',
+				'execute_callback'    => static function () {
+					throw new \Error( 'Test execution native error' );
+				},
+				'permission_callback' => static function () {
+					return true;
+				},
+			)
+		);
+
+		$result = ExecuteAbilityAbility::execute(
+			array(
+				'ability_name' => 'test/error-execution',
+				'parameters'   => array(),
+			)
+		);
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'success', $result );
+		$this->assertArrayHasKey( 'error', $result );
+		$this->assertFalse( $result['success'] );
+		$this->assertStringContainsString( 'Test execution native error', $result['error'] );
+		$this->assertIsString( $result['error_code'] );
+		$this->assertNotEmpty( $result['error_code'] );
+
+		// Clean up
+		wp_unregister_ability( 'test/error-execution' );
 	}
 
 	public function test_ability_has_correct_schema(): void {
