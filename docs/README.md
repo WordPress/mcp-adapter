@@ -4,6 +4,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ## Getting started
 
+- **[Site Owner Guide](getting-started/site-owners.md)** - Connect Claude, Cursor or another AI client to your site, no code needed
 - **[Quick Start Guide](getting-started/README.md)** - Get running in minutes with working examples
 - **[Installation Guide](getting-started/installation.md)** - Installing and activating the plugin
 - **[Basic Examples](getting-started/basic-examples.md)** - Complete examples for tools, resources, and prompts
