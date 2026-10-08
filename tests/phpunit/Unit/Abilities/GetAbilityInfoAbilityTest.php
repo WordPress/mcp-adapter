@@ -263,7 +263,6 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 	}
 
 	public function test_execute_with_nonexistent_ability(): void {
-		$this->setExpectedIncorrectUsage( 'WP_Abilities_Registry::get_registered' );
 		$result = GetAbilityInfoAbility::execute(
 			array(
 				'ability_name' => 'nonexistent/ability',
