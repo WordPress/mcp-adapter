@@ -103,6 +103,15 @@ final class SessionManager {
 	private const MAX_UPDATE_ATTEMPTS = 5;
 
 	/**
+	 * Maximum serialized initialization parameters stored in one session.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var int
+	 */
+	private const MAX_CLIENT_PARAMS_BYTES = 16384;
+
+	/**
 	 * Create a new session for a user
 	 *
 	 * @since 0.6.0 Added the optional error handler.
@@ -115,6 +124,24 @@ final class SessionManager {
 	 */
 	public static function create_session( int $user_id, array $params = array(), ?McpErrorHandlerInterface $error_handler = null ) {
 		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
+			return false;
+		}
+
+		// Adapter storage policy: MCP does not bound initialization parameter sizes.
+		$params_bytes = strlen( maybe_serialize( $params ) );
+		if ( $params_bytes > self::MAX_CLIENT_PARAMS_BYTES ) {
+			$error_handler = $error_handler ?? new ErrorLogMcpErrorHandler();
+			$error_handler->log(
+				'MCP session initialization parameters exceed the storage limit.',
+				array(
+					'component' => self::class,
+					'method'    => 'create_session',
+					'user_id'   => $user_id,
+					'bytes'     => $params_bytes,
+					'limit'     => self::MAX_CLIENT_PARAMS_BYTES,
+				)
+			);
+
 			return false;
 		}
 

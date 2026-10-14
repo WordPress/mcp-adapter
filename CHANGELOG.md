@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Session creation rejects client initialization parameters larger than 16 KiB in their PHP serialized representation before writing session metadata. This Adapter storage limit applies to the legacy HTTP initialization lifecycle and direct `SessionManager::create_session()` calls; MCP itself does not impose this byte limit. Accepted parameters are preserved unchanged. Oversized HTTP initialization returns the existing session-creation error (HTTP 500, JSON-RPC `-32603`). Existing oversized session rows are not automatically repaired.
+
 ## [0.7.0] - 2026-10-02
 
 ### Breaking Changes

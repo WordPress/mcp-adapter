@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport;
 
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\SessionManager;
 
@@ -78,6 +79,88 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertCount( 1, $sessions );
 		$this->assertArrayHasKey( $session_id, $sessions );
 		$this->assertSame( $client_info, $sessions[ $session_id ]['client_params'] );
+	}
+
+	/**
+	 * Oversized initialization cannot change existing sessions or issue storage writes.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_create_session_rejects_oversized_params_without_writes(): void {
+		$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'existing-client' ) );
+		$this->assertIsString( $session_id );
+		$before   = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$params   = array( 'capabilities' => array( 'experimental' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ) ) );
+		$meta_key = self::session_meta_key();
+		$writes   = 0;
+		$observe  = static function ( string $query ) use ( $meta_key, &$writes ): string {
+			if ( false !== strpos( $query, $meta_key ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)/i', $query ) ) {
+				++$writes;
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $observe );
+		try {
+			$this->assertFalse( SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() ) );
+			$this->assertSame( 0, $writes );
+			$this->assertSame( $before, SessionManager::get_all_user_sessions( $this->test_user_id ) );
+			$this->assertCount( 1, DummyErrorHandler::$logs );
+			$this->assertSame( strlen( maybe_serialize( $params ) ), DummyErrorHandler::$logs[0]['context']['bytes'] );
+			$this->assertSame( 16384, DummyErrorHandler::$logs[0]['context']['limit'] );
+			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
+		} finally {
+			remove_filter( 'query', $observe );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * Count serialized storage bytes, including overhead, without truncating accepted data.
+	 *
+	 * @since n.e.x.t
+	 * @dataProvider serialized_params_boundary_provider
+	 *
+	 * @param int  $payload_bytes    String content bytes.
+	 * @param int  $serialized_bytes Full stored parameter bytes.
+	 * @param bool $accepted         Whether the session can be persisted.
+	 */
+	public function test_create_session_serialized_params_boundary( int $payload_bytes, int $serialized_bytes, bool $accepted ): void {
+		$params = array( 'blob' => str_repeat( 'x', $payload_bytes ) );
+		$this->assertSame( $serialized_bytes, strlen( maybe_serialize( $params ) ) );
+
+		DummyErrorHandler::reset();
+		try {
+			$session_id = SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() );
+			if ( ! $accepted ) {
+				$this->assertFalse( $session_id );
+				$this->assertFalse( metadata_exists( 'user', $this->test_user_id, self::session_meta_key() ) );
+				return;
+			}
+
+			$this->assertIsString( $session_id );
+			$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+			$this->assertSame( $params, $sessions[ $session_id ]['client_params'] );
+			$this->assertTrue( SessionManager::validate_session( $this->test_user_id, $session_id ) );
+		} finally {
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * Exact byte fixtures include the 28-byte PHP array/string serialization overhead.
+	 *
+	 * @since n.e.x.t
+	 * @return array<string, array{int, int, bool}>
+	 */
+	public function serialized_params_boundary_provider(): array {
+		return array(
+			'below limit' => array( 16355, 16383, true ),
+			'at limit'    => array( 16356, 16384, true ),
+			'above limit' => array( 16357, 16385, false ),
+		);
 	}
 
 	/**
