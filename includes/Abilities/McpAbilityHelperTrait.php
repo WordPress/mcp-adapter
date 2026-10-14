@@ -29,20 +29,60 @@ trait McpAbilityHelperTrait {
 	 * @return bool|\WP_Error True if publicly exposed, WP_Error if not.
 	 */
 	protected static function check_ability_mcp_exposure( string $ability_name ) {
-		$ability = wp_get_ability( $ability_name );
+		// An unknown name from an MCP client is expected input, not a developer
+		// mistake, so check the registry before wp_get_ability(), which flags a
+		// miss with _doing_it_wrong().
+		$ability = wp_has_ability( $ability_name ) ? wp_get_ability( $ability_name ) : null;
 
 		if ( ! $ability ) {
-			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
+			return new WP_Error(
+				'ability_not_found',
+				self::ability_not_found_message( $ability_name ),
+				array( 'suggestions' => AbilityNameSuggester::suggest( $ability_name ) )
+			);
 		}
 
 		if ( ! McpAbilityExposure::is_public( $ability ) ) {
 			return new WP_Error(
 				'ability_not_public_mcp',
-				sprintf( 'Ability "%s" is not exposed via MCP (mcp.public!=true)', $ability_name )
+				sprintf(
+					'Ability "%s" is registered on this WordPress site, but the plugin that registers it does not make it available to MCP clients (meta.mcp.public). That is decided in the plugin\'s code: the site has no setting to switch it on, so do not ask the site owner to look for one.',
+					$ability_name
+				)
 			);
 		}
 
 		return true;
+	}
+
+	/**
+	 * Builds the message for an ability name that is not registered.
+	 *
+	 * Says plainly that the ability is not on this site and names the closest
+	 * abilities the client can call, so it takes one of them or stops instead
+	 * of guessing more names.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $ability_name The ability name the client asked for.
+	 *
+	 * @return string
+	 */
+	protected static function ability_not_found_message( string $ability_name ): string {
+		$suggestions = AbilityNameSuggester::suggest( $ability_name );
+
+		if ( array() !== $suggestions ) {
+			return sprintf(
+				'Ability \'%1$s\' not found on this WordPress site. Closest abilities you can call: %2$s. Use one of these if it does what you need; guessing other spellings will not find \'%1$s\'.',
+				$ability_name,
+				implode( ', ', $suggestions )
+			);
+		}
+
+		return sprintf(
+			'Ability \'%s\' not found on this WordPress site, and no ability you can call has a similar name. Call mcp-adapter/discover-abilities to see what this site offers, or tell the user this site cannot do it.',
+			$ability_name
+		);
 	}
 
 	/**
