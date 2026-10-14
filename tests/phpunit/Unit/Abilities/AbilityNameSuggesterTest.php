@@ -91,6 +91,23 @@ final class AbilityNameSuggesterTest extends TestCase {
 		$this->assertLessThanOrEqual( 1, count( AbilityNameSuggester::suggest( 'rankmath/create-redirection-rule', 1 ) ) );
 	}
 
+	public function test_an_empty_name_or_limit_suggests_nothing(): void {
+		$this->assertSame( array(), AbilityNameSuggester::suggest( '  ' ) );
+		$this->assertSame( array(), AbilityNameSuggester::suggest( 'rankmath/create-redirection', 0 ) );
+	}
+
+	public function test_the_requested_name_itself_is_never_suggested(): void {
+		$this->assertNotContains( 'rankmath/create-redirection', AbilityNameSuggester::suggest( 'RankMath/Create-Redirection' ) );
+	}
+
+	public function test_a_name_without_a_namespace_still_finds_the_action(): void {
+		$this->assertContains( 'rankmath/create-redirection', AbilityNameSuggester::suggest( 'create-redirection' ) );
+	}
+
+	public function test_a_namespace_without_an_action_does_not_break(): void {
+		$this->assertIsArray( AbilityNameSuggester::suggest( 'rankmath/' ) );
+	}
+
 	public function test_unknown_name_names_the_closest_abilities_without_a_notice(): void {
 		$result = ExecuteAbilityAbility::check_permission(
 			array(

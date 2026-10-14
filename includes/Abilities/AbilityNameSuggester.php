@@ -141,14 +141,11 @@ final class AbilityNameSuggester {
 		}
 
 		// levenshtein() is limited to 255 characters before PHP 8.
-		$a   = substr( $a, 0, 255 );
-		$b   = substr( $b, 0, 255 );
-		$max = max( strlen( $a ), strlen( $b ) );
-		if ( 0 === $max ) {
-			return 1.0;
-		}
+		// $a and $b differ here, so at least one is not empty.
+		$a = substr( $a, 0, 255 );
+		$b = substr( $b, 0, 255 );
 
-		return max( 0.0, 1 - levenshtein( $a, $b ) / $max );
+		return max( 0.0, 1 - levenshtein( $a, $b ) / max( strlen( $a ), strlen( $b ) ) );
 	}
 
 	/**
