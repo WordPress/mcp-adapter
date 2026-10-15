@@ -133,13 +133,25 @@ final class McpSessionManagerTest extends TestCase {
 
 		DummyErrorHandler::reset();
 		try {
+			$validation = SessionManager::validate_client_params( $params );
 			$session_id = SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() );
 			if ( ! $accepted ) {
+				$this->assertInstanceOf( \WP_Error::class, $validation );
+				$this->assertSame( 'mcp_session_params_too_large', $validation->get_error_code() );
+				$this->assertSame(
+					array(
+						'bytes' => $serialized_bytes,
+						'limit' => 16384,
+					),
+					$validation->get_error_data()
+				);
+				$this->assertStringNotContainsString( 'xxx', $validation->get_error_message() );
 				$this->assertFalse( $session_id );
 				$this->assertFalse( metadata_exists( 'user', $this->test_user_id, self::session_meta_key() ) );
 				return;
 			}
 
+			$this->assertTrue( $validation );
 			$this->assertIsString( $session_id );
 			$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 			$this->assertSame( $params, $sessions[ $session_id ]['client_params'] );
@@ -161,6 +173,88 @@ final class McpSessionManagerTest extends TestCase {
 			'at limit'    => array( 16356, 16384, true ),
 			'above limit' => array( 16357, 16385, false ),
 		);
+	}
+
+	/**
+	 * A map stored before the limit existed is discarded with one small delete, not rewritten.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_discards_oversized_legacy_map(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_id  = wp_generate_uuid4();
+		$legacy_map = array(
+			$legacy_id => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'capabilities' => array( 'experimental' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ) ) ),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		$queries = array();
+		$observe = static function ( string $query ) use ( &$queries ): string {
+			// The DELETE issued by delete_metadata() selects by meta ID and does not repeat the key.
+			if ( false !== strpos( $query, 'usermeta' ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)\b/i', $query, $matches ) ) {
+				$queries[] = strtoupper( $matches[1] );
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $observe );
+		try {
+			$this->assertSame( array(), SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+			$this->assertSame( array( 'DELETE' ), $queries );
+			$this->assertFalse( metadata_exists( 'user', $this->test_user_id, $meta_key ) );
+			$this->assertCount( 1, DummyErrorHandler::$logs );
+			$this->assertSame( 1, DummyErrorHandler::$logs[0]['context']['sessions'] );
+			$this->assertSame( strlen( maybe_serialize( $legacy_map ) ), DummyErrorHandler::$logs[0]['context']['bytes'] );
+			$this->assertSame( 32 * ( 16384 + 256 ), DummyErrorHandler::$logs[0]['context']['budget'] );
+			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
+
+			// The user is no longer locked out: the next initialize stores a small fresh map.
+			$this->assertFalse( SessionManager::validate_session( $this->test_user_id, $legacy_id, new DummyErrorHandler() ) );
+			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'fresh-client' ), new DummyErrorHandler() );
+			$this->assertIsString( $session_id );
+			$this->assertSame( array( $session_id ), array_keys( SessionManager::get_all_user_sessions( $this->test_user_id ) ) );
+			$this->assertSame( array( 'DELETE', 'INSERT' ), $queries );
+		} finally {
+			remove_filter( 'query', $observe );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * A full map of sessions at the parameter limit is legitimate and survives reads and a lowered session limit.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_keeps_full_map_at_the_limit(): void {
+		$params = array( 'blob' => str_repeat( 'x', 16356 ) );
+		$this->assertSame( 16384, strlen( maybe_serialize( $params ) ) );
+
+		DummyErrorHandler::reset();
+		for ( $i = 0; $i < 32; ++$i ) {
+			$this->assertIsString( SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() ) );
+		}
+
+		$lower_limit = static function (): int {
+			return 1;
+		};
+		add_filter( 'mcp_adapter_session_max_per_user', $lower_limit );
+		try {
+			wp_cache_delete( $this->test_user_id, 'user_meta' );
+			$sessions = SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() );
+			$this->assertCount( 32, $sessions );
+			$this->assertTrue( metadata_exists( 'user', $this->test_user_id, self::session_meta_key() ) );
+			$this->assertSame( array(), DummyErrorHandler::$logs );
+		} finally {
+			remove_filter( 'mcp_adapter_session_max_per_user', $lower_limit );
+			DummyErrorHandler::reset();
+		}
 	}
 
 	/**

@@ -54,11 +54,23 @@ final class HttpSessionStorageLimitTest extends TestCase {
 		$params  = array(
 			'protocolVersion' => '2025-11-25',
 			'capabilities'    => new \stdClass(),
-			'clientInfo'      => array( 'name' => 'storage-test', 'version' => '1' ),
+			'clientInfo'      => array(
+				'name'    => 'storage-test',
+				'version' => '1',
+			),
 		);
 		$request = new WP_REST_Request( 'POST', '/mcp-storage-test/v1/mcp' );
 		$request->set_header( 'Content-Type', 'application/json' );
-		$request->set_body( (string) wp_json_encode( array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize', 'params' => $params ) ) );
+		$request->set_body(
+			(string) wp_json_encode(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 1,
+					'method'  => 'initialize',
+					'params'  => $params,
+				)
+			)
+		);
 		$initial = rest_do_request( $request );
 		$this->assertSame( 200, $initial->get_status() );
 		$session_id = $initial->get_headers()['Mcp-Session-Id'];
@@ -73,21 +85,136 @@ final class HttpSessionStorageLimitTest extends TestCase {
 			$params['extra'] = $blob;
 		}
 
+		DummyErrorHandler::reset();
 		for ( $attempt = 0; $attempt < 3; ++$attempt ) {
-			$request->set_body( (string) wp_json_encode( array( 'jsonrpc' => '2.0', 'id' => 2, 'method' => 'initialize', 'params' => $params ) ) );
+			$request->set_body(
+				(string) wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 2,
+						'method'  => 'initialize',
+						'params'  => $params,
+					)
+				)
+			);
 			$response = rest_do_request( $request );
 			$data     = json_decode( (string) wp_json_encode( $response->get_data() ), true );
-			$this->assertSame( 500, $response->get_status() );
-			$this->assertSame( -32603, $data['error']['code'] );
+			// A client error under the 2025 revision: JSON-RPC Invalid params, not a storage failure.
+			$this->assertSame( 200, $response->get_status() );
+			$this->assertSame( -32602, $data['error']['code'] );
+			$this->assertStringContainsString( 'exceed the 16384 byte session storage limit', $data['error']['message'] );
 			$this->assertSame( 2, $data['id'] );
 			$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response->get_headers() );
 			$this->assertSame( $before, SessionManager::get_all_user_sessions( $user_id ) );
 		}
+		$this->assertCount( 3, DummyErrorHandler::$logs );
+		$this->assertSame( $user_id, DummyErrorHandler::$logs[0]['context']['user_id'] );
+		$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
+		DummyErrorHandler::reset();
 
 		$request->set_header( 'Mcp-Session-Id', $session_id );
 		$request->set_header( 'MCP-Protocol-Version', '2025-11-25' );
 		$request->set_body( '{"jsonrpc":"2.0","id":3,"method":"ping"}' );
 		$this->assertSame( 200, rest_do_request( $request )->get_status() );
+	}
+
+	/**
+	 * A row bloated by an earlier release is dropped on the next request instead of being rewritten.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_oversized_legacy_row_is_discarded_and_the_user_can_reinitialize(): void {
+		$user_id = $this->factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		new McpServer(
+			'storage-recovery-test',
+			'mcp-storage-test/v1',
+			'/mcp',
+			'Storage recovery test',
+			'Tests session storage recovery',
+			'1',
+			array( HttpTransport::class ),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class
+		);
+		do_action( 'rest_api_init' );
+
+		$meta_key  = self::session_meta_key();
+		$legacy_id = wp_generate_uuid4();
+		// Aged past the activity update interval so a validate would normally rewrite the whole row.
+		$legacy_map = array(
+			$legacy_id => array(
+				'created_at'    => time() - HOUR_IN_SECONDS,
+				'last_activity' => time() - HOUR_IN_SECONDS,
+				'client_params' => array(
+					'protocolVersion' => '2025-11-25',
+					'capabilities'    => array( 'experimental' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ) ),
+					'clientInfo'      => array(
+						'name'    => 'legacy',
+						'version' => '1',
+					),
+				),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $user_id, 'user_meta' );
+
+		$queries = array();
+		$observe = static function ( string $query ) use ( &$queries ): string {
+			// The DELETE issued by delete_metadata() selects by meta ID and does not repeat the key.
+			if ( false !== strpos( $query, 'usermeta' ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)\b/i', $query, $matches ) ) {
+				$queries[] = strtoupper( $matches[1] );
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $observe );
+		try {
+			$request = new WP_REST_Request( 'POST', '/mcp-storage-test/v1/mcp' );
+			$request->set_header( 'Content-Type', 'application/json' );
+			$request->set_header( 'Mcp-Session-Id', $legacy_id );
+			$request->set_header( 'MCP-Protocol-Version', '2025-11-25' );
+			$request->set_body( '{"jsonrpc":"2.0","id":1,"method":"ping"}' );
+			$response = rest_do_request( $request );
+
+			$this->assertSame( 404, $response->get_status() );
+			$this->assertSame( array( 'DELETE' ), $queries );
+			$this->assertFalse( metadata_exists( 'user', $user_id, $meta_key ) );
+			$this->assertCount( 1, DummyErrorHandler::$logs );
+			$this->assertSame( 'get_all_user_sessions', DummyErrorHandler::$logs[0]['context']['method'] );
+			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
+
+			$request = new WP_REST_Request( 'POST', '/mcp-storage-test/v1/mcp' );
+			$request->set_header( 'Content-Type', 'application/json' );
+			$request->set_body(
+				(string) wp_json_encode(
+					array(
+						'jsonrpc' => '2.0',
+						'id'      => 2,
+						'method'  => 'initialize',
+						'params'  => array(
+							'protocolVersion' => '2025-11-25',
+							'capabilities'    => new \stdClass(),
+							'clientInfo'      => array(
+								'name'    => 'fresh',
+								'version' => '1',
+							),
+						),
+					)
+				)
+			);
+			$response = rest_do_request( $request );
+			$this->assertSame( 200, $response->get_status() );
+			$this->assertArrayHasKey( 'Mcp-Session-Id', $response->get_headers() );
+			$this->assertSame( array( 'DELETE', 'INSERT' ), $queries );
+			$this->assertLessThan( 1024, strlen( (string) maybe_serialize( get_user_meta( $user_id, $meta_key, true ) ) ) );
+		} finally {
+			remove_filter( 'query', $observe );
+			DummyErrorHandler::reset();
+		}
 	}
 
 	/**
