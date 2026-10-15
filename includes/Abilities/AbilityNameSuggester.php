@@ -61,8 +61,9 @@ final class AbilityNameSuggester {
 	 * that writes, or the other way round: `core/get-site-info` is not what a
 	 * client asking for `core/set-site-info` needs.
 	 *
-	 * @var string[]
+	 * @var list<string>
 	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
 	private const READ_VERBS = array(
 		'get',
 		'list',
@@ -82,8 +83,9 @@ final class AbilityNameSuggester {
 	/**
 	 * Verbs that change something.
 	 *
-	 * @var string[]
+	 * @var list<string>
 	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
 	private const WRITE_VERBS = array(
 		'set',
 		'create',
