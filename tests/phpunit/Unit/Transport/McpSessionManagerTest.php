@@ -319,6 +319,34 @@ final class McpSessionManagerTest extends TestCase {
 	}
 
 	/**
+	 * Recovery salts the users query cache like delete_user_meta() does, and only when a row was deleted.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_recovery_bumps_users_last_changed_only_when_a_row_is_deleted(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_map = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		$before = wp_cache_get_last_changed( 'users' );
+		$this->assertSame( array(), SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+		$this->assertNotSame( $before, wp_cache_get_last_changed( 'users' ) );
+
+		// A map within budget is served as is and leaves the salt alone.
+		$this->assertIsString( SessionManager::create_session( $this->test_user_id, array( 'name' => 'fresh-client' ), new DummyErrorHandler() ) );
+		$after_write = wp_cache_get_last_changed( 'users' );
+		$this->assertCount( 1, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+		$this->assertSame( $after_write, wp_cache_get_last_changed( 'users' ) );
+	}
+
+	/**
 	 * Single-site keeps the unsuffixed legacy key (blog ID is still 1).
 	 */
 	public function test_create_session_uses_legacy_meta_key_on_single_site(): void {

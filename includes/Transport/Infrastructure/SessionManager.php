@@ -397,8 +397,10 @@ final class SessionManager {
 	 * The meta API offers no conditional delete that avoids sending the
 	 * oversized value back in the predicate, so this is one small direct query.
 	 * The length predicate makes the delete atomic: a concurrent request that
-	 * already replaced the row with a small map leaves nothing to delete. Meta
-	 * deletion hooks do not fire for this recovery.
+	 * already replaced the row with a small map leaves nothing to delete. The
+	 * caches delete_metadata() maintains are cleared here the same way: the
+	 * user's meta cache, and the users last_changed salt once a row is gone.
+	 * The delete_user_meta and deleted_user_meta actions do not fire.
 	 *
 	 * @since n.e.x.t
 	 *
@@ -421,7 +423,13 @@ final class SessionManager {
 		);
 		wp_cache_delete( $user_id, 'user_meta' );
 
-		return is_int( $deleted ) && $deleted > 0;
+		if ( ! is_int( $deleted ) || $deleted < 1 ) {
+			return false;
+		}
+
+		wp_cache_set_users_last_changed();
+
+		return true;
 	}
 
 	/**
