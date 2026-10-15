@@ -36,6 +36,8 @@ final class AbilityNameSuggesterTest extends TestCase {
 		$this->register( 'rankmath/list-redirections', true );
 		$this->register( 'rankmath/delete-redirection', false );
 		$this->register( 'acme/hidden-redirection', false );
+		$this->register( 'demo/get-site-info', true );
+		$this->register( 'demo/get-user-info', true );
 	}
 
 	public function tearDown(): void {
@@ -161,5 +163,19 @@ final class AbilityNameSuggesterTest extends TestCase {
 		$this->assertStringContainsString( 'not found on this WordPress site', $result->get_error_message() );
 		$this->assertStringNotContainsString( 'mcp.public', $result->get_error_message() );
 		$this->assertNotContains( 'rankmath/delete-redirection', $result->get_error_data()['suggestions'] );
+	}
+
+	public function test_a_shared_namespace_alone_does_not_make_a_suggestion(): void {
+		// From the build benchmark: Grok kept guessing around this one.
+		$this->assertNotContains( 'demo/get-user-info', AbilityNameSuggester::suggest( 'demo/get-opening-hours' ) );
+	}
+
+	public function test_a_read_ability_is_not_suggested_for_a_write(): void {
+		$this->assertNotContains( 'demo/get-site-info', AbilityNameSuggester::suggest( 'demo/set-site-info' ) );
+		$this->assertContains( 'demo/get-site-info', AbilityNameSuggester::suggest( 'demo/get-site-information' ) );
+	}
+
+	public function test_an_oversized_name_gets_no_suggestions(): void {
+		$this->assertSame( array(), AbilityNameSuggester::suggest( 'rankmath/create-redirection' . str_repeat( 'x', AbilityNameSuggester::MAX_NAME_LENGTH ) ) );
 	}
 }

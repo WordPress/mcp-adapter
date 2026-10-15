@@ -39,10 +39,12 @@ trait McpAbilityHelperTrait {
 		// unknown name. Naming the difference only sent agents looking for a
 		// switch the site owner does not have.
 		if ( ! $ability || ! McpAbilityExposure::is_public( $ability ) ) {
+			$suggestions = AbilityNameSuggester::suggest( $ability_name );
+
 			return new WP_Error(
 				'ability_not_found',
-				self::ability_not_found_message( $ability_name ),
-				array( 'suggestions' => AbilityNameSuggester::suggest( $ability_name ) )
+				self::ability_not_found_message( $ability_name, $suggestions ),
+				array( 'suggestions' => $suggestions )
 			);
 		}
 
@@ -58,12 +60,13 @@ trait McpAbilityHelperTrait {
 	 *
 	 * @since n.e.x.t
 	 *
-	 * @param string $ability_name The ability name the client asked for.
+	 * @param string        $ability_name The ability name the client asked for.
+	 * @param string[]|null $suggestions  Suggestions already computed for it, or null to compute them.
 	 *
 	 * @return string
 	 */
-	protected static function ability_not_found_message( string $ability_name ): string {
-		$suggestions = AbilityNameSuggester::suggest( $ability_name );
+	protected static function ability_not_found_message( string $ability_name, ?array $suggestions = null ): string {
+		$suggestions = $suggestions ?? AbilityNameSuggester::suggest( $ability_name );
 
 		if ( array() !== $suggestions ) {
 			return sprintf(
