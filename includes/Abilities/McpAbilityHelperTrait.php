@@ -58,7 +58,7 @@ trait McpAbilityHelperTrait {
 	 * abilities the client can call, so it takes one of them or stops instead
 	 * of guessing more names.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @param string        $ability_name The ability name the client asked for.
 	 * @param string[]|null $suggestions  Suggestions already computed for it, or null to compute them.

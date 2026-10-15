@@ -11,7 +11,7 @@
  * Plugin Name:       MCP Adapter
  * Plugin URI:        https://github.com/WordPress/mcp-adapter
  * Description:       Adapter for Abilities API, letting the abilities to be used as MCP tools, resources or prompts.
- * Version:           0.7.0
+ * Version:           0.7.1
  * Requires at least: 6.9
  * Requires PHP:      7.4
  * Author:            WordPress.org Contributors

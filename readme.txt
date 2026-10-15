@@ -4,7 +4,7 @@ Tags:              mcp, ai, abilities-api, model-context-protocol
 Requires at least: 6.9
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        0.7.0
+Stable tag:        0.7.1
 License:           GPL-2.0-or-later
 License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
 
@@ -64,6 +64,22 @@ On the [GitHub repository](https://github.com/WordPress/mcp-adapter/issues). Sec
 Plugin developers should depend on MCP Adapter by adding `Requires Plugins: mcp-adapter` to their plugin header. See the [README](https://github.com/WordPress/mcp-adapter#installation) for WP-CLI and wp-env options.
 
 == Changelog ==
+
+= 0.7.1 - 2026-10-15 =
+
+**Fixed**
+
+- Bound stored session initialization parameters to 4 KiB and automatically recover oversized session data, preventing repeated database failures and excessive logging. Affected clients need to reconnect once. Client icons are excluded from storage so large inline icons do not prevent connections.
+- Register the installed plugin's autoloader before checking for bundled copies, allowing version selection before an older bundled class is loaded.
+- Unknown ability names from MCP clients no longer generate WordPress developer notices.
+
+**Changed**
+
+- Unavailable abilities return clearer errors with relevant available ability names or a pointer to discovery. Abilities not exposed through MCP return the same `ability_not_found` error as unknown names.
+
+**Added**
+
+- A [site-owner guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/getting-started/site-owners.md) covers connecting an AI client, Application Passwords, and troubleshooting.
 
 = 0.7.0 - 2026-10-02 =
 
@@ -136,6 +152,9 @@ No API, hook, or protocol behavior changed. Upgrading from 0.6.0 requires no mig
 For older releases, see [CHANGELOG.md](https://github.com/WordPress/mcp-adapter/blob/trunk/CHANGELOG.md).
 
 == Upgrade Notice ==
+
+= 0.7.1 =
+Fixes a session storage security issue, improves plugin loading alongside bundled copies, and adds clearer ability errors and a site-owner guide. Clients whose oversized session data is cleared need to reconnect once.
 
 = 0.7.0 =
 Breaking changes for extensions: DTO and validator classes and a filter were removed, and custom transports have a new contract. Bundling MCP Adapter as a library is deprecated. See the [v0.7.0 migration guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/v0.7.0.md).

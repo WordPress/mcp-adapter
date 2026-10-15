@@ -23,7 +23,7 @@ namespace WP\MCP\Abilities;
  * Only abilities exposed through MCP are suggested, so every suggestion is
  * one the client can call.
  *
- * @since n.e.x.t
+ * @since 0.7.1
  */
 final class AbilityNameSuggester {
 
@@ -126,7 +126,7 @@ final class AbilityNameSuggester {
 	/**
 	 * Returns the registered, MCP-exposed ability names closest to a name.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @param string $requested The ability name the client asked for.
 	 * @param int    $limit     The most names to return.

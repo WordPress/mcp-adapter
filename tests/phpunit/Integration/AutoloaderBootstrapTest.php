@@ -3,7 +3,7 @@
  * Tests canonical plugin selection alongside a Jetpack-based bundler.
  *
  * @package WP\MCP\Tests
- * @since n.e.x.t
+ * @since 0.7.1
  */
 
 declare( strict_types=1 );
@@ -16,7 +16,7 @@ use WP\MCP\Core\McpAdapter;
 /**
  * Exercises real plugin loading in fresh WordPress processes.
  *
- * @since n.e.x.t
+ * @since 0.7.1
  */
 final class AutoloaderBootstrapTest extends TestCase {
 
@@ -25,7 +25,7 @@ final class AutoloaderBootstrapTest extends TestCase {
 	 *
 	 * @dataProvider provide_canonical_scenarios
 	 * @param string $scenario Whether Jetpack can initially discover the canonical plugin.
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_canonical_plugin_wins_before_a_bundled_class_is_loaded( string $scenario ): void {
 		$result = $this->bootstrap_wordpress( $scenario );
@@ -42,7 +42,7 @@ final class AutoloaderBootstrapTest extends TestCase {
 	 * Supplies ordinary activation and host-loaded plugin scenarios.
 	 *
 	 * @return array<string, array{string}>
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public static function provide_canonical_scenarios(): array {
 		return array(
@@ -54,7 +54,7 @@ final class AutoloaderBootstrapTest extends TestCase {
 	/**
 	 * A newer bundled copy that wins arbitration keeps its own directory and is reported.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_newer_bundled_copy_wins_and_is_reported(): void {
 		$result = $this->bootstrap_wordpress( 'newer' );
@@ -71,7 +71,7 @@ final class AutoloaderBootstrapTest extends TestCase {
 	/**
 	 * A class that PHP has already loaded cannot be replaced by version arbitration.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_already_loaded_bundled_class_is_preserved_and_reported(): void {
 		$result = $this->bootstrap_wordpress( 'preloaded' );
@@ -88,7 +88,7 @@ final class AutoloaderBootstrapTest extends TestCase {
 	 *
 	 * @param string $scenario Plugin discovery and class loading scenario.
 	 * @return array<string, mixed>
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	private function bootstrap_wordpress( string $scenario ): array {
 		$this->assertTrue( function_exists( 'proc_open' ), 'Autoloader regression tests require proc_open().' );

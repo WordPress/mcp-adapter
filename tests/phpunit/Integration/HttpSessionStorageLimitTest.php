@@ -20,14 +20,14 @@ use WP_REST_Request;
 /**
  * A subscriber cannot persist oversized initialization data through HTTP.
  *
- * @since n.e.x.t
+ * @since 0.7.1
  */
 final class HttpSessionStorageLimitTest extends TestCase {
 
 	/**
 	 * Open initialization fields all share the storage limit, without breaking an existing session.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 * @dataProvider oversized_initialize_provider
 	 *
 	 * @param string $field Initialization field carrying oversized data.
@@ -121,7 +121,7 @@ final class HttpSessionStorageLimitTest extends TestCase {
 	/**
 	 * A row bloated by an earlier release is dropped on the next request instead of being rewritten.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_oversized_legacy_row_is_discarded_and_the_user_can_reinitialize(): void {
 		$user_id = $this->factory()->user->create( array( 'role' => 'subscriber' ) );
@@ -224,7 +224,7 @@ final class HttpSessionStorageLimitTest extends TestCase {
 	/**
 	 * A spec-valid initialize carrying inline icon data still connects; the icons are not stored.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_initialize_with_data_uri_icons_connects_and_stores_no_icons(): void {
 		$user_id = $this->factory()->user->create( array( 'role' => 'subscriber' ) );
@@ -302,7 +302,7 @@ final class HttpSessionStorageLimitTest extends TestCase {
 	/**
 	 * Attack surfaces that remain unbounded in the protocol schema.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 * @return array<string, array{string}>
 	 */
 	public function oversized_initialize_provider(): array {

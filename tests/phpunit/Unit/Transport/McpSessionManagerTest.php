@@ -84,7 +84,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * Oversized initialization cannot change existing sessions or issue storage writes.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_create_session_rejects_oversized_params_without_writes(): void {
 		$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'existing-client' ) );
@@ -120,7 +120,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * Count serialized storage bytes, including overhead, without truncating accepted data.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 * @dataProvider serialized_params_boundary_provider
 	 *
 	 * @param int  $payload_bytes    String content bytes.
@@ -164,7 +164,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * Exact byte fixtures include the 27-byte PHP array/string serialization overhead.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 * @return array<string, array{int, int, bool}>
 	 */
 	public function serialized_params_boundary_provider(): array {
@@ -178,7 +178,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * A map stored before the limit existed is discarded with one small delete, not rewritten.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_get_all_user_sessions_discards_oversized_legacy_map(): void {
 		$meta_key   = self::session_meta_key();
@@ -230,7 +230,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * A full map of sessions at the parameter limit survives reads after the session limit is lowered below its count.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_get_all_user_sessions_keeps_full_map_after_lowering_a_raised_limit(): void {
 		$params = array( 'blob' => str_repeat( 'x', 4069 ) );
@@ -271,7 +271,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * Recovery that loses the race to a concurrent request keeps that request's fresh session.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_get_all_user_sessions_recovery_does_not_delete_a_concurrently_replaced_map(): void {
 		$meta_key   = self::session_meta_key();
@@ -321,7 +321,7 @@ final class McpSessionManagerTest extends TestCase {
 	/**
 	 * Recovery salts the users query cache like delete_user_meta() does, and only when a row was deleted.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 */
 	public function test_get_all_user_sessions_recovery_bumps_users_last_changed_only_when_a_row_is_deleted(): void {
 		$meta_key   = self::session_meta_key();

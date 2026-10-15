@@ -114,7 +114,7 @@ final class SessionManager {
 	 * 32-session row under 140 KB and its write under 540 KB after escaping,
 	 * inside the 1 MB packet limit of the oldest supported database servers.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @var int
 	 */
@@ -126,7 +126,7 @@ final class SessionManager {
 	 * Covers the UUID key, the entry array header and both timestamps. A real
 	 * entry measures about 140 bytes; the slack also absorbs the outer map header.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @var int
 	 */
@@ -138,7 +138,7 @@ final class SessionManager {
 	 * The limit applies to the PHP serialized form, which is what user meta
 	 * stores. Accepted parameters are stored unchanged.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @param array<string, mixed> $params Client parameters from the initialize request.
 	 *
@@ -164,7 +164,7 @@ final class SessionManager {
 	 * Create a new session for a user
 	 *
 	 * @since 0.6.0 Added the optional error handler.
-	 * @since n.e.x.t Rejects parameters that fail {@see validate_client_params()}.
+	 * @since 0.7.1 Rejects parameters that fail {@see validate_client_params()}.
 	 *
 	 * @param int                                                   $user_id      The user ID.
 	 * @param array                                                 $params       Client parameters from initialize request.
@@ -331,7 +331,7 @@ final class SessionManager {
 	 * the row and its previous value exceed the database packet limit, so it is
 	 * deleted here and the user starts with no sessions.
 	 *
-	 * @since n.e.x.t Added the optional error handler and discards oversized maps.
+	 * @since 0.7.1 Added the optional error handler and discards oversized maps.
 	 *
 	 * @param int                                                   $user_id       The user ID.
 	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting a discarded map. Defaults to the standard error-log handler.
@@ -383,7 +383,7 @@ final class SessionManager {
 	/**
 	 * Largest serialized map a given number of accepted sessions can occupy.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @param int $session_count Sessions in the stored map.
 	 */
@@ -402,7 +402,7 @@ final class SessionManager {
 	 * user's meta cache, and the users last_changed salt once a row is gone.
 	 * The delete_user_meta and deleted_user_meta actions do not fire.
 	 *
-	 * @since n.e.x.t
+	 * @since 0.7.1
 	 *
 	 * @param int $user_id The user ID.
 	 * @param int $budget  Serialized byte budget the stored row must exceed.

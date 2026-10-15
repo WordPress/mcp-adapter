@@ -3,7 +3,7 @@
  * Boots WordPress with a Jetpack-based bundler before the canonical plugin.
  *
  * @package WP\MCP\Tests
- * @since n.e.x.t
+ * @since 0.7.1
  *
  * phpcs:disable WordPressVIPMinimum.Files.IncludingFile.UsingVariable -- Includes only repository sources and process-owned fixture files.
  * phpcs:disable WordPressVIPMinimum.Performance.FetchingRemoteData.FileGetContentsUnknown -- Reads local installed autoloader files, never remote URLs.

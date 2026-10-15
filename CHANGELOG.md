@@ -2,12 +2,24 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.1] - 2026-10-15
+
+### Added
+- A site-owner guide covers connecting AI clients, creating Application Passwords, testing a connection, and troubleshooting common setup problems ([#375](https://github.com/WordPress/mcp-adapter/pull/375)).
+
+### Changed
+- Unknown ability names now receive a plain error with up to three relevant, MCP-exposed ability names, or a pointer to the discovery tool when no close match exists. Abilities that are registered but not exposed through MCP receive the same `ability_not_found` response instead of `ability_not_public_mcp` ([#385](https://github.com/WordPress/mcp-adapter/pull/385)).
 
 ### Fixed
 - Session creation rejects client initialization parameters larger than 4 KiB in their PHP serialized representation before writing session metadata. This Adapter storage limit applies to the legacy HTTP initialization lifecycle and direct `SessionManager::create_session()` calls; MCP itself does not impose this byte limit. Accepted parameters are preserved unchanged. Over HTTP an oversized `initialize` is answered as a client error (JSON-RPC `-32602` Invalid params) that names the limit; `SessionManager::validate_client_params()` exposes the same check and `create_session()` still returns `false`. Rejections are logged with byte counts only.
 - `clientInfo.icons` is omitted from the initialization parameters retained for later requests on any transport, so `McpRequestContext::client_info()` has no `icons` on 2025-11-25 requests after `initialize`. The schema allows `data:` URI icons of several kilobytes, the Adapter never renders a client's icon, and keeping them would push a spec-valid `initialize` over the session storage limit. The `initialize` request's own context still carries them.
 - A stored session map larger than its session count can legitimately hold (written by an earlier release) is deleted on the next read and reported through the error handler. The delete is conditional on the row still being oversized, so a concurrent request that already recovered it is unaffected, and changing `mcp_adapter_session_max_per_user` never discards valid sessions. The affected user re-initializes once. This replaces repeated failed multi-megabyte `UPDATE` queries, each logged in full by WordPress, with one small `DELETE`.
+- The canonical plugin registers its autoloader manifest before a duplicate check can load a bundled MCP Adapter class, allowing Jetpack Autoloader to compare available versions first. Already-loaded classes are still preserved and reported as conflicts ([#366](https://github.com/WordPress/mcp-adapter/pull/366)).
+- Unknown ability names supplied by MCP clients no longer trigger WordPress `_doing_it_wrong()` notices ([#331](https://github.com/WordPress/mcp-adapter/issues/331), [#385](https://github.com/WordPress/mcp-adapter/pull/385)).
+
+### Developer
+- WordPress.org deployment is skipped for stable release versions below `0.7.0`; GitHub release packaging remains available for those maintenance releases ([#387](https://github.com/WordPress/mcp-adapter/pull/387)).
+- Updated PHPStan, its PHP stubs, and `@wordpress/env` development dependencies ([#372](https://github.com/WordPress/mcp-adapter/pull/372), [#373](https://github.com/WordPress/mcp-adapter/pull/373)).
 
 ## [0.7.0] - 2026-10-02
 

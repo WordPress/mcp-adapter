@@ -635,7 +635,7 @@ final class McpWireOrchestrator {
 	 * still carries the icons. This is an Adapter storage policy; MCP does not
 	 * require servers to retain them.
 	 *
-	 * @since n.e.x.t Omits `clientInfo.icons` from the stored parameters.
+	 * @since 0.7.1 Omits `clientInfo.icons` from the stored parameters.
 	 *
 	 * @param string $method Dispatched method name.
 	 * @param \WP\McpSchema\Record $request Validated request record.
