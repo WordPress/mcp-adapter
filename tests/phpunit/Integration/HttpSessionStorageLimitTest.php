@@ -170,6 +170,9 @@ final class HttpSessionStorageLimitTest extends TestCase {
 			return $query;
 		};
 
+		// wpdb::print_error() appends every failed query here before writing it, in full, to the PHP error log.
+		$failed_queries_before = count( $GLOBALS['EZSQL_ERROR'] ?? array() );
+
 		DummyErrorHandler::reset();
 		add_filter( 'query', $observe );
 		try {
@@ -211,6 +214,7 @@ final class HttpSessionStorageLimitTest extends TestCase {
 			$this->assertArrayHasKey( 'Mcp-Session-Id', $response->get_headers() );
 			$this->assertSame( array( 'DELETE', 'INSERT' ), $queries );
 			$this->assertLessThan( 1024, strlen( (string) maybe_serialize( get_user_meta( $user_id, $meta_key, true ) ) ) );
+			$this->assertSame( $failed_queries_before, count( $GLOBALS['EZSQL_ERROR'] ?? array() ), 'Recovery must not produce a failed query, which WordPress would log in full.' );
 		} finally {
 			remove_filter( 'query', $observe );
 			DummyErrorHandler::reset();

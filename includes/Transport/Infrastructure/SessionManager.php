@@ -321,11 +321,12 @@ final class SessionManager {
 	/**
 	 * Get all sessions for a user on the current site.
 	 *
-	 * A stored map larger than any map the current limits can produce was
-	 * written before {@see validate_client_params()} existed. Such a row cannot
-	 * be updated once the row and its previous value exceed the database packet
-	 * limit, so it is deleted here and the user starts with no sessions. The
-	 * delete is a small query by meta ID and succeeds where the update failed.
+	 * Every stored session passed {@see validate_client_params()} when written,
+	 * so a legitimate map never exceeds its session count times the per-session
+	 * budget, whatever the configured session limit was or is now. A larger map
+	 * was written before the limit existed. Such a row cannot be updated once
+	 * the row and its previous value exceed the database packet limit, so it is
+	 * deleted here and the user starts with no sessions.
 	 *
 	 * @since n.e.x.t Added the optional error handler and discards oversized maps.
 	 *
@@ -346,12 +347,19 @@ final class SessionManager {
 		}
 
 		$stored_bytes = strlen( maybe_serialize( $sessions ) );
-		$budget       = self::max_stored_sessions_bytes();
+		$budget       = self::session_map_budget_bytes( count( $sessions ) );
 		if ( $stored_bytes <= $budget ) {
 			return $sessions;
 		}
 
-		delete_user_meta( $user_id, self::session_meta_key() );
+		if ( ! self::delete_oversized_session_map( $user_id, $budget ) ) {
+			// A concurrent request already replaced the row; serve the current map.
+			$current = get_user_meta( $user_id, self::session_meta_key(), true );
+
+			return is_array( $current ) && strlen( maybe_serialize( $current ) ) <= self::session_map_budget_bytes( count( $current ) )
+				? $current
+				: array();
+		}
 
 		$error_handler = $error_handler ?? new ErrorLogMcpErrorHandler();
 		$error_handler->log(
@@ -370,17 +378,47 @@ final class SessionManager {
 	}
 
 	/**
-	 * Largest serialized session map the current limits can legitimately produce.
-	 *
-	 * Uses at least the default session count so lowering the per-user limit
-	 * never discards sessions created under the previous limit.
+	 * Largest serialized map a given number of accepted sessions can occupy.
 	 *
 	 * @since n.e.x.t
+	 *
+	 * @param int $session_count Sessions in the stored map.
 	 */
-	private static function max_stored_sessions_bytes(): int {
-		$max_sessions = max( self::get_config()['max_sessions'], self::DEFAULT_MAX_SESSIONS );
+	private static function session_map_budget_bytes( int $session_count ): int {
+		return max( 1, $session_count ) * ( self::MAX_CLIENT_PARAMS_BYTES + self::SESSION_ENVELOPE_BYTES );
+	}
 
-		return $max_sessions * ( self::MAX_CLIENT_PARAMS_BYTES + self::SESSION_ENVELOPE_BYTES );
+	/**
+	 * Delete the user's session row only while it still exceeds the budget.
+	 *
+	 * The meta API offers no conditional delete that avoids sending the
+	 * oversized value back in the predicate, so this is one small direct query.
+	 * The length predicate makes the delete atomic: a concurrent request that
+	 * already replaced the row with a small map leaves nothing to delete. Meta
+	 * deletion hooks do not fire for this recovery.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int $user_id The user ID.
+	 * @param int $budget  Serialized byte budget the stored row must exceed.
+	 *
+	 * @return bool True when a row was deleted.
+	 */
+	private static function delete_oversized_session_map( int $user_id, int $budget ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The meta API cannot delete conditionally without repeating the oversized value; the cache is cleared below.
+		$deleted = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s AND LENGTH( meta_value ) > %d",
+				$user_id,
+				self::session_meta_key(),
+				$budget
+			)
+		);
+		wp_cache_delete( $user_id, 'user_meta' );
+
+		return is_int( $deleted ) && $deleted > 0;
 	}
 
 	/**
