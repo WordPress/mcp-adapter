@@ -90,8 +90,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check WordPress.org deployment version
+        id: wordpress_org
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          php -r '
+            $version = preg_replace( "/^v/", "", getenv( "RELEASE_TAG" ) );
+            $deploy = preg_match( "/^[0-9]+\.[0-9]+\.[0-9]+$/D", $version ) && version_compare( $version, "0.7.0", ">=" );
+            echo "deploy=" . ( $deploy ? "true" : "false" ) . PHP_EOL;
+          ' >> "$GITHUB_OUTPUT"
+
       - name: Deploy to WordPress.org
-        if: ${{ !github.event.release.prerelease }}
+        if: ${{ !github.event.release.prerelease && steps.wordpress_org.outputs.deploy == 'true' }}
         uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # v2.3.0
         env:
           BUILD_DIR: build/mcp-adapter

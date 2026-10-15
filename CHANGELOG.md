@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Session creation rejects client initialization parameters larger than 4 KiB in their PHP serialized representation before writing session metadata. This Adapter storage limit applies to the legacy HTTP initialization lifecycle and direct `SessionManager::create_session()` calls; MCP itself does not impose this byte limit. Accepted parameters are preserved unchanged. Over HTTP an oversized `initialize` is answered as a client error (JSON-RPC `-32602` Invalid params) that names the limit; `SessionManager::validate_client_params()` exposes the same check and `create_session()` still returns `false`. Rejections are logged with byte counts only.
+- `clientInfo.icons` is omitted from the initialization parameters retained for later requests on any transport, so `McpRequestContext::client_info()` has no `icons` on 2025-11-25 requests after `initialize`. The schema allows `data:` URI icons of several kilobytes, the Adapter never renders a client's icon, and keeping them would push a spec-valid `initialize` over the session storage limit. The `initialize` request's own context still carries them.
+- A stored session map larger than its session count can legitimately hold (written by an earlier release) is deleted on the next read and reported through the error handler. The delete is conditional on the row still being oversized, so a concurrent request that already recovered it is unaffected, and changing `mcp_adapter_session_max_per_user` never discards valid sessions. The affected user re-initializes once. This replaces repeated failed multi-megabyte `UPDATE` queries, each logged in full by WordPress, with one small `DELETE`.
+
 ## [0.7.0] - 2026-10-02
 
 ### Breaking Changes

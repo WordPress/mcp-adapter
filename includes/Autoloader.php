@@ -40,28 +40,30 @@ final class Autoloader {
 			return self::$is_loaded;
 		}
 
-		// If the class already exists that means another copy of the plugin is already loaded.
-		if ( self::is_loaded_elsewhere() ) {
+		// PHP cannot replace a class that another copy has already loaded.
+		if ( class_exists( Core\McpAdapter::class, false ) && self::is_loaded_elsewhere() ) {
 			self::$is_loaded = true;
 
+			return self::$is_loaded;
+		}
+
+		// Jetpack Autoloader uses `autoload_packages.php` instead of `autoload.php`.
+		$autoloader = plugin_dir_path( __DIR__ ) . '/vendor/autoload_packages.php';
+
+		self::$is_loaded = self::require_autoloader( $autoloader );
+		if ( ! self::$is_loaded ) {
+			return false;
+		}
+
+		// Register this manifest before class_exists() can load a bundled copy, so Jetpack can select the package version.
+		if ( self::is_loaded_elsewhere() ) {
 			return self::$is_loaded;
 		}
 
 		// This is conditionally redefined in Plugin::constants().
 		define( 'WP_MCP_DIR', plugin_dir_path( __DIR__ ) );
 
-		// Jetpack Autoloader uses `autoload_packages.php` instead of `autoload.php`.
-		$autoloader = WP_MCP_DIR . '/vendor/autoload_packages.php';
-
-		if ( is_readable( $autoloader ) ) {
-			self::$is_loaded = self::require_autoloader( $autoloader );
-
-			return self::$is_loaded;
-		}
-
-		self::missing_autoloader_notice();
-
-		return false;
+		return self::$is_loaded;
 	}
 
 	/**

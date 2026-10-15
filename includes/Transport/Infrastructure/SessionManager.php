@@ -103,9 +103,68 @@ final class SessionManager {
 	private const MAX_UPDATE_ATTEMPTS = 5;
 
 	/**
+	 * Maximum serialized initialization parameters stored in one session.
+	 *
+	 * Adapter storage policy: MCP does not bound initialization parameter
+	 * sizes, and the whole session map is one user meta row rewritten on every
+	 * activity update with the previous value in the SQL predicate. Without a
+	 * ceiling, one user could grow that row past the database packet limit and
+	 * lock themselves out while every failed write is logged in full. A real
+	 * initialize serializes to a few hundred bytes; 4 KiB keeps the default
+	 * 32-session row under 140 KB and its write under 540 KB after escaping,
+	 * inside the 1 MB packet limit of the oldest supported database servers.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var int
+	 */
+	private const MAX_CLIENT_PARAMS_BYTES = 4096;
+
+	/**
+	 * Upper bound on the serialized bytes one session entry adds around its client params.
+	 *
+	 * Covers the UUID key, the entry array header and both timestamps. A real
+	 * entry measures about 140 bytes; the slack also absorbs the outer map header.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @var int
+	 */
+	private const SESSION_ENVELOPE_BYTES = 256;
+
+	/**
+	 * Check initialization parameters against the per-session storage limit.
+	 *
+	 * The limit applies to the PHP serialized form, which is what user meta
+	 * stores. Accepted parameters are stored unchanged.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param array<string, mixed> $params Client parameters from the initialize request.
+	 *
+	 * @return true|\WP_Error True when the parameters fit, `mcp_session_params_too_large` with `bytes` and `limit` data otherwise.
+	 */
+	public static function validate_client_params( array $params ) {
+		$params_bytes = strlen( maybe_serialize( $params ) );
+		if ( $params_bytes <= self::MAX_CLIENT_PARAMS_BYTES ) {
+			return true;
+		}
+
+		return new WP_Error(
+			'mcp_session_params_too_large',
+			sprintf( 'Initialization parameters exceed the %d byte session storage limit.', self::MAX_CLIENT_PARAMS_BYTES ),
+			array(
+				'bytes' => $params_bytes,
+				'limit' => self::MAX_CLIENT_PARAMS_BYTES,
+			)
+		);
+	}
+
+	/**
 	 * Create a new session for a user
 	 *
 	 * @since 0.6.0 Added the optional error handler.
+	 * @since n.e.x.t Rejects parameters that fail {@see validate_client_params()}.
 	 *
 	 * @param int                                                   $user_id      The user ID.
 	 * @param array                                                 $params       Client parameters from initialize request.
@@ -115,6 +174,24 @@ final class SessionManager {
 	 */
 	public static function create_session( int $user_id, array $params = array(), ?McpErrorHandlerInterface $error_handler = null ) {
 		if ( ! $user_id || ! get_user_by( 'id', $user_id ) ) {
+			return false;
+		}
+
+		$validation = self::validate_client_params( $params );
+		if ( is_wp_error( $validation ) ) {
+			$error_handler = $error_handler ?? new ErrorLogMcpErrorHandler();
+			$error_handler->log(
+				'MCP session initialization parameters exceed the storage limit.',
+				array_merge(
+					array(
+						'component' => self::class,
+						'method'    => 'create_session',
+						'user_id'   => $user_id,
+					),
+					(array) $validation->get_error_data()
+				)
+			);
+
 			return false;
 		}
 
@@ -179,7 +256,7 @@ final class SessionManager {
 	private static function mutate_sessions( int $user_id, callable $mutation, ?McpErrorHandlerInterface $error_handler = null ): bool {
 		for ( $attempt = 0; $attempt < self::MAX_UPDATE_ATTEMPTS; ++$attempt ) {
 			wp_cache_delete( $user_id, 'user_meta' );
-			$previous_sessions = self::get_all_user_sessions( $user_id );
+			$previous_sessions = self::get_all_user_sessions( $user_id, $error_handler );
 			$updated_sessions  = $mutation( $previous_sessions );
 
 			if ( $updated_sessions === $previous_sessions ) {
@@ -247,11 +324,21 @@ final class SessionManager {
 	/**
 	 * Get all sessions for a user on the current site.
 	 *
-	 * @param int $user_id The user ID.
+	 * Every stored session passed {@see validate_client_params()} when written,
+	 * so a legitimate map never exceeds its session count times the per-session
+	 * budget, whatever the configured session limit was or is now. A larger map
+	 * was written before the limit existed. Such a row cannot be updated once
+	 * the row and its previous value exceed the database packet limit, so it is
+	 * deleted here and the user starts with no sessions.
+	 *
+	 * @since n.e.x.t Added the optional error handler and discards oversized maps.
+	 *
+	 * @param int                                                   $user_id       The user ID.
+	 * @param \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface|null $error_handler Error handler for reporting a discarded map. Defaults to the standard error-log handler.
 	 *
 	 * @return array Array of sessions.
 	 */
-	public static function get_all_user_sessions( int $user_id ): array {
+	public static function get_all_user_sessions( int $user_id, ?McpErrorHandlerInterface $error_handler = null ): array {
 		if ( ! $user_id ) {
 			return array();
 		}
@@ -262,7 +349,87 @@ final class SessionManager {
 			return array();
 		}
 
-		return $sessions;
+		$stored_bytes = strlen( maybe_serialize( $sessions ) );
+		$budget       = self::session_map_budget_bytes( count( $sessions ) );
+		if ( $stored_bytes <= $budget ) {
+			return $sessions;
+		}
+
+		if ( ! self::delete_oversized_session_map( $user_id, $budget ) ) {
+			// A concurrent request already replaced the row; serve the current map.
+			$current = get_user_meta( $user_id, self::session_meta_key(), true );
+
+			return is_array( $current ) && strlen( maybe_serialize( $current ) ) <= self::session_map_budget_bytes( count( $current ) )
+				? $current
+				: array();
+		}
+
+		$error_handler = $error_handler ?? new ErrorLogMcpErrorHandler();
+		$error_handler->log(
+			'Discarded an MCP session map that exceeds the storage budget.',
+			array(
+				'component' => self::class,
+				'method'    => 'get_all_user_sessions',
+				'user_id'   => $user_id,
+				'sessions'  => count( $sessions ),
+				'bytes'     => $stored_bytes,
+				'budget'    => $budget,
+			)
+		);
+
+		return array();
+	}
+
+	/**
+	 * Largest serialized map a given number of accepted sessions can occupy.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int $session_count Sessions in the stored map.
+	 */
+	private static function session_map_budget_bytes( int $session_count ): int {
+		return max( 1, $session_count ) * ( self::MAX_CLIENT_PARAMS_BYTES + self::SESSION_ENVELOPE_BYTES );
+	}
+
+	/**
+	 * Delete the user's session row only while it still exceeds the budget.
+	 *
+	 * The meta API offers no conditional delete that avoids sending the
+	 * oversized value back in the predicate, so this is one small direct query.
+	 * The length predicate makes the delete atomic: a concurrent request that
+	 * already replaced the row with a small map leaves nothing to delete. The
+	 * caches delete_metadata() maintains are cleared here the same way: the
+	 * user's meta cache, and the users last_changed salt once a row is gone.
+	 * The delete_user_meta and deleted_user_meta actions do not fire.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int $user_id The user ID.
+	 * @param int $budget  Serialized byte budget the stored row must exceed.
+	 *
+	 * @return bool True when a row was deleted.
+	 */
+	private static function delete_oversized_session_map( int $user_id, int $budget ): bool {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The meta API cannot delete conditionally without repeating the oversized value; the cache is cleared below.
+		$deleted = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s AND LENGTH( meta_value ) > %d",
+				$user_id,
+				self::session_meta_key(),
+				$budget
+			)
+		);
+		wp_cache_delete( $user_id, 'user_meta' );
+
+		if ( ! is_int( $deleted ) || $deleted < 1 ) {
+			return false;
+		}
+
+		wp_cache_set_users_last_changed();
+
+		return true;
 	}
 
 	/**
@@ -276,6 +443,12 @@ final class SessionManager {
 		 *
 		 * When a user exceeds this limit on the current site, the oldest inactive
 		 * session is automatically removed to make room for new sessions.
+		 *
+		 * Each session stores at most 4 KiB of serialized client parameters, so
+		 * this limit also bounds the user meta row. With the default 32 sessions
+		 * the row stays under 140 KB and each compare-and-swap write under
+		 * 540 KB after SQL escaping, inside a 1 MB `max_allowed_packet`. Raising
+		 * this limit scales both numbers linearly.
 		 *
 		 * @since 0.3.0
 		 *

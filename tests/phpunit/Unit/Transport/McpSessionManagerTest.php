@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Unit\Transport;
 
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\SessionManager;
 
@@ -78,6 +79,271 @@ final class McpSessionManagerTest extends TestCase {
 		$this->assertCount( 1, $sessions );
 		$this->assertArrayHasKey( $session_id, $sessions );
 		$this->assertSame( $client_info, $sessions[ $session_id ]['client_params'] );
+	}
+
+	/**
+	 * Oversized initialization cannot change existing sessions or issue storage writes.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_create_session_rejects_oversized_params_without_writes(): void {
+		$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'existing-client' ) );
+		$this->assertIsString( $session_id );
+		$before   = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$params   = array( 'capabilities' => array( 'experimental' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ) ) );
+		$meta_key = self::session_meta_key();
+		$writes   = 0;
+		$observe  = static function ( string $query ) use ( $meta_key, &$writes ): string {
+			if ( false !== strpos( $query, $meta_key ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)/i', $query ) ) {
+				++$writes;
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $observe );
+		try {
+			$this->assertFalse( SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() ) );
+			$this->assertSame( 0, $writes );
+			$this->assertSame( $before, SessionManager::get_all_user_sessions( $this->test_user_id ) );
+			$this->assertCount( 1, DummyErrorHandler::$logs );
+			$this->assertSame( strlen( maybe_serialize( $params ) ), DummyErrorHandler::$logs[0]['context']['bytes'] );
+			$this->assertSame( 4096, DummyErrorHandler::$logs[0]['context']['limit'] );
+			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
+		} finally {
+			remove_filter( 'query', $observe );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * Count serialized storage bytes, including overhead, without truncating accepted data.
+	 *
+	 * @since n.e.x.t
+	 * @dataProvider serialized_params_boundary_provider
+	 *
+	 * @param int  $payload_bytes    String content bytes.
+	 * @param int  $serialized_bytes Full stored parameter bytes.
+	 * @param bool $accepted         Whether the session can be persisted.
+	 */
+	public function test_create_session_serialized_params_boundary( int $payload_bytes, int $serialized_bytes, bool $accepted ): void {
+		$params = array( 'blob' => str_repeat( 'x', $payload_bytes ) );
+		$this->assertSame( $serialized_bytes, strlen( maybe_serialize( $params ) ) );
+
+		DummyErrorHandler::reset();
+		try {
+			$validation = SessionManager::validate_client_params( $params );
+			$session_id = SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() );
+			if ( ! $accepted ) {
+				$this->assertInstanceOf( \WP_Error::class, $validation );
+				$this->assertSame( 'mcp_session_params_too_large', $validation->get_error_code() );
+				$this->assertSame(
+					array(
+						'bytes' => $serialized_bytes,
+						'limit' => 4096,
+					),
+					$validation->get_error_data()
+				);
+				$this->assertStringNotContainsString( 'xxx', $validation->get_error_message() );
+				$this->assertFalse( $session_id );
+				$this->assertFalse( metadata_exists( 'user', $this->test_user_id, self::session_meta_key() ) );
+				return;
+			}
+
+			$this->assertTrue( $validation );
+			$this->assertIsString( $session_id );
+			$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+			$this->assertSame( $params, $sessions[ $session_id ]['client_params'] );
+			$this->assertTrue( SessionManager::validate_session( $this->test_user_id, $session_id ) );
+		} finally {
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * Exact byte fixtures include the 27-byte PHP array/string serialization overhead.
+	 *
+	 * @since n.e.x.t
+	 * @return array<string, array{int, int, bool}>
+	 */
+	public function serialized_params_boundary_provider(): array {
+		return array(
+			'below limit' => array( 4068, 4095, true ),
+			'at limit'    => array( 4069, 4096, true ),
+			'above limit' => array( 4070, 4097, false ),
+		);
+	}
+
+	/**
+	 * A map stored before the limit existed is discarded with one small delete, not rewritten.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_discards_oversized_legacy_map(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_id  = wp_generate_uuid4();
+		$legacy_map = array(
+			$legacy_id => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'capabilities' => array( 'experimental' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ) ) ),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		$queries = array();
+		$observe = static function ( string $query ) use ( &$queries ): string {
+			// The DELETE issued by delete_metadata() selects by meta ID and does not repeat the key.
+			if ( false !== strpos( $query, 'usermeta' ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)\b/i', $query, $matches ) ) {
+				$queries[] = strtoupper( $matches[1] );
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $observe );
+		try {
+			$this->assertSame( array(), SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+			$this->assertSame( array( 'DELETE' ), $queries );
+			$this->assertFalse( metadata_exists( 'user', $this->test_user_id, $meta_key ) );
+			$this->assertCount( 1, DummyErrorHandler::$logs );
+			$this->assertSame( 1, DummyErrorHandler::$logs[0]['context']['sessions'] );
+			$this->assertSame( strlen( maybe_serialize( $legacy_map ) ), DummyErrorHandler::$logs[0]['context']['bytes'] );
+			$this->assertSame( 4096 + 256, DummyErrorHandler::$logs[0]['context']['budget'] );
+			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
+
+			// The user is no longer locked out: the next initialize stores a small fresh map.
+			$this->assertFalse( SessionManager::validate_session( $this->test_user_id, $legacy_id, new DummyErrorHandler() ) );
+			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'fresh-client' ), new DummyErrorHandler() );
+			$this->assertIsString( $session_id );
+			$this->assertSame( array( $session_id ), array_keys( SessionManager::get_all_user_sessions( $this->test_user_id ) ) );
+			$this->assertSame( array( 'DELETE', 'INSERT' ), $queries );
+		} finally {
+			remove_filter( 'query', $observe );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * A full map of sessions at the parameter limit survives reads after the session limit is lowered below its count.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_keeps_full_map_after_lowering_a_raised_limit(): void {
+		$params = array( 'blob' => str_repeat( 'x', 4069 ) );
+		$this->assertSame( 4096, strlen( maybe_serialize( $params ) ) );
+
+		$limit_64 = static function (): int {
+			return 64;
+		};
+		$limit_32 = static function (): int {
+			return 32;
+		};
+		add_filter( 'mcp_adapter_session_max_per_user', $limit_64 );
+		DummyErrorHandler::reset();
+		try {
+			for ( $i = 0; $i < 64; ++$i ) {
+				$this->assertIsString( SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() ) );
+			}
+			$this->assertCount( 64, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+
+			remove_filter( 'mcp_adapter_session_max_per_user', $limit_64 );
+			add_filter( 'mcp_adapter_session_max_per_user', $limit_32 );
+			wp_cache_delete( $this->test_user_id, 'user_meta' );
+			$sessions = SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() );
+			$this->assertCount( 64, $sessions );
+			$this->assertTrue( metadata_exists( 'user', $this->test_user_id, self::session_meta_key() ) );
+			$this->assertSame( array(), DummyErrorHandler::$logs );
+
+			// The lowered limit still applies to new sessions: one eviction per creation.
+			$this->assertIsString( SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() ) );
+			$this->assertCount( 64, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+		} finally {
+			remove_filter( 'mcp_adapter_session_max_per_user', $limit_64 );
+			remove_filter( 'mcp_adapter_session_max_per_user', $limit_32 );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * Recovery that loses the race to a concurrent request keeps that request's fresh session.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_recovery_does_not_delete_a_concurrently_replaced_map(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_map = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ),
+			),
+		);
+		$fresh_map  = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'name' => 'fresh-client' ),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		// Between the read and the conditional delete, another request replaces the row.
+		$user_id = $this->test_user_id;
+		$raced   = false;
+		$race    = static function ( string $query ) use ( $user_id, $meta_key, $fresh_map, &$raced ): string {
+			if ( ! $raced && preg_match( '/^\s*DELETE\b.*LENGTH/is', $query ) ) {
+				$raced = true;
+				delete_user_meta( $user_id, $meta_key );
+				update_user_meta( $user_id, $meta_key, $fresh_map );
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $race );
+		try {
+			$this->assertSame( $fresh_map, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+			$this->assertTrue( $raced );
+			$this->assertSame( $fresh_map, get_user_meta( $this->test_user_id, $meta_key, true ) );
+			$this->assertSame( array(), DummyErrorHandler::$logs );
+		} finally {
+			remove_filter( 'query', $race );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * Recovery salts the users query cache like delete_user_meta() does, and only when a row was deleted.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_get_all_user_sessions_recovery_bumps_users_last_changed_only_when_a_row_is_deleted(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_map = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		$before = wp_cache_get_last_changed( 'users' );
+		$this->assertSame( array(), SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+		$this->assertNotSame( $before, wp_cache_get_last_changed( 'users' ) );
+
+		// A map within budget is served as is and leaves the salt alone.
+		$this->assertIsString( SessionManager::create_session( $this->test_user_id, array( 'name' => 'fresh-client' ), new DummyErrorHandler() ) );
+		$after_write = wp_cache_get_last_changed( 'users' );
+		$this->assertCount( 1, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+		$this->assertSame( $after_write, wp_cache_get_last_changed( 'users' ) );
 	}
 
 	/**
