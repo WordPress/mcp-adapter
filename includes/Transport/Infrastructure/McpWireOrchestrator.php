@@ -627,6 +627,16 @@ final class McpWireOrchestrator {
 	/**
 	 * Extract legacy initialization parameters for later requests.
 	 *
+	 * Client icons are omitted from the retained copy on every transport, so
+	 * later requests see a client_info() without `icons`. The schema allows
+	 * `clientInfo.icons` with `data:` URIs carrying kilobytes of image data,
+	 * the Adapter never renders a client's icon, and the HTTP copy is subject
+	 * to the per-session storage limit. The initialize request's own context
+	 * still carries the icons. This is an Adapter storage policy; MCP does not
+	 * require servers to retain them.
+	 *
+	 * @since n.e.x.t Omits `clientInfo.icons` from the stored parameters.
+	 *
 	 * @param string $method Dispatched method name.
 	 * @param \WP\McpSchema\Record $request Validated request record.
 	 *
@@ -638,8 +648,15 @@ final class McpWireOrchestrator {
 		}
 
 		$params = $this->decoder->to_associative( $request->getParams()->jsonSerialize() );
+		if ( ! is_array( $params ) ) {
+			return null;
+		}
 
-		return is_array( $params ) ? $params : null;
+		if ( isset( $params['clientInfo'] ) && is_array( $params['clientInfo'] ) ) {
+			unset( $params['clientInfo']['icons'] );
+		}
+
+		return $params;
 	}
 
 	/**

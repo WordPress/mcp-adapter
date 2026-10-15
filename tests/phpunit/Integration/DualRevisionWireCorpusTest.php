@@ -660,7 +660,10 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 200, $response['status'] );
 		$session_id = $response['headers']['Mcp-Session-Id'];
 		$sessions   = get_user_meta( get_current_user_id(), self::session_meta_key(), true );
-		$this->assertSame( $params, $sessions[ $session_id ]['client_params'] );
+		// Client icons are not retained; everything else is stored as sent.
+		$stored_params = $params;
+		unset( $stored_params['clientInfo']['icons'] );
+		$this->assertSame( $stored_params, $sessions[ $session_id ]['client_params'] );
 
 		// Simulate a rollback where none of the new package classes can be loaded.
 		$restored = unserialize( serialize( $sessions ), array( 'allowed_classes' => false ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize, WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize -- Trusted test fixture verifies the persistent PHP representation.

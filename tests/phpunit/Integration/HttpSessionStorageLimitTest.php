@@ -222,6 +222,84 @@ final class HttpSessionStorageLimitTest extends TestCase {
 	}
 
 	/**
+	 * A spec-valid initialize carrying inline icon data still connects; the icons are not stored.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_initialize_with_data_uri_icons_connects_and_stores_no_icons(): void {
+		$user_id = $this->factory()->user->create( array( 'role' => 'subscriber' ) );
+		wp_set_current_user( $user_id );
+
+		new McpServer(
+			'storage-icons-test',
+			'mcp-storage-test/v1',
+			'/mcp',
+			'Storage icons test',
+			'Tests that client icons are not stored',
+			'1',
+			array( HttpTransport::class ),
+			DummyErrorHandler::class,
+			DummyObservabilityHandler::class
+		);
+		do_action( 'rest_api_init' );
+
+		// Two icons of about 6 KB each, far over the 4 KiB per-session limit on their own.
+		$png_icon = 'data:image/png;base64,' . base64_encode( "\x89PNG\r\n\x1a\n" . str_repeat( 'i', 4500 ) );
+		$params   = array(
+			'protocolVersion' => '2025-11-25',
+			'capabilities'    => new \stdClass(),
+			'clientInfo'      => array(
+				'name'    => 'icon-client',
+				'version' => '1',
+				'icons'   => array(
+					array(
+						'src'      => $png_icon,
+						'mimeType' => 'image/png',
+						'sizes'    => array( '48x48' ),
+					),
+					array(
+						'src'      => $png_icon,
+						'mimeType' => 'image/png',
+						'sizes'    => array( '96x96' ),
+					),
+				),
+			),
+		);
+		$this->assertGreaterThan( 4096, strlen( maybe_serialize( $params['clientInfo']['icons'] ) ) );
+
+		$request = new WP_REST_Request( 'POST', '/mcp-storage-test/v1/mcp' );
+		$request->set_header( 'Content-Type', 'application/json' );
+		$request->set_body(
+			(string) wp_json_encode(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 1,
+					'method'  => 'initialize',
+					'params'  => $params,
+				)
+			)
+		);
+		$response = rest_do_request( $request );
+		$data     = json_decode( (string) wp_json_encode( $response->get_data() ), true );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertArrayHasKey( 'result', $data );
+		$this->assertArrayHasKey( 'Mcp-Session-Id', $response->get_headers() );
+
+		$sessions = SessionManager::get_all_user_sessions( $user_id );
+		$stored   = $sessions[ $response->get_headers()['Mcp-Session-Id'] ]['client_params'];
+		$this->assertArrayNotHasKey( 'icons', $stored['clientInfo'] );
+		$this->assertSame( 'icon-client', $stored['clientInfo']['name'] );
+		$this->assertSame( '2025-11-25', $stored['protocolVersion'] );
+		$this->assertStringNotContainsString( 'data:image', maybe_serialize( $sessions ) );
+
+		$request->set_header( 'Mcp-Session-Id', $response->get_headers()['Mcp-Session-Id'] );
+		$request->set_header( 'MCP-Protocol-Version', '2025-11-25' );
+		$request->set_body( '{"jsonrpc":"2.0","id":2,"method":"ping"}' );
+		$this->assertSame( 200, rest_do_request( $request )->get_status() );
+	}
+
+	/**
 	 * Attack surfaces that remain unbounded in the protocol schema.
 	 *
 	 * @since n.e.x.t
