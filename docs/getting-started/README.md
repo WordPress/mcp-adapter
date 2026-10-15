@@ -2,6 +2,8 @@
 
 This guide will help you quickly set up the WordPress MCP Adapter to expose your WordPress abilities as MCP (Model Context Protocol) tools, resources, and prompts.
 
+> Connecting an AI client to your own site, rather than building abilities? Start with the [Site Owner Guide](site-owners.md).
+
 ## Quick Overview
 
 The MCP Adapter transforms WordPress abilities into AI-accessible interfaces, allowing AI agents to interact with your WordPress functionality through standardized protocols.
