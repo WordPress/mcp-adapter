@@ -29,6 +29,11 @@ trait McpAbilityHelperTrait {
 	 * @return bool|\WP_Error True if publicly exposed, WP_Error if not.
 	 */
 	protected static function check_ability_mcp_exposure( string $ability_name ) {
+		// Guard with wp_has_ability() so unknown client-supplied names don't trigger _doing_it_wrong().
+		if ( ! wp_has_ability( $ability_name ) ) {
+			return new WP_Error( 'ability_not_found', "Ability '{$ability_name}' not found" );
+		}
+
 		$ability = wp_get_ability( $ability_name );
 
 		if ( ! $ability ) {
