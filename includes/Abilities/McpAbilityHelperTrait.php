@@ -34,21 +34,15 @@ trait McpAbilityHelperTrait {
 		// miss with _doing_it_wrong().
 		$ability = wp_has_ability( $ability_name ) ? wp_get_ability( $ability_name ) : null;
 
-		if ( ! $ability ) {
+		// An ability that is registered but not exposed through MCP does not
+		// exist for an MCP client either, so it gets the same answer as an
+		// unknown name. Naming the difference only sent agents looking for a
+		// switch the site owner does not have.
+		if ( ! $ability || ! McpAbilityExposure::is_public( $ability ) ) {
 			return new WP_Error(
 				'ability_not_found',
 				self::ability_not_found_message( $ability_name ),
 				array( 'suggestions' => AbilityNameSuggester::suggest( $ability_name ) )
-			);
-		}
-
-		if ( ! McpAbilityExposure::is_public( $ability ) ) {
-			return new WP_Error(
-				'ability_not_public_mcp',
-				sprintf(
-					'Ability "%s" is registered on this WordPress site, but the plugin that registers it does not make it available to MCP clients (meta.mcp.public). That is decided in the plugin\'s code: the site has no setting to switch it on, so do not ask the site owner to look for one.',
-					$ability_name
-				)
 			);
 		}
 
@@ -80,7 +74,7 @@ trait McpAbilityHelperTrait {
 		}
 
 		return sprintf(
-			'Ability \'%s\' not found on this WordPress site, and no ability you can call has a similar name. Call mcp-adapter/discover-abilities to see what this site offers, or tell the user this site cannot do it.',
+			'Ability \'%s\' not found on this WordPress site, and no ability you can call has a similar name. Call the mcp-adapter-discover-abilities tool to see what this site offers, or tell the user this site cannot do it.',
 			$ability_name
 		);
 	}

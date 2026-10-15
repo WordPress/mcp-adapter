@@ -308,7 +308,7 @@ The AI agent uses these three tools in combination to systematically explore and
 - Requires authenticated WordPress user
 - Requires `read` capability (customizable via `mcp_adapter_get_ability_info_capability` filter)
 - Only works with abilities that have effective MCP public exposure
-- Returns `ability_not_public_mcp` error for non-public abilities
+- Returns `ability_not_found` for abilities that are not exposed via MCP, the same answer as for an unknown name
 
 **Output Format**:
 ```json
@@ -467,8 +467,7 @@ The default server uses structured error handling:
 ### Common Error Codes
 - `authentication_required`: User not logged in
 - `insufficient_capability`: User lacks required WordPress capability
-- `ability_not_found`: Requested ability doesn't exist
-- `ability_not_public_mcp`: Ability is not exposed via MCP
+- `ability_not_found`: Requested ability doesn't exist, or is not exposed via MCP
 - `missing_ability_name`: Required ability name parameter missing
 
 ### Error Response Format

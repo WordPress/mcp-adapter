@@ -96,8 +96,12 @@ final class AbilityNameSuggesterTest extends TestCase {
 		$this->assertSame( array(), AbilityNameSuggester::suggest( 'rankmath/create-redirection', 0 ) );
 	}
 
-	public function test_the_requested_name_itself_is_never_suggested(): void {
-		$this->assertNotContains( 'rankmath/create-redirection', AbilityNameSuggester::suggest( 'RankMath/Create-Redirection' ) );
+	public function test_a_case_slip_still_finds_the_real_name(): void {
+		$this->assertSame( 'rankmath/create-redirection', AbilityNameSuggester::suggest( 'RankMath/Create-Redirection' )[0] ?? null );
+	}
+
+	public function test_stray_spaces_still_find_the_real_name(): void {
+		$this->assertSame( 'rankmath/create-redirection', AbilityNameSuggester::suggest( ' rankmath/create-redirection ' )[0] ?? null );
 	}
 
 	public function test_a_name_without_a_namespace_still_finds_the_action(): void {
@@ -128,7 +132,7 @@ final class AbilityNameSuggesterTest extends TestCase {
 
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'ability_not_found', $result->get_error_code() );
-		$this->assertStringContainsString( 'mcp-adapter/discover-abilities', $result->get_error_message() );
+		$this->assertStringContainsString( 'mcp-adapter-discover-abilities tool', $result->get_error_message() );
 		$this->assertSame( array(), $result->get_error_data()['suggestions'] );
 	}
 
@@ -144,7 +148,7 @@ final class AbilityNameSuggesterTest extends TestCase {
 		$this->assertStringContainsString( 'rankmath/create-redirection', $result['error'] );
 	}
 
-	public function test_registered_but_not_exposed_says_there_is_no_site_setting(): void {
+	public function test_registered_but_not_exposed_gets_the_same_answer_as_an_unknown_name(): void {
 		$result = ExecuteAbilityAbility::check_permission(
 			array(
 				'ability_name' => 'rankmath/delete-redirection',
@@ -153,8 +157,9 @@ final class AbilityNameSuggesterTest extends TestCase {
 		);
 
 		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertSame( 'ability_not_public_mcp', $result->get_error_code() );
-		$this->assertStringContainsString( 'is registered on this WordPress site', $result->get_error_message() );
-		$this->assertStringContainsString( 'no setting', $result->get_error_message() );
+		$this->assertSame( 'ability_not_found', $result->get_error_code() );
+		$this->assertStringContainsString( 'not found on this WordPress site', $result->get_error_message() );
+		$this->assertStringNotContainsString( 'mcp.public', $result->get_error_message() );
+		$this->assertNotContains( 'rankmath/delete-redirection', $result->get_error_data()['suggestions'] );
 	}
 }

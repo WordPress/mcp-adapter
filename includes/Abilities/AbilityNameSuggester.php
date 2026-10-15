@@ -48,12 +48,14 @@ final class AbilityNameSuggester {
 	 * @return string[] Ability names, closest first. Empty when none is close.
 	 */
 	public static function suggest( string $requested, int $limit = 3 ): array {
-		$requested = strtolower( trim( $requested ) );
-		if ( '' === $requested || $limit < 1 || ! function_exists( 'wp_get_abilities' ) ) {
+		// Normalized for scoring only: `RankMath/Create-Redirection` and
+		// ` rankmath/create-redirection ` should still lead to the real name.
+		$normalized = strtolower( trim( $requested ) );
+		if ( '' === $normalized || $limit < 1 || ! function_exists( 'wp_get_abilities' ) ) {
 			return array();
 		}
 
-		$wanted = self::split( $requested );
+		$wanted = self::split( $normalized );
 		$scores = array();
 
 		foreach ( wp_get_abilities() as $ability ) {
@@ -62,7 +64,7 @@ final class AbilityNameSuggester {
 			}
 
 			$name = $ability->get_name();
-			if ( strtolower( $name ) === $requested ) {
+			if ( $name === $requested ) {
 				continue;
 			}
 

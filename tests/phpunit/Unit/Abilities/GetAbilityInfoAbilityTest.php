@@ -106,7 +106,7 @@ final class GetAbilityInfoAbilityTest extends TestCase {
 			)
 		);
 		$this->assertInstanceOf( WP_Error::class, $result );
-		$this->assertEquals( 'ability_not_public_mcp', $result->get_error_code() );
+		$this->assertEquals( 'ability_not_found', $result->get_error_code() );
 
 		// Clean up
 		wp_unregister_ability( 'test/not-public-info' );
