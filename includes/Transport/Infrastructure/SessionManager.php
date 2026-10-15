@@ -109,13 +109,16 @@ final class SessionManager {
 	 * sizes, and the whole session map is one user meta row rewritten on every
 	 * activity update with the previous value in the SQL predicate. Without a
 	 * ceiling, one user could grow that row past the database packet limit and
-	 * lock themselves out while every failed write is logged in full.
+	 * lock themselves out while every failed write is logged in full. A real
+	 * initialize serializes to a few hundred bytes; 4 KiB keeps the default
+	 * 32-session row under 140 KB and its write under 540 KB after escaping,
+	 * inside the 1 MB packet limit of the oldest supported database servers.
 	 *
 	 * @since n.e.x.t
 	 *
 	 * @var int
 	 */
-	private const MAX_CLIENT_PARAMS_BYTES = 16384;
+	private const MAX_CLIENT_PARAMS_BYTES = 4096;
 
 	/**
 	 * Upper bound on the serialized bytes one session entry adds around its client params.
@@ -433,9 +436,11 @@ final class SessionManager {
 		 * When a user exceeds this limit on the current site, the oldest inactive
 		 * session is automatically removed to make room for new sessions.
 		 *
-		 * Each session stores at most 16 KiB of serialized client parameters, so
-		 * this limit also bounds the user meta row. Keep the product of both
-		 * well below the database packet limit (16 MiB by default).
+		 * Each session stores at most 4 KiB of serialized client parameters, so
+		 * this limit also bounds the user meta row. With the default 32 sessions
+		 * the row stays under 140 KB and each compare-and-swap write under
+		 * 540 KB after SQL escaping, inside a 1 MB `max_allowed_packet`. Raising
+		 * this limit scales both numbers linearly.
 		 *
 		 * @since 0.3.0
 		 *

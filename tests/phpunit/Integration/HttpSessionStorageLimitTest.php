@@ -102,7 +102,7 @@ final class HttpSessionStorageLimitTest extends TestCase {
 			// A client error under the 2025 revision: JSON-RPC Invalid params, not a storage failure.
 			$this->assertSame( 200, $response->get_status() );
 			$this->assertSame( -32602, $data['error']['code'] );
-			$this->assertStringContainsString( 'exceed the 16384 byte session storage limit', $data['error']['message'] );
+			$this->assertStringContainsString( 'exceed the 4096 byte session storage limit', $data['error']['message'] );
 			$this->assertSame( 2, $data['id'] );
 			$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response->get_headers() );
 			$this->assertSame( $before, SessionManager::get_all_user_sessions( $user_id ) );

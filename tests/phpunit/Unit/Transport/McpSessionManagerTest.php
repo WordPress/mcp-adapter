@@ -109,7 +109,7 @@ final class McpSessionManagerTest extends TestCase {
 			$this->assertSame( $before, SessionManager::get_all_user_sessions( $this->test_user_id ) );
 			$this->assertCount( 1, DummyErrorHandler::$logs );
 			$this->assertSame( strlen( maybe_serialize( $params ) ), DummyErrorHandler::$logs[0]['context']['bytes'] );
-			$this->assertSame( 16384, DummyErrorHandler::$logs[0]['context']['limit'] );
+			$this->assertSame( 4096, DummyErrorHandler::$logs[0]['context']['limit'] );
 			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
 		} finally {
 			remove_filter( 'query', $observe );
@@ -141,7 +141,7 @@ final class McpSessionManagerTest extends TestCase {
 				$this->assertSame(
 					array(
 						'bytes' => $serialized_bytes,
-						'limit' => 16384,
+						'limit' => 4096,
 					),
 					$validation->get_error_data()
 				);
@@ -162,16 +162,16 @@ final class McpSessionManagerTest extends TestCase {
 	}
 
 	/**
-	 * Exact byte fixtures include the 28-byte PHP array/string serialization overhead.
+	 * Exact byte fixtures include the 27-byte PHP array/string serialization overhead.
 	 *
 	 * @since n.e.x.t
 	 * @return array<string, array{int, int, bool}>
 	 */
 	public function serialized_params_boundary_provider(): array {
 		return array(
-			'below limit' => array( 16355, 16383, true ),
-			'at limit'    => array( 16356, 16384, true ),
-			'above limit' => array( 16357, 16385, false ),
+			'below limit' => array( 4068, 4095, true ),
+			'at limit'    => array( 4069, 4096, true ),
+			'above limit' => array( 4070, 4097, false ),
 		);
 	}
 
@@ -212,7 +212,7 @@ final class McpSessionManagerTest extends TestCase {
 			$this->assertCount( 1, DummyErrorHandler::$logs );
 			$this->assertSame( 1, DummyErrorHandler::$logs[0]['context']['sessions'] );
 			$this->assertSame( strlen( maybe_serialize( $legacy_map ) ), DummyErrorHandler::$logs[0]['context']['bytes'] );
-			$this->assertSame( 16384 + 256, DummyErrorHandler::$logs[0]['context']['budget'] );
+			$this->assertSame( 4096 + 256, DummyErrorHandler::$logs[0]['context']['budget'] );
 			$this->assertStringNotContainsString( str_repeat( 'x', 100 ), (string) wp_json_encode( DummyErrorHandler::$logs ) );
 
 			// The user is no longer locked out: the next initialize stores a small fresh map.
@@ -233,8 +233,8 @@ final class McpSessionManagerTest extends TestCase {
 	 * @since n.e.x.t
 	 */
 	public function test_get_all_user_sessions_keeps_full_map_after_lowering_a_raised_limit(): void {
-		$params = array( 'blob' => str_repeat( 'x', 16356 ) );
-		$this->assertSame( 16384, strlen( maybe_serialize( $params ) ) );
+		$params = array( 'blob' => str_repeat( 'x', 4069 ) );
+		$this->assertSame( 4096, strlen( maybe_serialize( $params ) ) );
 
 		$limit_64 = static function (): int {
 			return 64;
