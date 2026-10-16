@@ -158,9 +158,9 @@ final class McpAdapter {
 	/**
 	 * Whether the default server and its abilities are enabled.
 	 *
-	 * @internal For use by adapter initialization only.
+	 * @since 0.8.0 Public, so the Site Health section can report it.
 	 */
-	private function is_default_server_enabled(): bool {
+	public function is_default_server_enabled(): bool {
 		/**
 		 * Filters whether the default MCP server should be created.
 		 *
