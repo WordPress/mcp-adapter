@@ -51,7 +51,7 @@ That means you also need abilities on the site for this to be useful, from core 
 
 = How do AI agents connect to my site? =
 
-The adapter registers MCP endpoints over the built-in HTTP transport. Point an MCP-compatible client at the endpoint and authenticate as a WordPress user. The adapter supports exact MCP revisions `2025-11-25` and `2026-07-28`. See the [getting started guide](https://github.com/WordPress/mcp-adapter/tree/trunk/docs/getting-started) for endpoint details.
+The adapter registers MCP endpoints over the built-in HTTP transport. Point an MCP-compatible client at the endpoint and authenticate as a WordPress user. The adapter supports exact MCP revisions `2025-11-25` and `2026-07-28`. See the [site-owner guide](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/getting-started/site-owners.md) for step-by-step client setup and troubleshooting.
 
 = Does every registered ability get exposed automatically? =
 
