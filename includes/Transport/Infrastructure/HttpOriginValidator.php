@@ -20,7 +20,9 @@ defined( 'ABSPATH' ) || exit;
  * Both supported MCP revisions require servers to validate the Origin header
  * on every Streamable HTTP request to prevent DNS rebinding, and to answer a
  * present but invalid Origin with HTTP 403. Requests without an Origin header,
- * such as those from command-line and server-side clients, are accepted.
+ * such as those from command-line and server-side clients, are accepted. A
+ * header that is present but empty is not a serialized origin (RFC 6454) and
+ * is rejected.
  *
  * @since n.e.x.t
  * @internal
@@ -30,7 +32,8 @@ final class HttpOriginValidator {
 	/**
 	 * Check whether a request Origin may reach the MCP endpoint.
 	 *
-	 * A missing or empty Origin is accepted. A present Origin must be a bare
+	 * A missing Origin is accepted; a present but empty one is rejected. A
+	 * present Origin must be a bare
 	 * origin (scheme, host, and optional port) whose scheme, host, and effective
 	 * port match the home URL, the site URL, or an origin added through the
 	 * `mcp_adapter_allowed_http_origins` filter.
@@ -44,8 +47,12 @@ final class HttpOriginValidator {
 	 * @return bool True when the request may proceed, false when it must be rejected with HTTP 403.
 	 */
 	public static function is_allowed( ?string $origin, McpServer $server, ?McpErrorHandlerInterface $error_handler = null ): bool {
-		if ( null === $origin || '' === $origin ) {
+		if ( null === $origin ) {
 			return true;
+		}
+
+		if ( '' === $origin ) {
+			return false;
 		}
 
 		$normalized = self::normalize_origin( $origin, true );

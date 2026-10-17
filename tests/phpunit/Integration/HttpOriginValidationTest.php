@@ -53,12 +53,12 @@ final class HttpOriginValidationTest extends TestCase {
 		$this->assertSame( 200, $this->tools_list_2026( null )['status'] );
 	}
 
-	/** An empty Origin header is treated as absent. */
-	public function test_empty_origin_is_accepted_for_both_revisions(): void {
-		$session_id = $this->initialize_session( '' );
+	/** A present but empty Origin header is not a serialized origin, so it is rejected. */
+	public function test_empty_origin_is_rejected_for_both_revisions(): void {
+		$session_id = $this->initialize_session( null );
 
-		$this->assertSame( 200, $this->tools_list_2025( $session_id, '' )['status'] );
-		$this->assertSame( 200, $this->tools_list_2026( '' )['status'] );
+		$this->assert_origin_rejected( $this->tools_list_2025( $session_id, '' ) );
+		$this->assert_origin_rejected( $this->tools_list_2026( '' ) );
 	}
 
 	/** The origin of home_url() is accepted under both revisions. */
@@ -252,7 +252,7 @@ final class HttpOriginValidationTest extends TestCase {
 		);
 	}
 
-	/** The built-in REST route applies the check after authentication and before MCP processing. */
+	/** The built-in REST route rejects an invalid Origin before MCP processing. */
 	public function test_rest_route_rejects_mismatched_origin(): void {
 		new HttpTransport( $this->server->create_transport_context() );
 		do_action( 'rest_api_init' );
@@ -279,6 +279,69 @@ final class HttpOriginValidationTest extends TestCase {
 		$this->assertSame( array( 403, 200, 200 ), $statuses );
 	}
 
+	/** An anonymous request with an invalid Origin gets 403, not the permission check's 401. */
+	public function test_rest_route_answers_anonymous_invalid_origin_with_403(): void {
+		$this->boot_rest_route();
+		wp_set_current_user( 0 );
+
+		$this->assert_rest_origin_rejected( $this->rest_initialize( 'http://evil.example' ) );
+		$this->assert_rest_origin_rejected( $this->rest_initialize( '' ) );
+		$this->assertSame( 401, $this->rest_initialize( null )->get_status(), 'Without an Origin, ordinary permission handling still applies.' );
+	}
+
+	/** A response another pre-dispatch filter prepared earlier does not mask the rejection. */
+	public function test_rest_route_rejects_invalid_origin_over_an_earlier_filter_result(): void {
+		$this->boot_rest_route();
+		add_filter(
+			'rest_pre_dispatch',
+			static function ( $result, $server, $request ) {
+				return '/mcp/v1/mcp' === $request->get_route() ? new \WP_REST_Response( array( 'cached' => true ), 200 ) : $result;
+			},
+			8,
+			3
+		);
+
+		$this->assert_rest_origin_rejected( $this->rest_initialize( 'http://evil.example' ) );
+		$this->assertSame( array( 'cached' => true ), $this->rest_initialize( self::HOME )->get_data(), 'A valid Origin leaves the earlier result alone.' );
+	}
+
+	/** A pre-dispatch filter at an ordinary later priority does not replace the rejection. */
+	public function test_rest_route_rejects_invalid_origin_over_a_later_filter_result(): void {
+		$this->boot_rest_route();
+		add_filter(
+			'rest_pre_dispatch',
+			static function ( $result, $server, $request ) {
+				return '/mcp/v1/mcp' === $request->get_route() ? new \WP_REST_Response( array( 'cached' => true ), 200 ) : $result;
+			},
+			10,
+			3
+		);
+
+		$this->assert_rest_origin_rejected( $this->rest_initialize( 'http://evil.example' ) );
+	}
+
+	/** Other REST routes and OPTIONS requests are not touched by the MCP Origin check. */
+	public function test_other_routes_and_options_are_unaffected(): void {
+		$this->boot_rest_route();
+		register_rest_route(
+			'origin-test/v1',
+			'/ping',
+			array(
+				'methods'             => 'GET',
+				'callback'            => static fn() => array( 'ok' => true ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		$ping = new WP_REST_Request( 'GET', '/origin-test/v1/ping' );
+		$ping->set_header( 'Origin', 'http://evil.example' );
+		$this->assertSame( 200, rest_do_request( $ping )->get_status() );
+
+		$options = new WP_REST_Request( 'OPTIONS', '/mcp/v1/mcp' );
+		$options->set_header( 'Origin', 'http://evil.example' );
+		$this->assertNotSame( 403, rest_do_request( $options )->get_status() );
+	}
+
 	/** The Origin header is captured on the request context. */
 	public function test_request_context_captures_origin_header(): void {
 		$request = new WP_REST_Request( 'POST', '/mcp' );
@@ -286,6 +349,32 @@ final class HttpOriginValidationTest extends TestCase {
 
 		$request->set_header( 'Origin', 'https://example.org' );
 		$this->assertSame( 'https://example.org', ( new HttpRequestContext( $request ) )->origin_header );
+	}
+
+	/** Register the server's REST route the way a running site does. */
+	private function boot_rest_route(): void {
+		new HttpTransport( $this->server->create_transport_context() );
+		do_action( 'rest_api_init' );
+	}
+
+	/** Send an initialize request through the REST server. */
+	private function rest_initialize( ?string $origin ): \WP_REST_Response {
+		$request = new WP_REST_Request( 'POST', '/mcp/v1/mcp' );
+		$request->set_header( 'Content-Type', 'application/json' );
+		$request->set_body( (string) wp_json_encode( $this->initialize_payload() ) );
+		if ( null !== $origin ) {
+			$request->set_header( 'Origin', $origin );
+		}
+
+		return rest_do_request( $request );
+	}
+
+	/** Assert a REST response is the 403 JSON-RPC Origin rejection. */
+	private function assert_rest_origin_rejected( \WP_REST_Response $response ): void {
+		$this->assertSame( 403, $response->get_status() );
+		$this->assertSame( McpErrorFactory::PERMISSION_DENIED, $response->get_data()['error']['code'] );
+		$this->assertStringContainsString( 'Invalid Origin header', $response->get_data()['error']['message'] );
+		$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response->get_headers() );
 	}
 
 	/**

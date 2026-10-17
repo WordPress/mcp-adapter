@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 ## [Unreleased] - TBD
 
 ### Security
-- The HTTP transport now validates the `Origin` header on every request for both MCP revisions, as the Streamable HTTP transport requires to prevent DNS rebinding. Requests without an `Origin` header are unaffected. A present `Origin` must match the scheme, host, and port of `home_url()` or `site_url()`; any other value, including `null`, returns HTTP 403 with a JSON-RPC permission error before session or method handling ([#323](https://github.com/WordPress/mcp-adapter/issues/323)).
+- The HTTP transport now validates the `Origin` header on every request for both MCP revisions, as the Streamable HTTP transport requires to prevent DNS rebinding. Requests without an `Origin` header are unaffected. A present `Origin` must match the scheme, host, and port of `home_url()` or `site_url()`; any other value, including `null` and an empty header, returns HTTP 403 with a JSON-RPC permission error. The check runs last on `rest_pre_dispatch` for the server's own route, so it answers before WordPress permission handling (403, not 401, for anonymous requests) and over any response an earlier pre-dispatch filter prepared; OPTIONS requests and other routes are unaffected ([#323](https://github.com/WordPress/mcp-adapter/issues/323)).
 
 ### Added
 - The `mcp_adapter_allowed_http_origins` filter adds exact origins allowed to call MCP endpoints, such as a headless front end. A return value that is not an array of strings rejects every request that carries an `Origin` header ([#323](https://github.com/WordPress/mcp-adapter/issues/323)).
