@@ -108,7 +108,7 @@ npm run plugin-zip
 
 ## Merging PRs
 
-All members of the [mcp-adapter-maintainers team](https://github.com/orgs/WordPress/teams/mcp-adapters-maintainers) within the WordPress org on GitHub have the ability to review and merge PRs.  If you are not a maintainer but have reviewed a PR and are confident in the code, approve the PR and comment pinging @wordpress/mcp-adapters-maintainers or a specific maintainer who has been involved in the PR.  Once a maintainer confirms there are no objections, you are free to merge the PR into `trunk`.
+All members of the [mcp-adapter-maintainers team](https://github.com/orgs/WordPress/teams/mcp-adapter-maintainers) within the WordPress org on GitHub have the ability to review and merge PRs.  If you are not a maintainer but have reviewed a PR and are confident in the code, approve the PR and comment pinging @wordpress/mcp-adapter-maintainers or a specific maintainer who has been involved in the PR.  Once a maintainer confirms there are no objections, you are free to merge the PR into `trunk`.
 
 Most PRs will be automatically assigned a release milestone, but please make sure your merged PR was assigned one.  Doing so creates the historical legacy of what code landed when, and makes it possible for all project contributors (even non-technical ones) to access this information.
 
