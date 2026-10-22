@@ -11,6 +11,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP;
 
+use WP\MCP\Admin\SiteHealth;
 use WP\MCP\Core\McpAdapter;
 
 // Exit if accessed directly.
@@ -76,6 +77,9 @@ final class Plugin {
 		$this->constants();
 
 		McpAdapter::instance();
+
+		// The class only loads when Site Health builds its Info screen.
+		add_filter( 'debug_information', array( SiteHealth::class, 'add_debug_information' ) );
 	}
 
 	/**
