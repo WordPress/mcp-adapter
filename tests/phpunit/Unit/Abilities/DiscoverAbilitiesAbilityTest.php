@@ -11,6 +11,8 @@ namespace WP\MCP\Tests\Unit\Abilities;
 
 use WP\MCP\Abilities\DiscoverAbilitiesAbility;
 use WP\MCP\Abilities\McpAbilityExposure;
+use WP\MCP\Domain\Tools\RegisterAbilityAsMcpTool;
+use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Tests\TestCase;
 use WP_Error;
 
@@ -413,9 +415,14 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	public function test_ability_has_correct_schema(): void {
 		$ability = wp_get_ability( 'mcp-adapter/discover-abilities' );
 
-		$input_schema = $ability->get_input_schema();
-		$this->assertIsArray( $input_schema );
-		$this->assertEmpty( $input_schema );
+		$this->assertSame(
+			array(
+				'type'                 => 'object',
+				'properties'           => array(),
+				'additionalProperties' => false,
+			),
+			$ability->get_input_schema()
+		);
 
 		$output_schema = $ability->get_output_schema();
 		$this->assertIsArray( $output_schema );
@@ -436,5 +443,60 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 		$this->assertTrue( $annotations['readonly'] );
 		$this->assertFalse( $annotations['destructive'] );
 		$this->assertTrue( $annotations['idempotent'] );
+	}
+
+	/**
+	 * The advertised tool schema tells clients not to send arguments.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/381
+	 */
+	public function test_tool_input_schema_does_not_allow_arguments(): void {
+		$tool = RegisterAbilityAsMcpTool::build( wp_get_ability( 'mcp-adapter/discover-abilities' ) );
+		$this->assertIsArray( $tool );
+
+		$input_schema = $tool['tool_data']['inputSchema'];
+		$this->assertSame( 'object', $input_schema['type'] );
+		$this->assertFalse( $input_schema['additionalProperties'] );
+		$this->assertSame( '{}', wp_json_encode( $input_schema['properties'] ) );
+	}
+
+	/**
+	 * A call without arguments still runs: an empty object and a missing argument set both normalize to an empty array.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/381
+	 *
+	 * @dataProvider data_no_arguments
+	 *
+	 * @param array<string, mixed>|null $arguments Arguments as sent by an MCP client.
+	 */
+	public function test_execute_without_arguments_succeeds( ?array $arguments ): void {
+		$ability = wp_get_ability( 'mcp-adapter/discover-abilities' );
+		$result  = $ability->execute( AbilityArgumentNormalizer::normalize( $ability, $arguments ) );
+
+		$this->assertIsArray( $result );
+		$this->assertArrayHasKey( 'abilities', $result );
+	}
+
+	/**
+	 * @return array<string, array{0: array<string, mixed>|null}>
+	 */
+	public function data_no_arguments(): array {
+		return array(
+			'empty object'      => array( array() ),
+			'missing arguments' => array( null ),
+		);
+	}
+
+	/**
+	 * Unexpected arguments fail input validation instead of reporting a missing input schema.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/381
+	 */
+	public function test_execute_with_unexpected_arguments_returns_invalid_input(): void {
+		$ability = wp_get_ability( 'mcp-adapter/discover-abilities' );
+		$result  = $ability->execute( AbilityArgumentNormalizer::normalize( $ability, array( 'foo' => 'bar' ) ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'ability_invalid_input', $result->get_error_code() );
 	}
 }
