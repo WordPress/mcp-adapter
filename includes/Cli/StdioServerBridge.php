@@ -139,7 +139,14 @@ final class StdioServerBridge {
 	 * @return string Encoded response, or an empty string when no response is required.
 	 */
 	private function handle_request( string $json_input ): string {
-		$this->flush_runtime_cache();
+		// The whole session runs in one process, so drop the in-memory object cache
+		// before each message. Otherwise tools miss changes made by other processes
+		// such as WP Admin, cron or REST requests. A persistent cache that cannot
+		// flush its runtime copy is left alone, since wp_cache_flush() would empty
+		// the shared cache for the whole site.
+		if ( wp_cache_supports( 'flush_runtime' ) ) {
+			wp_cache_flush_runtime();
+		}
 
 		try {
 			$message = $this->orchestrator->decode( $json_input );
@@ -159,27 +166,6 @@ final class StdioServerBridge {
 		}
 
 		return null === $processed['response'] ? '' : $this->encode_response( $processed['response'] );
-	}
-
-	/**
-	 * Drop the in-memory object cache so each message reads current data.
-	 *
-	 * The STDIO server handles a whole session in one process, so the runtime
-	 * cache would otherwise keep what earlier messages read, and tools would miss
-	 * changes made by other processes such as WP Admin, cron or REST requests.
-	 * A persistent cache that cannot flush its runtime copy is left alone, since
-	 * wp_cache_flush() would empty the shared cache for the whole site.
-	 *
-	 * @since n.e.x.t
-	 *
-	 * @return void
-	 */
-	private function flush_runtime_cache(): void {
-		if ( ! wp_cache_supports( 'flush_runtime' ) ) {
-			return;
-		}
-
-		wp_cache_flush_runtime();
 	}
 
 	/**
