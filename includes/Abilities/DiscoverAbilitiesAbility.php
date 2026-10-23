@@ -37,6 +37,14 @@ final class DiscoverAbilitiesAbility {
 				'label'               => 'Discover Abilities',
 				'description'         => 'Discover all available WordPress abilities in the system. Returns a list of all registered abilities with their basic information.',
 				'category'            => 'mcp-adapter',
+				// The ability takes no arguments. An explicit empty schema keeps the advertised
+				// tool schema and the input validation in agreement, so stray arguments get a
+				// validation error instead of ability_missing_input_schema.
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'properties'           => array(),
+					'additionalProperties' => false,
+				),
 				'output_schema'       => array(
 					'type'       => 'object',
 					'properties' => array(
