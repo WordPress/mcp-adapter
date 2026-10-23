@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
-use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Record;
 
@@ -179,24 +178,26 @@ class HttpRequestHandler {
 	/**
 	 * Check the MCP-Protocol-Version header against the version negotiated at initialization.
 	 *
-	 * The header must match the negotiated identifier whenever it is sent. It may
-	 * be omitted only for sessions negotiated under a revision that predates the
-	 * header, see {@see McpVersionNegotiator::PROTOCOL_VERSION_HEADER_SINCE}.
+	 * The header must match the negotiated identifier whenever it is sent. When it
+	 * is absent, the version negotiated at initialization identifies the session's
+	 * protocol, which the transport specification allows before falling back to
+	 * 2025-03-26, so the request is accepted.
+	 *
+	 * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#protocol-version-header
 	 *
 	 * @param string|null          $header_version Request header value.
 	 * @param array<string, mixed> $client_params  Stored initialize params.
 	 * @param string|int|null      $request_id     Readable JSON-RPC request ID.
 	 * @return array<string, mixed>|null Error payload, or null when the header is acceptable.
 	 * @since 0.7.0
+	 * @since n.e.x.t A missing header is accepted for every negotiated version.
 	 */
 	private function validate_session_protocol_version( ?string $header_version, array $client_params, $request_id ): ?array {
-		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );
-
 		if ( null === $header_version ) {
-			return McpVersionNegotiator::requires_protocol_version_header( $negotiated )
-				? McpErrorFactory::invalid_request( $request_id, sprintf( 'MCP-Protocol-Version header is required for a %s session', $negotiated ) )
-				: null;
+			return null;
 		}
+
+		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );
 
 		return $header_version === $negotiated
 			? null
