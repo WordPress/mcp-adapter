@@ -139,6 +139,15 @@ final class StdioServerBridge {
 	 * @return string Encoded response, or an empty string when no response is required.
 	 */
 	private function handle_request( string $json_input ): string {
+		// The whole session runs in one process, so drop the in-memory object cache
+		// before each message. Otherwise tools miss changes made by other processes
+		// such as WP Admin, cron or REST requests. A persistent cache that cannot
+		// flush its runtime copy is left alone, since wp_cache_flush() would empty
+		// the shared cache for the whole site.
+		if ( wp_cache_supports( 'flush_runtime' ) ) {
+			wp_cache_flush_runtime();
+		}
+
 		try {
 			$message = $this->orchestrator->decode( $json_input );
 		} catch ( \UnexpectedValueException | \RangeException $exception ) {
