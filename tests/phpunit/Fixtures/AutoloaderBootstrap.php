@@ -108,7 +108,7 @@ tests_add_filter(
 		}
 
 		// Copy the production entry point and loader classes; give their manifest release-build versions.
-		foreach ( array( 'mcp-adapter.php', 'includes/Autoloader.php', 'includes/Core/McpAdapter.php', 'includes/Plugin.php' ) as $file ) {
+		foreach ( array( 'mcp-adapter.php', 'includes/Autoloader.php', 'includes/loaded-elsewhere-notice.php', 'includes/Core/McpAdapter.php', 'includes/Plugin.php' ) as $file ) {
 			wp_mkdir_p( dirname( $wp_mcp_test_canonical . '/' . $file ) );
 			copy( $wp_mcp_test_root . '/' . $file, $wp_mcp_test_canonical . '/' . $file );
 		}
@@ -149,6 +149,12 @@ tests_add_filter(
 		require $wp_mcp_test_bundler . '/vendor/autoload_packages.php';
 		$wp_mcp_test_before['class_loaded'] = class_exists( McpAdapter::class, false );
 		if ( 'preloaded' === $wp_mcp_test_scenario ) {
+			class_exists( McpAdapter::class );
+		}
+		if ( 'bundled-entry' === $wp_mcp_test_scenario ) {
+			// A plugin that loads first includes its bundled copy's entry point, which declares that copy's own loader.
+			file_put_contents( $wp_mcp_test_bundler . '/Autoloader.php', '<?php namespace WP\\MCP; final class Autoloader { public static function autoload(): bool { return true; } }' );
+			require $wp_mcp_test_bundler . '/Autoloader.php';
 			class_exists( McpAdapter::class );
 		}
 		$load_canonical = static function () use ( $wp_mcp_test_canonical, $wp_mcp_test_composer ) {
