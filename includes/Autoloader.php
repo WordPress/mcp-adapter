@@ -95,7 +95,8 @@ final class Autoloader {
 	 */
 	private static function loaded_elsewhere_notice(): void {
 		$running_file = ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName();
-		( require __DIR__ . '/loaded-elsewhere-notice.php' )( (string) $running_file );
+		// is_loaded_elsewhere() has already found that this class belongs to another copy.
+		( require __DIR__ . '/loaded-elsewhere-notice.php' )( (string) $running_file, true );
 	}
 
 	/**

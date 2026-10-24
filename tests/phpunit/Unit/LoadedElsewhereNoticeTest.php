@@ -75,12 +75,22 @@ final class LoadedElsewhereNoticeTest extends TestCase {
 	}
 
 	/**
+	 * After the entry point stood down, Jetpack can still select this installation's McpAdapter: no conflict is reported.
+	 */
+	public function test_no_notice_when_this_installation_is_the_one_running(): void {
+		$messages = $this->notice_for( $this->plugin_dir . '/vendor/wordpress/mcp-adapter/includes/Autoloader.php', false );
+
+		$this->assertSame( array(), $messages );
+	}
+
+	/**
 	 * Registers the notice for a file, runs its deferred init step and returns the logged messages.
 	 *
-	 * @param string $running_file A file of the running copy.
+	 * @param string $running_file  A file of the running copy.
+	 * @param bool   $known_foreign Whether the caller already knows McpAdapter is another copy's class.
 	 * @return string[]
 	 */
-	private function notice_for( string $running_file ): array {
+	private function notice_for( string $running_file, bool $known_foreign = true ): array {
 		$messages = array();
 		$capture  = static function ( $function_name, $message ) use ( &$messages ) {
 			if ( McpAdapter::class !== $function_name ) {
@@ -90,9 +100,11 @@ final class LoadedElsewhereNoticeTest extends TestCase {
 		};
 		add_action( 'doing_it_wrong_run', $capture, 10, 2 );
 		add_filter( 'doing_it_wrong_trigger_error', '__return_false' );
-		$this->setExpectedIncorrectUsage( McpAdapter::class );
+		if ( $known_foreign ) {
+			$this->setExpectedIncorrectUsage( McpAdapter::class );
+		}
 
-		( require dirname( __DIR__, 3 ) . '/includes/loaded-elsewhere-notice.php' )( $running_file );
+		( require dirname( __DIR__, 3 ) . '/includes/loaded-elsewhere-notice.php' )( $running_file, $known_foreign );
 		$entries = $GLOBALS['wp_filter']['init']->callbacks[10];
 		$notice  = end( $entries )['function'];
 		$notice();

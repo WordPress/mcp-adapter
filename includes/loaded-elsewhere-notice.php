@@ -19,12 +19,29 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Registers the notice for the copy whose file is given.
  *
- * @param string $running_file A file of the copy that is running.
+ * @param string $running_file  A file of the copy that is running: its McpAdapter class, or its loader when the
+ *                              class is not loaded yet.
+ * @param bool   $known_foreign True when the caller has already found that McpAdapter is another copy's class.
+ *                              Otherwise the copy is resolved from McpAdapter itself when the notice runs, because
+ *                              Jetpack Autoloader can still select this installation's class after its entry
+ *                              point stood down.
  */
-return static function ( string $running_file ): void {
+return static function ( string $running_file, bool $known_foreign = false ): void {
+	$installed_root = trailingslashit( wp_normalize_path( (string) realpath( dirname( __DIR__ ) ) ) );
 	add_action(
 		'init',
-		static function () use ( $running_file ) {
+		static function () use ( $running_file, $known_foreign, $installed_root ) {
+			if ( ! $known_foreign && class_exists( Core\McpAdapter::class ) ) {
+				$class_file = ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName();
+				if ( false !== $class_file ) {
+					// This installation's adapter is the one running: there is no conflict to report.
+					if ( 0 === strpos( wp_normalize_path( (string) realpath( $class_file ) ), $installed_root ) ) {
+						return;
+					}
+					$running_file = $class_file;
+				}
+			}
+
 			$running_version = '';
 			if ( class_exists( Core\McpAdapter::class, false ) && defined( Core\McpAdapter::class . '::VERSION' ) ) {
 				$running_version = (string) Core\McpAdapter::VERSION;
