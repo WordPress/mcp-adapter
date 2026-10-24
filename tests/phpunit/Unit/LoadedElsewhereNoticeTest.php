@@ -65,6 +65,30 @@ final class LoadedElsewhereNoticeTest extends TestCase {
 	}
 
 	/**
+	 * A copy bundled in a theme is reported under the theme's name.
+	 */
+	public function test_names_the_theme_that_bundles_the_running_copy(): void {
+		$theme_dir = get_theme_root() . '/mcp-notice-theme-' . uniqid();
+		wp_mkdir_p( $theme_dir . '/vendor' );
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Test-owned theme header.
+		file_put_contents( $theme_dir . '/style.css', "/*\nTheme Name: Example Theme\n*/\n" );
+		// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Test-owned stand-in for a bundled class file.
+		file_put_contents( $theme_dir . '/vendor/McpAdapter.php', '<?php' );
+
+		$messages = $this->notice_for( $theme_dir . '/vendor/McpAdapter.php' );
+
+		// phpcs:disable WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_unlink, WordPressVIPMinimum.Functions.RestrictedFunctions.directory_rmdir -- Removes only the test-owned theme.
+		unlink( $theme_dir . '/vendor/McpAdapter.php' );
+		unlink( $theme_dir . '/style.css' );
+		rmdir( $theme_dir . '/vendor' );
+		rmdir( $theme_dir );
+		// phpcs:enable
+
+		$this->assertCount( 1, $messages );
+		$this->assertStringContainsString( 'Example Theme loads its own bundled copy', $messages[0] );
+	}
+
+	/**
 	 * A copy outside the plugin, must-use plugin and theme folders gets the general advice.
 	 */
 	public function test_unknown_carrier_gets_the_general_advice(): void {
