@@ -295,6 +295,75 @@ final class HandlerCompatibilityTest extends TestCase {
 		$this->assertSame( 'Blocked before execution', $blocked['content'][0]['text'] );
 	}
 
+	/** A tool call refused by its permission check fires the refused action; an allowed call does not. */
+	public function test_tool_call_refused_action_reports_permission_refusals(): void {
+		$executions = 0;
+		$permission = true;
+		$tool       = McpTool::fromArray(
+			array(
+				'name'        => 'guarded-tool',
+				'inputSchema' => array( 'type' => 'object' ),
+				'handler'     => static function () use ( &$executions ): array {
+					++$executions;
+
+					return array( 'ran' => true );
+				},
+				'permission'  => static function () use ( &$permission ) {
+					return $permission;
+				},
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$server  = $this->makeServer( array( $tool ) );
+		$handler = new ToolsHandler( $server );
+		$request = $this->schema()->fromArray(
+			CallToolRequest::class,
+			array(
+				'jsonrpc' => '2.0',
+				'id'      => 5,
+				'method'  => 'tools/call',
+				'params'  => array(
+					'name'      => 'guarded-tool',
+					'arguments' => array( 'post_id' => 7 ),
+				),
+			)
+		);
+		$refusals = array();
+		$observer = static function ( WP_Error $error, array $args, string $tool_name, McpTool $mcp_tool, McpServer $mcp_server ) use ( &$refusals ): void {
+			$refusals[] = compact( 'error', 'args', 'tool_name', 'mcp_tool', 'mcp_server' );
+		};
+		$permission_error = new WP_Error( 'not_allowed', 'You cannot use this tool' );
+		add_action( 'mcp_adapter_tool_call_refused', $observer, 10, 5 );
+		try {
+			$permission       = $permission_error;
+			$refused_by_error = $handler->call_tool( $request, $this->request_context( $server ) );
+			$permission       = false;
+			$refused_by_false = $handler->call_tool( $request, $this->request_context( $server ) );
+			$permission       = true;
+			$allowed          = $handler->call_tool( $request, $this->request_context( $server ) );
+		} finally {
+			remove_action( 'mcp_adapter_tool_call_refused', $observer );
+		}
+
+		$this->assertSame( 1, $executions );
+		$this->assertTrue( $refused_by_error['isError'] );
+		$this->assertSame( 'You cannot use this tool', $refused_by_error['content'][0]['text'] );
+		$this->assertTrue( $refused_by_false['isError'] );
+		$this->assertSame( 'Permission denied', $refused_by_false['content'][0]['text'] );
+		$this->assertTrue( $allowed['structuredContent']->ran );
+
+		$this->assertCount( 2, $refusals );
+		$this->assertSame( $permission_error, $refusals[0]['error'] );
+		$this->assertSame( 'mcp_adapter_permission_denied', $refusals[1]['error']->get_error_code() );
+		$this->assertSame( 'Permission denied', $refusals[1]['error']->get_error_message() );
+		foreach ( $refusals as $refusal ) {
+			$this->assertSame( array( 'post_id' => 7 ), $refusal['args'] );
+			$this->assertSame( 'guarded-tool', $refusal['tool_name'] );
+			$this->assertSame( 'guarded-tool', $refusal['mcp_tool']->get_name() );
+			$this->assertSame( $server, $refusal['mcp_server'] );
+		}
+	}
+
 	/** Resource results preserve advertised URI, text/blob variants, and metadata as given. */
 	public function test_resource_result_normalization_preserves_identity_and_metadata(): void {
 		$resource = McpResource::fromArray(
