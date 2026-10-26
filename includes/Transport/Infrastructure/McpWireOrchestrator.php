@@ -207,16 +207,13 @@ final class McpWireOrchestrator {
 			return $this->failure( McpErrorFactory::invalid_request( null, 'Message must be an object' ) );
 		}
 
-		$id           = $generic['id'] ?? null;
-		$safe_id      = is_string( $id ) || is_int( $id ) ? $id : null;
-		$method       = isset( $generic['method'] ) && is_string( $generic['method'] ) ? $generic['method'] : null;
-		$notification = '2.0' === ( $generic['jsonrpc'] ?? null ) && null !== $method && ! array_key_exists( 'id', $generic );
-		if ( '2.0' !== ( $generic['jsonrpc'] ?? null ) || null === $method ) {
-			return $this->failure( McpErrorFactory::invalid_request( $safe_id, 'Invalid JSON-RPC request envelope' ), $method, $safe_id, $notification );
+		$envelope = JsonRpcRequestDecoder::inspect_envelope( $message );
+		if ( 'invalid' === $envelope['kind'] ) {
+			return $this->failure( $envelope['error'], $envelope['method'], $envelope['id'], false );
 		}
-		if ( ! $notification && ! is_string( $id ) && ! is_int( $id ) ) {
-			return $this->failure( McpErrorFactory::invalid_request( null, 'Request id must be a string or integer' ), $method, null, false );
-		}
+		$id           = $envelope['id'];
+		$method       = $envelope['method'];
+		$notification = 'notification' === $envelope['kind'];
 
 		// Notification failures carry error data for transport status selection, not response-record hydration.
 		$selection = $this->select_revision( $generic, $transport_metadata, $client_params_2025_11_25 );
@@ -260,7 +257,7 @@ final class McpWireOrchestrator {
 			);
 		}
 
-		if ( $notification ) {
+		if ( 'notification' === $envelope['kind'] ) {
 			if ( ! $this->allows_notification( $selection, $method, $schema ) ) {
 				return array(
 					'context'          => $request_context,
@@ -295,6 +292,7 @@ final class McpWireOrchestrator {
 			);
 		}
 
+		$id = $envelope['id'];
 		if ( ! $this->allows_request( $selection, $method, $schema ) ) {
 			$error = McpErrorFactory::method_not_found( $id, $method );
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
