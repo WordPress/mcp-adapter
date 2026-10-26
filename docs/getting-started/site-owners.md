@@ -109,8 +109,23 @@ If **Users > Profile** has no Application Passwords section:
 
 ### 404 or "rest_no_route"
 
-- Check that MCP Adapter is active under **Plugins**.
+Open the connection address in your browser. What comes back tells you which problem it is. Any other JSON error, such as one with status 401, means the address works; see [401 Unauthorized](#401-unauthorized).
+
+#### A web page comes back
+
+You see your homepage, or the server's own "Not Found" page. WordPress did not treat the address as an API request, so the cause is the site's permalinks or the server's rewrite rules.
+
 - If your site uses plain permalinks (**Settings > Permalinks**), `/wp-json/` addresses do not work. Use `https://example.com/?rest_route=/mcp/mcp-adapter-default-server` instead.
+- If permalinks are not plain and the server shows its own "Not Found" page, its rewrite rules are missing. Click **Save Changes** under **Settings > Permalinks** to write them again, or ask your host.
+
+#### A JSON error with "rest_no_route" comes back
+
+WordPress received the request but has no MCP Adapter address at that URL.
+
+- Check the address for typos. It is your **Site Address (URL)** followed by `/wp-json/mcp/mcp-adapter-default-server`.
+- Check that MCP Adapter is active under **Plugins**.
+- If you installed MCP Adapter from its GitHub source code, files it needs are missing. Delete it and install it from WordPress.org under **Plugins > Add New Plugin** instead.
+- Another plugin can turn the default MCP server off. If everything above is right, look for an MCP or AI setting in your other plugins, or deactivate them one at a time and test again.
 
 ### Connected, but the assistant finds nothing to do
 
