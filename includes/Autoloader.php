@@ -94,40 +94,9 @@ final class Autoloader {
 	 * Displays a notice if the plugin classes are already registered with another autoloader.
 	 */
 	private static function loaded_elsewhere_notice(): void {
-		// Defer notice until translation functions are available.
-		add_action(
-			'init',
-			static function () {
-				$error_message = __( 'Another version of MCP Adapter is already loaded and may cause conflicts. This is usually caused by an outdated plugin bundling its own copy MCP Adapter as a dependency. Update that plugin to the latest version to ensure compatibility.', 'mcp-adapter' );
-
-				// Log a notice.
-				_doing_it_wrong(
-					Core\McpAdapter::class,
-					esc_html( $error_message ),
-					'0.7.0'
-				);
-
-				// Log an admin notice.
-				$hooks = array(
-					'admin_notices',
-					'network_admin_notices',
-				);
-				foreach ( $hooks as $hook ) {
-					add_action(
-						$hook,
-						static function () use ( $error_message ) {
-							wp_admin_notice(
-								esc_html( $error_message ),
-								array(
-									'type'    => 'error',
-									'dismiss' => false,
-								),
-							);
-						}
-					);
-				}
-			}
-		);
+		$running_file = ( new \ReflectionClass( Core\McpAdapter::class ) )->getFileName();
+		// is_loaded_elsewhere() has already found that this class belongs to another copy.
+		( require __DIR__ . '/loaded-elsewhere-notice.php' )( (string) $running_file, true );
 	}
 
 	/**
