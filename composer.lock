@@ -3120,7 +3120,7 @@
         },
         {
             "name": "wp-phpunit/wp-phpunit",
-            "version": "7.1.1",
+            "version": "7.1.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/wp-phpunit/wp-phpunit.git",
