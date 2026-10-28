@@ -240,12 +240,14 @@ class ResourcesHandler {
 			// Check if this is an array of content items (has 'uri', 'text', or 'blob' in first item).
 			$first_item = reset( $contents );
 			if ( is_array( $first_item ) && ( isset( $first_item['uri'] ) || isset( $first_item['text'] ) || isset( $first_item['blob'] ) ) ) {
-				return array_values( array_map(
-					function ( $item ) use ( $uri ) {
-						return $this->create_content_data( $item, $uri );
-					},
-					$contents
-				) );
+				return array_values(
+					array_map(
+						function ( $item ) use ( $uri ) {
+							return $this->create_content_data( $item, $uri );
+						},
+						$contents
+					)
+				);
 			}
 		}
 
