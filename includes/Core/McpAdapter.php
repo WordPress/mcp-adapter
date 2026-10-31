@@ -19,6 +19,7 @@ use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterfa
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Servers\DefaultServerFactory;
 use WP_Error;
+use WordPress\Abilities\Registrar;
 
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
@@ -72,6 +73,20 @@ final class McpAdapter {
 			// Subscribe before `init`, the earliest point the Abilities API registries can initialize.
 			add_action( 'wp_abilities_api_categories_init', array( self::$instance, 'register_default_category' ) );
 			add_action( 'wp_abilities_api_init', array( self::$instance, 'register_default_abilities' ) );
+
+			/**
+			 * Filters whether to register canonical abilities for core WP entities 
+			 * (posts, users, content, media, etc.)
+			 *
+			 * Return false to prevent these abilities from being registered.
+			 *
+			 * @since 0.x.x
+			 *
+			 * @param bool $register_abilities Whether to register WP abilities. Default true.
+			*/
+			if ( (bool) apply_filters( 'mcp_adapter_register_wordpress_abilities', true ) ) {
+				Registrar::register_all();
+			}
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {

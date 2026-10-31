@@ -24,6 +24,12 @@
 		"issues": "https://github.com/wordpress/mcp-adapter/issues",
 		"source": "https://github.com/wordpress/mcp-adapter"
 	},
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "https://github.com/nikmclaughlin/wordpress-abilities.git"
+		}
+	],
 	"minimum-stability": "dev",
 	"prefer-stable": true,
 	"config": {
@@ -57,6 +63,7 @@
 	"require": {
 		"php": "^7.4 || ^8.0",
 		"automattic/jetpack-autoloader": "^6.0",
+		"wordpress/abilities": "dev-add/mcp-public-meta#00d65cfbc4e4d335138bcdd51d3d17dcbd55f027",
 		"wordpress/php-mcp-schema": "^0.2.0",
 		"ext-json": "*"
 	},

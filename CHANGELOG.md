@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- PoC: consume core abilities from the `wordpress-abilities` package. Provided abilities are registered with WordPress and then surfaced through the default server's layered-discovery meta-tools.
+
 ## [0.7.1] - 2026-10-15
 
 ### Added

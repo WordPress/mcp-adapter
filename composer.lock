@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "68af6b636972fe9a37b2bcb38eca81e4",
+    "content-hash": "3c9fafdc738bb9c07591091e9c00a3d2",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -68,6 +68,63 @@
                 "source": "https://github.com/Automattic/jetpack-autoloader/tree/v6.0.2"
             },
             "time": "2026-10-20T16:01:49+00:00"
+        },
+        {
+            "name": "wordpress/abilities",
+            "version": "dev-add/mcp-public-meta",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nikmclaughlin/wordpress-abilities.git",
+                "reference": "00d65cfbc4e4d335138bcdd51d3d17dcbd55f027"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nikmclaughlin/wordpress-abilities/zipball/00d65cfbc4e4d335138bcdd51d3d17dcbd55f027",
+                "reference": "00d65cfbc4e4d335138bcdd51d3d17dcbd55f027",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.2",
+                "szepeviktor/phpstan-wordpress": "^2.0",
+                "wp-coding-standards/wpcs": "^3.4",
+                "wp-phpunit/wp-phpunit": "^7.1",
+                "yoast/phpunit-polyfills": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "WordPress\\Abilities\\": "src/"
+                }
+            },
+            "scripts": {
+                "lint:phpcs": [
+                    "phpcs"
+                ],
+                "lint:phpstan": [
+                    "phpstan analyse"
+                ],
+                "test": [
+                    "phpunit"
+                ],
+                "verify:manifest": [
+                    "php bin/verify-manifest.php"
+                ],
+                "verify:coreify": [
+                    "php tools/coreify.php --check"
+                ]
+            },
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "description": "Canonical WordPress Abilities, consumable by plugins via the Abilities API.",
+            "support": {
+                "source": "https://github.com/nikmclaughlin/wordpress-abilities/tree/add/mcp-public-meta",
+                "issues": "https://github.com/nikmclaughlin/wordpress-abilities/issues"
+            },
+            "time": "2026-10-30T18:29:05+00:00"
         },
         {
             "name": "wordpress/php-mcp-schema",
@@ -3239,7 +3296,9 @@
         }
     ],
     "minimum-stability": "dev",
-    "stability-flags": {},
+    "stability-flags": {
+        "wordpress/abilities": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
