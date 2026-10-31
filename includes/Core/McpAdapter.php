@@ -74,21 +74,16 @@ final class McpAdapter {
 			add_action( 'wp_abilities_api_categories_init', array( self::$instance, 'register_default_category' ) );
 			add_action( 'wp_abilities_api_init', array( self::$instance, 'register_default_abilities' ) );
 
-			// Register the canonical `wordpress/abilities` package abilities.
-			//
-			// This must run here, at plugin load: the package's Registrar
-			// declares its manifest categories at priority 20 on
-			// `wp_abilities_api_categories_init`, and that declaration can only
-			// happen while the categories action fires — so the first
-			// `Registrar::register_all()` call must precede the registry boot.
-			//
-			// The call intentionally passes no `public_only` argument: the
-			// Registrar's gate probes only the high-level `public` meta, which
-			// would exclude abilities that opt in to MCP exposure via
-			// `meta.mcp.public`. MCP visibility is resolved at the adapter
-			// layer by `McpAbilityExposure` instead.
-			//
-			// Mirrors the `mcp_adapter_create_default_server` filter pattern.
+			/**
+			 * Filters whether to register canonical abilities for core WP entities 
+			 * (posts, users, content, media, etc.)
+			 *
+			 * Return false to prevent these abilities from being registered.
+			 *
+			 * @since 0.x.x
+			 *
+			 * @param bool $register_abilities Whether to register WP abilities. Default true.
+			*/
 			if ( (bool) apply_filters( 'mcp_adapter_register_wordpress_abilities', true ) ) {
 				Registrar::register_all();
 			}
