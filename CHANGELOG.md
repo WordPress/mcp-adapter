@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file, per [the Ke
 ## [Unreleased]
 
 ### Added
-- PoC: consume the `wordpress/abilities` package. The adapter registers the package's canonical WordPress abilities at plugin load via `Registrar::register_all()`, filter-gated by a new `mcp_adapter_register_wordpress_abilities` filter (default `true` for the PoC; the shipped default is a team decision before merge). All 18 package abilities then surface through the default server's layered-discovery meta-tools (`mcp-adapter/discover-abilities`, `mcp-adapter/get-ability-info`, `mcp-adapter/execute-ability`) — the default server's `tools/list` still contains exactly those three tools. The package dependency is pinned to the open package PR branch (`wordpress/abilities: dev-add/mcp-public-meta#00d65cf`) until `meta.mcp.public` and Packagist publishing are settled by the team.
+- PoC: consume core abilities from the `wordpress-abilities` package. Provided abilities are registered with WordPress and then surfaced through the default server's layered-discovery meta-tools.
 
 ## [0.7.1] - 2026-10-15
 
