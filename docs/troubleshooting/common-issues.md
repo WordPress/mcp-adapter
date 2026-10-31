@@ -145,16 +145,16 @@ add_action( 'mcp_adapter_init', function( $adapter ) {
 ```
 
 ### Check Registered Servers
+
+Servers are registered while the `mcp_adapter_init` action runs, and the adapter fires that action on `rest_api_init` (priority 15), or on `init` (priority 20) under WP-CLI. `get_servers()` therefore returns an empty array until `mcp_adapter_init` has fired, for example when called on `init`. Hook `mcp_adapter_init` with a priority later than 10 (the default server is created at priority 10) to read the list reliably:
+
 ```php
-// List all servers
-add_action( 'init', function() {
-    if ( class_exists( 'WP\MCP\Core\McpAdapter' ) ) {
-        $adapter = \WP\MCP\Core\McpAdapter::instance();
-        $servers = $adapter->get_servers();
-        error_log( 'MCP servers: ' . implode( ', ', array_keys( $servers ) ) );
-    }
-}, 999 );
+add_action( 'mcp_adapter_init', function ( $adapter ) {
+    error_log( 'MCP servers: ' . implode( ', ', array_keys( $adapter->get_servers() ) ) );
+}, 20 );
 ```
+
+`get_servers()` returns `McpServer` objects keyed by server ID. Their properties are private, so `json_encode()` or `rest_ensure_response()` serializes them as `{}`; build a plain array from the getters instead.
 
 ### REST API Not Working
 ```bash
