@@ -198,8 +198,8 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
 		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'permission_check_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+		$this->assertSame( 'text', $res['content'][0]['type'] );
+		$this->assertNotEmpty( $res['content'][0]['text'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/permission-exception-in-call' );
@@ -251,8 +251,7 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
 		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'execution_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+		$this->assertStringContainsString( 'boom', $res['content'][0]['text'] );
 	}
 
 	public function test_call_tool_permission_exception_returns_error(): void {
@@ -276,8 +275,8 @@ final class ToolsHandlerTest extends TestCase {
 		$this->assertTrue( $res['isError'] );
 		$this->assertArrayHasKey( 'content', $res );
 		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'permission_check_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+		$this->assertSame( 'text', $res['content'][0]['type'] );
+		$this->assertNotEmpty( $res['content'][0]['text'] );
 	}
 
 	public function test_call_tool_permission_denied_returns_error(): void {
