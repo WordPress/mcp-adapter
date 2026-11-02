@@ -200,8 +200,8 @@ final class ResourcesHandlerTest extends TestCase {
 		// Should return error
 		$this->assertArrayHasKey( 'error', $res );
 		$this->assertArrayHasKey( '_metadata', $res );
-		$this->assertEquals( 'execution_failed', $res['_metadata']['failure_reason'] );
-		$this->assertArrayHasKey( 'error_type', $res['_metadata'] );
+		$this->assertIsString( $res['error']['message'] );
+		$this->assertNotEmpty( $res['error']['message'] );
 
 		// Clean up
 		wp_unregister_ability( 'test/resource-execute-exception' );

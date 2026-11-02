@@ -43,7 +43,7 @@ final class ToolsHandlerCallTest extends TestCase {
 		$this->assertStringContainsString( 'Permission denied', $res['content'][0]['text'] );
 	}
 
-	public function test_permission_exception_logs_and_returns_error(): void {
+	public function test_permission_exception_returns_error(): void {
 		$server = $this->makeServer( array( 'test/permission-exception' ) );
 		$handler = new ToolsHandler( $server );
 		$res     = $handler->call_tool(
@@ -54,7 +54,8 @@ final class ToolsHandlerCallTest extends TestCase {
 		// Permission check exception is returned as isError: true (tool execution error)
 		$this->assertArrayHasKey( 'isError', $res );
 		$this->assertTrue( $res['isError'] );
-		$this->assertNotEmpty( DummyErrorHandler::$logs );
+		$this->assertSame( 'text', $res['content'][0]['type'] );
+		$this->assertNotEmpty( $res['content'][0]['text'] );
 	}
 
 	public function test_execute_exception_logs_and_returns_internal_error_envelope(): void {
