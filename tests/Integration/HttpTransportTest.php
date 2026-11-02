@@ -1022,4 +1022,95 @@ final class HttpTransportTest extends TestCase {
 			)
 		);
 	}
+	/**
+	 * Oversized initialization must not allocate a session or mutate existing sessions.
+	 *
+	 * @dataProvider oversized_initialize_params_provider
+	 * @param array $oversized_params Initialization parameters to reject.
+	 */
+	public function test_initialize_rejects_oversized_session_params( array $oversized_params ): void {
+		$user_id = wp_create_user( 'oversized_session_user', 'password' );
+		$this->assertIsInt( $user_id );
+		wp_set_current_user( $user_id );
+		$this->assertTrue( current_user_can( 'read' ) );
+		$this->assertFalse( current_user_can( 'manage_options' ) );
+		$session_id = \WP\MCP\Transport\Infrastructure\SessionManager::create_session( $user_id );
+		$this->assertIsString( $session_id );
+		$before  = get_user_meta( $user_id, 'mcp_adapter_sessions', true );
+		$writes  = array();
+		$observe = static function ( string $query ) use ( &$writes ): string {
+			if ( false !== strpos( $query, 'usermeta' ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)\b/i', $query ) ) {
+				$writes[] = $query;
+			}
+			return $query;
+		};
+		add_filter( 'query', $observe );
+		try {
+			$request = $this->createPostRequest(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 42,
+					'method'  => 'initialize',
+					'params'  => $oversized_params,
+				)
+			);
+			$request->set_header( 'Accept', 'application/json, text/event-stream' );
+			$response = $this->transport->handle_request( $request );
+			$data     = $response->get_data();
+			$this->assertSame( 42, $data['id'] );
+			$this->assertArrayHasKey( 'error', $data );
+			$this->assertSame( -32602, $data['error']['code'] );
+			$this->assertStringContainsString( '4096', $data['error']['message'] );
+			$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response->get_headers() );
+			$this->assertSame( array(), $writes );
+			$this->assertSame( $before, get_user_meta( $user_id, 'mcp_adapter_sessions', true ) );
+		} finally {
+			remove_filter( 'query', $observe );
+			wp_set_current_user( 1 );
+			wp_delete_user( $user_id );
+		}
+	}
+
+	/** @return array<string, array{array}> Oversized input locations. */
+	public function oversized_initialize_params_provider(): array {
+		$blob = str_repeat( 'x', 1024 * 1024 );
+		return array(
+			'unknown key'  => array( array( 'extra' => $blob ) ),
+			'capabilities' => array( array( 'capabilities' => array( 'experimental' => array( 'blob' => $blob ) ) ) ),
+			'client name'  => array( array( 'clientInfo' => array( 'name' => $blob ) ) ),
+		);
+	}
+
+	/** Large client icons are omitted before applying the storage limit. */
+	public function test_initialize_omits_client_icons_from_session_storage(): void {
+		$user_id = wp_create_user( 'session_icons_user', 'password' );
+		$this->assertIsInt( $user_id );
+		wp_set_current_user( $user_id );
+		try {
+			$params  = array(
+				'clientInfo' => array(
+					'name'  => 'client',
+					'icons' => array( array( 'src' => 'data:image/png;base64,' . str_repeat( 'a', 8192 ) ) ),
+				),
+			);
+			$request = $this->createPostRequest(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 43,
+					'method'  => 'initialize',
+					'params'  => $params,
+				)
+			);
+			$request->set_header( 'Accept', 'application/json, text/event-stream' );
+			$response = $this->transport->handle_request( $request );
+			$this->assertArrayNotHasKey( 'error', $response->get_data() );
+			$sessions = get_user_meta( $user_id, 'mcp_adapter_sessions', true );
+			$this->assertCount( 1, $sessions );
+			$session = reset( $sessions );
+			$this->assertSame( array( 'clientInfo' => array( 'name' => 'client' ) ), $session['client_params'] );
+		} finally {
+			wp_set_current_user( 1 );
+			wp_delete_user( $user_id );
+		}
+	}
 }
