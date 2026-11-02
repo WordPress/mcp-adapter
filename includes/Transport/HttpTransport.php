@@ -81,19 +81,22 @@ class HttpTransport implements McpRestTransportInterface {
 
 				// Handle WP_Error returns
 				if ( ! is_wp_error( $result ) ) {
-					// Return boolean result directly
-					return $result;
+					// Cast to bool to match return type while preserving truthy/falsy semantics.
+					return (bool) $result;
 				}
 
-				// Log the error and fall back to default permission
+				// Log the error and deny access (fail-closed)
 				$this->request_handler->transport_context->error_handler->log(
 					'Permission callback returned WP_Error: ' . $result->get_error_message(),
 					array( 'HttpTransport::check_permission' )
 				);
-				// Fall through to default permission check
+
+				return false;
 			} catch ( \Throwable $e ) {
-				// Log the error using the error handler, and fall back to default permission
+				// Log the error and deny access (fail-closed)
 				$this->request_handler->transport_context->error_handler->log( 'Error in transport permission callback: ' . $e->getMessage(), array( 'HttpTransport::check_permission' ) );
+
+				return false;
 			}
 		}
 		$user_capability = apply_filters( 'mcp_adapter_default_transport_permission_user_capability', 'read', $context );
