@@ -12,6 +12,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 ## Implementation guides
 
 - **[Default Server](guides/default-server.md)** - Understanding the built-in MCP server and core abilities
+- **[Core Abilities](guides/core-abilities.md)** - The WordPress core abilities polyfill and the staging ground for future core abilities
 - **[Creating Abilities](guides/creating-abilities.md)** - Build tools, resources, and prompts with annotations
 - **[MRTR Tools](guides/mrtr.md)** - Gather client input before completing a direct tool call
 - **[Transport Permissions](guides/transport-permissions.md)** - Custom authentication and access control
