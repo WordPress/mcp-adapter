@@ -128,13 +128,13 @@ final class CoreAbilitiesPolyfill {
 		add_filter( 'register_post_type_args', array( self::class, 'add_post_type_arg' ), 10, 2 );
 		add_filter( 'register_setting_args', array( self::class, 'add_setting_arg' ), 10, 4 );
 		add_filter( 'wp_register_ability_args', array( self::class, 'map_required_capabilities' ), 10, 2 );
-		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_categories' ), 100 );
+		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_categories' ), 20 );
 		// Priority 1 mirrors core's own hook for `_wp_register_initial_settings_for_abilities()`,
 		// so the flagged settings exist before WP_Abilities_Settings::register() snapshots them.
 		add_action( 'wp_abilities_api_init', array( self::class, 'register_initial_settings_for_abilities' ), 1 );
-		// Priority 100: core registers at 10, so when core provides an ability it always wins
+		// Priority 20: core registers at 10, so when core provides an ability it always wins
 		// before the wp_has_ability() guard in register_core_abilities() runs.
-		add_action( 'wp_abilities_api_init', array( self::class, 'register_core_abilities' ), 100 );
+		add_action( 'wp_abilities_api_init', array( self::class, 'register_core_abilities' ), 20 );
 	}
 
 	/**
@@ -270,7 +270,7 @@ final class CoreAbilitiesPolyfill {
 	 * Registers the ability categories the polyfilled abilities need that nothing else provides.
 	 *
 	 * Runs on `wp_abilities_api_categories_init` after core and other plugins (priority
-	 * 100), registering only the categories nothing else has claimed.
+	 * 20), registering only the categories nothing else has claimed.
 	 */
 	public static function register_categories(): void {
 		if ( ! self::is_enabled() ) {
@@ -341,7 +341,7 @@ final class CoreAbilitiesPolyfill {
 	/**
 	 * Loads and registers the core abilities this WordPress version does not provide.
 	 *
-	 * Runs on `wp_abilities_api_init` after core and other plugins (priority 100). A class
+	 * Runs on `wp_abilities_api_init` after core and other plugins (priority 20). A class
 	 * is skipped when it is already declared elsewhere and any of its abilities is already
 	 * registered; its file is loaded only when the class does not exist, so a WordPress
 	 * (or another plugin) that ships it is never redeclared.
