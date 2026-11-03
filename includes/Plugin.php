@@ -77,7 +77,7 @@ final class Plugin {
 		$this->constants();
 
 		// Register the core abilities this WordPress version does not provide.
-		CoreAbilitiesPolyfill::register_hooks();
+		CoreAbilitiesPolyfill::register_hooks(); // @codeCoverageIgnore
 
 		McpAdapter::instance();
 	}

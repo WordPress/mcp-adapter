@@ -223,6 +223,22 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 		$this->assertFalse( $args['permission_callback']( 'no' ) );
 	}
 
+	public function test_mapper_drops_a_malformed_capabilities_argument(): void {
+		if ( self::wordpress_supports_required_capabilities() ) {
+			$this->markTestSkipped( 'This WordPress supports required_capabilities natively.' );
+		}
+
+		foreach ( array( 'manage_options', array() ) as $invalid ) {
+			$args = CoreAbilitiesPolyfill::map_required_capabilities(
+				array( 'required_capabilities' => $invalid ),
+				'core/test'
+			);
+
+			// The unknown argument is removed, and no permission callback is synthesized from it.
+			$this->assertSame( array(), $args );
+		}
+	}
+
 	public function test_mapper_ignores_abilities_outside_the_core_namespace(): void {
 		$args = array(
 			'label'                 => 'Test',
@@ -269,6 +285,40 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 		$this->assertSame( $args, CoreAbilitiesPolyfill::map_required_capabilities( $args, 'core/test' ) );
 
 		remove_filter( 'mcp_adapter_register_core_abilities', '__return_false' );
+	}
+
+	public function test_kill_switch_disables_every_registrar(): void {
+		global $wp_current_filter, $wp_registered_settings;
+
+		$saved_settings = $wp_registered_settings;
+		unset( $wp_registered_settings['wp_page_for_privacy_policy'] );
+
+		wp_unregister_ability( 'core/users-query' );
+		wp_unregister_ability_category( 'uncategorized' );
+
+		add_filter( 'mcp_adapter_register_core_abilities', '__return_false' );
+
+		$wp_current_filter[] = 'wp_abilities_api_categories_init';
+		CoreAbilitiesPolyfill::register_categories();
+		array_pop( $wp_current_filter );
+
+		$wp_current_filter[] = 'wp_abilities_api_init';
+		CoreAbilitiesPolyfill::register_initial_settings_for_abilities();
+		CoreAbilitiesPolyfill::register_core_abilities();
+		array_pop( $wp_current_filter );
+
+		$this->assertFalse( wp_has_ability_category( 'uncategorized' ) );
+		$this->assertFalse( wp_has_ability( 'core/users-query' ) );
+		$this->assertArrayNotHasKey( 'wp_page_for_privacy_policy', get_registered_settings() );
+
+		remove_filter( 'mcp_adapter_register_core_abilities', '__return_false' );
+
+		// With the switch back on, the guarded registrars restore what they manage.
+		self::ensure_core_abilities_registered();
+		$this->assertTrue( wp_has_ability_category( 'uncategorized' ) );
+		$this->assertTrue( wp_has_ability( 'core/users-query' ) );
+
+		$wp_registered_settings = $saved_settings;
 	}
 
 	public function test_privacy_policy_setting_is_registered_for_abilities(): void {

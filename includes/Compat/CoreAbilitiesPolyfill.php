@@ -119,6 +119,12 @@ final class CoreAbilitiesPolyfill {
 	 *
 	 * When every class in ABILITY_CLASSES already exists — core loads its own copies from
 	 * wp-settings.php before any plugin — there is nothing to polyfill and no hook is added.
+	 *
+	 * Excluded from coverage: it runs while the plugin loads in the test bootstrap, before
+	 * PHPUnit records coverage. CoreAbilitiesPolyfillBootstrapTest asserts the resulting
+	 * hook state on both the polyfilled and the core path in a fresh WordPress process.
+	 *
+	 * @codeCoverageIgnore
 	 */
 	public static function register_hooks(): void {
 		if ( ! self::has_missing_ability_class() ) {
@@ -139,6 +145,10 @@ final class CoreAbilitiesPolyfill {
 
 	/**
 	 * Whether at least one polyfillable core ability class is missing from this WordPress.
+	 *
+	 * Excluded from coverage with register_hooks(), its only caller.
+	 *
+	 * @codeCoverageIgnore
 	 */
 	private static function has_missing_ability_class(): bool {
 		foreach ( array_keys( self::ABILITY_CLASSES ) as $class_name ) {
@@ -235,8 +245,9 @@ final class CoreAbilitiesPolyfill {
 		}
 
 		// This WordPress (or a feature plugin's WP_Ability) supports the argument natively.
+		// Reachable only on 7.2+, which the CI matrix tests without coverage collection.
 		if ( property_exists( WP_Ability::class, 'required_capabilities' ) ) {
-			return $args;
+			return $args; // @codeCoverageIgnore
 		}
 
 		$capabilities = $args['required_capabilities'];
