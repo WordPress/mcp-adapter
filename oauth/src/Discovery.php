@@ -44,6 +44,33 @@ final class Discovery {
 	 */
 	public function register_hooks(): void {
 		add_filter( 'do_parse_request', array( $this, 'maybe_serve' ), 0 );
+		add_filter( 'rest_index', array( $this, 'add_to_rest_index' ) );
+	}
+
+	/**
+	 * Lists the server in the REST API index, as WP-API/OAuth2 does, next to
+	 * core's Application Passwords entry.
+	 *
+	 * @param \WP_REST_Response $response Index response.
+	 * @return \WP_REST_Response
+	 */
+	public function add_to_rest_index( $response ) {
+		if ( ! $response instanceof \WP_REST_Response || ! Server::is_available() ) {
+			return $response;
+		}
+
+		$data                             = $response->get_data();
+		$data['authentication']['oauth2'] = array(
+			'endpoints' => array(
+				'authorization' => Server::authorization_endpoint(),
+				'token'         => Server::token_endpoint(),
+				'revocation'    => Server::revocation_endpoint(),
+			),
+			'metadata'  => untrailingslashit( home_url( '/.well-known/oauth-authorization-server' ) ),
+		);
+		$response->set_data( $data );
+
+		return $response;
 	}
 
 	/**
@@ -90,13 +117,15 @@ final class Discovery {
 	 */
 	public function authorization_server_metadata(): array {
 		$metadata = array(
-			'issuer'                                => Server::issuer(),
-			'authorization_endpoint'                => Server::authorization_endpoint(),
-			'token_endpoint'                        => Server::token_endpoint(),
-			'response_types_supported'              => array( 'code' ),
-			'grant_types_supported'                 => array( 'authorization_code' ),
-			'code_challenge_methods_supported'      => array( 'S256' ),
-			'token_endpoint_auth_methods_supported' => array( 'none', 'client_secret_post', 'client_secret_basic' ),
+			'issuer'                                     => Server::issuer(),
+			'authorization_endpoint'                     => Server::authorization_endpoint(),
+			'token_endpoint'                             => Server::token_endpoint(),
+			'revocation_endpoint'                        => Server::revocation_endpoint(),
+			'response_types_supported'                   => array( 'code' ),
+			'grant_types_supported'                      => array( 'authorization_code' ),
+			'code_challenge_methods_supported'           => array( 'S256' ),
+			'token_endpoint_auth_methods_supported'      => array( 'none', 'client_secret_post', 'client_secret_basic' ),
+			'revocation_endpoint_auth_methods_supported' => array( 'none', 'client_secret_post', 'client_secret_basic' ),
 			'authorization_response_iss_parameter_supported' => true,
 		);
 
@@ -136,6 +165,8 @@ final class Discovery {
 	 *
 	 * Accepts the document at the origin root, with an optional path suffix as
 	 * RFC 8414 and RFC 9728 describe, and under the site's home path.
+	 * Tolerates a trailing slash, as WP-API/OAuth2 does, because some hosts
+	 * redirect extensionless paths to their trailing-slash form first.
 	 *
 	 * @return array{0: string, 1: string}|null Document name and path suffix, or null.
 	 */
@@ -144,7 +175,7 @@ final class Discovery {
 			return null;
 		}
 
-		$path = (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared against fixed paths.
+		$path = untrailingslashit( (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared against fixed paths.
 		if ( false === strpos( $path, '/.well-known/oauth-' ) ) {
 			return null;
 		}

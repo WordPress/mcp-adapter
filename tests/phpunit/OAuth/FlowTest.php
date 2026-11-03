@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Tests;
 
+use WP\OAuth\Endpoints\Token;
 use WP\OAuth\Server;
 use WP\OAuth\Tokens\AccessToken;
 
@@ -99,6 +100,30 @@ final class FlowTest extends \WP_UnitTestCase {
 
 		$this->assertWPError( $result );
 		$this->assertContains( 'oauth_server_bearer_only', $result->get_error_codes() );
+	}
+
+	public function test_revocation_deletes_the_connection_and_always_succeeds(): void {
+		$token = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data()['access_token'];
+
+		$request = new \WP_REST_Request( 'POST', '/oauth/v1/revoke' );
+		$request->set_body_params(
+			array(
+				'token'     => $token,
+				'client_id' => $this->client->get_id(),
+			)
+		);
+
+		$this->assertSame( 200, rest_do_request( $request )->get_status() );
+		$this->assertEmpty( \WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+		$this->assertSame( 200, rest_do_request( $request )->get_status(), 'Revoking again still succeeds (RFC 7009).' );
+	}
+
+	public function test_signing_in_again_beyond_the_limit_removes_the_oldest_connection(): void {
+		for ( $i = 0; $i <= Token::MAX_SESSIONS_PER_CLIENT; $i++ ) {
+			$this->assertSame( 200, $this->exchange( $this->issue_code(), self::VERIFIER )->get_status() );
+		}
+
+		$this->assertCount( Token::MAX_SESSIONS_PER_CLIENT, \WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
 	}
 
 	private function issue_code(): string {

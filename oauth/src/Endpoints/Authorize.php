@@ -21,12 +21,21 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Handles authorization requests and the consent screen.
  *
- * Runs as a wp-login.php action, so login redirects work on every permalink
- * setting and the page gets the login screen's frame protection.
+ * Runs as a wp-login.php action (as WP-API/OAuth2 does), so login redirects
+ * work on every permalink setting and the page gets the login screen's frame
+ * protection.
+ *
+ * A validated request is stored server-side while the user decides, and the
+ * consent form only carries its ID. Submitting the form consumes the stored
+ * request, so a double submission cannot mint two codes (as wp-media/mcp-oauth
+ * does with its state transient).
  */
 final class Authorize {
 
 	public const ACTION = 'oauth_authorize';
+
+	private const REQUEST_PREFIX   = 'oauth_server_request_';
+	private const REQUEST_LIFETIME = 10 * MINUTE_IN_SECONDS;
 
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas.
 	private const PARAMS = array(
@@ -89,9 +98,13 @@ final class Authorize {
 			$this->fail( __( 'Connecting applications is not available on this site.', 'mcp-adapter' ) );
 		}
 
+		if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === $_SERVER['REQUEST_METHOD'] ) {
+			$this->handle_decision();
+		}
+
 		$params = $this->read_params();
 
-		// Without a known client and redirect URI, errors cannot be sent back to the client.
+		// Check the client and redirect URI before redirecting anywhere (OAuth 2.1 section 7.5.2).
 		$client = $this->clients->get( $params['client_id'] );
 		if ( ! $client instanceof Client ) {
 			$this->fail( __( 'This application is not registered on this site.', 'mcp-adapter' ) );
@@ -100,11 +113,16 @@ final class Authorize {
 			$this->fail( __( 'This application asked to return to an address that is not registered for it.', 'mcp-adapter' ) );
 		}
 
+		// From here on, errors go back to the client.
 		if ( 'code' !== $params['response_type'] ) {
 			$this->redirect_error( $params, 'unsupported_response_type', 'Only the code response type is supported.' );
 		}
 		if ( 'S256' !== $params['code_challenge_method'] || ! Pkce::is_valid_challenge( $params['code_challenge'] ) ) {
 			$this->redirect_error( $params, 'invalid_request', 'PKCE with the S256 method is required.' );
+		}
+		if ( '' === $params['state'] ) {
+			// Required by OAuth 2.1 section 4.1.1: without it the client cannot detect CSRF.
+			$this->redirect_error( $params, 'invalid_request', 'The state parameter is required.' );
 		}
 		if ( '' !== $params['resource'] && null === $this->resources->find_by_url( $params['resource'] ) ) {
 			$this->redirect_error( $params, 'invalid_target', 'The requested resource is not served by this site.' );
@@ -120,28 +138,53 @@ final class Authorize {
 			$this->redirect_error( $params, 'access_denied', 'This user cannot authorize applications.' );
 		}
 
-		if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === $_SERVER['REQUEST_METHOD'] ) {
-			check_admin_referer( $this->nonce_action( $params ) );
+		$request_id = bin2hex( random_bytes( 16 ) );
+		set_transient( self::REQUEST_PREFIX . $request_id, array_merge( $params, array( 'user_id' => $user->ID ) ), self::REQUEST_LIFETIME );
 
-			if ( ! isset( $_POST['approve'] ) ) {
-				$this->redirect_error( $params, 'access_denied', 'The user denied the request.' );
-			}
+		$this->render_consent( $client, $user, $params, $request_id );
+		exit;
+	}
 
-			$code = $this->codes->issue(
-				array(
-					'client_id'      => $client->get_id(),
-					'redirect_uri'   => $params['redirect_uri'],
-					'code_challenge' => $params['code_challenge'],
-					'resource'       => $params['resource'],
-					'user_id'        => $user->ID,
-				)
-			);
-
-			$this->redirect( $params, array( 'code' => $code ) );
+	/**
+	 * Handles the consent form. Always ends the request.
+	 */
+	private function handle_decision(): void {
+		$request_id = isset( $_POST['request_id'] ) ? sanitize_key( wp_unslash( $_POST['request_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked below.
+		if ( 1 !== preg_match( '/^[a-f0-9]{32}$/', $request_id ) || ! is_user_logged_in() ) {
+			$this->fail( __( 'This request is not valid. Start again from the application.', 'mcp-adapter' ) );
 		}
 
-		$this->render_consent( $client, $user, $params );
-		exit;
+		check_admin_referer( self::ACTION . '_' . $request_id );
+
+		// Consume the stored request. delete_transient() only succeeds once, so a
+		// repeated submission fails here.
+		$key     = self::REQUEST_PREFIX . $request_id;
+		$pending = get_transient( $key );
+		if ( ! is_array( $pending ) || ! delete_transient( $key ) || get_current_user_id() !== (int) $pending['user_id'] ) {
+			$this->fail( __( 'This request has expired. Start again from the application.', 'mcp-adapter' ) );
+		}
+
+		// The client may have been edited or deleted while the user decided.
+		$client = $this->clients->get( (string) $pending['client_id'] );
+		if ( ! $client instanceof Client || ! $client->allows_redirect_uri( (string) $pending['redirect_uri'] ) ) {
+			$this->fail( __( 'This application is no longer registered on this site.', 'mcp-adapter' ) );
+		}
+
+		if ( ! isset( $_POST['approve'] ) ) {
+			$this->redirect_error( $pending, 'access_denied', 'The user denied the request.' );
+		}
+
+		$code = $this->codes->issue(
+			array(
+				'client_id'      => $client->get_id(),
+				'redirect_uri'   => $pending['redirect_uri'],
+				'code_challenge' => $pending['code_challenge'],
+				'resource'       => $pending['resource'],
+				'user_id'        => get_current_user_id(),
+			)
+		);
+
+		$this->redirect( $pending, array( 'code' => $code ) );
 	}
 
 	/**
@@ -150,11 +193,9 @@ final class Authorize {
 	 * @return array<string, string>
 	 */
 	private function read_params(): array {
-		$source = isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === $_SERVER['REQUEST_METHOD'] ? $_POST : $_GET; // phpcs:ignore WordPress.Security.NonceVerification -- The nonce is checked before anything changes.
-
 		$params = array();
 		foreach ( self::PARAMS as $name ) {
-			$params[ $name ] = isset( $source[ $name ] ) && is_string( $source[ $name ] ) ? trim( wp_unslash( $source[ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Values are validated, and redirect URIs must match exactly.
+			$params[ $name ] = isset( $_GET[ $name ] ) && is_string( $_GET[ $name ] ) ? trim( wp_unslash( $_GET[ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- An OAuth request from another site; values are validated, and redirect URIs must match exactly.
 		}
 
 		return $params;
@@ -167,8 +208,8 @@ final class Authorize {
 	 */
 	private function request_url( array $params ): string {
 		$present = array_filter(
-			$params,
-			static function ( string $value ): bool {
+			array_intersect_key( $params, array_flip( self::PARAMS ) ),
+			static function ( $value ): bool {
 				return '' !== $value;
 			}
 		);
@@ -177,21 +218,11 @@ final class Authorize {
 	}
 
 	/**
-	 * Builds the nonce action, bound to the request so a nonce for one
-	 * request cannot approve another.
-	 *
-	 * @param array<string, string> $params Request parameters.
-	 */
-	private function nonce_action( array $params ): string {
-		return self::ACTION . '|' . $params['client_id'] . '|' . md5( $params['redirect_uri'] . '|' . $params['code_challenge'] . '|' . $params['resource'] );
-	}
-
-	/**
 	 * Redirects back to the client with an error.
 	 *
-	 * @param array<string, string> $params      Request parameters.
-	 * @param string                $error       OAuth error code.
-	 * @param string                $description Description for the client developer.
+	 * @param array<string, mixed> $params      Request parameters.
+	 * @param string               $error       OAuth error code.
+	 * @param string               $description Description for the client developer.
 	 * @return never
 	 */
 	private function redirect_error( array $params, string $error, string $description ): void {
@@ -207,17 +238,17 @@ final class Authorize {
 	/**
 	 * Redirects back to the client.
 	 *
-	 * @param array<string, string> $params Request parameters.
+	 * @param array<string, mixed>  $params Request parameters.
 	 * @param array<string, string> $values Values to add to the redirect URI.
 	 * @return never
 	 */
 	private function redirect( array $params, array $values ): void {
-		if ( '' !== $params['state'] ) {
-			$values['state'] = $params['state'];
+		if ( '' !== (string) $params['state'] ) {
+			$values['state'] = (string) $params['state'];
 		}
 		$values['iss'] = Server::issuer();
 
-		$uri       = $params['redirect_uri'];
+		$uri       = (string) $params['redirect_uri'];
 		$separator = false === strpos( $uri, '?' ) ? '?' : '&';
 
 		// The redirect URI was checked against the client's registered URIs.
@@ -226,30 +257,44 @@ final class Authorize {
 	}
 
 	/**
-	 * Shows an error that cannot be sent back to the client.
+	 * Shows an error that cannot be sent back to the client, styled as a login screen error.
 	 *
 	 * @param string $message Message for the user.
 	 * @return never
 	 */
 	private function fail( string $message ): void {
-		wp_die( esc_html( $message ), esc_html__( 'Cannot connect application', 'mcp-adapter' ), array( 'response' => 400 ) );
+		status_header( 400 );
+		nocache_headers();
+
+		if ( ! function_exists( 'login_header' ) ) {
+			wp_die( esc_html( $message ), esc_html__( 'Cannot connect application', 'mcp-adapter' ), array( 'response' => 400 ) );
+		}
+
+		login_header( __( 'Cannot connect application', 'mcp-adapter' ), '', new \WP_Error( 'oauth_server_error', esc_html( $message ) ) );
+		login_footer();
+		exit;
 	}
 
 	/**
 	 * Renders the consent screen.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client asking for access.
-	 * @param \WP_User                 $user   Current user.
-	 * @param array<string, string>    $params Request parameters.
+	 * @param \WP\OAuth\Clients\Client $client     Client asking for access.
+	 * @param \WP_User                 $user       Current user.
+	 * @param array<string, string>    $params     Request parameters.
+	 * @param string                   $request_id Stored request ID.
 	 */
-	private function render_consent( Client $client, \WP_User $user, array $params ): void {
+	private function render_consent( Client $client, \WP_User $user, array $params, string $request_id ): void {
+		nocache_headers();
+
 		$data = array( // phpcs:ignore SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable -- Used by the template.
-			'client'        => $client,
-			'user'          => $user,
-			'params'        => $params,
-			'action_url'    => Server::authorization_endpoint(),
-			'nonce_action'  => $this->nonce_action( $params ),
-			'redirect_host' => (string) wp_parse_url( $params['redirect_uri'], PHP_URL_HOST ),
+			'client'          => $client,
+			'user'            => $user,
+			'params'          => $params,
+			'request_id'      => $request_id,
+			'action_url'      => Server::authorization_endpoint(),
+			'nonce_action'    => self::ACTION . '_' . $request_id,
+			'redirect_host'   => (string) wp_parse_url( $params['redirect_uri'], PHP_URL_HOST ),
+			'switch_user_url' => wp_login_url( $this->request_url( $params ), true ),
 		);
 
 		require dirname( __DIR__, 2 ) . '/templates/consent.php';

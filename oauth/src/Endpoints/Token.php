@@ -28,6 +28,12 @@ final class Token {
 	public const REST_ROUTE     = '/token';
 
 	/**
+	 * Most connections one user can have to one client. Signing in again
+	 * beyond this removes the oldest, as in wp-media/mcp-oauth.
+	 */
+	public const MAX_SESSIONS_PER_CLIENT = 5;
+
+	/**
 	 * Client registry.
 	 *
 	 * @var \WP\OAuth\Clients\ClientRepository
@@ -76,13 +82,14 @@ final class Token {
 	}
 
 	/**
-	 * Stops core reading client credentials sent with Basic auth as a username
-	 * and Application Password, which would fail the request before it runs.
+	 * Stops core reading client credentials sent with Basic auth to the token
+	 * and revocation endpoints as a username and Application Password, which
+	 * would fail the request before it runs.
 	 *
 	 * @param bool $is_api_request Whether Application Passwords may be used.
 	 */
 	public function skip_application_passwords( $is_api_request ): bool {
-		return self::is_token_request() ? false : (bool) $is_api_request;
+		return self::is_oauth_endpoint_request() ? false : (bool) $is_api_request;
 	}
 
 	/**
@@ -143,6 +150,8 @@ final class Token {
 			return self::error( 'invalid_grant', __( 'The user can no longer authorize applications.', 'mcp-adapter' ) );
 		}
 
+		$this->prune_sessions( $user->ID, $client->get_id() );
+
 		$created = \WP_Application_Passwords::create_new_application_password(
 			$user->ID,
 			array(
@@ -172,7 +181,7 @@ final class Token {
 	 * @param \WP_REST_Request $request Request.
 	 * @return array{0: string, 1: string, 2: bool} Client ID, secret, and whether Basic auth was used.
 	 */
-	private static function client_credentials( \WP_REST_Request $request ): array {
+	public static function client_credentials( \WP_REST_Request $request ): array {
 		$header = Bearer::get_authorization_header();
 		if ( null !== $header && 1 === preg_match( '/^Basic\s+(\S+)$/i', $header, $matches ) ) {
 			$decoded = base64_decode( $matches[1], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- HTTP Basic credentials.
@@ -203,19 +212,61 @@ final class Token {
 	}
 
 	/**
-	 * Whether the current request is for the token endpoint.
+	 * Removes the oldest connections between a user and a client so that one
+	 * more stays within the limit.
+	 *
+	 * Only Application Passwords issued to this client are touched; they are
+	 * matched by the app_id set when they were created.
+	 *
+	 * @param int    $user_id   User ID.
+	 * @param string $client_id Client ID.
 	 */
-	private static function is_token_request(): bool {
-		$route = '/' . self::REST_NAMESPACE . self::REST_ROUTE;
+	private function prune_sessions( int $user_id, string $client_id ): void {
+		/**
+		 * Filters how many connections one user can have to one client.
+		 *
+		 * @param int    $max       Maximum connections. Default 5.
+		 * @param string $client_id Client ID.
+		 */
+		$max = max( 1, (int) apply_filters( 'oauth_server_max_sessions_per_client', self::MAX_SESSIONS_PER_CLIENT, $client_id ) );
+
+		$sessions = array_values(
+			array_filter(
+				\WP_Application_Passwords::get_user_application_passwords( $user_id ),
+				static function ( $item ) use ( $client_id ): bool {
+					return isset( $item['app_id'] ) && $item['app_id'] === $client_id;
+				}
+			)
+		);
+		if ( count( $sessions ) < $max ) {
+			return;
+		}
+
+		usort(
+			$sessions,
+			static function ( $a, $b ): int {
+				return (int) $a['created'] <=> (int) $b['created'];
+			}
+		);
+
+		foreach ( array_slice( $sessions, 0, count( $sessions ) - $max + 1 ) as $item ) {
+			\WP_Application_Passwords::delete_application_password( $user_id, $item['uuid'] );
+		}
+	}
+
+	/**
+	 * Whether the current request is for one of this server's REST endpoints.
+	 */
+	private static function is_oauth_endpoint_request(): bool {
+		$prefix = '/' . self::REST_NAMESPACE . '/';
 
 		if ( isset( $_GET['rest_route'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only compared.
-			return untrailingslashit( sanitize_text_field( wp_unslash( $_GET['rest_route'] ) ) ) === $route; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only compared.
+			return 0 === strpos( '/' . ltrim( sanitize_text_field( wp_unslash( $_GET['rest_route'] ) ), '/' ), $prefix ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only compared.
 		}
 
 		$path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared.
-		$end  = '/' . rest_get_url_prefix() . $route;
 
-		return substr( untrailingslashit( $path ), -strlen( $end ) ) === $end;
+		return false !== strpos( $path, '/' . rest_get_url_prefix() . $prefix );
 	}
 
 	/**
@@ -225,7 +276,7 @@ final class Token {
 	 * @param string $description Human-readable description.
 	 * @param int    $status      HTTP status.
 	 */
-	private static function error( string $code, string $description, int $status = 400 ): \WP_REST_Response {
+	public static function error( string $code, string $description, int $status = 400 ): \WP_REST_Response {
 		return new \WP_REST_Response(
 			array(
 				'error'             => $code,
@@ -241,7 +292,7 @@ final class Token {
 	 *
 	 * @return array<string, string>
 	 */
-	private static function no_store_headers(): array {
+	public static function no_store_headers(): array {
 		return array(
 			'Cache-Control' => 'no-store',
 			'Pragma'        => 'no-cache',

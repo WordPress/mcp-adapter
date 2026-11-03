@@ -17,7 +17,9 @@ defined( 'ABSPATH' ) || exit;
  * Adds a Bearer challenge to 401 responses from protected routes.
  *
  * The challenge points clients at the protected resource metadata, which is
- * where OAuth discovery starts (RFC 9728 section 5.1).
+ * where OAuth discovery starts (RFC 9728 section 5.1). Error details are only
+ * added when a token was sent and rejected (RFC 6750 section 3), as in
+ * WP-API/OAuth2.
  */
 final class Challenge {
 
@@ -68,16 +70,31 @@ final class Challenge {
 		}
 
 		$route = $this->resources->find_by_route( $request->get_route() );
-		if ( null === $route || ! Server::is_available() ) {
+		if ( null === $route || ! Server::is_available() || isset( $response->get_headers()['WWW-Authenticate'] ) ) {
 			return $response;
 		}
 
-		$challenge = sprintf( 'Bearer resource_metadata="%s"', $this->resources->metadata_url( $route ) );
-		if ( $this->bearer->has_error() ) {
-			$challenge .= ', error="invalid_token"';
+		$params = array();
+		$error  = $this->bearer->get_error();
+		if ( null !== $error ) {
+			$params['error']             = 'invalid_token';
+			$params['error_description'] = $error->get_error_message();
+		}
+		$params['resource_metadata'] = $this->resources->metadata_url( $route );
+
+		$parts = array();
+		foreach ( $params as $key => $value ) {
+			$parts[] = sprintf( '%s="%s"', $key, addcslashes( $value, '"\\' ) );
 		}
 
-		$response->header( 'WWW-Authenticate', $challenge );
+		/**
+		 * Filters the WWW-Authenticate challenge sent with 401 responses from protected routes.
+		 *
+		 * @param string                $challenge Header value.
+		 * @param array<string, string> $params    Parameters used to build it.
+		 * @param string                $route     Protected route.
+		 */
+		$response->header( 'WWW-Authenticate', apply_filters( 'oauth_server_www_authenticate_challenge', 'Bearer ' . implode( ', ', $parts ), $params, $route ) );
 
 		return $response;
 	}

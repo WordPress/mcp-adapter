@@ -125,6 +125,13 @@ final class Bearer {
 	}
 
 	/**
+	 * Gets the error from the last attempt, if it failed.
+	 */
+	public function get_error(): ?\WP_Error {
+		return $this->error;
+	}
+
+	/**
 	 * Stops OAuth-issued Application Passwords from working with Basic auth.
 	 *
 	 * @param \WP_Error            $error Errors so far.

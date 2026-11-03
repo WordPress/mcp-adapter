@@ -118,6 +118,25 @@ final class Client {
 	}
 
 	/**
+	 * Returns a copy with a new name and redirect URIs.
+	 *
+	 * @param string   $name          Display name.
+	 * @param string[] $redirect_uris Redirect URIs.
+	 */
+	public function with_details( string $name, array $redirect_uris ): self {
+		return new self( $this->id, $name, $redirect_uris, $this->secret_hash, $this->created );
+	}
+
+	/**
+	 * Returns a copy with a new secret hash, or none to make it a public client.
+	 *
+	 * @param string|null $secret_hash Hash of the client secret, or null.
+	 */
+	public function with_secret_hash( ?string $secret_hash ): self {
+		return new self( $this->id, $this->name, $this->redirect_uris, $secret_hash, $this->created );
+	}
+
+	/**
 	 * Gets the display name.
 	 */
 	public function get_name(): string {
@@ -226,7 +245,8 @@ final class Client {
 			return in_array( $parts['host'] ?? '', self::LOOPBACK_HOSTS, true );
 		}
 
-		$blocked = array( 'javascript', 'data', 'vbscript', 'file' );
+		// Schemes that can run code, load local content, or are not app callbacks.
+		$blocked = array( 'javascript', 'data', 'vbscript', 'file', 'blob', 'about', 'ftp', 'ws', 'wss', 'mailto', 'tel' );
 
 		return ! in_array( $scheme, $blocked, true ) && 1 === preg_match( '/^[a-z][a-z0-9+.\-]*$/', $scheme );
 	}

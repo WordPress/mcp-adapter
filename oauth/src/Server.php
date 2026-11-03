@@ -10,9 +10,11 @@ declare( strict_types=1 );
 namespace WP\OAuth;
 
 use WP\OAuth\Admin\ClientsPage;
+use WP\OAuth\Admin\HealthCheck;
 use WP\OAuth\Authentication\Bearer;
 use WP\OAuth\Clients\ClientRepository;
 use WP\OAuth\Endpoints\Authorize;
+use WP\OAuth\Endpoints\Revoke;
 use WP\OAuth\Endpoints\Token;
 use WP\OAuth\Grants\AuthorizationCodes;
 
@@ -119,6 +121,13 @@ final class Server {
 	}
 
 	/**
+	 * The revocation endpoint URL.
+	 */
+	public static function revocation_endpoint(): string {
+		return rest_url( Token::REST_NAMESPACE . Revoke::REST_ROUTE );
+	}
+
+	/**
 	 * Builds the components.
 	 */
 	private function __construct() {
@@ -136,7 +145,9 @@ final class Server {
 		( new Challenge( $this->resources, $this->bearer ) )->register_hooks();
 		( new Authorize( $this->clients, $this->resources, $this->codes ) )->register_hooks();
 		( new Token( $this->clients, $this->codes ) )->register_hooks();
+		( new Revoke( $this->clients ) )->register_hooks();
 		( new ClientsPage( $this->clients ) )->register_hooks();
+		( new HealthCheck() )->register_hooks();
 		$this->bearer->register_hooks();
 	}
 
