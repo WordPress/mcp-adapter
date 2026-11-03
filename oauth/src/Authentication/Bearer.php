@@ -54,7 +54,10 @@ final class Bearer {
 	 * Registers hooks.
 	 */
 	public function register_hooks(): void {
-		add_filter( 'determine_current_user', array( $this, 'authenticate' ), 30 );
+		// Between the auth cookie (10) and the logged-in cookie (20), so an explicit
+		// bearer token wins over a logged-in cookie the browser also sent. The
+		// auth cookie is only sent to wp-admin, so it does not affect REST requests.
+		add_filter( 'determine_current_user', array( $this, 'authenticate' ), 15 );
 		add_filter( 'rest_authentication_errors', array( $this, 'report' ), 85 );
 		add_action( 'wp_authenticate_application_password_errors', array( $this, 'block_basic_auth' ), 10, 3 );
 	}
