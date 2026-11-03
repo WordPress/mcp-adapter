@@ -76,6 +76,34 @@ final class Plugin {
 		$this->constants();
 
 		McpAdapter::instance();
+
+		// Tell the bundled OAuth server (oauth/) which routes to protect.
+		add_filter( 'oauth_server_protected_resources', array( self::class, 'add_oauth_protected_resources' ) );
+	}
+
+	/**
+	 * Adds every MCP server route to the OAuth server's protected resources.
+	 *
+	 * MCP servers are only created on rest_api_init, so this starts the REST
+	 * server when called outside a REST request, such as for discovery documents.
+	 *
+	 * @param mixed $routes Protected REST routes.
+	 * @return mixed
+	 */
+	public static function add_oauth_protected_resources( $routes ) {
+		if ( ! is_array( $routes ) ) {
+			return $routes;
+		}
+
+		if ( ! did_action( 'rest_api_init' ) ) {
+			rest_get_server();
+		}
+
+		foreach ( McpAdapter::instance()->get_servers() as $server ) {
+			$routes[] = '/' . $server->get_server_route_namespace() . '/' . $server->get_server_route();
+		}
+
+		return $routes;
 	}
 
 	/**

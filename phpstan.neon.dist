@@ -26,6 +26,7 @@ parameters:
 	paths:
 		- mcp-adapter.php
 		- includes/
+		- oauth/
 	excludePaths:
 		analyse:
 			- vendor/

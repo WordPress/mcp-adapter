@@ -8,6 +8,7 @@
 
 	<!-- What to scan: include any root-level PHP files and any folders that contain PHP -->
 	<file>./includes/</file>
+	<file>./oauth/</file>
 	<file>./mcp-adapter.php</file>
 
 	<!-- These are excluded from the above paths.-->
@@ -187,6 +188,8 @@
 				<element value="mcp_adapter" /><!-- Function and variable prefix -->
 				<element value="WP\MCP" /><!-- Namespace -->
 				<element value="WP_MCP_" /><!-- Class constant prefix -->
+				<element value="oauth_server" /><!-- OAuth server function, hook, and variable prefix -->
+				<element value="WP\OAuth" /><!-- OAuth server namespace -->
 			</property>
 		</properties>
 	</rule>

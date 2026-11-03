@@ -12,6 +12,7 @@
 	},
 	"files": [
 		"includes",
+		"oauth",
 		"vendor",
 		"composer.json",
 		"LICENSE.md",
