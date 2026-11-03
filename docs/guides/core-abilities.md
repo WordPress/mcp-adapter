@@ -45,7 +45,7 @@ add_action(
 	static function () {
 		wp_unregister_ability( 'core/users-query' );
 	},
-	200 // After core (10) and the polyfill (100).
+	200 // After core (10) and the polyfill (20).
 );
 ```
 
