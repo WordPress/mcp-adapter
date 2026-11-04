@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Clients;
 
+use WP_Error;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -16,11 +18,16 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Client {
 
+	/**
+	 * Hosts treated as loopback: core's list in
+	 * wp_is_authorize_application_redirect_url_valid(), plus localhost, which
+	 * desktop MCP clients use for their callback.
+	 */
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas.
 	private const LOOPBACK_HOSTS = array(
 		'127.0.0.1',
-		'localhost',
 		'[::1]',
+		'localhost',
 	);
 
 	/**
@@ -152,14 +159,8 @@ final class Client {
 	private static function is_loopback_match( string $registered, string $provided ): bool {
 		$a = wp_parse_url( $registered );
 		$b = wp_parse_url( $provided );
-		if ( ! is_array( $a ) || ! is_array( $b ) ) {
+		if ( ! is_array( $a ) || ! is_array( $b ) || ! self::is_http_loopback( $a ) || ! self::is_http_loopback( $b ) ) {
 			return false;
-		}
-
-		foreach ( array( $a, $b ) as $parts ) {
-			if ( 'http' !== ( $parts['scheme'] ?? '' ) || ! in_array( $parts['host'] ?? '', self::LOOPBACK_HOSTS, true ) ) {
-				return false;
-			}
 		}
 
 		return ( $a['host'] ?? '' ) === ( $b['host'] ?? '' )
@@ -169,31 +170,41 @@ final class Client {
 	}
 
 	/**
-	 * Whether a URI is acceptable to register as a redirect URI.
+	 * Checks a URI before it is registered as a redirect URI.
 	 *
-	 * Allows HTTPS, HTTP on loopback hosts, and private-use schemes for native
-	 * apps. Fragments are not allowed (RFC 6749 section 3.1.2).
+	 * Uses core's check for Application Password redirect URLs, so the rules
+	 * and the wp_authorize_application_redirect_url_invalid_protocols filter
+	 * match core's own authorization flow. On top of that it allows HTTP on
+	 * localhost, which core only allows on local sites, and rejects fragments
+	 * (RFC 6749 section 3.1.2).
 	 *
 	 * @param string $uri URI to check.
+	 * @return true|WP_Error True if the URI can be registered, or the reason it cannot.
 	 */
-	public static function is_valid_redirect_uri( string $uri ): bool {
+	public static function validate_redirect_uri( string $uri ) {
+		if ( '' === $uri || false !== strpos( $uri, '#' ) ) {
+			return new WP_Error( 'oauth_server_redirect_uri', __( 'Redirect URIs must be absolute and cannot contain a fragment.', 'mcp-adapter' ) );
+		}
+
 		$parts = wp_parse_url( $uri );
-		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || isset( $parts['fragment'] ) ) {
-			return false;
+		if ( is_array( $parts ) && self::is_http_loopback( $parts ) ) {
+			return true;
 		}
 
-		$scheme = strtolower( $parts['scheme'] );
-		if ( 'https' === $scheme ) {
-			return ! empty( $parts['host'] );
+		if ( ! function_exists( 'wp_is_authorize_application_redirect_url_valid' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/user.php';
 		}
 
-		if ( 'http' === $scheme ) {
-			return in_array( $parts['host'] ?? '', self::LOOPBACK_HOSTS, true );
-		}
+		return wp_is_authorize_application_redirect_url_valid( $uri );
+	}
 
-		// Schemes that can run code, load local content, or are not app callbacks.
-		$blocked = array( 'javascript', 'data', 'vbscript', 'file', 'blob', 'about', 'ftp', 'ws', 'wss', 'mailto', 'tel' );
-
-		return ! in_array( $scheme, $blocked, true ) && 1 === preg_match( '/^[a-z][a-z0-9+.\-]*$/', $scheme );
+	/**
+	 * Whether parsed URL parts are plain HTTP to a loopback host.
+	 *
+	 * @param array<string, mixed> $parts Parts from wp_parse_url().
+	 */
+	private static function is_http_loopback( array $parts ): bool {
+		return 'http' === strtolower( (string) ( $parts['scheme'] ?? '' ) )
+			&& in_array( strtolower( (string) ( $parts['host'] ?? '' ) ), self::LOOPBACK_HOSTS, true );
 	}
 }

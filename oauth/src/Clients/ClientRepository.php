@@ -301,11 +301,12 @@ final class ClientRepository {
 		}
 
 		foreach ( $redirect_uris as $uri ) {
-			if ( ! Client::is_valid_redirect_uri( $uri ) ) {
+			$valid = Client::validate_redirect_uri( $uri );
+			if ( is_wp_error( $valid ) ) {
 				return new WP_Error(
 					'oauth_server_client_redirect',
-					/* translators: %s: redirect URI. */
-					sprintf( __( '%s is not a valid redirect URI. Use HTTPS, HTTP on localhost, or an app-specific scheme.', 'mcp-adapter' ), $uri )
+					/* translators: 1: redirect URI, 2: reason it was rejected. */
+					sprintf( __( '%1$s is not a valid redirect URI. %2$s', 'mcp-adapter' ), $uri, $valid->get_error_message() )
 				);
 			}
 		}
