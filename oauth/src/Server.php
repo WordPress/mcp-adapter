@@ -1,6 +1,6 @@
 <?php
 /**
- * OAuth server bootstrap.
+ * OAuth server setup.
  *
  * @package WP\OAuth
  */
@@ -26,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
 final class Server {
 
 	/**
-	 * The running server, if booted.
+	 * The running server, once initialized.
 	 *
 	 * @var self|null
 	 */
@@ -63,7 +63,7 @@ final class Server {
 	/**
 	 * Starts the server unless it has been disabled.
 	 */
-	public static function boot(): void {
+	public static function init(): void {
 		if ( null !== self::$instance ) {
 			return;
 		}

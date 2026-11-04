@@ -40,4 +40,4 @@ spl_autoload_register(
 	}
 );
 
-add_action( 'plugins_loaded', array( Server::class, 'boot' ) );
+add_action( 'plugins_loaded', array( Server::class, 'init' ) );

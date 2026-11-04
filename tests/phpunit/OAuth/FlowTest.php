@@ -47,7 +47,7 @@ final class FlowTest extends WP_UnitTestCase {
 		$_SERVER['REQUEST_URI'] = '/wp-json/mcp/mcp-adapter-default-server';
 
 		$server = Server::instance();
-		$this->assertNotNull( $server, 'The OAuth server should boot with the plugin.' );
+		$this->assertNotNull( $server, 'The OAuth server should start with the plugin.' );
 		$this->server = $server;
 
 		$this->user = self::factory()->user->create_and_get( array( 'role' => 'editor' ) );
