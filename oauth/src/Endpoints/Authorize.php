@@ -54,30 +54,30 @@ final class Authorize {
 	/**
 	 * Client registry.
 	 *
-	 * @var \WP\OAuth\Clients\ClientRepository
+	 * @var ClientRepository
 	 */
 	private $clients;
 
 	/**
 	 * Protected resource registry.
 	 *
-	 * @var \WP\OAuth\ProtectedResources
+	 * @var ProtectedResources
 	 */
 	private $resources;
 
 	/**
 	 * Authorization code store.
 	 *
-	 * @var \WP\OAuth\Grants\AuthorizationCodes
+	 * @var AuthorizationCodes
 	 */
 	private $codes;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\Clients\ClientRepository  $clients   Client registry.
-	 * @param \WP\OAuth\ProtectedResources        $resources Protected resource registry.
-	 * @param \WP\OAuth\Grants\AuthorizationCodes $codes     Authorization code store.
+	 * @param ClientRepository  $clients   Client registry.
+	 * @param ProtectedResources        $resources Protected resource registry.
+	 * @param AuthorizationCodes $codes     Authorization code store.
 	 */
 	public function __construct( ClientRepository $clients, ProtectedResources $resources, AuthorizationCodes $codes ) {
 		$this->clients   = $clients;
@@ -269,8 +269,8 @@ final class Authorize {
 	/**
 	 * Renders the consent screen.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client     Client asking for access.
-	 * @param \WP_User                 $user       Current user.
+	 * @param Client $client     Client asking for access.
+	 * @param WP_User                 $user       Current user.
 	 * @param array<string, string>    $params     Request parameters.
 	 * @param string                   $request_id Stored request ID.
 	 */

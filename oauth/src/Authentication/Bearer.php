@@ -26,14 +26,14 @@ final class Bearer {
 	/**
 	 * Client registry.
 	 *
-	 * @var \WP\OAuth\Clients\ClientRepository
+	 * @var ClientRepository
 	 */
 	private $clients;
 
 	/**
 	 * Error from the last attempt, if it failed.
 	 *
-	 * @var \WP_Error|null
+	 * @var WP_Error|null
 	 */
 	private $error = null;
 
@@ -58,7 +58,7 @@ final class Bearer {
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\Clients\ClientRepository $clients Client registry.
+	 * @param ClientRepository $clients Client registry.
 	 */
 	public function __construct( ClientRepository $clients ) {
 		$this->clients = $clients;
@@ -122,8 +122,8 @@ final class Bearer {
 	/**
 	 * Reports the result to the REST API.
 	 *
-	 * @param \WP_Error|true|null $result Result from earlier authentication methods.
-	 * @return \WP_Error|true|null
+	 * @param WP_Error|true|null $result Result from earlier authentication methods.
+	 * @return WP_Error|true|null
 	 */
 	public function report( $result ) {
 		if ( ! empty( $result ) ) {
@@ -154,8 +154,8 @@ final class Bearer {
 	/**
 	 * Stops OAuth-issued Application Passwords from working with Basic auth.
 	 *
-	 * @param \WP_Error            $error Errors so far.
-	 * @param \WP_User             $user  User being authenticated.
+	 * @param WP_Error            $error Errors so far.
+	 * @param WP_User             $user  User being authenticated.
 	 * @param array<string, mixed> $item  Application Password details.
 	 */
 	public function block_basic_auth( $error, $user, $item ): void {
@@ -174,7 +174,7 @@ final class Bearer {
 	 * Validates a token.
 	 *
 	 * @param string $token Token.
-	 * @return array{0: \WP_User, 1: array<string, mixed>}|\WP_Error The user and Application Password, or an error.
+	 * @return array{0: WP_User, 1: array<string, mixed>}|WP_Error The user and Application Password, or an error.
 	 */
 	private function validate( string $token ) {
 		$invalid = new WP_Error(

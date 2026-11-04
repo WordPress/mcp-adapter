@@ -35,28 +35,28 @@ final class Server {
 	/**
 	 * Client registry.
 	 *
-	 * @var \WP\OAuth\Clients\ClientRepository
+	 * @var ClientRepository
 	 */
 	private $clients;
 
 	/**
 	 * Protected resource registry.
 	 *
-	 * @var \WP\OAuth\ProtectedResources
+	 * @var ProtectedResources
 	 */
 	private $resources;
 
 	/**
 	 * Authorization code store.
 	 *
-	 * @var \WP\OAuth\Grants\AuthorizationCodes
+	 * @var AuthorizationCodes
 	 */
 	private $codes;
 
 	/**
 	 * Bearer token authentication.
 	 *
-	 * @var \WP\OAuth\Authentication\Bearer
+	 * @var Bearer
 	 */
 	private $bearer;
 

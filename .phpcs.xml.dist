@@ -148,8 +148,16 @@
 				<element value="@phpstan-var" />
 			</property>
 		</properties>
+		<!-- The OAuth server references imported classes by their short names in docblocks. -->
+		<exclude-pattern>oauth/*</exclude-pattern>
+		<exclude-pattern>tests/phpunit/OAuth/*</exclude-pattern>
 	</rule>
-	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses" />
+	<rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+		<properties>
+			<!-- Count docblock references, so imports used only in annotations are kept. -->
+			<property name="searchAnnotations" value="true" />
+		</properties>
+	</rule>
 	<rule ref="SlevomatCodingStandard.Namespaces.UseDoesNotStartWithBackslash" />
 	<rule ref="SlevomatCodingStandard.Namespaces.UseFromSameNamespace" />
 

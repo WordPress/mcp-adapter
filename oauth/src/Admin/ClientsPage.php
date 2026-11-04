@@ -33,14 +33,14 @@ final class ClientsPage {
 	/**
 	 * Client registry.
 	 *
-	 * @var \WP\OAuth\Clients\ClientRepository
+	 * @var ClientRepository
 	 */
 	private $clients;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\Clients\ClientRepository $clients Client registry.
+	 * @param ClientRepository $clients Client registry.
 	 */
 	public function __construct( ClientRepository $clients ) {
 		$this->clients = $clients;
@@ -271,7 +271,7 @@ final class ClientsPage {
 	/**
 	 * Renders the edit screen for a client.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client.
+	 * @param Client $client Client.
 	 */
 	private function render_edit( Client $client ): void {
 		$post_url = admin_url( 'admin-post.php' );
@@ -321,7 +321,7 @@ final class ClientsPage {
 	/**
 	 * Renders the name and redirect URI fields.
 	 *
-	 * @param \WP\OAuth\Clients\Client|null $client Client being edited, or null when adding.
+	 * @param Client|null $client Client being edited, or null when adding.
 	 */
 	private function render_detail_fields( ?Client $client ): void {
 		?>
@@ -345,7 +345,7 @@ final class ClientsPage {
 	/**
 	 * Renders a button that generates or removes a client secret.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client.
+	 * @param Client $client Client.
 	 * @param string                   $mode   'new' or 'remove'.
 	 * @param string                   $label  Button label.
 	 */
@@ -367,7 +367,7 @@ final class ClientsPage {
 	/**
 	 * Renders a delete button.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client.
+	 * @param Client $client Client.
 	 * @param bool                     $link   Whether to style it as a link.
 	 */
 	private function render_delete_button( Client $client, bool $link ): void {
@@ -387,7 +387,7 @@ final class ClientsPage {
 	 * Renders a one-time notice.
 	 *
 	 * @param array<string, string|null>    $notice Notice data.
-	 * @param \WP\OAuth\Clients\Client|null $client Client being shown, if any.
+	 * @param Client|null $client Client being shown, if any.
 	 */
 	private function render_notice( array $notice, ?Client $client ): void {
 		if ( ! empty( $notice['error'] ) ) {
@@ -452,7 +452,7 @@ final class ClientsPage {
 	/**
 	 * Gets a client's edit URL.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client.
+	 * @param Client $client Client.
 	 */
 	private function edit_url( Client $client ): string {
 		return add_query_arg( 'client', rawurlencode( $client->get_id() ), $this->page_url() );

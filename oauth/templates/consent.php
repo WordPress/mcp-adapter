@@ -4,10 +4,12 @@
  *
  * @package WP\OAuth
  *
- * @var array{client: \WP\OAuth\Clients\Client, user: \WP_User, params: array<string, string>, request_id: string, action_url: string, nonce_action: string, redirect_host: string, switch_user_url: string} $data
+ * @var array{client: Client, user: WP_User, params: array<string, string>, request_id: string, action_url: string, nonce_action: string, redirect_host: string, switch_user_url: string} $data
  */
 
 declare( strict_types=1 );
+
+use WP\OAuth\Clients\Client;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -77,8 +79,8 @@ login_header(
 	 *
 	 * Use it to add fields, such as options that limit what the application can do.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client asking for access.
-	 * @param \WP_User                 $user   Current user.
+	 * @param Client $client Client asking for access.
+	 * @param WP_User                 $user   Current user.
 	 * @param array<string, string>    $params Authorization request parameters.
 	 */
 	do_action( 'oauth_server_consent_form', $data['client'], $data['user'], $data['params'] );

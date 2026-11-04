@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Tests;
 
+use WP\OAuth\Clients\Client;
 use WP\OAuth\Clients\ClientRepository;
 use WP\OAuth\Endpoints\Token;
 use WP\OAuth\Server;
@@ -17,6 +18,7 @@ use WP_Application_Passwords;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_UnitTestCase;
+use WP_User;
 
 /**
  * Covers the token endpoint, bearer authentication, and revocation.
@@ -27,17 +29,17 @@ final class FlowTest extends WP_UnitTestCase {
 	private const REDIRECT_URI = 'https://client.example/callback';
 
 	/**
-	 * @var \WP\OAuth\Server
+	 * @var Server
 	 */
 	private $server;
 
 	/**
-	 * @var \WP_User
+	 * @var WP_User
 	 */
 	private $user;
 
 	/**
-	 * @var \WP\OAuth\Clients\Client
+	 * @var Client
 	 */
 	private $client;
 

@@ -33,14 +33,14 @@ final class Revoke {
 	/**
 	 * Client registry.
 	 *
-	 * @var \WP\OAuth\Clients\ClientRepository
+	 * @var ClientRepository
 	 */
 	private $clients;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\Clients\ClientRepository $clients Client registry.
+	 * @param ClientRepository $clients Client registry.
 	 */
 	public function __construct( ClientRepository $clients ) {
 		$this->clients = $clients;
@@ -71,7 +71,7 @@ final class Revoke {
 	/**
 	 * Handles a revocation request.
 	 *
-	 * @param \WP_REST_Request $request Request.
+	 * @param WP_REST_Request $request Request.
 	 */
 	public function handle( WP_REST_Request $request ): WP_REST_Response {
 		$token = (string) $request->get_param( 'token' );

@@ -81,7 +81,7 @@ final class ClientRepository {
 	/**
 	 * Gets all clients, oldest first.
 	 *
-	 * @return array<string, \WP\OAuth\Clients\Client> Clients keyed by client ID.
+	 * @return array<string, Client> Clients keyed by client ID.
 	 */
 	public function all(): array {
 		$posts = ( new WP_Query() )->query(
@@ -129,7 +129,7 @@ final class ClientRepository {
 	 * @param string   $name          Display name.
 	 * @param string[] $redirect_uris Redirect URIs.
 	 * @param bool     $confidential  Whether the client gets a secret.
-	 * @return array{0: \WP\OAuth\Clients\Client, 1: string|null}|\WP_Error The client and its plain-text secret, or an error.
+	 * @return array{0: Client, 1: string|null}|WP_Error The client and its plain-text secret, or an error.
 	 */
 	public function create( string $name, array $redirect_uris, bool $confidential ) {
 		$details = self::validate_details( $name, $redirect_uris );
@@ -172,7 +172,7 @@ final class ClientRepository {
 	 * @param string   $id            Client ID.
 	 * @param string   $name          Display name.
 	 * @param string[] $redirect_uris Redirect URIs.
-	 * @return \WP\OAuth\Clients\Client|\WP_Error The updated client, or an error.
+	 * @return Client|WP_Error The updated client, or an error.
 	 */
 	public function update( string $id, string $name, array $redirect_uris ) {
 		$post = self::find_post( $id );
@@ -207,7 +207,7 @@ final class ClientRepository {
 	 *
 	 * @param string $id           Client ID.
 	 * @param bool   $confidential True to generate a new secret, false to make the client public.
-	 * @return array{0: \WP\OAuth\Clients\Client, 1: string|null}|\WP_Error The client and its plain-text secret, or an error.
+	 * @return array{0: Client, 1: string|null}|WP_Error The client and its plain-text secret, or an error.
 	 */
 	public function reset_secret( string $id, bool $confidential ) {
 		$post = self::find_post( $id );
@@ -262,8 +262,8 @@ final class ClientRepository {
 	/**
 	 * Builds a client from its post.
 	 *
-	 * @param \WP_Post $post Client post.
-	 * @return \WP\OAuth\Clients\Client|null The client, or null if the post is malformed.
+	 * @param WP_Post $post Client post.
+	 * @return Client|null The client, or null if the post is malformed.
 	 */
 	private static function to_client( WP_Post $post ): ?Client {
 		$redirect_uris = get_post_meta( $post->ID, self::REDIRECT_URIS_KEY, true );
@@ -287,7 +287,7 @@ final class ClientRepository {
 	 *
 	 * @param string   $name          Display name.
 	 * @param string[] $redirect_uris Redirect URIs.
-	 * @return array{0: string, 1: string[]}|\WP_Error The cleaned name and URIs, or an error.
+	 * @return array{0: string, 1: string[]}|WP_Error The cleaned name and URIs, or an error.
 	 */
 	private static function validate_details( string $name, array $redirect_uris ) {
 		$name = sanitize_text_field( $name );

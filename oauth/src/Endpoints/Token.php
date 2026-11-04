@@ -40,22 +40,22 @@ final class Token {
 	/**
 	 * Client registry.
 	 *
-	 * @var \WP\OAuth\Clients\ClientRepository
+	 * @var ClientRepository
 	 */
 	private $clients;
 
 	/**
 	 * Authorization code store.
 	 *
-	 * @var \WP\OAuth\Grants\AuthorizationCodes
+	 * @var AuthorizationCodes
 	 */
 	private $codes;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\Clients\ClientRepository  $clients Client registry.
-	 * @param \WP\OAuth\Grants\AuthorizationCodes $codes   Authorization code store.
+	 * @param ClientRepository  $clients Client registry.
+	 * @param AuthorizationCodes $codes   Authorization code store.
 	 */
 	public function __construct( ClientRepository $clients, AuthorizationCodes $codes ) {
 		$this->clients = $clients;
@@ -99,7 +99,7 @@ final class Token {
 	/**
 	 * Handles a token request.
 	 *
-	 * @param \WP_REST_Request $request Request.
+	 * @param WP_REST_Request $request Request.
 	 */
 	public function handle( WP_REST_Request $request ): WP_REST_Response {
 		if ( ! Server::is_available() ) {
@@ -184,7 +184,7 @@ final class Token {
 	/**
 	 * Reads client credentials from Basic auth or the request body.
 	 *
-	 * @param \WP_REST_Request $request Request.
+	 * @param WP_REST_Request $request Request.
 	 * @return array{0: string, 1: string, 2: bool} Client ID, secret, and whether Basic auth was used.
 	 */
 	public static function client_credentials( WP_REST_Request $request ): array {

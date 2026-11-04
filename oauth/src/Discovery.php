@@ -28,14 +28,14 @@ final class Discovery {
 	/**
 	 * Protected resource registry.
 	 *
-	 * @var \WP\OAuth\ProtectedResources
+	 * @var ProtectedResources
 	 */
 	private $resources;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\ProtectedResources $resources Protected resource registry.
+	 * @param ProtectedResources $resources Protected resource registry.
 	 */
 	public function __construct( ProtectedResources $resources ) {
 		$this->resources = $resources;
@@ -53,8 +53,8 @@ final class Discovery {
 	 * Lists the server in the REST API index, as WP-API/OAuth2 does, next to
 	 * core's Application Passwords entry.
 	 *
-	 * @param \WP_REST_Response $response Index response.
-	 * @return \WP_REST_Response
+	 * @param WP_REST_Response $response Index response.
+	 * @return WP_REST_Response
 	 */
 	public function add_to_rest_index( $response ) {
 		if ( ! $response instanceof WP_REST_Response || ! Server::is_available() ) {

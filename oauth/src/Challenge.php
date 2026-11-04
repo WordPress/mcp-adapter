@@ -12,6 +12,7 @@ namespace WP\OAuth;
 use WP\OAuth\Authentication\Bearer;
 use WP_REST_Request;
 use WP_REST_Response;
+use WP_REST_Server;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -28,22 +29,22 @@ final class Challenge {
 	/**
 	 * Protected resource registry.
 	 *
-	 * @var \WP\OAuth\ProtectedResources
+	 * @var ProtectedResources
 	 */
 	private $resources;
 
 	/**
 	 * Bearer token authentication.
 	 *
-	 * @var \WP\OAuth\Authentication\Bearer
+	 * @var Bearer
 	 */
 	private $bearer;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param \WP\OAuth\ProtectedResources    $resources Protected resource registry.
-	 * @param \WP\OAuth\Authentication\Bearer $bearer    Bearer token authentication.
+	 * @param ProtectedResources    $resources Protected resource registry.
+	 * @param Bearer $bearer    Bearer token authentication.
 	 */
 	public function __construct( ProtectedResources $resources, Bearer $bearer ) {
 		$this->resources = $resources;
@@ -62,8 +63,8 @@ final class Challenge {
 	 * Adds the challenge header to 401 responses from protected routes.
 	 *
 	 * @param mixed            $response Response.
-	 * @param \WP_REST_Server  $server   REST server.
-	 * @param \WP_REST_Request $request  Request.
+	 * @param WP_REST_Server  $server   REST server.
+	 * @param WP_REST_Request $request  Request.
 	 * @return mixed
 	 */
 	public function add_challenge( $response, $server, $request ) {

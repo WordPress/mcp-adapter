@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\OAuth\Admin;
 
 use WP\OAuth\Server;
+use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -117,7 +118,7 @@ final class HealthCheck {
 	/**
 	 * Builds a Site Health result.
 	 *
-	 * @param array<string, mixed>|\WP_Error $response HTTP response.
+	 * @param array<string, mixed>|WP_Error $response HTTP response.
 	 * @param string                         $name     Header name.
 	 */
 	private static function has_header( $response, string $name ): bool {
