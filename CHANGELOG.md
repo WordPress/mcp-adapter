@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- An OAuth 2.1 sign-in lets web clients such as claude.ai connect without an Application Password. Administrators register clients under **Settings > OAuth Clients**; users approve each connection on a consent screen, and it is stored as an Application Password they can revoke. The flow uses authorization codes with required PKCE (S256), RFC 8414 and RFC 9728 discovery, and RFC 7009 revocation. It ships as a self-contained module in `oauth/` (namespace `WP\OAuth`), runs only from the standalone plugin, and can be turned off with the `oauth_server_enabled` filter. A Site Health check reports when the web server does not pass `/.well-known/` requests to WordPress.
+- Browser-based MCP clients on other origins can send the `Mcp-Session-Id` and `MCP-Protocol-Version` headers to MCP routes and read `Mcp-Session-Id` from responses.
+
 ## [0.7.1] - 2026-10-15
 
 ### Added
