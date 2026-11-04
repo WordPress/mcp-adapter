@@ -210,6 +210,68 @@ final class FlowTest extends WP_UnitTestCase {
 		$this->assertSame( 200, rest_do_request( $request )->get_status(), 'Revoking again still succeeds (RFC 7009).' );
 	}
 
+	public function test_public_client_can_revoke_without_naming_itself(): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$this->assertSame( 200, $this->revoke( array( 'token' => $token ) )->get_status() );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_confidential_client_must_authenticate_to_revoke(): void {
+		[ $client, $secret ] = $this->server->clients()->create( 'Confidential Client', array( self::REDIRECT_URI ), true );
+		$token               = $this->exchange( $this->issue_code( $this->user->ID, $client ), self::VERIFIER, $client, $secret )->get_data()['access_token'];
+
+		// Leaving out client_id does not skip authentication: the token's own client is used.
+		$this->assertSame( 401, $this->revoke( array( 'token' => $token ) )->get_status() );
+		$this->assertSame(
+			401,
+			$this->revoke(
+				array(
+					'token'         => $token,
+					'client_id'     => $client->get_id(),
+					'client_secret' => 'wrong',
+				)
+			)->get_status()
+		);
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+
+		$response = $this->revoke(
+			array(
+				'token'         => $token,
+				'client_id'     => $client->get_id(),
+				'client_secret' => $secret,
+			)
+		);
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_revocation_rejects_unknown_clients_and_other_clients_tokens(): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+		$other = $this->server->clients()->create( 'Other Client', array( self::REDIRECT_URI ), false )[0];
+
+		$unknown = $this->revoke(
+			array(
+				'token'     => $token,
+				'client_id' => wp_generate_uuid4(),
+			)
+		);
+		$this->assertSame( 401, $unknown->get_status() );
+		$this->assertSame( 'invalid_client', $unknown->get_data()['error'] );
+
+		// Another client gets a 200, as RFC 7009 requires, but the token is untouched.
+		$this->assertSame(
+			200,
+			$this->revoke(
+				array(
+					'token'     => $token,
+					'client_id' => $other->get_id(),
+				)
+			)->get_status()
+		);
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
 	public function test_deleting_a_client_removes_its_connections_for_every_user(): void {
 		$other_user   = self::factory()->user->create_and_get( array( 'role' => 'author' ) );
 		$other_client = $this->server->clients()->create( 'Other Client', array( self::REDIRECT_URI ), false )[0];
@@ -260,17 +322,30 @@ final class FlowTest extends WP_UnitTestCase {
 		);
 	}
 
-	private function exchange( string $code, string $verifier = self::VERIFIER, ?Client $client = null ): WP_REST_Response {
+	private function exchange( string $code, string $verifier = self::VERIFIER, ?Client $client = null, ?string $secret = null ): WP_REST_Response {
 		$request = new WP_REST_Request( 'POST', '/oauth/v1/token' );
 		$request->set_body_params(
 			array(
 				'grant_type'    => 'authorization_code',
 				'code'          => $code,
 				'client_id'     => ( $client ?? $this->client )->get_id(),
+				'client_secret' => (string) $secret,
 				'redirect_uri'  => self::REDIRECT_URI,
 				'code_verifier' => $verifier,
 			)
 		);
+
+		return rest_do_request( $request );
+	}
+
+	/**
+	 * Sends a revocation request.
+	 *
+	 * @param array<string, string> $params Body parameters.
+	 */
+	private function revoke( array $params ): WP_REST_Response {
+		$request = new WP_REST_Request( 'POST', '/oauth/v1/revoke' );
+		$request->set_body_params( $params );
 
 		return rest_do_request( $request );
 	}

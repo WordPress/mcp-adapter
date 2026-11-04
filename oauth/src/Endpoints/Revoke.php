@@ -79,28 +79,31 @@ final class Revoke {
 			return Token::error( 'invalid_request', __( 'The token parameter is required.', 'mcp-adapter' ) );
 		}
 
-		[ $client_id, $client_secret ] = Token::client_credentials( $request );
+		[ $client_id, $client_secret, $used_basic ] = Token::client_credentials( $request );
 
-		// Confidential clients must authenticate (RFC 7009 section 2.1).
-		$client = '' === $client_id ? null : $this->clients->get( $client_id );
-		if ( null !== $client && $client->is_confidential() && ! $client->verify_secret( $client_secret ) ) {
-			return Token::error( 'invalid_client', __( 'Client authentication failed.', 'mcp-adapter' ), 401 );
+		// Find the token's Application Password and the client it was issued to.
+		$parts        = Server::is_available() ? AccessToken::decode( $token ) : null;
+		$item         = null === $parts ? null : WP_Application_Passwords::get_user_application_password( $parts['user_id'], $parts['uuid'] );
+		$token_client = is_array( $item ) && WP_Application_Passwords::check_password( $parts['password'], $item['password'] )
+			? $this->clients->get( (string) $item['app_id'] )
+			: null;
+
+		// The client asking is the one named, or else the one the token was issued
+		// to. Confidential clients must authenticate either way (RFC 7009 section 2.1).
+		$client = '' === $client_id ? $token_client : $this->clients->get( $client_id );
+		if ( ( '' !== $client_id && null === $client ) || ( null !== $client && $client->is_confidential() && ! $client->verify_secret( $client_secret ) ) ) {
+			$response = Token::error( 'invalid_client', __( 'Client authentication failed.', 'mcp-adapter' ), 401 );
+			if ( $used_basic ) {
+				$response->header( 'WWW-Authenticate', 'Basic realm="oauth"' );
+			}
+
+			return $response;
 		}
 
-		$parts = AccessToken::decode( $token );
-
-		if ( null !== $parts && Server::is_available() ) {
-			$item = WP_Application_Passwords::get_user_application_password( $parts['user_id'], $parts['uuid'] );
-
-			// Only revoke for whoever holds the token, and only if it belongs to the
-			// calling client when one is named (RFC 7009 section 2.1).
-			$holds_token = is_array( $item ) && WP_Application_Passwords::check_password( $parts['password'], $item['password'] );
-			$is_oauth    = $holds_token && null !== $this->clients->get( (string) $item['app_id'] );
-			$same_client = '' === $client_id || ( $holds_token && hash_equals( (string) $item['app_id'], $client_id ) );
-
-			if ( $is_oauth && $same_client ) {
-				WP_Application_Passwords::delete_application_password( $parts['user_id'], $parts['uuid'] );
-			}
+		// Only revoke a token issued to the client asking. Unknown, invalid, and
+		// already-revoked tokens still get a 200 (RFC 7009 section 2.2).
+		if ( null !== $token_client && null !== $client && $token_client->get_id() === $client->get_id() ) {
+			WP_Application_Passwords::delete_application_password( $parts['user_id'], $parts['uuid'] );
 		}
 
 		return new WP_REST_Response( new stdClass(), 200, array_filter( wp_get_nocache_headers() ) );
