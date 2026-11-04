@@ -113,6 +113,92 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 	}
 
 	/**
+	 * An `mcp.type` the adapter does not recognise is not discovered as a tool.
+	 *
+	 * The default server already compares the raw type, so such an ability is
+	 * not in its tool list; discovery must agree with it rather than coerce
+	 * the unknown value to `tool`.
+	 *
+	 * @dataProvider data_mcp_type_discovery
+	 *
+	 * @param array<string, mixed> $mcp_meta   The ability's `meta.mcp`.
+	 * @param bool                 $discovered Whether discovery should list it.
+	 */
+	public function test_execute_discovers_only_tool_typed_abilities( array $mcp_meta, bool $discovered ): void {
+		$ability_name = 'test/mcp-type-discovery';
+
+		$this->register_ability_in_hook(
+			$ability_name,
+			array(
+				'label'               => 'MCP Type Discovery Test',
+				'description'         => 'Public ability with a given mcp.type',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function () {
+					return array(); },
+				'permission_callback' => static function () {
+					return true; },
+				'meta'                => array( 'mcp' => $mcp_meta ),
+			)
+		);
+
+		$result = DiscoverAbilitiesAbility::execute( array() );
+		$names  = array_column( $result['abilities'], 'name' );
+
+		wp_unregister_ability( $ability_name );
+
+		if ( $discovered ) {
+			$this->assertContains( $ability_name, $names );
+		} else {
+			$this->assertNotContains( $ability_name, $names );
+		}
+	}
+
+	/**
+	 * @return array<string, array{0: array<string, mixed>, 1: bool}>
+	 */
+	public function data_mcp_type_discovery(): array {
+		return array(
+			'type absent defaults to tool' => array( array( 'public' => true ), true ),
+			'explicit tool'                => array(
+				array(
+					'public' => true,
+					'type'   => 'tool',
+				),
+				true,
+			),
+			'resource'                     => array(
+				array(
+					'public' => true,
+					'type'   => 'resource',
+				),
+				false,
+			),
+			'prompt'                       => array(
+				array(
+					'public' => true,
+					'type'   => 'prompt',
+				),
+				false,
+			),
+			'unrecognised string'          => array(
+				array(
+					'public' => true,
+					'type'   => 'private',
+				),
+				false,
+			),
+			'non-string value'             => array(
+				array(
+					'public' => true,
+					'type'   => array( 'tool' ),
+				),
+				false,
+			),
+		);
+	}
+
+	/**
 	 * @dataProvider data_public_exposure
 	 *
 	 * @param array<string, mixed> $meta                Ability metadata.
@@ -296,12 +382,12 @@ final class DiscoverAbilitiesAbilityTest extends TestCase {
 			// last, because WordPress orders same-priority callbacks by
 			// registration order. No priority can win this, so exposure must
 			// not be resolved while the ability is being registered.
-			'same-priority opt-out still wins'     => array(
+			'same-priority opt-out still wins' => array(
 				'registered_public' => true,
 				'filtered_public'   => false,
 				'filter_priority'   => PHP_INT_MAX,
 			),
-			'same-priority opt-in still wins'      => array(
+			'same-priority opt-in still wins'  => array(
 				'registered_public' => false,
 				'filtered_public'   => true,
 				'filter_priority'   => PHP_INT_MAX,

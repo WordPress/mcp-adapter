@@ -100,18 +100,23 @@ trait McpAbilityHelperTrait {
 	 * Gets the MCP type of an ability.
 	 *
 	 * Returns the type specified in meta.mcp.type, defaulting to 'tool' if not specified.
+	 * A value that is set but is not one of the known types resolves to an empty
+	 * string, so it matches no surface. The default server compares the raw type
+	 * the same way; coercing it to 'tool' would list an ability as a tool that
+	 * its author marked as something else.
 	 *
 	 * @param \WP_Ability $ability The ability object to check.
 	 *
-	 * @return string The MCP type ('tool', 'resource', or 'prompt'). Defaults to 'tool'.
+	 * @return string The MCP type ('tool', 'resource', or 'prompt'), 'tool' when not specified,
+	 *                or '' when the specified type is not recognised.
 	 */
 	protected static function get_ability_mcp_type( \WP_Ability $ability ): string {
 		$meta = $ability->get_meta();
 		$type = $meta['mcp']['type'] ?? 'tool';
 
-		// Validate type is one of the allowed values
+		// An unrecognised type matches no surface.
 		if ( ! in_array( $type, array( 'tool', 'resource', 'prompt' ), true ) ) {
-			return 'tool';
+			return '';
 		}
 
 		return $type;
