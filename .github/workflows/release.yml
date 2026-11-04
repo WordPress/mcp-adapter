@@ -79,7 +79,7 @@ jobs:
       # core/ is outside the autoloader (see core/README.md), so the manifest
       # check above cannot catch it going missing from the package.
       - name: Verify core ability copies are in the ZIP
-        run: test -f build/mcp-adapter/core/abilities/class-wp-abilities-content.php
+        run: test -f build/mcp-adapter/core/abilities/class-wp-mcp-abilities-content.php
 
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
