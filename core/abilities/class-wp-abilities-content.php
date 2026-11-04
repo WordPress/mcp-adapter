@@ -1,6 +1,6 @@
 <?php
 /**
- * Abilities API: WP_Abilities_Content class.
+ * Abilities API: WP_MCP_Abilities_Content class.
  *
  * @package WordPress
  * @subpackage Abilities API
@@ -33,7 +33,7 @@ declare( strict_types = 1 );
  *
  * @access private
  */
-final class WP_Abilities_Content {
+final class WP_MCP_Abilities_Content {
 
 	/**
 	 * The ability category used for content abilities.
@@ -108,7 +108,9 @@ final class WP_Abilities_Content {
 	 * @since 7.2.0
 	 */
 	public function register(): void {
-		$this->register_content_query();
+		if ( ! wp_has_ability( 'core/content-query' ) ) {
+			$this->register_content_query();
+		}
 
 		/*
 		 * Future write-oriented content abilities can be registered here, reusing the

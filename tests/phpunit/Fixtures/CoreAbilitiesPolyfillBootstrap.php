@@ -61,6 +61,7 @@ tests_add_filter(
 			'WP_Ability::__construct',
 			'WP_Abilities_Registry::register',
 			'WP_Abilities_Settings::get_exposed_settings',
+			'WP_MCP_Abilities_Settings::get_exposed_settings',
 		);
 		if ( ! in_array( $function_name, $watched, true ) ) {
 			return;
