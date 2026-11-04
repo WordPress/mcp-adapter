@@ -2,12 +2,13 @@
 /**
  * Registers the WordPress 7.2 core abilities on WordPress versions that do not ship them.
  *
- * The ability implementations themselves are verbatim copies of core files, kept in the
- * plugin's `core/` directory (see `core/README.md`). This class is the plugin-owned glue
- * that loads and registers them on WordPress 6.9–7.1 and bridges the registration
- * surface those files expect from WordPress 7.2. It never moves into core: once the
- * plugin's minimum WordPress version reaches the release that ships an ability, the
- * ability's copy and its entry here are deleted.
+ * The ability implementations themselves are copies of core files under plugin-prefixed
+ * class names, kept in the plugin's `core/` directory (see `core/README.md`). This class
+ * is the plugin-owned glue that loads and registers them whenever the running WordPress
+ * does not provide every ability they hold, and bridges the registration surface those
+ * files expect from WordPress 7.2. It never moves into core: once the plugin's minimum
+ * WordPress version reaches the release that ships an ability, the ability's copy and
+ * its entry here are deleted.
  *
  * Everything is feature-detected, never version-compared, so each shim disables itself
  * as soon as core (or another plugin, such as a feature plugin backporting parts of the
@@ -33,25 +34,35 @@ final class CoreAbilitiesPolyfill {
 	/**
 	 * The core ability classes this plugin can polyfill, in core's registration order.
 	 *
-	 * Each entry maps a global core class name to its file in `core/abilities/` and the
-	 * ability names the class registers. A class is loaded and registered only when the
-	 * class does not already exist and none of its abilities are registered.
+	 * Each entry maps the plugin's copy of a core ability class — the same file with the
+	 * class renamed to the `WP_MCP_` prefix, so it can load alongside core's — to its file
+	 * in `core/abilities/`, the core class it mirrors, the ability names it registers, and
+	 * the subset of those (`staged`) that no WordPress release ships yet. A copy is loaded
+	 * and registered only when at least one of its abilities is missing; the guards inside
+	 * its register() then skip every ability something else (core, or another plugin)
+	 * already registered.
 	 *
-	 * @var array<string, array{file: string, abilities: list<string>}>
+	 * @var array<string, array{file: string, core_class: string, abilities: list<string>, staged: list<string>}>
 	 */
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
 	private const ABILITY_CLASSES = array(
-		'WP_Abilities_Settings' => array(
-			'file'      => 'class-wp-abilities-settings.php',
-			'abilities' => array( 'core/settings-get' ),
+		'WP_MCP_Abilities_Settings' => array(
+			'file'       => 'class-wp-abilities-settings.php',
+			'core_class' => 'WP_Abilities_Settings',
+			'abilities'  => array( 'core/settings-get' ),
+			'staged'     => array(),
 		),
-		'WP_Abilities_Users'    => array(
-			'file'      => 'class-wp-abilities-users.php',
-			'abilities' => array( 'core/users-query' ),
+		'WP_MCP_Abilities_Users'    => array(
+			'file'       => 'class-wp-abilities-users.php',
+			'core_class' => 'WP_Abilities_Users',
+			'abilities'  => array( 'core/users-query' ),
+			'staged'     => array(),
 		),
-		'WP_Abilities_Content'  => array(
-			'file'      => 'class-wp-abilities-content.php',
-			'abilities' => array( 'core/content-query' ),
+		'WP_MCP_Abilities_Content'  => array(
+			'file'       => 'class-wp-abilities-content.php',
+			'core_class' => 'WP_Abilities_Content',
+			'abilities'  => array( 'core/content-query' ),
+			'staged'     => array(),
 		),
 	);
 
@@ -117,8 +128,9 @@ final class CoreAbilitiesPolyfill {
 	 * actions fire lazily and only once, any time after `init` starts, so subscribing on
 	 * a later hook could miss them (the same constraint applies in McpAdapter::instance()).
 	 *
-	 * When every class in ABILITY_CLASSES already exists — core loads its own copies from
-	 * wp-settings.php before any plugin — there is nothing to polyfill and no hook is added.
+	 * When core ships every mirrored class — it loads them from wp-settings.php before any
+	 * plugin — and no ability is staged beyond them, there is nothing to polyfill and no
+	 * hook is added.
 	 *
 	 * Excluded from coverage: it runs while the plugin loads in the test bootstrap, before
 	 * PHPUnit records coverage. CoreAbilitiesPolyfillBootstrapTest asserts the resulting
@@ -127,7 +139,7 @@ final class CoreAbilitiesPolyfill {
 	 * @codeCoverageIgnore
 	 */
 	public static function register_hooks(): void {
-		if ( ! self::has_missing_ability_class() ) {
+		if ( ! self::needs_polyfill() ) {
 			return;
 		}
 
@@ -136,7 +148,7 @@ final class CoreAbilitiesPolyfill {
 		add_filter( 'wp_register_ability_args', array( self::class, 'map_required_capabilities' ), 10, 2 );
 		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_categories' ), 20 );
 		// Priority 1 mirrors core's own hook for `_wp_register_initial_settings_for_abilities()`,
-		// so the flagged settings exist before WP_Abilities_Settings::register() snapshots them.
+		// so the flagged settings exist before the settings ability class snapshots them.
 		add_action( 'wp_abilities_api_init', array( self::class, 'register_initial_settings_for_abilities' ), 1 );
 		// Priority 20: core registers at 10, so when core provides an ability it always wins
 		// before the wp_has_ability() guard in register_core_abilities() runs.
@@ -144,20 +156,36 @@ final class CoreAbilitiesPolyfill {
 	}
 
 	/**
-	 * Whether at least one polyfillable core ability class is missing from this WordPress.
+	 * Whether this WordPress is missing anything the polyfill can provide.
+	 *
+	 * True when core does not ship one of the mirrored ability classes, or when a copy
+	 * stages an ability beyond what the shipped core class registers.
 	 *
 	 * Excluded from coverage with register_hooks(), its only caller.
 	 *
 	 * @codeCoverageIgnore
 	 */
-	private static function has_missing_ability_class(): bool {
-		foreach ( array_keys( self::ABILITY_CLASSES ) as $class_name ) {
-			if ( ! class_exists( $class_name ) ) {
+	private static function needs_polyfill(): bool {
+		foreach ( self::ability_classes() as $entry ) {
+			if ( ! class_exists( $entry['core_class'] ) || array() !== $entry['staged'] ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * Returns ABILITY_CLASSES at its declared contract type.
+	 *
+	 * PHPStan otherwise narrows the private constant to its current literal value — where
+	 * every `staged` list is empty and (with the WordPress stubs pinned before 7.2) no
+	 * `core_class` exists — and reports the forward-looking checks above as impossible.
+	 *
+	 * @return array<string, array{file: string, core_class: string, abilities: list<string>, staged: list<string>}>
+	 */
+	private static function ability_classes(): array {
+		return self::ABILITY_CLASSES;
 	}
 
 	/**
@@ -302,8 +330,8 @@ final class CoreAbilitiesPolyfill {
 	 *
 	 * Mirrors core's private `_wp_register_initial_settings_for_abilities()` (WordPress
 	 * 7.2): the initial settings normally register on `rest_api_init`, which fires lazily
-	 * and independently of `wp_abilities_api_init`, so they may not exist yet when
-	 * WP_Abilities_Settings::register() snapshots the exposed settings. Re-registering
+	 * and independently of `wp_abilities_api_init`, so they may not exist yet when the
+	 * settings ability class's register() snapshots the exposed settings. Re-registering
 	 * them later on `rest_api_init` is harmless.
 	 *
 	 * Additionally registers the `wp_page_for_privacy_policy` setting, which WordPress
@@ -352,10 +380,11 @@ final class CoreAbilitiesPolyfill {
 	/**
 	 * Loads and registers the core abilities this WordPress version does not provide.
 	 *
-	 * Runs on `wp_abilities_api_init` after core and other plugins (priority 20). A class
-	 * is skipped when it is already declared elsewhere and any of its abilities is already
-	 * registered; its file is loaded only when the class does not exist, so a WordPress
-	 * (or another plugin) that ships it is never redeclared.
+	 * Runs on `wp_abilities_api_init` after core and other plugins (priority 20). A copy
+	 * is skipped when every ability it holds is already registered; otherwise it is loaded
+	 * and its register() fills in only the missing abilities — each registration inside
+	 * the copies is individually guarded with `wp_has_ability()`, so whatever registered
+	 * an ability first (core at priority 10, or another plugin) always keeps it.
 	 */
 	public static function register_core_abilities(): void {
 		if ( ! self::is_enabled() ) {
@@ -363,7 +392,7 @@ final class CoreAbilitiesPolyfill {
 		}
 
 		foreach ( self::ABILITY_CLASSES as $class_name => $entry ) {
-			if ( self::has_any_ability( $entry['abilities'] ) ) {
+			if ( self::has_every_ability( $entry['abilities'] ) ) {
 				continue;
 			}
 
@@ -376,17 +405,17 @@ final class CoreAbilitiesPolyfill {
 	}
 
 	/**
-	 * Whether any of the given abilities is already registered.
+	 * Whether every one of the given abilities is already registered.
 	 *
 	 * @param list<string> $abilities The ability names.
 	 */
-	private static function has_any_ability( array $abilities ): bool {
+	private static function has_every_ability( array $abilities ): bool {
 		foreach ( $abilities as $name ) {
-			if ( wp_has_ability( $name ) ) {
-				return true;
+			if ( ! wp_has_ability( $name ) ) {
+				return false;
 			}
 		}
 
-		return false;
+		return true;
 	}
 }

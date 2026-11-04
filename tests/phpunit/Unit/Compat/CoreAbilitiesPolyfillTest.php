@@ -58,7 +58,9 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 	 * so on WordPress versions that ship the abilities (7.2+) nothing registers them during
 	 * tests — and the polyfill is correctly unhooked at plugin load there. Calling the
 	 * polyfill's registrars directly fills the gap; every one of them is guarded, so where
-	 * the polyfill (or anything else) already registered a piece this is a no-op.
+	 * the polyfill (or anything else) already registered a piece this is a no-op. On 7.2+
+	 * this loads the plugin's prefixed copies next to core's identically-shaped classes —
+	 * exactly the coexistence the `WP_MCP_` prefix exists to allow.
 	 */
 	private static function ensure_core_abilities_registered(): void {
 		global $wp_current_filter;
@@ -86,9 +88,11 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 	}
 
 	/**
-	 * On every supported WordPress version the three core abilities exist and execute:
-	 * registered by the polyfill before 7.2, and from core's own classes on 7.2+ (which
-	 * the test framework strips, so setUp() registers them back the same guarded way).
+	 * On every supported WordPress version the three core abilities exist and execute.
+	 *
+	 * In production they come from the polyfill's copies before 7.2 and from core's own
+	 * classes on 7.2+; the test framework strips core's registration, so here setUp()
+	 * registers them back through the polyfill's copies on every version.
 	 */
 	public function test_core_abilities_are_available_on_every_wordpress(): void {
 		foreach ( self::CORE_ABILITIES as $name ) {
@@ -99,6 +103,44 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 	public function test_core_ability_categories_are_available(): void {
 		foreach ( array( 'site', 'user', 'content', 'uncategorized' ) as $category ) {
 			$this->assertTrue( wp_has_ability_category( $category ), "Category {$category} is not registered." );
+		}
+	}
+
+	/**
+	 * The guard inside each copy's register() makes re-registration a no-op.
+	 *
+	 * This is what keeps a partially-shipped WordPress safe: a copy loaded because one of
+	 * its abilities is missing re-registers nothing that core (or an earlier run) already
+	 * provides — no `_doing_it_wrong`, no overwrite.
+	 */
+	public function test_register_guards_skip_abilities_that_already_exist(): void {
+		global $wp_current_filter;
+
+		$this->assertTrue( wp_has_ability( 'core/users-query' ) );
+
+		$wp_current_filter[] = 'wp_abilities_api_init';
+		( new \WP_MCP_Abilities_Users() )->register();
+		array_pop( $wp_current_filter );
+
+		$this->assertTrue( wp_has_ability( 'core/users-query' ) );
+	}
+
+	/**
+	 * The registrar reloads a copy only while one of its abilities is missing, and the
+	 * other copies — whose abilities are all registered — are skipped entirely.
+	 */
+	public function test_registrar_fills_only_missing_abilities(): void {
+		global $wp_current_filter;
+
+		wp_unregister_ability( 'core/users-query' );
+		$this->assertFalse( wp_has_ability( 'core/users-query' ) );
+
+		$wp_current_filter[] = 'wp_abilities_api_init';
+		CoreAbilitiesPolyfill::register_core_abilities();
+		array_pop( $wp_current_filter );
+
+		foreach ( self::CORE_ABILITIES as $name ) {
+			$this->assertTrue( wp_has_ability( $name ), "Ability {$name} is not registered." );
 		}
 	}
 

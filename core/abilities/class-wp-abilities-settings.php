@@ -1,6 +1,6 @@
 <?php
 /**
- * Abilities API: WP_Abilities_Settings class.
+ * Abilities API: WP_MCP_Abilities_Settings class.
  *
  * @package WordPress
  * @subpackage Abilities API
@@ -35,7 +35,7 @@ declare( strict_types = 1 );
  *
  * @access private
  */
-final class WP_Abilities_Settings {
+final class WP_MCP_Abilities_Settings {
 
 	/**
 	 * The ability category used for settings abilities.
@@ -67,7 +67,9 @@ final class WP_Abilities_Settings {
 			return;
 		}
 
-		$this->register_settings_get();
+		if ( ! wp_has_ability( 'core/settings-get' ) ) {
+			$this->register_settings_get();
+		}
 	}
 
 	/**

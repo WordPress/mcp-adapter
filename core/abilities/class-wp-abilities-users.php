@@ -1,6 +1,6 @@
 <?php
 /**
- * Abilities API: WP_Abilities_Users class.
+ * Abilities API: WP_MCP_Abilities_Users class.
  *
  * @package WordPress
  * @subpackage Abilities API
@@ -33,7 +33,7 @@ declare( strict_types = 1 );
  *
  * @access private
  */
-final class WP_Abilities_Users {
+final class WP_MCP_Abilities_Users {
 
 	/**
 	 * The ability category used for user abilities.
@@ -99,7 +99,9 @@ final class WP_Abilities_Users {
 	 * @since 7.2.0
 	 */
 	public function register(): void {
-		$this->register_users_query();
+		if ( ! wp_has_ability( 'core/users-query' ) ) {
+			$this->register_users_query();
+		}
 	}
 
 	/**
