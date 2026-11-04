@@ -545,6 +545,18 @@ final class HttpTransportTest extends TestCase {
 	}
 
 	public function test_permission_callback_returning_wp_error(): void {
+		// Create a mock error handler that captures log messages
+		$mock_error_handler = $this->getMockBuilder( DummyErrorHandler::class )
+			->onlyMethods( array( 'log' ) )
+			->getMock();
+
+		$mock_error_handler->expects( $this->once() )
+			->method( 'log' )
+			->with(
+				$this->stringContains( 'Permission callback returned WP_Error: Custom permission error' ),
+				$this->equalTo( array( 'HttpTransport::check_permission' ) )
+			);
+
 		// Test with custom permission callback that returns WP_Error
 		$context_with_permission = new McpTransportContext(
 			array(
@@ -556,7 +568,7 @@ final class HttpTransportTest extends TestCase {
 				'system_handler'                => $this->context->system_handler,
 				'observability_handler'         => $this->context->observability_handler,
 				'request_router'                => $this->context->request_router,
-				'error_handler'                 => new DummyErrorHandler(), // Add error_handler
+				'error_handler'                 => $mock_error_handler,
 				'transport_permission_callback' => static function () {
 					return new \WP_Error( 'permission_denied', 'Custom permission error' );
 				},
@@ -574,11 +586,10 @@ final class HttpTransportTest extends TestCase {
 			)
 		);
 
-		// Should fall back to default permission check when WP_Error is returned
+		// Should deny access (fail-closed) when WP_Error is returned
+		wp_set_current_user( 1 );
 		$permission_result = $transport_with_permission->check_permission( $request );
-
-		// Since we're user ID 1 (admin), default permission check should pass
-		$this->assertTrue( $permission_result );
+		$this->assertFalse( $permission_result, 'Should deny access when callback returns WP_Error' );
 	}
 
 	public function test_permission_with_different_user_capabilities(): void {
@@ -747,10 +758,10 @@ final class HttpTransportTest extends TestCase {
 			)
 		);
 
-		// Should fall back to default permission check when exception is thrown
+		// Should deny access (fail-closed) when exception is thrown
 		wp_set_current_user( 1 );
 		$permission_result = $transport_with_permission->check_permission( $request );
-		$this->assertTrue( $permission_result, 'Should fall back to default permission check' );
+		$this->assertFalse( $permission_result, 'Should deny access when callback throws exception' );
 	}
 
 	public function test_permission_denied_logging(): void {
@@ -962,5 +973,96 @@ final class HttpTransportTest extends TestCase {
 				'error_handler'         => new DummyErrorHandler(),
 			)
 		);
+	}
+	/**
+	 * Oversized initialization must not allocate a session or mutate existing sessions.
+	 *
+	 * @dataProvider oversized_initialize_params_provider
+	 * @param array $oversized_params Initialization parameters to reject.
+	 */
+	public function test_initialize_rejects_oversized_session_params( array $oversized_params ): void {
+		$user_id = wp_create_user( 'oversized_session_user', 'password' );
+		$this->assertIsInt( $user_id );
+		wp_set_current_user( $user_id );
+		$this->assertTrue( current_user_can( 'read' ) );
+		$this->assertFalse( current_user_can( 'manage_options' ) );
+		$session_id = \WP\MCP\Transport\Infrastructure\SessionManager::create_session( $user_id );
+		$this->assertIsString( $session_id );
+		$before  = get_user_meta( $user_id, 'mcp_adapter_sessions', true );
+		$writes  = array();
+		$observe = static function ( string $query ) use ( &$writes ): string {
+			if ( false !== strpos( $query, 'usermeta' ) && preg_match( '/^\s*(INSERT|UPDATE|DELETE)\b/i', $query ) ) {
+				$writes[] = $query;
+			}
+			return $query;
+		};
+		add_filter( 'query', $observe );
+		try {
+			$request = $this->createPostRequest(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 42,
+					'method'  => 'initialize',
+					'params'  => $oversized_params,
+				)
+			);
+			$request->set_header( 'Accept', 'application/json, text/event-stream' );
+			$response = $this->transport->handle_request( $request );
+			$data     = $response->get_data();
+			$this->assertSame( 42, $data['id'] );
+			$this->assertArrayHasKey( 'error', $data );
+			$this->assertSame( -32602, $data['error']['code'] );
+			$this->assertStringContainsString( '4096', $data['error']['message'] );
+			$this->assertArrayNotHasKey( 'Mcp-Session-Id', $response->get_headers() );
+			$this->assertSame( array(), $writes );
+			$this->assertSame( $before, get_user_meta( $user_id, 'mcp_adapter_sessions', true ) );
+		} finally {
+			remove_filter( 'query', $observe );
+			wp_set_current_user( 1 );
+			wp_delete_user( $user_id );
+		}
+	}
+
+	/** @return array<string, array{array}> Oversized input locations. */
+	public function oversized_initialize_params_provider(): array {
+		$blob = str_repeat( 'x', 1024 * 1024 );
+		return array(
+			'unknown key'  => array( array( 'extra' => $blob ) ),
+			'capabilities' => array( array( 'capabilities' => array( 'experimental' => array( 'blob' => $blob ) ) ) ),
+			'client name'  => array( array( 'clientInfo' => array( 'name' => $blob ) ) ),
+		);
+	}
+
+	/** Large client icons are omitted before applying the storage limit. */
+	public function test_initialize_omits_client_icons_from_session_storage(): void {
+		$user_id = wp_create_user( 'session_icons_user', 'password' );
+		$this->assertIsInt( $user_id );
+		wp_set_current_user( $user_id );
+		try {
+			$params  = array(
+				'clientInfo' => array(
+					'name'  => 'client',
+					'icons' => array( array( 'src' => 'data:image/png;base64,' . str_repeat( 'a', 8192 ) ) ),
+				),
+			);
+			$request = $this->createPostRequest(
+				array(
+					'jsonrpc' => '2.0',
+					'id'      => 43,
+					'method'  => 'initialize',
+					'params'  => $params,
+				)
+			);
+			$request->set_header( 'Accept', 'application/json, text/event-stream' );
+			$response = $this->transport->handle_request( $request );
+			$this->assertArrayNotHasKey( 'error', $response->get_data() );
+			$sessions = get_user_meta( $user_id, 'mcp_adapter_sessions', true );
+			$this->assertCount( 1, $sessions );
+			$session = reset( $sessions );
+			$this->assertSame( array( 'clientInfo' => array( 'name' => 'client' ) ), $session['client_params'] );
+		} finally {
+			wp_set_current_user( 1 );
+			wp_delete_user( $user_id );
+		}
 	}
 }

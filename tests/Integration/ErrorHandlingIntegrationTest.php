@@ -93,13 +93,13 @@ final class ErrorHandlingIntegrationTest extends TestCase {
 	}
 
 	public function test_error_logging_works_with_instances(): void {
-		$server  = $this->makeServer( array( 'test/permission-exception' ) );
+		$server  = $this->makeServer( array( 'test/execute-exception' ) );
 		$handler = new ToolsHandler( $server );
 
 		// This should trigger an error and log it
-		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-permission-exception' ) ) );
+		$result = $handler->call_tool( array( 'params' => array( 'name' => 'test-execute-exception' ) ) );
 
-		// Permission exceptions are tool execution errors (isError: true)
+		// Execution exceptions are tool execution errors (isError: true)
 		$this->assertArrayHasKey( 'isError', $result );
 		$this->assertTrue( $result['isError'] );
 		$this->assertNotEmpty( DummyErrorHandler::$logs );
