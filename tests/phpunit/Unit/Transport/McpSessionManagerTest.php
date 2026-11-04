@@ -319,6 +319,170 @@ final class McpSessionManagerTest extends TestCase {
 	}
 
 	/**
+	 * Recovery does not delete a valid map that is larger than the stale row's budget (#395).
+	 *
+	 * The budget comes from the session count of the row that was read. A map
+	 * written concurrently can hold more sessions, be valid for its own count,
+	 * and still be longer than that budget; a length-only delete removed it.
+	 *
+	 * @since 0.7.2
+	 */
+	public function test_get_all_user_sessions_recovery_does_not_delete_a_larger_valid_concurrent_map(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_map = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ),
+			),
+		);
+		// Two sessions at the parameter limit: valid for two, longer than one session's budget.
+		$params    = array( 'blob' => str_repeat( 'y', 4069 ) );
+		$fresh_map = array();
+		foreach ( array( 1, 2 ) as $offset ) {
+			$fresh_map[ wp_generate_uuid4() ] = array(
+				'created_at'    => time() - $offset,
+				'last_activity' => time() - $offset,
+				'client_params' => $params,
+			);
+		}
+		$this->assertGreaterThan( 4096 + 256, strlen( maybe_serialize( $fresh_map ) ) );
+		$this->assertLessThanOrEqual( 2 * ( 4096 + 256 ), strlen( maybe_serialize( $fresh_map ) ) );
+
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		// Between the read and the conditional delete, other requests replace the row with the larger valid map.
+		$user_id = $this->test_user_id;
+		$raced   = false;
+		$race    = static function ( string $query ) use ( $user_id, $meta_key, $fresh_map, &$raced ): string {
+			if ( ! $raced && preg_match( '/^\s*DELETE\b.*LENGTH/is', $query ) ) {
+				$raced = true;
+				delete_user_meta( $user_id, $meta_key );
+				update_user_meta( $user_id, $meta_key, $fresh_map );
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $race );
+		try {
+			$this->assertSame( $fresh_map, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+			$this->assertTrue( $raced );
+			wp_cache_delete( $this->test_user_id, 'user_meta' );
+			$this->assertSame( $fresh_map, get_user_meta( $this->test_user_id, $meta_key, true ) );
+			$this->assertSame( array(), DummyErrorHandler::$logs );
+		} finally {
+			remove_filter( 'query', $race );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * A replacement that lands before recovery reads the raw row is judged by its own session count (#395).
+	 *
+	 * @since 0.7.2
+	 */
+	public function test_get_all_user_sessions_recovery_keeps_a_map_replaced_before_the_raw_read(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_map = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ),
+			),
+		);
+		$params     = array( 'blob' => str_repeat( 'y', 4069 ) );
+		$fresh_map  = array();
+		foreach ( array( 1, 2 ) as $offset ) {
+			$fresh_map[ wp_generate_uuid4() ] = array(
+				'created_at'    => time() - $offset,
+				'last_activity' => time() - $offset,
+				'client_params' => $params,
+			);
+		}
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		$user_id = $this->test_user_id;
+		$raced   = false;
+		$deletes = 0;
+		$race    = static function ( string $query ) use ( $user_id, $meta_key, $fresh_map, &$raced, &$deletes ): string {
+			if ( ! $raced && preg_match( '/^\s*SELECT\s+meta_value\b.*LIMIT 1/is', $query ) ) {
+				$raced = true;
+				delete_user_meta( $user_id, $meta_key );
+				update_user_meta( $user_id, $meta_key, $fresh_map );
+			}
+			if ( preg_match( '/^\s*DELETE\b.*MD5/is', $query ) ) {
+				++$deletes;
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $race );
+		try {
+			$this->assertSame( $fresh_map, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+			$this->assertTrue( $raced );
+			$this->assertSame( 0, $deletes );
+			wp_cache_delete( $this->test_user_id, 'user_meta' );
+			$this->assertSame( $fresh_map, get_user_meta( $this->test_user_id, $meta_key, true ) );
+			$this->assertSame( array(), DummyErrorHandler::$logs );
+		} finally {
+			remove_filter( 'query', $race );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
+	 * A row removed before recovery reads it raw leaves nothing to delete and no sessions to serve (#395).
+	 *
+	 * @since 0.7.2
+	 */
+	public function test_get_all_user_sessions_recovery_handles_a_row_removed_before_the_raw_read(): void {
+		$meta_key   = self::session_meta_key();
+		$legacy_map = array(
+			wp_generate_uuid4() => array(
+				'created_at'    => time(),
+				'last_activity' => time(),
+				'client_params' => array( 'blob' => str_repeat( 'x', 1024 * 1024 ) ),
+			),
+		);
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, $legacy_map ) );
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		$user_id = $this->test_user_id;
+		$raced   = false;
+		$deletes = 0;
+		$race    = static function ( string $query ) use ( $user_id, $meta_key, &$raced, &$deletes ): string {
+			if ( ! $raced && preg_match( '/^\s*SELECT\s+meta_value\b.*LIMIT 1/is', $query ) ) {
+				$raced = true;
+				delete_user_meta( $user_id, $meta_key );
+			}
+			if ( preg_match( '/^\s*DELETE\b.*MD5/is', $query ) ) {
+				++$deletes;
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $race );
+		try {
+			$this->assertSame( array(), SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
+			$this->assertTrue( $raced );
+			$this->assertSame( 0, $deletes );
+			$this->assertFalse( metadata_exists( 'user', $this->test_user_id, $meta_key ) );
+			$this->assertSame( array(), DummyErrorHandler::$logs );
+		} finally {
+			remove_filter( 'query', $race );
+			DummyErrorHandler::reset();
+		}
+	}
+
+	/**
 	 * Recovery salts the users query cache like delete_user_meta() does, and only when a row was deleted.
 	 *
 	 * @since 0.7.1
