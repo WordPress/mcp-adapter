@@ -37,11 +37,11 @@ final class AccessToken {
 	}
 
 	/**
-	 * Whether a string looks like one of our tokens.
+	 * Whether a string has the access token prefix.
 	 *
 	 * @param string $token Token.
 	 */
-	public static function is_ours( string $token ): bool {
+	public static function has_prefix( string $token ): bool {
 		return 0 === strpos( $token, self::PREFIX );
 	}
 
@@ -52,7 +52,7 @@ final class AccessToken {
 	 * @return array{user_id: int, uuid: string, password: string}|null The parts, or null if malformed.
 	 */
 	public static function decode( string $token ): ?array {
-		if ( ! self::is_ours( $token ) ) {
+		if ( ! self::has_prefix( $token ) ) {
 			return null;
 		}
 

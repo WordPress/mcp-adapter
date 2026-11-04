@@ -12,6 +12,9 @@ namespace WP\OAuth\Authentication;
 use WP\OAuth\Clients\ClientRepository;
 use WP\OAuth\Server;
 use WP\OAuth\Tokens\AccessToken;
+use WP_Application_Passwords;
+use WP_Error;
+use WP_User;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -90,7 +93,7 @@ final class Bearer {
 
 		[ $user, $item ] = $result;
 
-		\WP_Application_Passwords::record_application_password_usage( $user->ID, $item['uuid'] );
+		WP_Application_Passwords::record_application_password_usage( $user->ID, $item['uuid'] );
 		$this->authenticated = true;
 
 		/** This action is documented in wp-includes/user.php */
@@ -127,7 +130,7 @@ final class Bearer {
 	/**
 	 * Gets the error from the last attempt, if it failed.
 	 */
-	public function get_error(): ?\WP_Error {
+	public function get_error(): ?WP_Error {
 		return $this->error;
 	}
 
@@ -139,7 +142,7 @@ final class Bearer {
 	 * @param array<string, mixed> $item  Application Password details.
 	 */
 	public function block_basic_auth( $error, $user, $item ): void {
-		if ( ! $error instanceof \WP_Error || ! is_array( $item ) || empty( $item['app_id'] ) ) {
+		if ( ! $error instanceof WP_Error || ! is_array( $item ) || empty( $item['app_id'] ) ) {
 			return;
 		}
 
@@ -157,7 +160,7 @@ final class Bearer {
 	 * @return array{0: \WP_User, 1: array<string, mixed>}|\WP_Error The user and Application Password, or an error.
 	 */
 	private function validate( string $token ) {
-		$invalid = new \WP_Error(
+		$invalid = new WP_Error(
 			'oauth_server_invalid_token',
 			__( 'The access token is invalid or has been revoked.', 'mcp-adapter' ),
 			array( 'status' => 401 )
@@ -169,12 +172,12 @@ final class Bearer {
 		}
 
 		$user = get_userdata( $parts['user_id'] );
-		if ( ! $user instanceof \WP_User || ! wp_is_application_passwords_available_for_user( $user ) ) {
+		if ( ! $user instanceof WP_User || ! wp_is_application_passwords_available_for_user( $user ) ) {
 			return $invalid;
 		}
 
-		$item = \WP_Application_Passwords::get_user_application_password( $user->ID, $parts['uuid'] );
-		if ( ! is_array( $item ) || ! \WP_Application_Passwords::check_password( $parts['password'], $item['password'] ) ) {
+		$item = WP_Application_Passwords::get_user_application_password( $user->ID, $parts['uuid'] );
+		if ( ! is_array( $item ) || ! WP_Application_Passwords::check_password( $parts['password'], $item['password'] ) ) {
 			return $invalid;
 		}
 
@@ -206,7 +209,9 @@ final class Bearer {
 	}
 
 	/**
-	 * Gets the bearer token from the request, if it is one of ours.
+	 * Gets the bearer token from the request, if it has the access token prefix.
+	 *
+	 * Bearer tokens in other formats are left for other authentication handlers.
 	 */
 	public static function get_bearer_token(): ?string {
 		$header = self::get_authorization_header();
@@ -214,7 +219,7 @@ final class Bearer {
 			return null;
 		}
 
-		return AccessToken::is_ours( $matches[1] ) ? $matches[1] : null;
+		return AccessToken::has_prefix( $matches[1] ) ? $matches[1] : null;
 	}
 
 	/**

@@ -12,6 +12,10 @@ namespace WP\OAuth\Endpoints;
 use WP\OAuth\Clients\ClientRepository;
 use WP\OAuth\Server;
 use WP\OAuth\Tokens\AccessToken;
+use WP_Application_Passwords;
+use WP_REST_Request;
+use WP_REST_Response;
+use stdClass;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -69,7 +73,7 @@ final class Revoke {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
-	public function handle( \WP_REST_Request $request ): \WP_REST_Response {
+	public function handle( WP_REST_Request $request ): WP_REST_Response {
 		$token = (string) $request->get_param( 'token' );
 		if ( '' === $token ) {
 			return Token::error( 'invalid_request', __( 'The token parameter is required.', 'mcp-adapter' ) );
@@ -86,19 +90,19 @@ final class Revoke {
 		$parts = AccessToken::decode( $token );
 
 		if ( null !== $parts && Server::is_available() ) {
-			$item = \WP_Application_Passwords::get_user_application_password( $parts['user_id'], $parts['uuid'] );
+			$item = WP_Application_Passwords::get_user_application_password( $parts['user_id'], $parts['uuid'] );
 
 			// Only revoke for whoever holds the token, and only if it belongs to the
 			// calling client when one is named (RFC 7009 section 2.1).
-			$holds_token = is_array( $item ) && \WP_Application_Passwords::check_password( $parts['password'], $item['password'] );
+			$holds_token = is_array( $item ) && WP_Application_Passwords::check_password( $parts['password'], $item['password'] );
 			$is_oauth    = $holds_token && null !== $this->clients->get( (string) $item['app_id'] );
 			$same_client = '' === $client_id || ( $holds_token && hash_equals( (string) $item['app_id'], $client_id ) );
 
 			if ( $is_oauth && $same_client ) {
-				\WP_Application_Passwords::delete_application_password( $parts['user_id'], $parts['uuid'] );
+				WP_Application_Passwords::delete_application_password( $parts['user_id'], $parts['uuid'] );
 			}
 		}
 
-		return new \WP_REST_Response( new \stdClass(), 200, Token::no_store_headers() );
+		return new WP_REST_Response( new stdClass(), 200, Token::no_store_headers() );
 	}
 }

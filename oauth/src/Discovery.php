@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\OAuth;
 
+use WP_REST_Response;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -55,7 +57,7 @@ final class Discovery {
 	 * @return \WP_REST_Response
 	 */
 	public function add_to_rest_index( $response ) {
-		if ( ! $response instanceof \WP_REST_Response || ! Server::is_available() ) {
+		if ( ! $response instanceof WP_REST_Response || ! Server::is_available() ) {
 			return $response;
 		}
 

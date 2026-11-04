@@ -15,6 +15,8 @@ use WP\OAuth\Grants\AuthorizationCodes;
 use WP\OAuth\Grants\Pkce;
 use WP\OAuth\ProtectedResources;
 use WP\OAuth\Server;
+use WP_Error;
+use WP_User;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -102,7 +104,10 @@ final class Authorize {
 			$this->handle_decision();
 		}
 
-		$params = $this->read_params();
+		$params = array();
+		foreach ( self::PARAMS as $name ) {
+			$params[ $name ] = isset( $_GET[ $name ] ) && is_string( $_GET[ $name ] ) ? trim( wp_unslash( $_GET[ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- An OAuth request from another site; values are validated below, and redirect URIs must match exactly.
+		}
 
 		// Check the client and redirect URI before redirecting anywhere (OAuth 2.1 section 7.5.2).
 		$client = $this->clients->get( $params['client_id'] );
@@ -188,20 +193,6 @@ final class Authorize {
 	}
 
 	/**
-	 * Reads the authorization request parameters.
-	 *
-	 * @return array<string, string>
-	 */
-	private function read_params(): array {
-		$params = array();
-		foreach ( self::PARAMS as $name ) {
-			$params[ $name ] = isset( $_GET[ $name ] ) && is_string( $_GET[ $name ] ) ? trim( wp_unslash( $_GET[ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- An OAuth request from another site; values are validated, and redirect URIs must match exactly.
-		}
-
-		return $params;
-	}
-
-	/**
 	 * Builds the URL of this authorization request.
 	 *
 	 * @param array<string, string> $params Request parameters.
@@ -270,7 +261,7 @@ final class Authorize {
 			wp_die( esc_html( $message ), esc_html__( 'Cannot connect application', 'mcp-adapter' ), array( 'response' => 400 ) );
 		}
 
-		login_header( __( 'Cannot connect application', 'mcp-adapter' ), '', new \WP_Error( 'oauth_server_error', esc_html( $message ) ) );
+		login_header( __( 'Cannot connect application', 'mcp-adapter' ), '', new WP_Error( 'oauth_server_error', esc_html( $message ) ) );
 		login_footer();
 		exit;
 	}
@@ -283,7 +274,7 @@ final class Authorize {
 	 * @param array<string, string>    $params     Request parameters.
 	 * @param string                   $request_id Stored request ID.
 	 */
-	private function render_consent( Client $client, \WP_User $user, array $params, string $request_id ): void {
+	private function render_consent( Client $client, WP_User $user, array $params, string $request_id ): void {
 		nocache_headers();
 
 		$data = array( // phpcs:ignore SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable -- Used by the template.

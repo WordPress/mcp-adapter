@@ -16,6 +16,10 @@ use WP\OAuth\Grants\AuthorizationCodes;
 use WP\OAuth\Grants\Pkce;
 use WP\OAuth\Server;
 use WP\OAuth\Tokens\AccessToken;
+use WP_Application_Passwords;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_User;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -97,7 +101,7 @@ final class Token {
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 */
-	public function handle( \WP_REST_Request $request ): \WP_REST_Response {
+	public function handle( WP_REST_Request $request ): WP_REST_Response {
 		if ( ! Server::is_available() ) {
 			return self::error( 'temporarily_unavailable', __( 'OAuth is not available on this site.', 'mcp-adapter' ), 503 );
 		}
@@ -146,13 +150,13 @@ final class Token {
 		}
 
 		$user = get_userdata( (int) $grant['user_id'] );
-		if ( ! $user instanceof \WP_User || ! wp_is_application_passwords_available_for_user( $user ) ) {
+		if ( ! $user instanceof WP_User || ! wp_is_application_passwords_available_for_user( $user ) ) {
 			return self::error( 'invalid_grant', __( 'The user can no longer authorize applications.', 'mcp-adapter' ) );
 		}
 
 		$this->prune_sessions( $user->ID, $client->get_id() );
 
-		$created = \WP_Application_Passwords::create_new_application_password(
+		$created = WP_Application_Passwords::create_new_application_password(
 			$user->ID,
 			array(
 				'name'   => $client->get_name(),
@@ -165,7 +169,7 @@ final class Token {
 
 		[ $password, $item ] = $created;
 
-		return new \WP_REST_Response(
+		return new WP_REST_Response(
 			array(
 				'access_token' => AccessToken::encode( $user->ID, $item['uuid'], $password ),
 				'token_type'   => 'Bearer',
@@ -181,7 +185,7 @@ final class Token {
 	 * @param \WP_REST_Request $request Request.
 	 * @return array{0: string, 1: string, 2: bool} Client ID, secret, and whether Basic auth was used.
 	 */
-	public static function client_credentials( \WP_REST_Request $request ): array {
+	public static function client_credentials( WP_REST_Request $request ): array {
 		$header = Bearer::get_authorization_header();
 		if ( null !== $header && 1 === preg_match( '/^Basic\s+(\S+)$/i', $header, $matches ) ) {
 			$decoded = base64_decode( $matches[1], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- HTTP Basic credentials.
@@ -232,7 +236,7 @@ final class Token {
 
 		$sessions = array_values(
 			array_filter(
-				\WP_Application_Passwords::get_user_application_passwords( $user_id ),
+				WP_Application_Passwords::get_user_application_passwords( $user_id ),
 				static function ( $item ) use ( $client_id ): bool {
 					return isset( $item['app_id'] ) && $item['app_id'] === $client_id;
 				}
@@ -250,7 +254,7 @@ final class Token {
 		);
 
 		foreach ( array_slice( $sessions, 0, count( $sessions ) - $max + 1 ) as $item ) {
-			\WP_Application_Passwords::delete_application_password( $user_id, $item['uuid'] );
+			WP_Application_Passwords::delete_application_password( $user_id, $item['uuid'] );
 		}
 	}
 
@@ -276,8 +280,8 @@ final class Token {
 	 * @param string $description Human-readable description.
 	 * @param int    $status      HTTP status.
 	 */
-	public static function error( string $code, string $description, int $status = 400 ): \WP_REST_Response {
-		return new \WP_REST_Response(
+	public static function error( string $code, string $description, int $status = 400 ): WP_REST_Response {
+		return new WP_REST_Response(
 			array(
 				'error'             => $code,
 				'error_description' => $description,

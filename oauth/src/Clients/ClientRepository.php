@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Clients;
 
+use WP_Error;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -96,7 +98,7 @@ final class ClientRepository {
 	public function update( string $id, string $name, array $redirect_uris ) {
 		$client = $this->get( $id );
 		if ( null === $client ) {
-			return new \WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
+			return new WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
 		}
 
 		$details = self::validate_details( $name, $redirect_uris );
@@ -122,7 +124,7 @@ final class ClientRepository {
 	public function reset_secret( string $id, bool $confidential ) {
 		$client = $this->get( $id );
 		if ( null === $client ) {
-			return new \WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
+			return new WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
 		}
 
 		$secret = $confidential ? wp_generate_password( 40, false ) : null;
@@ -187,17 +189,17 @@ final class ClientRepository {
 	private static function validate_details( string $name, array $redirect_uris ) {
 		$name = sanitize_text_field( $name );
 		if ( '' === $name ) {
-			return new \WP_Error( 'oauth_server_client_name', __( 'Enter a name for the client.', 'mcp-adapter' ) );
+			return new WP_Error( 'oauth_server_client_name', __( 'Enter a name for the client.', 'mcp-adapter' ) );
 		}
 
 		$redirect_uris = array_values( array_unique( array_filter( array_map( 'trim', $redirect_uris ) ) ) );
 		if ( empty( $redirect_uris ) ) {
-			return new \WP_Error( 'oauth_server_client_redirect', __( 'Enter at least one redirect URI.', 'mcp-adapter' ) );
+			return new WP_Error( 'oauth_server_client_redirect', __( 'Enter at least one redirect URI.', 'mcp-adapter' ) );
 		}
 
 		foreach ( $redirect_uris as $uri ) {
 			if ( ! Client::is_valid_redirect_uri( $uri ) ) {
-				return new \WP_Error(
+				return new WP_Error(
 					'oauth_server_client_redirect',
 					/* translators: %s: redirect URI. */
 					sprintf( __( '%s is not a valid redirect URI. Use HTTPS, HTTP on localhost, or an app-specific scheme.', 'mcp-adapter' ), $uri )

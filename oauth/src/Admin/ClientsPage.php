@@ -74,9 +74,15 @@ final class ClientsPage {
 	 * Handles the add client form.
 	 */
 	public function handle_add(): void {
-		$this->check_request( self::ADD_ACTION );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
+		}
+		check_admin_referer( self::ADD_ACTION );
 
-		$result = $this->clients->create( $this->posted( 'client_name' ), $this->posted_uris(), ! empty( $_POST['confidential'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in check_request().
+		$name          = isset( $_POST['client_name'] ) ? sanitize_text_field( wp_unslash( $_POST['client_name'] ) ) : '';
+		$redirect_uris = isset( $_POST['redirect_uris'] ) ? ( preg_split( '/\R/', wp_unslash( $_POST['redirect_uris'] ) ) ?: array() ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each URI is validated by the repository; sanitizing would alter percent-encoding.
+
+		$result = $this->clients->create( $name, $redirect_uris, ! empty( $_POST['confidential'] ) );
 		if ( is_wp_error( $result ) ) {
 			$this->finish( array( 'error' => $result->get_error_message() ) );
 		}
@@ -96,10 +102,16 @@ final class ClientsPage {
 	 * Handles the edit client form.
 	 */
 	public function handle_update(): void {
-		$client_id = $this->posted( 'client_id' );
-		$this->check_request( self::UPDATE_ACTION . '_' . $client_id );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
+		}
+		$client_id = isset( $_POST['client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Part of the nonce action, checked next.
+		check_admin_referer( self::UPDATE_ACTION . '_' . $client_id );
 
-		$result = $this->clients->update( $client_id, $this->posted( 'client_name' ), $this->posted_uris() );
+		$name          = isset( $_POST['client_name'] ) ? sanitize_text_field( wp_unslash( $_POST['client_name'] ) ) : '';
+		$redirect_uris = isset( $_POST['redirect_uris'] ) ? ( preg_split( '/\R/', wp_unslash( $_POST['redirect_uris'] ) ) ?: array() ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Each URI is validated by the repository; sanitizing would alter percent-encoding.
+
+		$result = $this->clients->update( $client_id, $name, $redirect_uris );
 		if ( is_wp_error( $result ) ) {
 			$this->finish( array( 'error' => $result->get_error_message() ), $client_id );
 		}
@@ -111,10 +123,13 @@ final class ClientsPage {
 	 * Handles generating or removing a client secret.
 	 */
 	public function handle_secret(): void {
-		$client_id = $this->posted( 'client_id' );
-		$this->check_request( self::SECRET_ACTION . '_' . $client_id );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
+		}
+		$client_id = isset( $_POST['client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Part of the nonce action, checked next.
+		check_admin_referer( self::SECRET_ACTION . '_' . $client_id );
 
-		$confidential = 'remove' !== $this->posted( 'mode' );
+		$confidential = ! isset( $_POST['mode'] ) || 'remove' !== $_POST['mode'];
 		$result       = $this->clients->reset_secret( $client_id, $confidential );
 		if ( is_wp_error( $result ) ) {
 			$this->finish( array( 'error' => $result->get_error_message() ) );
@@ -135,8 +150,11 @@ final class ClientsPage {
 	 * Handles the delete client form.
 	 */
 	public function handle_delete(): void {
-		$client_id = $this->posted( 'client_id' );
-		$this->check_request( self::DELETE_ACTION . '_' . $client_id );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
+		}
+		$client_id = isset( $_POST['client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Part of the nonce action, checked next.
+		check_admin_referer( self::DELETE_ACTION . '_' . $client_id );
 
 		$client = $this->clients->get( $client_id );
 		$this->clients->delete( $client_id );
@@ -392,39 +410,6 @@ final class ClientsPage {
 			<?php endif; ?>
 		</div>
 		<?php
-	}
-
-	/**
-	 * Checks the capability and nonce for a form submission.
-	 *
-	 * @param string $nonce_action Nonce action.
-	 */
-	private function check_request( string $nonce_action ): void {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
-		}
-		check_admin_referer( $nonce_action );
-	}
-
-	/**
-	 * Gets a posted text field.
-	 *
-	 * @param string $name Field name.
-	 */
-	private function posted( string $name ): string {
-		return isset( $_POST[ $name ] ) ? sanitize_text_field( wp_unslash( $_POST[ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in check_request().
-	}
-
-	/**
-	 * Gets the posted redirect URIs, one per line.
-	 *
-	 * @return string[]
-	 */
-	private function posted_uris(): array {
-		$raw  = isset( $_POST['redirect_uris'] ) ? (string) wp_unslash( $_POST['redirect_uris'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Checked in check_request(); each URI is validated by the repository.
-		$uris = preg_split( '/\R/', $raw );
-
-		return is_array( $uris ) ? $uris : array();
 	}
 
 	/**

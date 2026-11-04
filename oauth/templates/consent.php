@@ -7,6 +7,7 @@
  * @var array{client: \WP\OAuth\Clients\Client, user: \WP_User, params: array<string, string>, request_id: string, action_url: string, nonce_action: string, redirect_host: string, switch_user_url: string} $data
  */
 
+
 defined( 'ABSPATH' ) || exit;
 
 $oauth_server_site = get_bloginfo( 'name' );

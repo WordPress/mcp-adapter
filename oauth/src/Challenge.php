@@ -10,6 +10,8 @@ declare( strict_types=1 );
 namespace WP\OAuth;
 
 use WP\OAuth\Authentication\Bearer;
+use WP_REST_Request;
+use WP_REST_Response;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -65,7 +67,7 @@ final class Challenge {
 	 * @return mixed
 	 */
 	public function add_challenge( $response, $server, $request ) {
-		if ( ! $response instanceof \WP_REST_Response || 401 !== $response->get_status() || ! $request instanceof \WP_REST_Request ) {
+		if ( ! $response instanceof WP_REST_Response || 401 !== $response->get_status() || ! $request instanceof WP_REST_Request ) {
 			return $response;
 		}
 
