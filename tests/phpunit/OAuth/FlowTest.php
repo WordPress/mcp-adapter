@@ -1,0 +1,352 @@
+<?php
+/**
+ * Tests for the OAuth server's code exchange and bearer authentication.
+ *
+ * @package WP\OAuth\Tests
+ */
+
+declare( strict_types=1 );
+
+namespace WP\OAuth\Tests;
+
+use WP\OAuth\Clients\Client;
+use WP\OAuth\Clients\ClientRepository;
+use WP\OAuth\Endpoints\Token;
+use WP\OAuth\Server;
+use WP\OAuth\Tokens\AccessToken;
+use WP_Application_Passwords;
+use WP_Post;
+use WP_REST_Request;
+use WP_REST_Response;
+use WP_UnitTestCase;
+use WP_User;
+
+/**
+ * Covers the token endpoint, bearer authentication, and revocation.
+ */
+final class FlowTest extends WP_UnitTestCase {
+
+	private const VERIFIER     = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+	private const REDIRECT_URI = 'https://client.example/callback';
+
+	/**
+	 * @var Server
+	 */
+	private $server;
+
+	/**
+	 * @var WP_User
+	 */
+	private $user;
+
+	/**
+	 * @var Client
+	 */
+	private $client;
+
+	public function set_up(): void {
+		parent::set_up();
+
+		add_filter( 'wp_is_application_passwords_available', '__return_true' );
+		// A REST request as the front controller receives it.
+		$_SERVER['SCRIPT_NAME'] = '/index.php';
+		$_SERVER['REQUEST_URI'] = '/wp-json/mcp/mcp-adapter-default-server';
+
+		$server = Server::instance();
+		$this->assertNotNull( $server, 'The OAuth server should start with the plugin.' );
+		$this->server = $server;
+
+		$this->user = self::factory()->user->create_and_get( array( 'role' => 'editor' ) );
+
+		$created = $this->server->clients()->create( 'Test Client', array( self::REDIRECT_URI ), false );
+		$this->assertIsArray( $created );
+		$this->client = $created[0];
+	}
+
+	public function tear_down(): void {
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['SCRIPT_NAME'], $_GET['rest_route'] );
+		parent::tear_down();
+	}
+
+	public function test_code_exchange_issues_token_that_authenticates_until_revoked(): void {
+		$response = $this->exchange( $this->issue_code(), self::VERIFIER );
+
+		$this->assertSame( 200, $response->get_status() );
+		$token = $response->get_data()['access_token'];
+		$this->assertStringStartsWith( AccessToken::PREFIX, $token );
+
+		$passwords = WP_Application_Passwords::get_user_application_passwords( $this->user->ID );
+		$this->assertCount( 1, $passwords );
+		$this->assertSame( $this->client->get_id(), $passwords[0]['app_id'] );
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->assertSame( $this->user->ID, $this->server->bearer()->authenticate( false ) );
+		$this->assertNotNull( WP_Application_Passwords::get_user_application_password( $this->user->ID, $passwords[0]['uuid'] )['last_used'] );
+
+		WP_Application_Passwords::delete_application_password( $this->user->ID, $passwords[0]['uuid'] );
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+		$this->assertTrue( $this->server->bearer()->has_error() );
+	}
+
+	public function test_failed_pkce_check_burns_the_code(): void {
+		$code = $this->issue_code();
+
+		$wrong = $this->exchange( $code, str_repeat( 'x', 43 ) );
+		$this->assertSame( 400, $wrong->get_status() );
+		$this->assertSame( 'invalid_grant', $wrong->get_data()['error'] );
+
+		$retry = $this->exchange( $code, self::VERIFIER );
+		$this->assertSame( 'invalid_grant', $retry->get_data()['error'] );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_bearer_token_sets_the_current_user_on_a_fresh_request(): void {
+		$token = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data()['access_token'];
+
+		// Start as a real request does: WordPress looks up the current user
+		// before init, so the client post type is not registered yet, and
+		// nothing has set the current user.
+		unregister_post_type( ClientRepository::POST_TYPE );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$GLOBALS['current_user']       = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Simulates a request before the current user is set.
+
+		try {
+			$this->assertSame( $this->user->ID, get_current_user_id() );
+		} finally {
+			$this->server->clients()->register_post_type();
+		}
+	}
+
+	public function test_oauth_passwords_are_refused_for_basic_auth(): void {
+		$token = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data()['access_token'];
+		$parts = AccessToken::decode( $token );
+		$this->assertNotNull( $parts );
+
+		add_filter( 'application_password_is_api_request', '__return_true' );
+		$result = wp_authenticate_application_password( null, $this->user->user_login, $parts['password'] );
+
+		$this->assertWPError( $result );
+		$this->assertContains( 'oauth_server_bearer_only', $result->get_error_codes() );
+	}
+
+	/**
+	 * @dataProvider provide_non_rest_requests
+	 *
+	 * @param string $script     Script that handles the request.
+	 * @param string $uri        Request URI.
+	 * @param bool   $is_ajax    Whether the request is an AJAX request.
+	 * @param bool   $rest_route Whether a rest_route query parameter is present.
+	 */
+	public function test_bearer_token_is_ignored_outside_the_rest_api( string $script, string $uri, bool $is_ajax, bool $rest_route ): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$_SERVER['SCRIPT_NAME']        = $script;
+		$_SERVER['REQUEST_URI']        = $uri;
+		if ( $rest_route ) {
+			$_GET['rest_route'] = '/mcp/mcp-adapter-default-server';
+		}
+		if ( $is_ajax ) {
+			add_filter( 'wp_doing_ajax', '__return_true' );
+		}
+
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: string, 2: bool, 3: bool}>
+	 */
+	public static function provide_non_rest_requests(): array {
+		return array(
+			'admin-ajax with rest_route'   => array( '/wp-admin/admin-ajax.php', '/wp-admin/admin-ajax.php?rest_route=/mcp', true, true ),
+			'admin-ajax by script only'    => array( '/wp-admin/admin-ajax.php', '/wp-admin/admin-ajax.php?rest_route=/mcp', false, true ),
+			'REST path after wp-login.php' => array( '/wp-login.php', '/wp-login.php/wp-json/mcp/mcp-adapter-default-server', false, false ),
+			'AJAX through index.php'       => array( '/index.php', '/?rest_route=/mcp/mcp-adapter-default-server', true, true ),
+		);
+	}
+
+	/**
+	 * @dataProvider provide_rest_requests
+	 *
+	 * @param string $uri        Request URI.
+	 * @param bool   $rest_route Whether a rest_route query parameter is present.
+	 */
+	public function test_bearer_token_works_for_each_rest_permalink_style( string $uri, bool $rest_route ): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$_SERVER['REQUEST_URI']        = $uri;
+		if ( $rest_route ) {
+			$_GET['rest_route'] = '/mcp/mcp-adapter-default-server';
+		}
+
+		$this->assertSame( $this->user->ID, $this->server->bearer()->authenticate( false ) );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: bool}>
+	 */
+	public static function provide_rest_requests(): array {
+		return array(
+			'pretty permalinks'    => array( '/wp-json/mcp/mcp-adapter-default-server', false ),
+			'index.php permalinks' => array( '/index.php/wp-json/mcp/mcp-adapter-default-server', false ),
+			'plain permalinks'     => array( '/?rest_route=/mcp/mcp-adapter-default-server', true ),
+		);
+	}
+
+	public function test_revocation_deletes_the_connection_and_always_succeeds(): void {
+		$token = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data()['access_token'];
+
+		$request = new WP_REST_Request( 'POST', '/oauth/v1/revoke' );
+		$request->set_body_params(
+			array(
+				'token'     => $token,
+				'client_id' => $this->client->get_id(),
+			)
+		);
+
+		$this->assertSame( 200, rest_do_request( $request )->get_status() );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+		$this->assertSame( 200, rest_do_request( $request )->get_status(), 'Revoking again still succeeds (RFC 7009).' );
+	}
+
+	public function test_public_client_can_revoke_without_naming_itself(): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$this->assertSame( 200, $this->revoke( array( 'token' => $token ) )->get_status() );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_confidential_client_must_authenticate_to_revoke(): void {
+		[ $client, $secret ] = $this->server->clients()->create( 'Confidential Client', array( self::REDIRECT_URI ), true );
+		$token               = $this->exchange( $this->issue_code( $this->user->ID, $client ), self::VERIFIER, $client, $secret )->get_data()['access_token'];
+
+		// Leaving out client_id does not skip authentication: the token's own client is used.
+		$this->assertSame( 401, $this->revoke( array( 'token' => $token ) )->get_status() );
+		$this->assertSame(
+			401,
+			$this->revoke(
+				array(
+					'token'         => $token,
+					'client_id'     => $client->get_id(),
+					'client_secret' => 'wrong',
+				)
+			)->get_status()
+		);
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+
+		$response = $this->revoke(
+			array(
+				'token'         => $token,
+				'client_id'     => $client->get_id(),
+				'client_secret' => $secret,
+			)
+		);
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_revocation_rejects_unknown_clients_and_other_clients_tokens(): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+		$other = $this->server->clients()->create( 'Other Client', array( self::REDIRECT_URI ), false )[0];
+
+		$unknown = $this->revoke(
+			array(
+				'token'     => $token,
+				'client_id' => wp_generate_uuid4(),
+			)
+		);
+		$this->assertSame( 401, $unknown->get_status() );
+		$this->assertSame( 'invalid_client', $unknown->get_data()['error'] );
+
+		// Another client gets a 200, as RFC 7009 requires, but the token is untouched.
+		$this->assertSame(
+			200,
+			$this->revoke(
+				array(
+					'token'     => $token,
+					'client_id' => $other->get_id(),
+				)
+			)->get_status()
+		);
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_deleting_a_client_removes_its_connections_for_every_user(): void {
+		$other_user   = self::factory()->user->create_and_get( array( 'role' => 'author' ) );
+		$other_client = $this->server->clients()->create( 'Other Client', array( self::REDIRECT_URI ), false )[0];
+
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+		$this->exchange( $this->issue_code( $other_user->ID ) );
+		$this->exchange( $this->issue_code( $this->user->ID, $other_client ), self::VERIFIER, $other_client );
+		WP_Application_Passwords::create_new_application_password( $this->user->ID, array( 'name' => 'Made by hand' ) );
+
+		$this->assertTrue( $this->server->clients()->delete( $this->client->get_id() ) );
+
+		$this->assertSame( array( 'Other Client', 'Made by hand' ), array_values( wp_list_pluck( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ), 'name' ) ) );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $other_user->ID ) );
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+	}
+
+	public function test_trashing_a_client_removes_its_connections(): void {
+		$this->exchange( $this->issue_code() );
+
+		$post = get_page_by_path( $this->client->get_id(), OBJECT, ClientRepository::POST_TYPE );
+		$this->assertInstanceOf( WP_Post::class, $post );
+		wp_trash_post( $post->ID );
+
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_signing_in_again_beyond_the_limit_removes_the_oldest_connection(): void {
+		for ( $i = 0; $i <= Token::MAX_SESSIONS_PER_CLIENT; $i++ ) {
+			$this->assertSame( 200, $this->exchange( $this->issue_code(), self::VERIFIER )->get_status() );
+		}
+
+		$this->assertCount( Token::MAX_SESSIONS_PER_CLIENT, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	private function issue_code( ?int $user_id = null, ?Client $client = null ): string {
+		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', self::VERIFIER, true ) ), '+/', '-_' ), '=' );
+
+		return $this->server->codes()->issue(
+			array(
+				'client_id'      => ( $client ?? $this->client )->get_id(),
+				'redirect_uri'   => self::REDIRECT_URI,
+				'code_challenge' => $challenge,
+				'resource'       => '',
+				'user_id'        => $user_id ?? $this->user->ID,
+			)
+		);
+	}
+
+	private function exchange( string $code, string $verifier = self::VERIFIER, ?Client $client = null, ?string $secret = null ): WP_REST_Response {
+		$request = new WP_REST_Request( 'POST', '/oauth/v1/token' );
+		$request->set_body_params(
+			array(
+				'grant_type'    => 'authorization_code',
+				'code'          => $code,
+				'client_id'     => ( $client ?? $this->client )->get_id(),
+				'client_secret' => (string) $secret,
+				'redirect_uri'  => self::REDIRECT_URI,
+				'code_verifier' => $verifier,
+			)
+		);
+
+		return rest_do_request( $request );
+	}
+
+	/**
+	 * Sends a revocation request.
+	 *
+	 * @param array<string, string> $params Body parameters.
+	 */
+	private function revoke( array $params ): WP_REST_Response {
+		$request = new WP_REST_Request( 'POST', '/oauth/v1/revoke' );
+		$request->set_body_params( $params );
+
+		return rest_do_request( $request );
+	}
+}

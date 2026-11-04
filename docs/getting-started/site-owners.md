@@ -80,7 +80,14 @@ If the site runs on your own computer and you have WP-CLI, the client can start 
 
 ### Web apps (claude.ai, ChatGPT)
 
-The web versions of Claude and ChatGPT add connectors through an OAuth sign-in, and they have no field for an Application Password. WordPress does not include an OAuth server and MCP Adapter does not add one, so these apps cannot connect to MCP Adapter on their own today. Use a desktop client, or a plugin that adds an OAuth sign-in to your site.
+The web versions of Claude and ChatGPT add connectors through an OAuth sign-in, and they have no field for an Application Password. MCP Adapter includes an OAuth sign-in for them. An administrator registers each app once:
+
+1. In wp-admin, go to **Settings > OAuth Clients** and add a client. Enter the app's name and the redirect URI from the app's documentation, for example `https://claude.ai/api/mcp/auth_callback` for Claude. Leave **Generate a client secret** unchecked unless the app asks for one.
+2. Copy the client ID shown after saving.
+3. In the app, add a custom connector with your site's MCP address, and enter the client ID (and the secret, if you generated one) in the connector's advanced or OAuth settings.
+4. When the app sends you to your site, log in as the user the assistant should act as, and click **Approve**.
+
+The sign-in needs pretty permalinks (**Settings > Permalinks**), and your web server must pass addresses starting with `/.well-known/` to WordPress. **Tools > Site Health** warns if it does not.
 
 ## Step 3: Test the connection
 
@@ -141,5 +148,6 @@ If a desktop client shows an error such as "npx: command not found", Node.js is 
 ## Staying in control
 
 - Every Application Password is listed under **Users > Profile**, with when it was last used. Click **Revoke** to cut a client off at once.
+- Apps connected through the OAuth sign-in are listed there too, named after the app. Deleting the app under **Settings > OAuth Clients** cuts off every connection it has.
 - Create one password per client and device, so you can revoke one without touching the others.
 - Abilities change your live site the same way an action in wp-admin does. Try new abilities on a staging copy first, and keep regular backups.
