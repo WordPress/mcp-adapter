@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Infrastructure\ErrorHandling\ErrorLogMcpErrorHandler;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 
 /**
@@ -81,6 +82,30 @@ class HttpSessionValidator {
 		$user_id = get_current_user_id();
 		if ( ! $user_id ) {
 			return McpErrorFactory::unauthorized( 0, 'User authentication required for session creation' );
+		}
+
+		// Client icons are not used by the adapter and need not occupy session storage.
+		if ( isset( $params['clientInfo'] ) && is_array( $params['clientInfo'] ) ) {
+			unset( $params['clientInfo']['icons'] );
+		}
+
+		// Reject oversized initialization before cleanup or any session writes.
+		$validation = SessionManager::validate_client_params( $params );
+		if ( is_wp_error( $validation ) ) {
+			$error_handler = new ErrorLogMcpErrorHandler();
+			$error_handler->log(
+				'Rejected MCP initialization parameters that exceed the session storage limit.',
+				array_merge(
+					array(
+						'component' => self::class,
+						'method'    => 'create_session',
+						'user_id'   => $user_id,
+					),
+					(array) $validation->get_error_data()
+				)
+			);
+
+			return McpErrorFactory::invalid_params( 0, $validation->get_error_message() );
 		}
 
 		$session_id = SessionManager::create_session( $user_id, $params );
