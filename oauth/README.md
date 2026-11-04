@@ -10,7 +10,7 @@ This folder is self-contained: it has its own namespace (`WP\OAuth`), loader, an
 2. The application sends the user to `wp-login.php?action=oauth_authorize` with PKCE (S256) and a `state` value. The user logs in if needed and approves on the consent screen.
 3. The application exchanges the code at `/wp-json/oauth/v1/token`. This creates an Application Password for the user, named after the application.
 4. The access token carries the user ID, the Application Password UUID, and the raw password, and is checked against the stored hash. It works as a bearer token on REST requests, never for Basic auth.
-5. Deleting the Application Password, calling `/wp-json/oauth/v1/revoke` (RFC 7009), or deleting the client cuts the application off.
+5. Deleting the Application Password or calling `/wp-json/oauth/v1/revoke` (RFC 7009) cuts one connection off. Deleting or trashing the client removes all of its connections, for every user.
 
 Clients are registered by an administrator under **Settings > OAuth Clients**. Each client is a private `oauth_server_client` post, as in WP-API/OAuth2: the client ID is the post slug, and the redirect URIs and secret hash are post meta.
 

@@ -162,7 +162,7 @@ final class ClientsPage {
 		$this->finish(
 			null === $client ? array() : array(
 				/* translators: %s: client name. */
-				'success' => sprintf( __( '%s was deleted. Its existing connections stop working.', 'mcp-adapter' ), $client->get_name() ),
+				'success' => sprintf( __( '%s was deleted, along with its connections.', 'mcp-adapter' ), $client->get_name() ),
 			)
 		);
 	}
@@ -313,7 +313,7 @@ final class ClientsPage {
 		</div>
 
 		<h2><?php esc_html_e( 'Delete client', 'mcp-adapter' ); ?></h2>
-		<p><?php esc_html_e( 'Deleting the client stops all of its connections from working, and it can no longer ask users to connect.', 'mcp-adapter' ); ?></p>
+		<p><?php esc_html_e( 'Deleting the client also removes all of its connections from users’ Application Passwords, and it can no longer ask users to connect.', 'mcp-adapter' ); ?></p>
 		<?php
 		$this->render_delete_button( $client, false );
 	}
@@ -372,7 +372,7 @@ final class ClientsPage {
 	 */
 	private function render_delete_button( Client $client, bool $link ): void {
 		/* translators: %s: client name. */
-		$confirm = sprintf( __( 'Delete %s? Its existing connections stop working.', 'mcp-adapter' ), $client->get_name() );
+		$confirm = sprintf( __( 'Delete %s? Its connections are removed from users’ Application Passwords.', 'mcp-adapter' ), $client->get_name() );
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;" onsubmit="return confirm( <?php echo esc_attr( wp_json_encode( $confirm ) ?: '""' ); ?> );">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DELETE_ACTION ); ?>" />

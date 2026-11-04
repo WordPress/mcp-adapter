@@ -15,6 +15,7 @@ use WP\OAuth\Endpoints\Token;
 use WP\OAuth\Server;
 use WP\OAuth\Tokens\AccessToken;
 use WP_Application_Passwords;
+use WP_Post;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_UnitTestCase;
@@ -142,6 +143,34 @@ final class FlowTest extends WP_UnitTestCase {
 		$this->assertSame( 200, rest_do_request( $request )->get_status(), 'Revoking again still succeeds (RFC 7009).' );
 	}
 
+	public function test_deleting_a_client_removes_its_connections_for_every_user(): void {
+		$other_user   = self::factory()->user->create_and_get( array( 'role' => 'author' ) );
+		$other_client = $this->server->clients()->create( 'Other Client', array( self::REDIRECT_URI ), false )[0];
+
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+		$this->exchange( $this->issue_code( $other_user->ID ) );
+		$this->exchange( $this->issue_code( $this->user->ID, $other_client ), self::VERIFIER, $other_client );
+		WP_Application_Passwords::create_new_application_password( $this->user->ID, array( 'name' => 'Made by hand' ) );
+
+		$this->assertTrue( $this->server->clients()->delete( $this->client->get_id() ) );
+
+		$this->assertSame( array( 'Other Client', 'Made by hand' ), array_values( wp_list_pluck( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ), 'name' ) ) );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $other_user->ID ) );
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+	}
+
+	public function test_trashing_a_client_removes_its_connections(): void {
+		$this->exchange( $this->issue_code() );
+
+		$post = get_page_by_path( $this->client->get_id(), OBJECT, ClientRepository::POST_TYPE );
+		$this->assertInstanceOf( WP_Post::class, $post );
+		wp_trash_post( $post->ID );
+
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
 	public function test_signing_in_again_beyond_the_limit_removes_the_oldest_connection(): void {
 		for ( $i = 0; $i <= Token::MAX_SESSIONS_PER_CLIENT; $i++ ) {
 			$this->assertSame( 200, $this->exchange( $this->issue_code(), self::VERIFIER )->get_status() );
@@ -150,27 +179,27 @@ final class FlowTest extends WP_UnitTestCase {
 		$this->assertCount( Token::MAX_SESSIONS_PER_CLIENT, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
 	}
 
-	private function issue_code(): string {
+	private function issue_code( ?int $user_id = null, ?Client $client = null ): string {
 		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', self::VERIFIER, true ) ), '+/', '-_' ), '=' );
 
 		return $this->server->codes()->issue(
 			array(
-				'client_id'      => $this->client->get_id(),
+				'client_id'      => ( $client ?? $this->client )->get_id(),
 				'redirect_uri'   => self::REDIRECT_URI,
 				'code_challenge' => $challenge,
 				'resource'       => '',
-				'user_id'        => $this->user->ID,
+				'user_id'        => $user_id ?? $this->user->ID,
 			)
 		);
 	}
 
-	private function exchange( string $code, string $verifier ): WP_REST_Response {
+	private function exchange( string $code, string $verifier = self::VERIFIER, ?Client $client = null ): WP_REST_Response {
 		$request = new WP_REST_Request( 'POST', '/oauth/v1/token' );
 		$request->set_body_params(
 			array(
 				'grant_type'    => 'authorization_code',
 				'code'          => $code,
-				'client_id'     => $this->client->get_id(),
+				'client_id'     => ( $client ?? $this->client )->get_id(),
 				'redirect_uri'  => self::REDIRECT_URI,
 				'code_verifier' => $verifier,
 			)

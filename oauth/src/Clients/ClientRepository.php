@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Clients;
 
+use WP_Application_Passwords;
 use WP_Error;
 use WP_Post;
 use WP_Query;
@@ -40,6 +41,10 @@ final class ClientRepository {
 	 */
 	public function register_hooks(): void {
 		add_action( 'init', array( $this, 'register_post_type' ) );
+
+		// Remove a client's connections however it is deleted or trashed.
+		add_action( 'before_delete_post', array( $this, 'delete_connections' ), 10, 2 );
+		add_action( 'wp_trash_post', array( $this, 'delete_connections' ) );
 	}
 
 	/**
@@ -229,8 +234,7 @@ final class ClientRepository {
 	/**
 	 * Deletes a client.
 	 *
-	 * Tokens issued to the client stop working, because bearer authentication
-	 * checks that the client still exists.
+	 * Its connections are removed too, through delete_connections().
 	 *
 	 * @param string $id Client ID.
 	 */
@@ -238,6 +242,48 @@ final class ClientRepository {
 		$post = self::find_post( $id );
 
 		return null !== $post && false !== wp_delete_post( $post->ID, true );
+	}
+
+	/**
+	 * Deletes the Application Passwords issued to a client, for every user.
+	 *
+	 * Runs when a client post is deleted or trashed. Bearer authentication
+	 * already rejects tokens for a missing client, but without this the
+	 * passwords would stay in users' profiles looking active, and would work
+	 * again if a client with the same ID came back.
+	 *
+	 * @param int           $post_id Post ID.
+	 * @param \WP_Post|null $post    Post, when WordPress passes it.
+	 */
+	public function delete_connections( $post_id, $post = null ): void {
+		$post = $post instanceof WP_Post ? $post : get_post( (int) $post_id );
+		if ( ! $post instanceof WP_Post || self::POST_TYPE !== $post->post_type || '' === $post->post_name ) {
+			return;
+		}
+
+		$client_id = $post->post_name;
+
+		// Narrow to users whose stored passwords mention the client ID. Application
+		// Passwords belong to the network-wide user, so search every site.
+		$user_ids = get_users(
+			array(
+				'blog_id'      => 0,
+				'fields'       => 'ID',
+				'meta_key'     => WP_Application_Passwords::USERMETA_KEY_APPLICATION_PASSWORDS, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Runs only when a client is deleted.
+				'meta_value'   => $client_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Runs only when a client is deleted.
+				'meta_compare' => 'LIKE',
+			)
+		);
+
+		foreach ( $user_ids as $user_id ) {
+			foreach ( WP_Application_Passwords::get_user_application_passwords( (int) $user_id ) as $item ) {
+				if ( ( $item['app_id'] ?? '' ) !== $client_id ) {
+					continue;
+				}
+
+				WP_Application_Passwords::delete_application_password( (int) $user_id, $item['uuid'] );
+			}
+		}
 	}
 
 	/**
