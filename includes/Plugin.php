@@ -11,6 +11,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP;
 
+use WP\MCP\Compat\CoreAbilitiesPolyfill;
 use WP\MCP\Core\McpAdapter;
 
 // Exit if accessed directly.
@@ -74,6 +75,9 @@ final class Plugin {
 	private function setup(): void {
 		// Define the plugin constants.
 		$this->constants();
+
+		// Register the core abilities this WordPress version does not provide.
+		CoreAbilitiesPolyfill::register_hooks(); // @codeCoverageIgnore
 
 		McpAdapter::instance();
 	}

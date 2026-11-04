@@ -14,6 +14,8 @@ In general, all code must follow the [WordPress Coding Standards and best practi
 
 We include [several tools](#useful-commands) to help ensure your code meets these standards.
 
+Files under `core/` are copies of WordPress core files (two mechanical transforms apart) or abilities staged for a future WordPress release; they follow WordPress core's own conventions instead of the plugin's, and are linted separately with `composer lint:core`. See the [Core Abilities guide](docs/guides/core-abilities.md) and [core/README.md](core/README.md) before touching them.
+
 ## Guidelines
 
 - As with all WordPress projects, we want to ensure a welcoming environment for everyone. With that in mind, all contributors are expected to follow our [Code of Conduct](https://make.wordpress.org/handbook/community-code-of-conduct/).
