@@ -55,11 +55,11 @@ New core abilities (content updates, user updates, …) are developed and tested
 
 ### Authoring rules
 
-A new ability goes **into the existing class that owns its domain** whenever the shared helpers fit — core's classes say so themselves ("Future write-oriented user abilities can reuse them as well"). For example, `core/user-update` is a new guarded registration plus private helpers added to `WP_MCP_Abilities_Users`. A new file under `core/abilities/` (core naming: `class-wp-abilities-{name}.php`) is only for a genuinely new domain.
+A new ability goes **into the existing class that owns its domain** whenever the shared helpers fit — core's classes say so themselves ("Future write-oriented user abilities can reuse them as well"). For example, `core/user-update` is a new guarded registration plus private helpers added to `WP_MCP_Abilities_Users`. A new file under `core/abilities/` (named after the class: `class-wp-mcp-abilities-{name}.php`) is only for a genuinely new domain.
 
 Write the code exactly as it will land in core, modulo the two mechanical transforms from `core/README.md`:
 
-- A global `final` class named `WP_MCP_Abilities_*`. The `WP_MCP_` prefix replaces core's `WP_` on exactly two lines (header docblock and class declaration) and is what lets the copy load on WordPress versions that ship the core class; it is renamed back when the code moves upstream.
+- A global `final` class named `WP_MCP_Abilities_*`, in a file named after it. The `WP_MCP_` prefix replaces core's `WP_` on exactly two lines (header docblock and class declaration) plus the file name, and is what lets the copy load on WordPress versions that ship the core class; it is renamed back when the code moves upstream.
 - Each registration call in `register()` wrapped in its own `wp_has_ability()` guard — one guard around exactly one `$this->register_…();` call. The guard is what makes partial states safe: a WordPress that ships some of the class's abilities only gains the ones it is missing.
 - In a file whose class core already ships, every change relative to upstream must be a **pure addition** (new registration calls, helpers, constants) so re-syncing stays conflict-free.
 - `declare( strict_types=1 );` and core's file-level docblock, with `@since` set to the WordPress version the ability targets.
@@ -81,7 +81,7 @@ Never change core-owned lines in `core/abilities/` — change them upstream in [
 
 The core patch is:
 
-1. Copy the file (or, for an ability staged into an existing class, the added lines) from `core/abilities/` to `src/wp-includes/abilities/`, reversing the two transforms: rename the class prefix `WP_MCP_` back to `WP_`, and unwrap the `wp_has_ability()` guards in `register()` so each registration call runs unconditionally.
+1. Copy the file (or, for an ability staged into an existing class, the added lines) from `core/abilities/` to `src/wp-includes/abilities/`, reversing the two transforms: rename the `WP_MCP_` prefix back to `WP_` (in the class name and the file name), and unwrap the `wp_has_ability()` guards in `register()` so each registration call runs unconditionally.
 2. For a new class, add core's loading lines — a `require` alongside the other ability classes in `wp-settings.php` and a `( new WP_Abilities_X() )->register();` call in `wp-includes/abilities.php` — matching how the existing three abilities are loaded.
 
 Nothing changes in the plugin when core merges it: the `wp_has_ability()` guards make the plugin's registrations inert on the new WordPress version with no plugin release required. The next release moves the ability out of the `staged` list (so the load-time gate can short-circuit again on that WordPress version), and once the plugin's minimum WordPress version rises past the release that shipped the ability, its guard, copy, or `ABILITY_CLASSES` entry is deleted.

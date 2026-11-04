@@ -47,19 +47,19 @@ final class CoreAbilitiesPolyfill {
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
 	private const ABILITY_CLASSES = array(
 		'WP_MCP_Abilities_Settings' => array(
-			'file'       => 'class-wp-abilities-settings.php',
+			'file'       => 'class-wp-mcp-abilities-settings.php',
 			'core_class' => 'WP_Abilities_Settings',
 			'abilities'  => array( 'core/settings-get' ),
 			'staged'     => array(),
 		),
 		'WP_MCP_Abilities_Users'    => array(
-			'file'       => 'class-wp-abilities-users.php',
+			'file'       => 'class-wp-mcp-abilities-users.php',
 			'core_class' => 'WP_Abilities_Users',
 			'abilities'  => array( 'core/users-query' ),
 			'staged'     => array(),
 		),
 		'WP_MCP_Abilities_Content'  => array(
-			'file'       => 'class-wp-abilities-content.php',
+			'file'       => 'class-wp-mcp-abilities-content.php',
 			'core_class' => 'WP_Abilities_Content',
 			'abilities'  => array( 'core/content-query' ),
 			'staged'     => array(),

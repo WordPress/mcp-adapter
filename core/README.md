@@ -3,7 +3,7 @@
 This directory holds copies of WordPress core files, plus core abilities that are developed in this plugin first and are destined for WordPress core. Paths mirror `wp-includes/` in [wordpress-develop](https://github.com/WordPress/wordpress-develop):
 
 ```
-core/abilities/class-wp-abilities-content.php  ↔  src/wp-includes/abilities/class-wp-abilities-content.php
+core/abilities/class-wp-mcp-abilities-content.php  ↔  src/wp-includes/abilities/class-wp-abilities-content.php
 ```
 
 The copies were last synced from wordpress-develop trunk at commit `658bcc55325e75d2c2f6a38d06e57d8b454e8e52` (7.2-beta4).
@@ -12,10 +12,10 @@ The copies were last synced from wordpress-develop trunk at commit `658bcc55325e
 
 A copy differs from its upstream file by exactly two transforms, both reversible, so a sync in either direction is a copy plus a rename:
 
-1. **Class prefix.** The class is declared as `WP_MCP_Abilities_*` instead of core's `WP_Abilities_*` (two lines per file: the header docblock and the `final class` declaration). Core loads its own `WP_Abilities_*` classes from `wp-settings.php` before any plugin runs, so a copy keeping core's name could never load on the WordPress versions that ship the class — and an ability staged inside it would be missing exactly there. The prefixed copy loads on every WordPress version.
+1. **Class prefix.** The class is declared as `WP_MCP_Abilities_*` instead of core's `WP_Abilities_*` (two lines per file: the header docblock and the `final class` declaration), and the file name follows the class name (`class-wp-mcp-abilities-*.php` for core's `class-wp-abilities-*.php`). Core loads its own `WP_Abilities_*` classes from `wp-settings.php` before any plugin runs, so a copy keeping core's name could never load on the WordPress versions that ship the class — and an ability staged inside it would be missing exactly there. The prefixed copy loads on every WordPress version.
 2. **Per-ability guards.** Inside `register()`, each registration call is wrapped in a `wp_has_ability()` guard — `if ( ! wp_has_ability( 'core/users-query' ) ) { … }`, one guard around exactly one registration call — so a copy running next to core (or another plugin) registers only the abilities nothing else provides. Whoever registered first wins; core registers at priority 10, the polyfill at 20.
 
-Everything else stays byte-identical to upstream: core's file naming, docblocks, `@since`, and i18n via `__()` with **no text domain**.
+Everything else stays byte-identical to upstream: docblocks, `@since`, and i18n via `__()` with **no text domain**.
 
 ## Rules
 

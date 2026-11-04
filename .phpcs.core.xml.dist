@@ -16,10 +16,5 @@
 	<rule ref="PHPCompatibilityWP"/>
 
 	<!-- WordPress core's own ruleset applies WordPress-Core only (not WordPress-Docs). -->
-	<rule ref="WordPress-Core">
-		<!-- File names keep core's, mirroring the upstream path, while the class inside
-		     carries the plugin's WP_MCP_ prefix (the first of the two mechanical
-		     transforms in core/README.md), so this match cannot hold here. -->
-		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
-	</rule>
+	<rule ref="WordPress-Core"/>
 </ruleset>
