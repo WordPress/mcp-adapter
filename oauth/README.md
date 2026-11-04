@@ -93,9 +93,10 @@ since the Site Health check runs from the server to itself.
 
 ## Testing
 
-`tools/oauth-mcp-debugger/index.html` in the plugin is a browser client that
-runs the whole flow and logs every request. Register its URL as a redirect URI
-for a client and open it.
+The [OAuth + MCP Debugger](https://make.hmn.md/mcp-adapter/oauth/) is a browser
+client that runs the whole flow and logs every request. Register
+`https://make.hmn.md/mcp-adapter/oauth/` as a redirect URI for a client, open
+the debugger, and enter the site's MCP URL and the client ID.
 
 ## Credits
 

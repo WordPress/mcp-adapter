@@ -336,7 +336,7 @@ final class ClientsPage {
 			<th scope="row"><label for="oauth-server-redirect-uris"><?php esc_html_e( 'Redirect URIs', 'mcp-adapter' ); ?></label></th>
 			<td>
 				<textarea id="oauth-server-redirect-uris" name="redirect_uris" rows="3" class="large-text code" required><?php echo esc_textarea( null === $client ? '' : implode( "\n", $client->get_redirect_uris() ) ); ?></textarea>
-				<p class="description"><?php esc_html_e( 'One per line, matched exactly. Loopback addresses such as http://127.0.0.1/callback match any port. The application’s documentation lists these, for example https://claude.ai/api/mcp/auth_callback.', 'mcp-adapter' ); ?></p>
+				<p class="description"><?php esc_html_e( 'One per line, matched exactly, except that loopback addresses used by desktop apps match any port. The application’s documentation lists these, for example https://claude.ai/api/mcp/auth_callback.', 'mcp-adapter' ); ?></p>
 			</td>
 		</tr>
 		<?php
