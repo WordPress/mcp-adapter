@@ -48,6 +48,8 @@ final class FlowTest extends WP_UnitTestCase {
 		parent::set_up();
 
 		add_filter( 'wp_is_application_passwords_available', '__return_true' );
+		// A REST request as the front controller receives it.
+		$_SERVER['SCRIPT_NAME'] = '/index.php';
 		$_SERVER['REQUEST_URI'] = '/wp-json/mcp/mcp-adapter-default-server';
 
 		$server = Server::instance();
@@ -62,7 +64,7 @@ final class FlowTest extends WP_UnitTestCase {
 	}
 
 	public function tear_down(): void {
-		unset( $_SERVER['HTTP_AUTHORIZATION'] );
+		unset( $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['SCRIPT_NAME'], $_GET['rest_route'] );
 		parent::tear_down();
 	}
 
@@ -125,6 +127,71 @@ final class FlowTest extends WP_UnitTestCase {
 
 		$this->assertWPError( $result );
 		$this->assertContains( 'oauth_server_bearer_only', $result->get_error_codes() );
+	}
+
+	/**
+	 * @dataProvider provide_non_rest_requests
+	 *
+	 * @param string $script     Script that handles the request.
+	 * @param string $uri        Request URI.
+	 * @param bool   $is_ajax    Whether the request is an AJAX request.
+	 * @param bool   $rest_route Whether a rest_route query parameter is present.
+	 */
+	public function test_bearer_token_is_ignored_outside_the_rest_api( string $script, string $uri, bool $is_ajax, bool $rest_route ): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$_SERVER['SCRIPT_NAME']        = $script;
+		$_SERVER['REQUEST_URI']        = $uri;
+		if ( $rest_route ) {
+			$_GET['rest_route'] = '/mcp/mcp-adapter-default-server';
+		}
+		if ( $is_ajax ) {
+			add_filter( 'wp_doing_ajax', '__return_true' );
+		}
+
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: string, 2: bool, 3: bool}>
+	 */
+	public static function provide_non_rest_requests(): array {
+		return array(
+			'admin-ajax with rest_route'   => array( '/wp-admin/admin-ajax.php', '/wp-admin/admin-ajax.php?rest_route=/mcp', true, true ),
+			'admin-ajax by script only'    => array( '/wp-admin/admin-ajax.php', '/wp-admin/admin-ajax.php?rest_route=/mcp', false, true ),
+			'REST path after wp-login.php' => array( '/wp-login.php', '/wp-login.php/wp-json/mcp/mcp-adapter-default-server', false, false ),
+			'AJAX through index.php'       => array( '/index.php', '/?rest_route=/mcp/mcp-adapter-default-server', true, true ),
+		);
+	}
+
+	/**
+	 * @dataProvider provide_rest_requests
+	 *
+	 * @param string $uri        Request URI.
+	 * @param bool   $rest_route Whether a rest_route query parameter is present.
+	 */
+	public function test_bearer_token_works_for_each_rest_permalink_style( string $uri, bool $rest_route ): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$_SERVER['REQUEST_URI']        = $uri;
+		if ( $rest_route ) {
+			$_GET['rest_route'] = '/mcp/mcp-adapter-default-server';
+		}
+
+		$this->assertSame( $this->user->ID, $this->server->bearer()->authenticate( false ) );
+	}
+
+	/**
+	 * @return array<string, array{0: string, 1: bool}>
+	 */
+	public static function provide_rest_requests(): array {
+		return array(
+			'pretty permalinks'    => array( '/wp-json/mcp/mcp-adapter-default-server', false ),
+			'index.php permalinks' => array( '/index.php/wp-json/mcp/mcp-adapter-default-server', false ),
+			'plain permalinks'     => array( '/?rest_route=/mcp/mcp-adapter-default-server', true ),
+		);
 	}
 
 	public function test_revocation_deletes_the_connection_and_always_succeeds(): void {

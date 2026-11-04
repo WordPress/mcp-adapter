@@ -208,21 +208,44 @@ final class Bearer {
 	/**
 	 * Whether this is a request Application Passwords may be used on.
 	 *
-	 * The current user can be looked up before `REST_REQUEST` is defined, so the
-	 * request path is checked as well.
+	 * The current user can be looked up before `REST_REQUEST` is defined, so a
+	 * request that is clearly headed for the REST API counts as well.
 	 */
 	private function is_api_request(): bool {
-		$is_api_request = defined( 'REST_REQUEST' ) && REST_REQUEST;
-
-		if ( ! $is_api_request ) {
-			$path   = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared.
-			$prefix = '/' . rest_get_url_prefix() . '/';
-
-			$is_api_request = false !== strpos( $path . '/', $prefix ) || isset( $_GET['rest_route'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only checks presence.
-		}
+		$is_api_request = ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || self::is_early_rest_request();
 
 		/** This filter is documented in wp-includes/user.php */
 		return (bool) apply_filters( 'application_password_is_api_request', $is_api_request ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook.
+	}
+
+	/**
+	 * Whether a request is headed for the REST API, judged before WordPress
+	 * defines `REST_REQUEST`.
+	 *
+	 * Only the site's front controller (index.php) serves REST requests, so
+	 * AJAX, wp-admin, XML-RPC, and other scripts are ruled out first. A
+	 * `rest_route` parameter on admin-ajax.php, or a REST-looking path after
+	 * another script such as `/wp-login.php/wp-json/`, does not count.
+	 * Pretty, `/index.php/wp-json/`, and plain `?rest_route=` permalinks all
+	 * still work.
+	 */
+	private static function is_early_rest_request(): bool {
+		if ( wp_doing_ajax() || is_admin() || ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) ) {
+			return false;
+		}
+
+		$script = isset( $_SERVER['SCRIPT_NAME'] ) ? basename( (string) wp_unslash( $_SERVER['SCRIPT_NAME'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared.
+		if ( 'index.php' !== $script ) {
+			return false;
+		}
+
+		if ( isset( $_GET['rest_route'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only checks presence.
+			return true;
+		}
+
+		$path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared.
+
+		return false !== strpos( $path . '/', '/' . rest_get_url_prefix() . '/' );
 	}
 
 	/**
