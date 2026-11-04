@@ -99,6 +99,36 @@ add_filter( 'mcp_adapter_default_server_config', function ( $config ) {
 
 See the [full default configuration](#default-configuration) below for all available keys.
 
+#### When the filter runs
+
+The filter runs when the adapter initializes, not when the callback is registered. For HTTP requests that is `rest_api_init` at priority `15`; under WP-CLI it is `init` at priority `20`. This is late enough that abilities registered on `wp_abilities_api_init` are already in the registry, so the tool list can be built from it:
+
+```php
+add_filter( 'mcp_adapter_default_server_config', function ( $config ) {
+    foreach ( wp_get_abilities() as $ability ) {
+        if ( 0 === strpos( $ability->get_name(), 'my-plugin/' ) ) {
+            $config['tools'][] = $ability->get_name();
+        }
+    }
+
+    return $config;
+} );
+```
+
+Abilities registered after the adapter initializes are not available to the filter. Under WP-CLI, for example, an ability registered on `init` at a priority later than `20` is too late. Register abilities on `wp_abilities_api_init` so they are available on every transport.
+
+The filter does not run when the default server is disabled. If `mcp_adapter_create_default_server` returns `false`, `mcp_adapter_default_server_config` never fires.
+
+#### Names that do not resolve to an ability
+
+A tool, resource, or prompt name that does not match a registered ability is logged through the server's error handler and skipped. The other components are still registered and the default server is still created, so a list can include abilities from an optional plugin that is not active:
+
+```text
+WordPress ability 'my-plugin/optional-tool' does not exist.
+```
+
+Check the logged warning and the server's `tools/list` output after changing the list.
+
 ## HTTP sessions
 
 When using the HTTP REST API transport, MCP clients must follow the session protocol defined by the MCP specification. The STDIO transport (WP-CLI) does not use HTTP sessions — session lifecycle is tied to the WP-CLI process instead.
