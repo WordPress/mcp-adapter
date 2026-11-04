@@ -103,6 +103,6 @@ final class Revoke {
 			}
 		}
 
-		return new WP_REST_Response( new stdClass(), 200, Token::no_store_headers() );
+		return new WP_REST_Response( new stdClass(), 200, array_filter( wp_get_nocache_headers() ) );
 	}
 }

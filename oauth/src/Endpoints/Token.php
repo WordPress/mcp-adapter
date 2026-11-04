@@ -175,7 +175,9 @@ final class Token {
 				'token_type'   => 'Bearer',
 			),
 			200,
-			self::no_store_headers()
+			// Core's no-cache headers include Cache-Control: no-store (RFC 6749 section 5.1).
+			// Last-Modified is false there, meaning "remove", so it is filtered out.
+			array_filter( wp_get_nocache_headers() )
 		);
 	}
 
@@ -287,19 +289,7 @@ final class Token {
 				'error_description' => $description,
 			),
 			$status,
-			self::no_store_headers()
-		);
-	}
-
-	/**
-	 * Headers that stop token responses being cached.
-	 *
-	 * @return array<string, string>
-	 */
-	public static function no_store_headers(): array {
-		return array(
-			'Cache-Control' => 'no-store',
-			'Pragma'        => 'no-cache',
+			array_filter( wp_get_nocache_headers() )
 		);
 	}
 }
