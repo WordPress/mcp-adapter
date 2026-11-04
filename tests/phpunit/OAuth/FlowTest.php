@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Tests;
 
+use WP\OAuth\Clients\ClientRepository;
 use WP\OAuth\Endpoints\Token;
 use WP\OAuth\Server;
 use WP\OAuth\Tokens\AccessToken;
@@ -92,6 +93,23 @@ final class FlowTest extends WP_UnitTestCase {
 		$retry = $this->exchange( $code, self::VERIFIER );
 		$this->assertSame( 'invalid_grant', $retry->get_data()['error'] );
 		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+	}
+
+	public function test_bearer_token_sets_the_current_user_on_a_fresh_request(): void {
+		$token = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data()['access_token'];
+
+		// Start as a real request does: WordPress looks up the current user
+		// before init, so the client post type is not registered yet, and
+		// nothing has set the current user.
+		unregister_post_type( ClientRepository::POST_TYPE );
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$GLOBALS['current_user']       = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Simulates a request before the current user is set.
+
+		try {
+			$this->assertSame( $this->user->ID, get_current_user_id() );
+		} finally {
+			$this->server->clients()->register_post_type();
+		}
 	}
 
 	public function test_oauth_passwords_are_refused_for_basic_auth(): void {

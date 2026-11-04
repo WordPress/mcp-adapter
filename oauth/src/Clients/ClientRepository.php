@@ -10,30 +10,98 @@ declare( strict_types=1 );
 namespace WP\OAuth\Clients;
 
 use WP_Error;
+use WP_Post;
+use WP_Query;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Stores registered clients in a single option.
+ * Stores registered clients as a private post type, as WP-API/OAuth2 does.
+ *
+ * The client ID is the post slug, so lookups use the indexed post_name column.
+ * Redirect URIs and the secret hash are post meta. Only administrators can
+ * manage clients, through Settings > OAuth Clients.
  */
 final class ClientRepository {
 
-	public const OPTION = 'oauth_server_clients';
+	public const POST_TYPE = 'oauth_server_client';
 
 	/**
-	 * Gets all clients, keyed by client ID.
+	 * Most clients the settings screen lists. Admin-registered clients are few;
+	 * Dynamic Client Registration will need paging.
+	 */
+	private const LIST_LIMIT = 200;
+
+	private const REDIRECT_URIS_KEY = '_oauth_server_redirect_uris';
+	private const SECRET_HASH_KEY   = '_oauth_server_secret_hash';
+
+	/**
+	 * Registers hooks.
+	 */
+	public function register_hooks(): void {
+		add_action( 'init', array( $this, 'register_post_type' ) );
+	}
+
+	/**
+	 * Registers the client post type.
+	 */
+	public function register_post_type(): void {
+		register_post_type(
+			'oauth_server_client',
+			array(
+				'labels'           => array(
+					'name'          => __( 'OAuth Clients', 'mcp-adapter' ),
+					'singular_name' => __( 'OAuth Client', 'mcp-adapter' ),
+				),
+				'public'           => false,
+				'rewrite'          => false,
+				'query_var'        => false,
+				'supports'         => array( 'title' ),
+				'can_export'       => true,
+				'delete_with_user' => false,
+				'capability_type'  => array( 'oauth_server_client', 'oauth_server_clients' ),
+				'map_meta_cap'     => true,
+				'capabilities'     => array(
+					'create_posts'           => 'manage_options',
+					'edit_posts'             => 'manage_options',
+					'edit_others_posts'      => 'manage_options',
+					'edit_published_posts'   => 'manage_options',
+					'edit_private_posts'     => 'manage_options',
+					'publish_posts'          => 'manage_options',
+					'read_private_posts'     => 'manage_options',
+					'delete_posts'           => 'manage_options',
+					'delete_others_posts'    => 'manage_options',
+					'delete_published_posts' => 'manage_options',
+					'delete_private_posts'   => 'manage_options',
+				),
+			)
+		);
+	}
+
+	/**
+	 * Gets all clients, oldest first.
 	 *
-	 * @return array<string, \WP\OAuth\Clients\Client>
+	 * @return array<string, \WP\OAuth\Clients\Client> Clients keyed by client ID.
 	 */
 	public function all(): array {
-		$stored = get_option( self::OPTION, array() );
-		if ( ! is_array( $stored ) ) {
-			return array();
-		}
+		$posts = ( new WP_Query() )->query(
+			array(
+				'post_type'      => self::POST_TYPE,
+				'post_status'    => 'publish',
+				'posts_per_page' => self::LIST_LIMIT,
+				'orderby'        => 'date',
+				'order'          => 'ASC',
+				'no_found_rows'  => true,
+			)
+		);
 
 		$clients = array();
-		foreach ( $stored as $data ) {
-			$client = Client::from_array( $data );
+		foreach ( $posts as $post ) {
+			if ( ! $post instanceof WP_Post ) {
+				continue;
+			}
+
+			$client = self::to_client( $post );
 			if ( null === $client ) {
 				continue;
 			}
@@ -50,11 +118,9 @@ final class ClientRepository {
 	 * @param string $id Client ID.
 	 */
 	public function get( string $id ): ?Client {
-		if ( '' === $id ) {
-			return null;
-		}
+		$post = self::find_post( $id );
 
-		return $this->all()[ $id ] ?? null;
+		return null === $post ? null : self::to_client( $post );
 	}
 
 	/**
@@ -71,16 +137,29 @@ final class ClientRepository {
 			return $details;
 		}
 
-		$secret = $confidential ? wp_generate_password( 40, false ) : null;
-		$client = new Client(
-			wp_generate_uuid4(),
-			$details[0],
-			$details[1],
-			null === $secret ? null : wp_fast_hash( $secret ),
-			time()
+		$id      = wp_generate_uuid4();
+		$secret  = $confidential ? wp_generate_password( 40, false ) : null;
+		$post_id = wp_insert_post(
+			array(
+				'post_type'   => self::POST_TYPE,
+				'post_status' => 'publish',
+				'post_title'  => $details[0],
+				'post_name'   => $id,
+				'meta_input'  => array(
+					self::REDIRECT_URIS_KEY => $details[1],
+					self::SECRET_HASH_KEY   => null === $secret ? '' : wp_fast_hash( $secret ),
+				),
+			),
+			true
 		);
+		if ( is_wp_error( $post_id ) ) {
+			return $post_id;
+		}
 
-		$this->save( array_merge( $this->all(), array( $client->get_id() => $client ) ) );
+		$client = $this->get( $id );
+		if ( null === $client ) {
+			return new WP_Error( 'oauth_server_client_save', __( 'The client could not be saved.', 'mcp-adapter' ) );
+		}
 
 		return array( $client, $secret );
 	}
@@ -96,8 +175,8 @@ final class ClientRepository {
 	 * @return \WP\OAuth\Clients\Client|\WP_Error The updated client, or an error.
 	 */
 	public function update( string $id, string $name, array $redirect_uris ) {
-		$client = $this->get( $id );
-		if ( null === $client ) {
+		$post = self::find_post( $id );
+		if ( null === $post ) {
 			return new WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
 		}
 
@@ -106,10 +185,19 @@ final class ClientRepository {
 			return $details;
 		}
 
-		$client = $client->with_details( $details[0], $details[1] );
-		$this->put( $client );
+		$result = wp_update_post(
+			array(
+				'ID'         => $post->ID,
+				'post_title' => $details[0],
+			),
+			true
+		);
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		update_post_meta( $post->ID, self::REDIRECT_URIS_KEY, $details[1] );
 
-		return $client;
+		return $this->get( $id ) ?? new WP_Error( 'oauth_server_client_save', __( 'The client could not be saved.', 'mcp-adapter' ) );
 	}
 
 	/**
@@ -122,14 +210,18 @@ final class ClientRepository {
 	 * @return array{0: \WP\OAuth\Clients\Client, 1: string|null}|\WP_Error The client and its plain-text secret, or an error.
 	 */
 	public function reset_secret( string $id, bool $confidential ) {
-		$client = $this->get( $id );
-		if ( null === $client ) {
+		$post = self::find_post( $id );
+		if ( null === $post ) {
 			return new WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
 		}
 
 		$secret = $confidential ? wp_generate_password( 40, false ) : null;
-		$client = $client->with_secret_hash( null === $secret ? null : wp_fast_hash( $secret ) );
-		$this->put( $client );
+		update_post_meta( $post->ID, self::SECRET_HASH_KEY, null === $secret ? '' : wp_fast_hash( $secret ) );
+
+		$client = $this->get( $id );
+		if ( null === $client ) {
+			return new WP_Error( 'oauth_server_client_save', __( 'The client could not be saved.', 'mcp-adapter' ) );
+		}
 
 		return array( $client, $secret );
 	}
@@ -143,40 +235,51 @@ final class ClientRepository {
 	 * @param string $id Client ID.
 	 */
 	public function delete( string $id ): bool {
-		$clients = $this->all();
-		if ( ! isset( $clients[ $id ] ) ) {
-			return false;
-		}
+		$post = self::find_post( $id );
 
-		unset( $clients[ $id ] );
-		$this->save( $clients );
-
-		return true;
+		return null !== $post && false !== wp_delete_post( $post->ID, true );
 	}
 
 	/**
-	 * Saves clients.
+	 * Finds the post for a client ID.
 	 *
-	 * @param array<string, \WP\OAuth\Clients\Client> $clients Clients keyed by ID.
+	 * Uses get_page_by_path(), which reads the posts table directly and is
+	 * object-cached. Unlike WP_Query it never looks up the current user, so it
+	 * is safe to call while authentication is still working that out.
+	 *
+	 * @param string $id Client ID.
 	 */
-	private function save( array $clients ): void {
-		$data = array();
-		foreach ( $clients as $client ) {
-			$data[] = $client->to_array();
+	private static function find_post( string $id ): ?WP_Post {
+		if ( ! wp_is_uuid( $id, 4 ) ) {
+			return null;
 		}
 
-		update_option( self::OPTION, $data, false );
+		$post = get_page_by_path( $id, OBJECT, self::POST_TYPE );
+
+		return $post instanceof WP_Post && 'publish' === $post->post_status ? $post : null;
 	}
 
 	/**
-	 * Saves one client, replacing any stored client with the same ID.
+	 * Builds a client from its post.
 	 *
-	 * @param \WP\OAuth\Clients\Client $client Client.
+	 * @param \WP_Post $post Client post.
+	 * @return \WP\OAuth\Clients\Client|null The client, or null if the post is malformed.
 	 */
-	private function put( Client $client ): void {
-		$clients                      = $this->all();
-		$clients[ $client->get_id() ] = $client;
-		$this->save( $clients );
+	private static function to_client( WP_Post $post ): ?Client {
+		$redirect_uris = get_post_meta( $post->ID, self::REDIRECT_URIS_KEY, true );
+		if ( '' === $post->post_name || ! is_array( $redirect_uris ) || empty( $redirect_uris ) ) {
+			return null;
+		}
+
+		$secret_hash = (string) get_post_meta( $post->ID, self::SECRET_HASH_KEY, true );
+
+		return new Client(
+			$post->post_name,
+			$post->post_title,
+			array_map( 'strval', $redirect_uris ),
+			'' === $secret_hash ? null : $secret_hash,
+			(int) get_post_time( 'U', true, $post )
+		);
 	}
 
 	/**

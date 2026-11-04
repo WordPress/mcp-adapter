@@ -27,6 +27,8 @@ to move into its own plugin or into core later.
    (RFC 7009), or deleting the client cuts the application off.
 
 Clients are registered by an administrator under **Settings > OAuth Clients**.
+Each client is a private `oauth_server_client` post, as in WP-API/OAuth2: the
+client ID is the post slug, and the redirect URIs and secret hash are post meta.
 
 ## Current scope
 

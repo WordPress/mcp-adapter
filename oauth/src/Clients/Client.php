@@ -76,64 +76,10 @@ final class Client {
 	}
 
 	/**
-	 * Builds a client from stored data.
-	 *
-	 * @param mixed $data Stored data.
-	 * @return self|null The client, or null if the data is malformed.
-	 */
-	public static function from_array( $data ): ?self {
-		if ( ! is_array( $data ) || empty( $data['id'] ) || empty( $data['name'] ) || empty( $data['redirect_uris'] ) || ! is_array( $data['redirect_uris'] ) ) {
-			return null;
-		}
-
-		return new self(
-			(string) $data['id'],
-			(string) $data['name'],
-			array_map( 'strval', $data['redirect_uris'] ),
-			isset( $data['secret_hash'] ) ? (string) $data['secret_hash'] : null,
-			(int) ( $data['created'] ?? 0 )
-		);
-	}
-
-	/**
-	 * Converts the client to storable data.
-	 *
-	 * @return array<string, mixed>
-	 */
-	public function to_array(): array {
-		return array(
-			'id'            => $this->id,
-			'name'          => $this->name,
-			'redirect_uris' => $this->redirect_uris,
-			'secret_hash'   => $this->secret_hash,
-			'created'       => $this->created,
-		);
-	}
-
-	/**
 	 * Gets the client identifier.
 	 */
 	public function get_id(): string {
 		return $this->id;
-	}
-
-	/**
-	 * Returns a copy with a new name and redirect URIs.
-	 *
-	 * @param string   $name          Display name.
-	 * @param string[] $redirect_uris Redirect URIs.
-	 */
-	public function with_details( string $name, array $redirect_uris ): self {
-		return new self( $this->id, $name, $redirect_uris, $this->secret_hash, $this->created );
-	}
-
-	/**
-	 * Returns a copy with a new secret hash, or none to make it a public client.
-	 *
-	 * @param string|null $secret_hash Hash of the client secret, or null.
-	 */
-	public function with_secret_hash( ?string $secret_hash ): self {
-		return new self( $this->id, $this->name, $this->redirect_uris, $secret_hash, $this->created );
 	}
 
 	/**

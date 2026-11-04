@@ -45,6 +45,17 @@ final class Bearer {
 	private $authenticated = false;
 
 	/**
+	 * Whether a token is being checked right now.
+	 *
+	 * Checking a token runs queries, and anything that asks for the current
+	 * user during them would start authentication again. WP-API/OAuth2 uses
+	 * the same lock.
+	 *
+	 * @var bool
+	 */
+	private $checking = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param \WP\OAuth\Clients\ClientRepository $clients Client registry.
@@ -72,7 +83,7 @@ final class Bearer {
 	 * @return int|false
 	 */
 	public function authenticate( $user_id ) {
-		if ( ! empty( $user_id ) ) {
+		if ( ! empty( $user_id ) || $this->checking ) {
 			return $user_id;
 		}
 
@@ -84,7 +95,13 @@ final class Bearer {
 		$this->error         = null;
 		$this->authenticated = false;
 
-		$result = $this->validate( $token );
+		$this->checking = true;
+		try {
+			$result = $this->validate( $token );
+		} finally {
+			$this->checking = false;
+		}
+
 		if ( is_wp_error( $result ) ) {
 			$this->error = $result;
 

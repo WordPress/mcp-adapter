@@ -141,6 +141,7 @@ final class Server {
 	 * Registers hooks for every component.
 	 */
 	private function register_hooks(): void {
+		$this->clients->register_hooks();
 		( new Discovery( $this->resources ) )->register_hooks();
 		( new Challenge( $this->resources, $this->bearer ) )->register_hooks();
 		( new Authorize( $this->clients, $this->resources, $this->codes ) )->register_hooks();
