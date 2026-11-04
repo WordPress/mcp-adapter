@@ -14,8 +14,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Issues short-lived, single-use authorization codes.
  *
- * Codes are stored as transients keyed by a hash of the code, so the stored
- * data cannot be used to recover a working code.
+ * Follows wp-media/mcp-oauth: 32 random bytes, a 60 second transient, and
+ * consumption that only succeeds for the request whose delete_transient()
+ * call removed it. Unlike mcp-oauth, the key is a hash of the code, so the
+ * stored data cannot be used to recover a working code.
  */
 final class AuthorizationCodes {
 
@@ -40,6 +42,9 @@ final class AuthorizationCodes {
 	/**
 	 * Looks up a code and deletes it, so it can only be used once.
 	 *
+	 * When two requests race for the same code, delete_transient() returns
+	 * true for only one of them, so only that one gets the data.
+	 *
 	 * @param string $code The code.
 	 * @return array<string, mixed>|null The bound request details, or null if the code is unknown or expired.
 	 */
@@ -50,9 +55,8 @@ final class AuthorizationCodes {
 
 		$key  = self::key( $code );
 		$data = get_transient( $key );
-		delete_transient( $key );
 
-		if ( ! is_array( $data ) || (int) ( $data['expires'] ?? 0 ) < time() ) {
+		if ( ! is_array( $data ) || ! delete_transient( $key ) || (int) ( $data['expires'] ?? 0 ) < time() ) {
 			return null;
 		}
 
