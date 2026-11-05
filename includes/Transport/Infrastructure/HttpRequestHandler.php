@@ -61,11 +61,19 @@ class HttpRequestHandler {
 	/**
 	 * Dispatch an HTTP request to protocol processing or session termination.
 	 *
+	 * A present Origin header that does not match this WordPress installation
+	 * is rejected with HTTP 403 before any method, session, or protocol handling,
+	 * for every HTTP method and both supported revisions.
+	 *
 	 * @param \WP\MCP\Transport\Infrastructure\HttpRequestContext $context Request body, method, and header values.
 	 *
-	 * @return \WP_REST_Response Protocol response, session-termination response, or method rejection.
+	 * @return \WP_REST_Response Protocol response, session-termination response, Origin rejection, or method rejection.
 	 */
 	public function handle_request( HttpRequestContext $context ): \WP_REST_Response {
+		if ( ! HttpOriginValidator::is_allowed( $context->origin_header, $this->transport_context->mcp_server, $this->transport_context->error_handler ) ) {
+			return new \WP_REST_Response( McpErrorFactory::permission_denied( null, 'Invalid Origin header' ), 403 );
+		}
+
 		$action = $this->orchestrator->http_method_action( $context->method, $context->protocol_version );
 		if ( 'process' === $action ) {
 			return $this->handle_post( $context );
