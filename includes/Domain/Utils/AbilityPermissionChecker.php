@@ -23,6 +23,12 @@ final class AbilityPermissionChecker {
 	 */
 	public static function check( \WP_Ability $ability, $arguments ) {
 		$input = AbilityArgumentNormalizer::normalize( $ability, $arguments );
+
+		if ( method_exists( $ability, 'prepare_input' ) ) {
+			$input = $ability->prepare_input( $input );
+			return is_wp_error( $input ) ? $input : $ability->check_permissions( $input );
+		}
+
 		$input = $ability->normalize_input( $input );
 		if ( is_wp_error( $input ) ) {
 			return $input;

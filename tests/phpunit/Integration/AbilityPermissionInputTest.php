@@ -97,7 +97,7 @@ class AbilityPermissionInputTest extends TestCase {
 	 * @param string $path Adapter entry point.
 	 */
 	public function test_permission_callback_receives_coerced_input( string $path ): void {
-		if ( ! method_exists( WP_Ability::class, 'coerce_input' ) ) {
+		if ( ! method_exists( WP_Ability::class, 'prepare_input' ) && ! method_exists( WP_Ability::class, 'coerce_input' ) ) {
 			$this->markTestSkipped( 'Input coercion requires WordPress 7.2 or later.' );
 		}
 
@@ -227,7 +227,7 @@ class AbilityPermissionInputTest extends TestCase {
 	 * @param string $path Adapter entry point.
 	 */
 	public function test_coercion_error_does_not_reach_permission_callback( string $path ): void {
-		if ( ! method_exists( WP_Ability::class, 'coerce_input' ) ) {
+		if ( ! method_exists( WP_Ability::class, 'prepare_input' ) && ! method_exists( WP_Ability::class, 'coerce_input' ) ) {
 			$this->markTestSkipped( 'Input coercion requires WordPress 7.2 or later.' );
 		}
 
@@ -259,6 +259,48 @@ class AbilityPermissionInputTest extends TestCase {
 		$this->assertInstanceOf( WP_Error::class, $result );
 		$this->assertSame( 'ability_invalid_input', $result->get_error_code() );
 		$this->assertSame( 0, $calls );
+	}
+
+	/**
+	 * A normalization filter must run once before the permission callback.
+	 *
+	 * @dataProvider permission_paths
+	 * @param string $path Adapter entry point.
+	 */
+	public function test_input_is_prepared_once_before_permission_check( string $path ): void {
+		global $wp_version;
+		if ( version_compare( $wp_version, '7.1', '<' ) ) {
+			$this->markTestSkipped( 'The input normalization filter requires WordPress 7.1 or later.' );
+		}
+
+		$calls   = 0;
+		$seen    = array();
+		$ability = $this->make_ability(
+			array(
+				'type'       => 'object',
+				'properties' => array( 'id' => array( 'type' => 'integer' ) ),
+				'required'   => array( 'id' ),
+			),
+			static function ( $input ) use ( &$seen ): bool {
+				$seen[] = $input;
+				return true;
+			}
+		);
+		$filter  = static function ( $input, string $name ) use ( $ability, &$calls ) {
+			if ( $ability->get_name() === $name ) {
+				++$calls;
+				++$input['id'];
+			}
+			return $input;
+		};
+		add_filter( 'wp_ability_normalize_input', $filter, 10, 2 );
+		try {
+			$this->assertTrue( $this->check_permission( $path, $ability, array( 'id' => 1 ) ) );
+			$this->assertSame( array( array( 'id' => 2 ) ), $seen );
+			$this->assertSame( 1, $calls );
+		} finally {
+			remove_filter( 'wp_ability_normalize_input', $filter, 10 );
+		}
 	}
 
 	/**
