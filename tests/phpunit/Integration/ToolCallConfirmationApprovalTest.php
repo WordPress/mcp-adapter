@@ -59,6 +59,24 @@ final class ToolCallConfirmationApprovalTest extends ToolCallConfirmationTestCas
 		$this->assertSame( $this->user_id, $events[0]['user_id'] );
 	}
 
+	/** The page shows the input to the approver; once used, nothing stored keeps it. */
+	public function test_approval_data_does_not_outlive_the_confirmation(): void {
+		$parent = $this->make_agent_with_parent();
+		$asked  = $this->call_modern( 'test/confirm-uninstall', array( 'plugin' => 'zebra-quokka-7731' ), array(), array( 'url' ) )['result'];
+		$id     = self::id_from_state( $asked['requestState'] );
+		$this->assertStringContainsString( 'zebra-quokka-7731', ToolCallConfirmation::approval_request( $id, $parent )['summary'] );
+
+		ToolCallConfirmation::answer( $id, $parent, true );
+		$retry = array(
+			'requestState'   => $asked['requestState'],
+			'inputResponses' => array( ToolCallConfirmation::INPUT_KEY => array( 'action' => 'accept' ) ),
+		);
+		$this->assertSame( 'complete', $this->call_modern( 'test/confirm-uninstall', array( 'plugin' => 'zebra-quokka-7731' ), $retry, array( 'url' ) )['result']['resultType'] );
+
+		$this->assertSame( 'mcp_adapter_confirmation_link_expired', ToolCallConfirmation::approval_request( $id, $parent )->get_error_code() );
+		$this->assertSame( 0, self::stored_rows_containing( 'quokka' ) );
+	}
+
 	/** Nobody but the approver can see or answer the request: not another user, not the agent. */
 	public function test_only_the_approver_can_answer(): void {
 		$parent = $this->make_agent_with_parent();

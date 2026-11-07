@@ -444,14 +444,23 @@ final class ToolCallConfirmation {
 		}
 
 		$follow_ups = self::follow_ups( $ability, $input, $binding );
-		$summary    = self::summary( $ability, $input, $follow_ups );
+		$described  = self::summary( $ability, $input, $follow_ups );
+		$summary    = $described['shown'];
 		$id         = bin2hex( random_bytes( 16 ) );
 		$ttl        = self::ttl();
 		$expires    = time() + $ttl;
 		$record     = array(
 			'binding'     => $binding,
 			'channel'     => $channel,
+			// What the question shows, kept only until the confirmation is used or expires.
 			'summary'     => $summary,
+			// What may outlive it: the Ability's own sentence, never the default built from the input.
+			'described'   => array(
+				'ability_label'  => $ability->get_label(),
+				'summary'        => $described['ability'],
+				'summary_source' => $described['source'],
+				'covers'         => array_column( $follow_ups, 'summary' ),
+			),
 			'follow_ups'  => $follow_ups,
 			'approver'    => $approver,
 			'approved_by' => 0,
@@ -633,6 +642,12 @@ final class ToolCallConfirmation {
 					'binding'      => $follow_up['binding'],
 					'channel'      => $record['channel'],
 					'summary'      => $follow_up['summary'],
+					'described'    => array(
+						'ability_label'  => $follow_up['label'],
+						'summary'        => $follow_up['summary'],
+						'summary_source' => 'ability',
+						'covers'         => array(),
+					),
 					'approved_by'  => (int) ( $record['approved_by'] ?? 0 ),
 					'follow_up_of' => $used_id,
 					'issued_at'    => (int) $record['issued_at'],
@@ -645,26 +660,32 @@ final class ToolCallConfirmation {
 		/**
 		 * Fires when a confirmed Ability call is about to run.
 		 *
-		 * The record carries a digest of the input, never the input itself, so that this
-		 * broadcast action cannot leak call arguments to every listener. Use it to log
-		 * that the person said yes, and to what. Retries that get a stored result back
-		 * do not fire it again.
+		 * The record never carries the input, so that this broadcast action cannot leak
+		 * call arguments to every listener: only its digest, the Ability's label, and a
+		 * summary when the Ability wrote its own sentence (`summary_source` is
+		 * 'ability'). The default question text is built from the input, so it is never
+		 * passed on (`summary` is null, `summary_source` is 'default'). Use it to log that
+		 * the person said yes, and to what. Retries that get a stored result back do not
+		 * fire it again.
 		 *
 		 * Experimental.
 		 *
 		 * @since n.e.x.t
 		 *
 		 * @param array                  $confirmation {
-		 *     @type string      $id           Confirmation identifier, the key its result is stored under.
-		 *     @type string      $ability      Ability name.
-		 *     @type string      $input_hash   SHA-256 of the canonical input JSON.
-		 *     @type string      $summary      What the person was asked to confirm.
-		 *     @type string      $channel      'url', 'form' or 'chat'.
-		 *     @type int         $user_id      User the call runs as.
-		 *     @type int         $approved_by  User who approved on the approval page, 0 for other channels.
-		 *     @type string|null $follow_up_of Confirmation this follow-up was covered by, or null.
-		 *     @type int         $issued_at    Unix time the question was asked.
-		 *     @type int         $confirmed_at Unix time the confirmation was used.
+		 *     @type string      $id             Confirmation identifier, the key its result is stored under.
+		 *     @type string      $ability        Ability name.
+		 *     @type string      $ability_label  Ability label.
+		 *     @type string      $input_hash     SHA-256 of the canonical input JSON.
+		 *     @type string|null $summary        The Ability's own sentence the person confirmed, or null.
+		 *     @type string      $summary_source 'ability' (from the Ability or the summary filter) or 'default'.
+		 *     @type string[]    $covers         Sentences of the follow-ups this confirmation also covers.
+		 *     @type string      $channel        'url', 'form' or 'chat'.
+		 *     @type int         $user_id        User the call runs as.
+		 *     @type int         $approved_by    User who approved on the approval page, 0 for other channels.
+		 *     @type string|null $follow_up_of   Confirmation this follow-up was covered by, or null.
+		 *     @type int         $issued_at      Unix time the question was asked.
+		 *     @type int         $confirmed_at   Unix time the confirmation was used.
 		 * }
 		 * @param string                 $tool_name The MCP tool name.
 		 * @param \WP\MCP\Core\McpServer $server    The MCP server.
@@ -672,16 +693,19 @@ final class ToolCallConfirmation {
 		do_action(
 			'mcp_adapter_tool_call_confirmed',
 			array(
-				'id'           => $used_id,
-				'ability'      => $record['binding']['ability'],
-				'input_hash'   => $record['binding']['input'],
-				'summary'      => $record['summary'],
-				'channel'      => $record['channel'],
-				'user_id'      => $record['binding']['user'],
-				'approved_by'  => (int) ( $record['approved_by'] ?? 0 ),
-				'follow_up_of' => $record['follow_up_of'] ?? null,
-				'issued_at'    => (int) $record['issued_at'],
-				'confirmed_at' => time(),
+				'id'             => $used_id,
+				'ability'        => $record['binding']['ability'],
+				'ability_label'  => (string) ( $record['described']['ability_label'] ?? '' ),
+				'input_hash'     => $record['binding']['input'],
+				'summary'        => $record['described']['summary'] ?? null,
+				'summary_source' => (string) ( $record['described']['summary_source'] ?? 'default' ),
+				'covers'         => $record['described']['covers'] ?? array(),
+				'channel'        => $record['channel'],
+				'user_id'        => $record['binding']['user'],
+				'approved_by'    => (int) ( $record['approved_by'] ?? 0 ),
+				'follow_up_of'   => $record['follow_up_of'] ?? null,
+				'issued_at'      => (int) $record['issued_at'],
+				'confirmed_at'   => time(),
 			),
 			$tool_name,
 			$server
@@ -753,7 +777,7 @@ final class ToolCallConfirmation {
 	 * @param mixed                $input   Target input.
 	 * @param array<string, mixed> $binding What the main call is.
 	 *
-	 * @return list<array{binding: array<string, mixed>, summary: string}>
+	 * @return list<array{binding: array<string, mixed>, summary: string, label: string}>
 	 */
 	private static function follow_ups( WP_Ability $ability, $input, array $binding ): array {
 		$meta     = $ability->get_meta();
@@ -799,6 +823,7 @@ final class ToolCallConfirmation {
 			$follow_ups[] = array(
 				'binding' => $follow_binding,
 				'summary' => trim( $entry['summary'] ),
+				'label'   => $follow_ability->get_label(),
 			);
 		}
 
@@ -948,43 +973,64 @@ final class ToolCallConfirmation {
 	}
 
 	/**
-	 * A plain description of what the call would do, naming any follow-ups it covers.
+	 * What the person is asked to confirm, and the part of it that may be kept.
 	 *
-	 * @param \WP_Ability                                                  $ability    Target Ability.
-	 * @param mixed                                                        $input      Target input.
-	 * @param list<array{binding: array<string, mixed>, summary: string}> $follow_ups Covered follow-ups.
+	 * The default sentence shows the Ability and its input, because the person has to
+	 * see what will change. It is only shown: since it is built from the input, it is
+	 * never kept beyond the pending confirmation or passed to hooks. A sentence the
+	 * Ability writes itself (`meta.mcp.confirmation_summary` or the summary filter) may be.
+	 *
+	 * @param \WP_Ability                                                                $ability    Target Ability.
+	 * @param mixed                                                                      $input      Target input.
+	 * @param list<array{binding: array<string, mixed>, summary: string, label: string}> $follow_ups Covered follow-ups.
+	 *
+	 * @return array{shown: string, ability: string|null, source: string}
 	 */
-	private static function summary( WP_Ability $ability, $input, array $follow_ups ): string {
+	private static function summary( WP_Ability $ability, $input, array $follow_ups ): array {
 		$json = (string) wp_json_encode( $input );
 		if ( strlen( $json ) > 500 ) {
 			$json = substr( $json, 0, 500 ) . '...';
 		}
 		$default = sprintf( '%1$s (%2$s) with %3$s', $ability->get_label(), $ability->get_name(), $json );
 
+		$meta     = $ability->get_meta();
+		$callback = is_array( $meta['mcp'] ?? null ) ? ( $meta['mcp']['confirmation_summary'] ?? null ) : null;
+		$own      = is_callable( $callback ) ? call_user_func( $callback, $input ) : null;
+		$summary  = is_string( $own ) && '' !== trim( $own ) ? trim( $own ) : $default;
+
 		/**
 		 * Filters the sentence a person is asked to confirm.
 		 *
 		 * Abilities that can predict their effect ("Move the page About us to the trash")
-		 * should say so here. The confirmation stays bound to the full input whatever the
-		 * summary shows. Covered follow-ups are appended after this filter, so they are
-		 * always named.
+		 * should say so here, or with a `meta.mcp.confirmation_summary` callback that
+		 * receives the input. Such a sentence is treated as the Ability's own: it is passed
+		 * to `mcp_adapter_tool_call_confirmed` and may be logged, so keep secrets out of it.
+		 * The default sentence is built from the input and is only shown. The confirmation
+		 * stays bound to the full input whatever the summary shows. Covered follow-ups are
+		 * appended after this filter, so they are always named.
 		 *
 		 * Experimental.
 		 *
 		 * @since n.e.x.t
 		 *
-		 * @param string      $summary Default summary: label, name and input JSON.
+		 * @param string      $summary Ability sentence, or the default: label, name and input JSON.
 		 * @param \WP_Ability $ability The Ability that would run.
 		 * @param mixed       $input   The input it would run with.
 		 */
-		$summary = apply_filters( 'mcp_adapter_tool_call_confirmation_summary', $default, $ability, $input );
+		$summary = apply_filters( 'mcp_adapter_tool_call_confirmation_summary', $summary, $ability, $input );
 		$summary = is_string( $summary ) && '' !== trim( $summary ) ? $summary : $default;
+		$source  = $default === $summary ? 'default' : 'ability';
 
-		if ( array() === $follow_ups ) {
-			return $summary;
+		$shown = $summary;
+		if ( array() !== $follow_ups ) {
+			$shown .= "\n\n" . __( 'The same yes also covers:', 'mcp-adapter' ) . "\n- " . implode( "\n- ", array_column( $follow_ups, 'summary' ) );
 		}
 
-		return $summary . "\n\n" . __( 'The same yes also covers:', 'mcp-adapter' ) . "\n- " . implode( "\n- ", array_column( $follow_ups, 'summary' ) );
+		return array(
+			'shown'   => $shown,
+			'ability' => 'ability' === $source ? $summary : null,
+			'source'  => $source,
+		);
 	}
 
 	/**

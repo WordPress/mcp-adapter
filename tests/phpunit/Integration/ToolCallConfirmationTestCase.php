@@ -59,12 +59,16 @@ abstract class ToolCallConfirmationTestCase extends TestCase {
 				'test/confirm-' . $verb,
 				ucfirst( $verb ) . ' a plugin',
 				array( 'plugin' => array( 'type' => 'string' ) ),
-				static function ( array $input ) use ( $verb ): array {
+				static function () use ( $verb ): array {
+					// Deliberately does not echo its input, so stored responses never contain it.
 					return array(
-						$verb => $input['plugin'],
-						'run' => self::$runs[ 'test/confirm-' . $verb ],
+						'done' => $verb,
+						'run'  => self::$runs[ 'test/confirm-' . $verb ],
 					);
 				},
+				'activate' === $verb ? static function ( $input ): string {
+					return 'Switch on the plugin ' . $input['plugin'];
+				} : null,
 				'install' === $verb ? static function ( $input ): array {
 					return array(
 						array(
@@ -118,8 +122,11 @@ abstract class ToolCallConfirmationTestCase extends TestCase {
 	}
 
 	/** Register one destructive Ability that counts its runs. */
-	private function register_destructive( string $name, string $label, array $properties, callable $execute, ?callable $follow_ups = null ): void {
+	private function register_destructive( string $name, string $label, array $properties, callable $execute, ?callable $summary = null, ?callable $follow_ups = null ): void {
 		$mcp = array( 'public' => true );
+		if ( null !== $summary ) {
+			$mcp['confirmation_summary'] = $summary;
+		}
 		if ( null !== $follow_ups ) {
 			$mcp['confirmation_follow_ups'] = $follow_ups;
 		}
@@ -152,6 +159,14 @@ abstract class ToolCallConfirmationTestCase extends TestCase {
 				),
 			)
 		);
+	}
+
+	/** Option rows (pending confirmations, stored results, grants) that contain a value. */
+	protected static function stored_rows_containing( string $needle ): int {
+		global $wpdb;
+		wp_cache_flush();
+
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_value LIKE %s", '%' . $wpdb->esc_like( $needle ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	}
 
 	/** Executions of one test Ability. */

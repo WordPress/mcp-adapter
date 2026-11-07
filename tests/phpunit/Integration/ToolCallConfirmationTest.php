@@ -326,6 +326,74 @@ final class ToolCallConfirmationTest extends ToolCallConfirmationTestCase {
 		$this->assertArrayNotHasKey( 'input', $confirmation );
 	}
 
+	/** The person sees the input, but no hook payload or stored record keeps it after use. */
+	public function test_default_summary_never_leaves_the_question(): void {
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$events = array();
+		add_action(
+			'mcp_adapter_tool_call_confirmed',
+			static function ( array $confirmation ) use ( &$events ): void {
+				$events[] = $confirmation;
+			}
+		);
+		$secret = 'zebra-quokka-7731';
+
+		$asked = $this->call_ability( 'test/confirm-uninstall', array( 'plugin' => $secret ) );
+		$this->assertStringContainsString( $secret, $asked['content'][0]['text'], 'The person must see what will change.' );
+		$token = $this->token_from( $asked );
+		$this->call_ability( 'test/confirm-uninstall', array( 'plugin' => $secret, ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+		$this->call_ability( 'test/confirm-uninstall', array( 'plugin' => $secret, ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+
+		$this->assertCount( 1, $events );
+		$this->assertNull( $events[0]['summary'] );
+		$this->assertSame( 'default', $events[0]['summary_source'] );
+		$this->assertSame( 'Uninstall a plugin', $events[0]['ability_label'] );
+		foreach ( array( $secret, 'zebra', 'quokka', '7731' ) as $part ) {
+			$this->assertStringNotContainsString( $part, (string) wp_json_encode( $events[0] ) );
+		}
+
+		// The pending confirmation is gone; only the hash and the response remain.
+		$this->assertFalse( get_transient( 'mcp_adapter_confirm_' . $token ) );
+		$this->assertSame( 0, self::stored_rows_containing( 'quokka' ) );
+	}
+
+	/** A sentence the Ability wrote itself is passed on, and says where it came from. */
+	public function test_ability_sentence_is_kept(): void {
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$events = array();
+		add_action(
+			'mcp_adapter_tool_call_confirmed',
+			static function ( array $confirmation ) use ( &$events ): void {
+				$events[] = $confirmation;
+			}
+		);
+		add_filter(
+			'mcp_adapter_tool_call_confirmation_summary',
+			static function ( string $summary, \WP_Ability $ability ): string {
+				return 'test/confirm-uninstall' === $ability->get_name() ? 'Remove the plugin the person named' : $summary;
+			},
+			10,
+			2
+		);
+
+		// From the summary filter.
+		$token = $this->token_from( $this->call_ability( 'test/confirm-uninstall', array( 'plugin' => 'hello' ) ) );
+		$this->call_ability( 'test/confirm-uninstall', array( 'plugin' => 'hello', ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+		// From the Ability's own meta.mcp.confirmation_summary callback.
+		$token = $this->token_from( $this->call_ability( 'test/confirm-activate', array( 'plugin' => 'hello' ) ) );
+		$this->call_ability( 'test/confirm-activate', array( 'plugin' => 'hello', ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+		// A follow-up's declared sentence is the Ability's too, and the main call lists it.
+		$token = $this->token_from( $this->call_ability( 'test/confirm-install', array( 'plugin' => 'world' ) ) );
+		$this->call_ability( 'test/confirm-install', array( 'plugin' => 'world', ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+		$this->call_ability( 'test/confirm-activate', array( 'plugin' => 'world' ) );
+
+		$this->assertSame( array( 'Remove the plugin the person named', 'ability' ), array( $events[0]['summary'], $events[0]['summary_source'] ) );
+		$this->assertSame( array( 'Switch on the plugin hello', 'ability' ), array( $events[1]['summary'], $events[1]['summary_source'] ) );
+		$this->assertSame( array( null, 'default' ), array( $events[2]['summary'], $events[2]['summary_source'] ) );
+		$this->assertSame( array( 'Activate the plugin world' ), $events[2]['covers'] );
+		$this->assertSame( array( 'Activate the plugin world', 'ability', $token ), array( $events[3]['summary'], $events[3]['summary_source'], $events[3]['follow_up_of'] ) );
+	}
+
 	/** Other continuations on Ability-backed tools are still rejected. */
 	public function test_foreign_continuation_is_still_rejected(): void {
 		$response = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), array( 'requestState' => 'someone-else' ) );

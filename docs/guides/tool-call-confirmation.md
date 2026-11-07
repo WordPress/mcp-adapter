@@ -69,7 +69,19 @@ A confirmation runs its call once: only the request that deletes it may run. The
 - A retry that arrives while the first call is still running waits up to five seconds for its response (filter `mcp_adapter_tool_call_confirmation_replay_wait`, 0 to 30), then says the call is still running. It never runs the call a second time.
 - Protocol errors are never replayed, because they carry the first request's id. Results larger than 512 KB are not kept. In both cases a retry is told that the call already ran once and to check the site.
 
-Only the response is stored, never the input.
+Only the response is stored, never the input. Expired records are removed by WordPress's regular cleanup of expired transients.
+
+## What is kept, and for how long
+
+The person has to see what will change, so the default question shows the Ability's label and name and its input as JSON (up to 500 characters). That text is only shown:
+
+| Record | Holds | Until |
+| --- | --- | --- |
+| Pending confirmation | The binding (input as a SHA-256 hash), the question text, the approver | Used, declined or expired, then deleted |
+| Stored result | The binding and the call's response | The confirmation's expiry |
+| Follow-up grant | The binding and the follow-up's declared sentence | Used or the confirmation's expiry |
+
+Nothing that outlives the confirmation or is passed to a hook carries the input or the default question text. Hooks and logs get the input hash, the Ability's name and label, and a summary only when the Ability wrote its own sentence. `summary_source` says which: `ability` when the sentence came from the Ability (`meta.mcp.confirmation_summary`) or the summary filter, `default` when the question was built from the input, in which case `summary` is `null`. Declared follow-up sentences are the Ability's own as well. An Ability that writes its own sentence decides what it contains, so it should keep secrets out of it.
 
 ## One yes for the obvious next step
 
@@ -99,7 +111,7 @@ An Ability can declare them with a callback in its MCP metadata:
 
 ## Describing the change
 
-The default question names the Ability and shows its input as JSON. An Ability that can predict its effect should say so:
+The default question names the Ability and shows its input as JSON. An Ability that can predict its effect should say so, either with a `meta.mcp.confirmation_summary` callback that receives the input and returns a sentence, or with a filter:
 
 ```php
 add_filter(
@@ -116,8 +128,8 @@ add_filter(
 );
 ```
 
-Covered follow-ups are appended after this filter, so they are always named.
+Covered follow-ups are appended after this filter, so they are always named. A sentence from either source is the Ability's own, so it is passed to hooks with `summary_source` set to `ability`.
 
 ## Recording what was confirmed
 
-`mcp_adapter_tool_call_confirmed` fires once, just before a confirmed call runs, with the confirmation id, the Ability name, a digest of the input (never the input itself), the summary the person saw, the channel (`url`, `form` or `chat`), the user, the approver for the approval page, the confirmation a follow-up was covered by, and the times. Use it to log that the person said yes, and to what.
+`mcp_adapter_tool_call_confirmed` fires once, just before a confirmed call runs, with the confirmation id, the Ability name and label, a digest of the input (never the input itself), `summary` and `summary_source` as described above, `covers` (the sentences of the follow-ups it also covers), the channel (`url`, `form` or `chat`), the user, the approver for the approval page, the confirmation a follow-up was covered by, and the times. Use it to log that the person said yes, and to what.
