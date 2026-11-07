@@ -322,6 +322,15 @@ final class McpTool implements McpComponentInterface {
 	}
 
 	/**
+	 * The Ability this tool delegates to, or null for direct tools.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function get_ability(): ?\WP_Ability {
+		return $this->ability;
+	}
+
+	/**
 	 * Unwrap tool input arguments when the input schema was transformed (flattened → object wrapper).
 	 *
 	 * @param mixed $arguments Raw tool arguments.
