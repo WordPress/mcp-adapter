@@ -13,6 +13,7 @@ use WP\MCP\Abilities\DiscoverAbilitiesAbility;
 use WP\MCP\Abilities\ExecuteAbilityAbility;
 use WP\MCP\Abilities\GetAbilityInfoAbility;
 use WP\MCP\Admin\ConfirmationApprovalPage;
+use WP\MCP\Admin\ConfirmedCallLog;
 use WP\MCP\Cli\McpCommand;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
@@ -74,8 +75,9 @@ final class McpAdapter {
 			add_action( 'wp_abilities_api_categories_init', array( self::$instance, 'register_default_category' ) );
 			add_action( 'wp_abilities_api_init', array( self::$instance, 'register_default_abilities' ) );
 
-			// The approval page for confirmed calls (URL elicitation).
+			// The approval page for confirmed calls (URL elicitation), and their record for the owner.
 			ConfirmationApprovalPage::register();
+			ConfirmedCallLog::register();
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {
