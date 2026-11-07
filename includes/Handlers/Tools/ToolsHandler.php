@@ -129,21 +129,25 @@ class ToolsHandler {
 				return McpErrorFactory::tool_not_found( $request_id, $tool_name );
 			}
 
+			// The confirmation token is Adapter plumbing: Abilities never receive it.
+			$confirmation_token = $mcp_tool->is_ability_backed() ? ToolCallConfirmation::take_token( $args ) : null;
+
 			$has_continuation = $request_params->has( 'requestState' ) || $request_params->has( 'inputResponses' );
-			if ( $has_continuation && ( $mcp_tool->is_ability_backed() || Schemas::V2026_07_28 !== $request_context->revision() ) ) {
+			// Ability-backed tools accept a continuation only to answer the Adapter's own confirmation question.
+			$confirmation_continuation = $mcp_tool->is_ability_backed() && ToolCallConfirmation::is_confirmation_state( $request_params->getRequestState() );
+			if ( $has_continuation && ( Schemas::V2026_07_28 !== $request_context->revision() || ( $mcp_tool->is_ability_backed() && ! $confirmation_continuation ) ) ) {
 				return McpErrorFactory::invalid_params( $request_id, 'Continuation parameters require a direct MCP 2026-07-28 tool.' );
 			}
 
-			$call_context = null;
-			if ( ! $mcp_tool->is_ability_backed() ) {
-				$responses    = $request_params->getInputResponses();
-				$call_context = new McpToolCallContext(
-					$request_context,
-					null === $responses ? new \stdClass() : json_decode( json_encode( $responses, JSON_THROW_ON_ERROR ), false, 512, JSON_THROW_ON_ERROR ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Preserve exact client input without normalization.
-					$request_params->getRequestState(),
-					$has_continuation
-				);
-			}
+			$responses     = $request_params->getInputResponses();
+			$input_context = new McpToolCallContext(
+				$request_context,
+				null === $responses ? new \stdClass() : json_decode( json_encode( $responses, JSON_THROW_ON_ERROR ), false, 512, JSON_THROW_ON_ERROR ), // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Preserve exact client input without normalization.
+				$request_params->getRequestState(),
+				$has_continuation
+			);
+			// Only direct tools receive the context; Abilities keep their one-argument contract.
+			$call_context = $mcp_tool->is_ability_backed() ? null : $input_context;
 
 			$permission = $mcp_tool->check_permission( $args );
 			if ( true !== $permission ) {
@@ -186,6 +190,18 @@ class ToolsHandler {
 				return $this->create_error_result( $args->get_error_message() );
 			}
 
+			// Ask the person before a destructive Ability call runs. Refusals above come first,
+			// so nobody is asked about a call that would be refused anyway.
+			if ( $mcp_tool->is_ability_backed() && is_array( $args ) ) {
+				$confirmation = ToolCallConfirmation::check( $this->mcp, $mcp_tool, $tool_name, $args, $confirmation_token, $input_context );
+				if ( $confirmation instanceof McpInputRequired ) {
+					return $this->input_required_result( $confirmation, $input_context, $request_context, $request_id );
+				}
+				if ( is_wp_error( $confirmation ) ) {
+					return $this->create_error_result( $confirmation->get_error_message() );
+				}
+			}
+
 			$result = $mcp_tool->execute( $args, $call_context );
 
 			/**
@@ -206,29 +222,7 @@ class ToolsHandler {
 			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp );
 
 			if ( $result instanceof McpInputRequired ) {
-				if ( null === $call_context || Schemas::V2026_07_28 !== $request_context->revision() ) {
-					return McpErrorFactory::internal_error( $request_id, 'Input-required results require a direct MCP 2026-07-28 tool.' );
-				}
-				$requests = $request_context->schema()->fromArray( InputRequests::class, $result->input_requests() );
-				$values   = json_decode( json_encode( $requests, JSON_THROW_ON_ERROR ), false, 512, JSON_THROW_ON_ERROR ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Inspect validated protocol values without normalization.
-				foreach ( get_object_vars( $values ) as $input_request ) {
-					if ( 'elicitation/create' !== $input_request->method ) {
-						return McpErrorFactory::internal_error( $request_id, 'Only elicitation input requests are supported.' );
-					}
-					$mode = $input_request->params->mode ?? 'form';
-					if ( ! $call_context->client_supports_elicitation( $mode ) ) {
-						$required = (object) array( 'elicitation' => (object) array( $mode => new \stdClass() ) );
-						return McpErrorFactory::create_error_response( $request_id, McpErrorFactory::MISSING_CAPABILITY, 'The client has not declared the capabilities required for this input request.', array( 'requiredCapabilities' => $required ) );
-					}
-				}
-				$data = array( 'resultType' => 'input_required' );
-				if ( array() !== $result->input_requests() ) {
-					$data['inputRequests'] = $requests;
-				}
-				if ( null !== $result->request_state() ) {
-					$data['requestState'] = $result->request_state();
-				}
-				return $data;
+				return $this->input_required_result( $result, $call_context, $request_context, $request_id );
 			}
 
 			if ( is_wp_error( $result ) ) {
@@ -390,6 +384,43 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
+	}
+
+	/**
+	 * Build an input-required result after checking revision and client capabilities.
+	 *
+	 * @param \WP\MCP\Domain\Tools\McpInputRequired        $result          The input request.
+	 * @param \WP\MCP\Domain\Tools\McpToolCallContext|null $call_context    Context of the asking request, null when none may ask.
+	 * @param \WP\MCP\Core\McpRequestContext               $request_context Exact request context.
+	 * @param string|int|float|null                        $request_id      JSON-RPC request id.
+	 *
+	 * @return array<string, mixed>
+	 * @since n.e.x.t Extracted from call_tool() so the Adapter's confirmation question uses the same checks.
+	 */
+	private function input_required_result( McpInputRequired $result, ?McpToolCallContext $call_context, McpRequestContext $request_context, $request_id ): array {
+		if ( null === $call_context || Schemas::V2026_07_28 !== $request_context->revision() ) {
+			return McpErrorFactory::internal_error( $request_id, 'Input-required results require a direct MCP 2026-07-28 tool.' );
+		}
+		$requests = $request_context->schema()->fromArray( InputRequests::class, $result->input_requests() );
+		$values   = json_decode( json_encode( $requests, JSON_THROW_ON_ERROR ), false, 512, JSON_THROW_ON_ERROR ); // phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Inspect validated protocol values without normalization.
+		foreach ( get_object_vars( $values ) as $input_request ) {
+			if ( 'elicitation/create' !== $input_request->method ) {
+				return McpErrorFactory::internal_error( $request_id, 'Only elicitation input requests are supported.' );
+			}
+			$mode = $input_request->params->mode ?? 'form';
+			if ( ! $call_context->client_supports_elicitation( $mode ) ) {
+				$required = (object) array( 'elicitation' => (object) array( $mode => new \stdClass() ) );
+				return McpErrorFactory::create_error_response( $request_id, McpErrorFactory::MISSING_CAPABILITY, 'The client has not declared the capabilities required for this input request.', array( 'requiredCapabilities' => $required ) );
+			}
+		}
+		$data = array( 'resultType' => 'input_required' );
+		if ( array() !== $result->input_requests() ) {
+			$data['inputRequests'] = $requests;
+		}
+		if ( null !== $result->request_state() ) {
+			$data['requestState'] = $result->request_state();
+		}
+		return $data;
 	}
 
 	/**
