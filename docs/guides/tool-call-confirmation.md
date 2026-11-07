@@ -132,4 +132,25 @@ Covered follow-ups are appended after this filter, so they are always named. A s
 
 ## Recording what was confirmed
 
-`mcp_adapter_tool_call_confirmed` fires once, just before a confirmed call runs, with the confirmation id, the Ability name and label, a digest of the input (never the input itself), `summary` and `summary_source` as described above, `covers` (the sentences of the follow-ups it also covers), the channel (`url`, `form` or `chat`), the user, the approver for the approval page, the confirmation a follow-up was covered by, and the times. Use it to log that the person said yes, and to what.
+`mcp_adapter_tool_call_confirmed` fires once, just before a confirmed call runs, with the confirmation id, the Ability name and label, a digest of the input (never the input itself), `summary` and `summary_source` as described above, `covers` (the sentences of the follow-ups it also covers), the channel (`url`, `form` or `chat`), the user, the approver for the approval page, the confirmation a follow-up was covered by, and the times. `mcp_adapter_tool_call_confirmation_finished` fires after it ran, with the same id and `success`, `error` (the tool reported an error) or `failed` (the call did not complete). Retries that get a stored result do not fire either action again. Use them to log that the person said yes, and to what.
+
+### Tools → Agent changes
+
+The Adapter keeps a record of confirmed calls built on those two actions, so the owner can see what agents changed. Each entry holds:
+
+- the Ability's name and label, the MCP tool and the input hash, never the input;
+- the summary only when the Ability wrote its own sentence, with `summary_source` saying `ability` or `default`, and the sentences of any follow-ups the yes also covered;
+- how the person said yes: on the approval page (with the approver), in the MCP client, or reported by the agent in the chat;
+- who ran it: the user, and for an agent user from [WordPress/ai#1068](https://github.com/WordPress/ai/pull/1068) its parent at the time, through `wpai_is_agent_user()` and `wpai_get_agent_parent()`;
+- the confirmation a follow-up was covered by;
+- when it was confirmed and finished, and the result.
+
+For a default question the entry shows the Ability's label and name and says the details the person saw were not kept, because they contained the input.
+
+Names are stored with the IDs, so an entry still reads the same after an agent or its parent is deleted. Entries have no post author, so deleting or reassigning a user's content never moves them.
+
+**Tools → Agent changes** lists them, newest first. Users who can manage options see every entry; other users with `edit_posts` see their own calls, their agents' calls and the calls they approved. The newest 500 entries are kept (filter `mcp_adapter_confirmed_call_log_size`). Turn the record off with:
+
+```php
+add_filter( 'mcp_adapter_confirmed_call_log_enabled', '__return_false' );
+```

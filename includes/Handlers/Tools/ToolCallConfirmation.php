@@ -196,22 +196,40 @@ final class ToolCallConfirmation {
 	 * @param array<string, mixed>                 $response The logical response returned to the client.
 	 */
 	public static function remember( ConfirmedCall $call, array $response ): void {
-		$used = get_transient( self::USED_PREFIX . $call->id() );
-		if ( ! is_array( $used ) ) {
-			return;
-		}
-
 		if ( isset( $response['error'] ) ) {
-			// A protocol error carries this request's id; never replay it to another request.
-			$used['status'] = 'failed';
-		} elseif ( strlen( serialize( $response ) ) > self::MAX_STORED_RESULT ) { // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Measures what the transient will store.
-			$used['status'] = 'unstored';
+			$outcome = 'failed';
 		} else {
-			$used['status'] = 'done';
-			$used['result'] = $response;
+			$outcome = true === ( $response['isError'] ?? false ) ? 'error' : 'success';
 		}
 
-		self::store_until( self::USED_PREFIX . $call->id(), $used, (int) $used['expires'] );
+		$used = get_transient( self::USED_PREFIX . $call->id() );
+		if ( is_array( $used ) ) {
+			if ( 'failed' === $outcome ) {
+				// A protocol error carries this request's id; never replay it to another request.
+				$used['status'] = 'failed';
+			} elseif ( strlen( serialize( $response ) ) > self::MAX_STORED_RESULT ) { // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize -- Measures what the transient will store.
+				$used['status'] = 'unstored';
+			} else {
+				$used['status'] = 'done';
+				$used['result'] = $response;
+			}
+			self::store_until( self::USED_PREFIX . $call->id(), $used, (int) $used['expires'] );
+		}
+
+		/**
+		 * Fires once a confirmed Ability call has run.
+		 *
+		 * Pairs with `mcp_adapter_tool_call_confirmed` through the confirmation id. Retries
+		 * that get the stored result back do not fire it again.
+		 *
+		 * Experimental.
+		 *
+		 * @since n.e.x.t
+		 *
+		 * @param string $id      Confirmation identifier.
+		 * @param string $outcome 'success', 'error' (the tool reported an error) or 'failed' (the call did not complete).
+		 */
+		do_action( 'mcp_adapter_tool_call_confirmation_finished', $call->id(), $outcome );
 	}
 
 	/**
