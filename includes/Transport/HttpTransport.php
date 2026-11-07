@@ -75,7 +75,9 @@ class HttpTransport implements McpRestTransportInterface {
 	 *
 	 * @param \WP_REST_Request<array<string, mixed>> $request The request object.
 	 *
-	 * @return bool True if the user has permission, false otherwise.
+	 * @return bool|\WP_Error True if the user has permission. False when a custom
+	 *                        permission callback refuses, or a WP_Error when the
+	 *                        default check refuses.
 	 */
 	public function check_permission( \WP_REST_Request $request ) {
 		$context = new HttpRequestContext( $request );
@@ -128,15 +130,48 @@ class HttpTransport implements McpRestTransportInterface {
 
 		$user_has_capability = current_user_can( $user_capability ); // phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capability is filtered and defaults to 'read'
 
-		if ( ! $user_has_capability ) {
-			$user_id = get_current_user_id();
-			$this->request_handler->get_transport_context()->error_handler->log(
-				sprintf( 'Permission denied for MCP API access. User ID %d does not have capability "%s"', $user_id, $user_capability ),
-				array( 'HttpTransport::check_permission' )
+		if ( $user_has_capability ) {
+			return true;
+		}
+
+		$user_id = get_current_user_id();
+		$this->request_handler->get_transport_context()->error_handler->log(
+			sprintf( 'Permission denied for MCP API access. User ID %d does not have capability "%s"', $user_id, $user_capability ),
+			array( 'HttpTransport::check_permission' )
+		);
+
+		return $this->permission_error( $user_capability );
+	}
+
+	/**
+	 * Build the error for a request the default permission check refused.
+	 *
+	 * Says whether the request was not signed in or the user lacks the capability,
+	 * instead of core's generic "Sorry, you are not allowed to do that." The status
+	 * codes stay the same: 401 when no user is signed in, 403 otherwise. The message
+	 * does not assume Application Passwords, since OAuth and JWT plugins reach this
+	 * check too.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param string $capability The capability the request needed.
+	 *
+	 * @return \WP_Error Error with the HTTP status in its data.
+	 */
+	private function permission_error( string $capability ): \WP_Error {
+		if ( ! is_user_logged_in() ) {
+			return new \WP_Error(
+				'authentication_required',
+				'This request is not signed in as a WordPress user. Check the username and Application Password, or the sign-in plugin you use. See https://github.com/WordPress/mcp-adapter/blob/trunk/docs/getting-started/site-owners.md#401-unauthorized',
+				array( 'status' => 401 )
 			);
 		}
 
-		return $user_has_capability;
+		return new \WP_Error(
+			'insufficient_capability',
+			sprintf( 'The signed-in user does not have the "%s" capability that this MCP server requires.', $capability ),
+			array( 'status' => 403 )
+		);
 	}
 
 	/**
