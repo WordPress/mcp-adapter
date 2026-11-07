@@ -60,8 +60,45 @@ final class ConfirmedCallLogTest extends ToolCallConfirmationTestCase {
 		$this->assertSame( 'Jane', $entry['parent_name'] );
 		$this->assertSame( $parent, (int) $entry['approved_by'] );
 		$this->assertMatchesRegularExpression( '/\A[a-f0-9]{64}\z/', $entry['input_hash'] );
-		$this->assertStringContainsString( 'Delete a thing', $entry['summary'] );
+		$this->assertSame( 'Delete a thing', $entry['ability_label'] );
+		$this->assertSame( '', $entry['summary'] );
+		$this->assertSame( 'default', $entry['summary_source'] );
 		$this->assertGreaterThan( 0, (int) $entry['finished_at'] );
+	}
+
+	/** A default question is recorded without any part of the input. */
+	public function test_log_entry_never_holds_the_input(): void {
+		global $wpdb;
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$token = $this->token_from( $this->call_ability( 'test/confirm-uninstall', array( 'plugin' => 'zebra-quokka-7731' ) ) );
+		$this->call_ability( 'test/confirm-uninstall', array( 'plugin' => 'zebra-quokka-7731', ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+
+		$entries = ConfirmedCallLog::entries( $this->user_id );
+		$this->assertCount( 1, $entries );
+		$this->assertSame( 'default', $entries[0]['summary_source'] );
+		$this->assertSame( 'Uninstall a plugin', $entries[0]['ability_label'] );
+		foreach ( array( 'zebra', 'quokka', '7731' ) as $part ) {
+			$this->assertStringNotContainsString( $part, (string) wp_json_encode( $entries[0] ) );
+		}
+		wp_cache_flush();
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_value LIKE %s", '%quokka%' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_title LIKE %s OR post_content LIKE %s", '%quokka%', '%quokka%' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$this->assertSame( 0, self::stored_rows_containing( 'quokka' ) );
+	}
+
+	/** A sentence the Ability wrote itself is logged as the Ability's. */
+	public function test_ability_sentence_is_logged(): void {
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$token = $this->token_from( $this->call_ability( 'test/confirm-activate', array( 'plugin' => 'hello' ) ) );
+		$this->call_ability( 'test/confirm-activate', array( 'plugin' => 'hello', ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+
+		$entry = ConfirmedCallLog::entries( $this->user_id )[0];
+		$this->assertSame( 'Switch on the plugin hello', $entry['summary'] );
+		$this->assertSame( 'ability', $entry['summary_source'] );
+
+		ob_start();
+		ConfirmedCallLogPage::render();
+		$this->assertStringContainsString( 'Switch on the plugin hello', (string) ob_get_clean() );
 	}
 
 	/** A confirmed call that fails is recorded as such. */
@@ -91,6 +128,8 @@ final class ConfirmedCallLogTest extends ToolCallConfirmationTestCase {
 		$this->assertSame( 'test/confirm-activate', $entries[0]['ability'] );
 		$this->assertSame( $token, $entries[0]['follow_up_of'] );
 		$this->assertSame( 'Activate the plugin hello', $entries[0]['summary'] );
+		$this->assertSame( 'ability', $entries[0]['summary_source'] );
+		$this->assertSame( array( 'Activate the plugin hello' ), $entries[1]['covers'] );
 	}
 
 	/** Owners see everything; others see their own calls, their agents' and the ones they approved. */
@@ -124,7 +163,8 @@ final class ConfirmedCallLogTest extends ToolCallConfirmationTestCase {
 		$page = (string) ob_get_clean();
 
 		$this->assertStringContainsString( 'agent of Jane', $page );
-		$this->assertStringContainsString( 'Delete a thing (test/confirm-delete)', $page );
+		$this->assertStringContainsString( 'Delete a thing', $page );
+		$this->assertStringContainsString( 'are not kept', $page );
 		$this->assertStringContainsString( 'Agent reported a yes in the chat', $page );
 		$this->assertStringContainsString( 'Done', $page );
 	}
@@ -138,17 +178,18 @@ final class ConfirmedCallLogTest extends ToolCallConfirmationTestCase {
 				return 2;
 			}
 		);
+		$tokens = array();
 		foreach ( array( 1, 2, 3 ) as $id ) {
-			$token = $this->token_from( $this->call_ability( 'test/confirm-delete', array( 'id' => $id ) ) );
-			$this->call_ability( 'test/confirm-delete', array( 'id' => $id, ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+			$tokens[] = $this->token_from( $this->call_ability( 'test/confirm-delete', array( 'id' => $id ) ) );
+			$this->call_ability( 'test/confirm-delete', array( 'id' => $id, ToolCallConfirmation::TOKEN_ARGUMENT => end( $tokens ) ) );
 		}
 		$entries = ConfirmedCallLog::entries( $this->user_id );
 		$this->assertCount( 2, $entries );
-		$this->assertStringContainsString( '"id":3', $entries[0]['summary'] );
+		$this->assertSame( array( $tokens[2], $tokens[1] ), array_column( $entries, 'confirmation_id' ) );
 
 		add_filter( 'mcp_adapter_confirmed_call_log_enabled', '__return_false' );
 		$token = $this->token_from( $this->call_ability( 'test/confirm-delete', array( 'id' => 4 ) ) );
 		$this->call_ability( 'test/confirm-delete', array( 'id' => 4, ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
-		$this->assertStringContainsString( '"id":3', ConfirmedCallLog::entries( $this->user_id )[0]['summary'] );
+		$this->assertSame( $tokens[2], ConfirmedCallLog::entries( $this->user_id )[0]['confirmation_id'] );
 	}
 }

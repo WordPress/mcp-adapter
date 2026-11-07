@@ -19,8 +19,10 @@ use WP_User;
  * Entries are posts of a private post type with no author: the people involved are
  * kept as IDs and names in post meta, so an entry reads the same after an agent or
  * its parent is deleted or its content is reassigned (WordPress/ai#1068 deletes and
- * reassigns agents together with their parent). The input itself is never stored,
- * only its SHA-256 and the summary the person saw.
+ * reassigns agents together with their parent). The input itself is never stored:
+ * only its SHA-256, the Ability's name and label, and a summary when the Ability
+ * wrote its own sentence (`summary_source` 'ability'). The default question is built
+ * from the input, so for it no summary is kept (`summary_source` 'default').
  *
  * Agent users come from the Agent Users experiment in WordPress/ai#1068, through its
  * public helpers `wpai_is_agent_user()` and `wpai_get_agent_parent()`. Without that
@@ -100,7 +102,7 @@ final class ConfirmedCallLog {
 	 * @return string[]
 	 */
 	public static function fields(): array {
-		return array( 'confirmation_id', 'ability', 'tool', 'input_hash', 'summary', 'channel', 'user_id', 'user_name', 'is_agent', 'parent_id', 'parent_name', 'approved_by', 'approver_name', 'follow_up_of', 'issued_at', 'confirmed_at', 'finished_at', 'status' );
+		return array( 'confirmation_id', 'ability', 'tool', 'input_hash', 'ability_label', 'summary', 'summary_source', 'covers', 'channel', 'user_id', 'user_name', 'is_agent', 'parent_id', 'parent_name', 'approved_by', 'approver_name', 'follow_up_of', 'issued_at', 'confirmed_at', 'finished_at', 'status' );
 	}
 
 	/**
@@ -143,7 +145,11 @@ final class ConfirmedCallLog {
 			'ability'         => (string) ( $confirmation['ability'] ?? '' ),
 			'tool'            => $tool_name,
 			'input_hash'      => (string) ( $confirmation['input_hash'] ?? '' ),
-			'summary'         => (string) ( $confirmation['summary'] ?? '' ),
+			'ability_label'   => (string) ( $confirmation['ability_label'] ?? '' ),
+			// Only the Ability's own sentence; the default question contains the input.
+			'summary'         => 'ability' === ( $confirmation['summary_source'] ?? '' ) && is_string( $confirmation['summary'] ?? null ) ? $confirmation['summary'] : '',
+			'summary_source'  => 'ability' === ( $confirmation['summary_source'] ?? '' ) ? 'ability' : 'default',
+			'covers'          => array_values( array_filter( (array) ( $confirmation['covers'] ?? array() ), 'is_string' ) ),
 			'channel'         => (string) ( $confirmation['channel'] ?? '' ),
 			'user_id'         => $user_id,
 			'user_name'       => $user instanceof WP_User ? $user->display_name : '',

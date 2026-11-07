@@ -65,12 +65,32 @@ final class ConfirmedCallLogPage {
 			echo '<tr>';
 			echo '<td>' . esc_html( (string) wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $entry['confirmed_at'] ) ) . '</td>';
 			echo '<td>' . esc_html( self::who( $entry ) ) . '</td>';
-			echo '<td>' . nl2br( esc_html( (string) $entry['summary'] ) ) . '<br><code>' . esc_html( (string) $entry['ability'] ) . '</code></td>';
+			echo '<td>' . self::change( $entry ) . '</td>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in change().
 			echo '<td>' . esc_html( self::how( $entry ) ) . '</td>';
 			echo '<td>' . esc_html( self::result( (string) $entry['status'] ) ) . '</td>';
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
+	}
+
+	/**
+	 * What changed, as escaped HTML.
+	 *
+	 * A default question contained the input, so only the Ability is named for it.
+	 *
+	 * @param array<string, mixed> $entry Log entry.
+	 */
+	private static function change( array $entry ): string {
+		$label  = '' !== (string) $entry['ability_label'] ? (string) $entry['ability_label'] : (string) $entry['ability'];
+		$html   = 'ability' === $entry['summary_source'] && '' !== (string) $entry['summary']
+			? nl2br( esc_html( (string) $entry['summary'] ) )
+			: esc_html( $label ) . '<br><em>' . esc_html__( 'The details the person saw are not kept, because they contained the input.', 'mcp-adapter' ) . '</em>';
+		$covers = is_array( $entry['covers'] ) ? $entry['covers'] : array();
+		if ( array() !== $covers ) {
+			$html .= '<br>' . esc_html__( 'The same yes also covered:', 'mcp-adapter' ) . ' ' . esc_html( implode( '; ', $covers ) );
+		}
+
+		return $html . '<br><code>' . esc_html( (string) $entry['ability'] ) . '</code>';
 	}
 
 	/**
