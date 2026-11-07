@@ -109,6 +109,27 @@ class ToolsHandler {
 	 * @since 0.7.0
 	 */
 	public function call_tool( CallToolRequest $request, McpRequestContext $request_context ): array {
+		$confirmed = null;
+		$response  = $this->dispatch_tool_call( $request, $request_context, $confirmed );
+		if ( $confirmed instanceof ConfirmedCall ) {
+			// A retry of the same confirmed call gets this response back instead of running again.
+			ToolCallConfirmation::remember( $confirmed, $response );
+		}
+
+		return $response;
+	}
+
+	/**
+	 * Resolve, check, confirm and execute one tool call.
+	 *
+	 * @param \WP\McpSchema\Record\CallToolRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @param \WP\MCP\Handlers\Tools\ConfirmedCall|null $confirmed Set to the confirmed call this request runs, if any.
+	 *
+	 * @return array<string, mixed>
+	 * @since n.e.x.t Split from call_tool().
+	 */
+	private function dispatch_tool_call( CallToolRequest $request, McpRequestContext $request_context, ?ConfirmedCall &$confirmed ): array {
 		$request_params = $request->getParams();
 		$request_id     = $request->getId();
 
@@ -199,6 +220,13 @@ class ToolsHandler {
 				}
 				if ( is_wp_error( $confirmation ) ) {
 					return $this->create_error_result( $confirmation->get_error_message() );
+				}
+				if ( is_array( $confirmation ) ) {
+					// The same confirmed call already ran: return its result, do not run it again.
+					return $confirmation;
+				}
+				if ( $confirmation instanceof ConfirmedCall ) {
+					$confirmed = $confirmation;
 				}
 			}
 
