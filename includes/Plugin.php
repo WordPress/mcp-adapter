@@ -76,6 +76,9 @@ final class Plugin {
 		$this->constants();
 
 		McpAdapter::instance();
+
+		// OAuth sign-in runs only in the standalone plugin, never in a bundled library copy.
+		OAuth\Module::boot();
 	}
 
 	/**
