@@ -97,7 +97,7 @@ class AbilityPermissionInputTest extends TestCase {
 	 * @param string $path Adapter entry point.
 	 */
 	public function test_permission_callback_receives_coerced_input( string $path ): void {
-		if ( ! method_exists( WP_Ability::class, 'prepare_input' ) && ! method_exists( WP_Ability::class, 'coerce_input' ) ) {
+		if ( ! method_exists( WP_Ability::class, 'prepare_input' ) ) {
 			$this->markTestSkipped( 'Input coercion requires WordPress 7.2 or later.' );
 		}
 
@@ -227,7 +227,7 @@ class AbilityPermissionInputTest extends TestCase {
 	 * @param string $path Adapter entry point.
 	 */
 	public function test_coercion_error_does_not_reach_permission_callback( string $path ): void {
-		if ( ! method_exists( WP_Ability::class, 'prepare_input' ) && ! method_exists( WP_Ability::class, 'coerce_input' ) ) {
+		if ( ! method_exists( WP_Ability::class, 'prepare_input' ) ) {
 			$this->markTestSkipped( 'Input coercion requires WordPress 7.2 or later.' );
 		}
 

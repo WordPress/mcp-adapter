@@ -39,14 +39,6 @@ final class AbilityPermissionChecker {
 			return $validity;
 		}
 
-		// Input coercion was introduced in WordPress 7.2.
-		if ( method_exists( $ability, 'coerce_input' ) ) {
-			$input = $ability->coerce_input( $input );
-			if ( is_wp_error( $input ) ) {
-				return $input;
-			}
-		}
-
 		return $ability->check_permissions( $input );
 	}
 }
