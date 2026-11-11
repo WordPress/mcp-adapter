@@ -9,7 +9,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
-use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\McpSchema\Record;
 
@@ -179,9 +178,8 @@ class HttpRequestHandler {
 	/**
 	 * Check the MCP-Protocol-Version header against the version negotiated at initialization.
 	 *
-	 * The header must match the negotiated identifier whenever it is sent. It may
-	 * be omitted only for sessions negotiated under a revision that predates the
-	 * header, see {@see McpVersionNegotiator::PROTOCOL_VERSION_HEADER_SINCE}.
+	 * The header must match the negotiated identifier whenever it is sent. If it
+	 * is absent, the legacy session already provides the negotiated revision.
 	 *
 	 * @param string|null          $header_version Request header value.
 	 * @param array<string, mixed> $client_params  Stored initialize params.
@@ -190,13 +188,11 @@ class HttpRequestHandler {
 	 * @since 0.7.0
 	 */
 	private function validate_session_protocol_version( ?string $header_version, array $client_params, $request_id ): ?array {
-		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );
-
 		if ( null === $header_version ) {
-			return McpVersionNegotiator::requires_protocol_version_header( $negotiated )
-				? McpErrorFactory::invalid_request( $request_id, sprintf( 'MCP-Protocol-Version header is required for a %s session', $negotiated ) )
-				: null;
+			return null;
 		}
+
+		$negotiated = McpWireOrchestrator::negotiated_protocol_version( $client_params );
 
 		return $header_version === $negotiated
 			? null
