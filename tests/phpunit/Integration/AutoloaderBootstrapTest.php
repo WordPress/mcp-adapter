@@ -84,6 +84,24 @@ final class AutoloaderBootstrapTest extends TestCase {
 	}
 
 	/**
+	 * Another copy's entry point loaded first: the installed plugin stands down instead of a fatal error.
+	 *
+	 * Before, the second Autoloader class declaration was "Cannot declare class WP\\MCP\\Autoloader"
+	 * on every request, which took the whole site down.
+	 *
+	 * @since 0.7.2
+	 */
+	public function test_bundled_entry_point_loaded_first_is_reported_not_fatal(): void {
+		$result = $this->bootstrap_wordpress( 'bundled-entry' );
+
+		$this->assertSame( '0.6.1', $result['version'] );
+		$this->assertStringContainsString( '/mcp-adapter-bundler-', $result['class_file'] );
+		$this->assertFalse( $result['plugin_loaded'] );
+		$this->assertCount( 1, $result['notices'] );
+		$this->assertStringContainsString( 'Another version of MCP Adapter is already loaded', $result['notices'][0] );
+	}
+
+	/**
 	 * Boots WordPress without carrying loaded Adapter classes into the child process.
 	 *
 	 * @param string $scenario Plugin discovery and class loading scenario.
