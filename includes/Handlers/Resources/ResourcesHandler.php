@@ -62,13 +62,15 @@ class ResourcesHandler {
 		 * or reorder the resources list.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t Added the `$request_context` parameter.
 		 *
-		 * @param array<\WP\McpSchema\Record\Resource> $resources Array of Resource records.
-		 * @param \WP\MCP\Core\McpServer                             $server    The MCP server instance.
-		 * @param \WP\McpSchema\Schema                                $schema    Selected schema.
+		 * @param array<\WP\McpSchema\Record\Resource> $resources       Array of Resource records.
+		 * @param \WP\MCP\Core\McpServer               $server          The MCP server instance.
+		 * @param \WP\McpSchema\Schema                 $schema          Selected schema.
+		 * @param \WP\MCP\Core\McpRequestContext       $request_context Request context, with the client's capabilities.
 		 */
 		$resources = $this->validate_filtered_list(
-			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp, $schema ),
+			apply_filters( 'mcp_adapter_resources_list', $resources, $this->mcp, $schema, $request_context ),
 			$resources,
 			'mcp_adapter_resources_list',
 			$this->mcp->get_error_handler()
@@ -155,13 +157,15 @@ class ResourcesHandler {
 			 * or return a WP_Error to block execution and return an error to the client.
 			 *
 			 * @since 0.5.0
+			 * @since n.e.x.t Added the `$request_context` parameter.
 			 *
-			 * @param array                                $params       The request parameters.
-			 * @param string                               $uri          The resource URI.
-			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
-			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
+			 * @param array                                $params          The request parameters.
+			 * @param string                               $uri             The resource URI.
+			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource    The MCP resource instance.
+			 * @param \WP\MCP\Core\McpServer               $server          The MCP server instance.
+			 * @param \WP\MCP\Core\McpRequestContext       $request_context Request context, with the client's capabilities.
 			 */
-			$request_params = apply_filters( 'mcp_adapter_pre_resource_read', $request_params, $uri, $mcp_resource, $this->mcp );
+			$request_params = apply_filters( 'mcp_adapter_pre_resource_read', $request_params, $uri, $mcp_resource, $this->mcp, $request_context );
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $request_params ) ) {
@@ -177,14 +181,16 @@ class ResourcesHandler {
 			 * PII redaction, or audit logging.
 			 *
 			 * @since 0.5.0
+			 * @since n.e.x.t Added the `$request_context` parameter.
 			 *
-			 * @param mixed|\WP_Error                      $contents     The raw resource contents (may be WP_Error).
-			 * @param array                                $params       The request parameters used.
-			 * @param string                               $uri          The resource URI.
-			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource The MCP resource instance.
-			 * @param \WP\MCP\Core\McpServer               $server       The MCP server instance.
+			 * @param mixed|\WP_Error                      $contents        The raw resource contents (may be WP_Error).
+			 * @param array                                $params          The request parameters used.
+			 * @param string                               $uri             The resource URI.
+			 * @param \WP\MCP\Domain\Resources\McpResource $mcp_resource    The MCP resource instance.
+			 * @param \WP\MCP\Core\McpServer               $server          The MCP server instance.
+			 * @param \WP\MCP\Core\McpRequestContext       $request_context Request context, with the client's capabilities.
 			 */
-			$contents = apply_filters( 'mcp_adapter_resource_read_result', $contents, $request_params, $uri, $mcp_resource, $this->mcp );
+			$contents = apply_filters( 'mcp_adapter_resource_read_result', $contents, $request_params, $uri, $mcp_resource, $this->mcp, $request_context );
 
 			// Handle WP_Error objects returned by McpResource execution.
 			if ( is_wp_error( $contents ) ) {
