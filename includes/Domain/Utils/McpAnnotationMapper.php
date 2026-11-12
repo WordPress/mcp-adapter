@@ -66,7 +66,7 @@ class McpAnnotationMapper {
 		),
 		'openWorldHint'   => array(
 			'features'         => array( 'tool' ),
-			'ability_property' => null,
+			'ability_property' => 'open_world',
 		),
 		'title'           => array(
 			'features'         => array( 'tool' ),
