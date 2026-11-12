@@ -30,6 +30,11 @@ defined( 'ABSPATH' ) || exit();
 
 require_once __DIR__ . '/includes/Autoloader.php';
 
+// The OAuth server is self-contained and only runs from the standalone plugin.
+if ( is_readable( __DIR__ . '/oauth/load.php' ) ) {
+	require_once __DIR__ . '/oauth/load.php';
+}
+
 // If autoloader failed, we cannot proceed.
 if ( ! Autoloader::autoload() ) {
 	return;

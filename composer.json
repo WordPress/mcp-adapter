@@ -51,6 +51,9 @@
 		"psr-4": {
 			"WP\\MCP\\Tests\\": [
 				"tests/phpunit/"
+			],
+			"WP\\OAuth\\Tests\\": [
+				"tests/phpunit/OAuth/"
 			]
 		}
 	},
