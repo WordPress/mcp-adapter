@@ -124,7 +124,7 @@ final class Discovery {
 			'token_endpoint'                             => Server::token_endpoint(),
 			'revocation_endpoint'                        => Server::revocation_endpoint(),
 			'response_types_supported'                   => array( 'code' ),
-			'grant_types_supported'                      => array( 'authorization_code' ),
+			'grant_types_supported'                      => array( 'authorization_code', 'refresh_token' ),
 			'code_challenge_methods_supported'           => array( 'S256' ),
 			'token_endpoint_auth_methods_supported'      => array( 'none', 'client_secret_post', 'client_secret_basic' ),
 			'revocation_endpoint_auth_methods_supported' => array( 'none', 'client_secret_post', 'client_secret_basic' ),

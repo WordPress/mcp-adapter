@@ -9,10 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Authentication;
 
-use WP\OAuth\Clients\ClientRepository;
-use WP\OAuth\Server;
-use WP\OAuth\Tokens\AccessToken;
-use WP_Application_Passwords;
+use WP\OAuth\Tokens\AuthenticatedToken;
+use WP\OAuth\Tokens\Contracts\ConnectionStoreInterface;
+use WP\OAuth\Tokens\Contracts\TokenServiceInterface;
 use WP_Error;
 use WP_User;
 
@@ -24,11 +23,18 @@ defined( 'ABSPATH' ) || exit;
 final class Bearer {
 
 	/**
-	 * Client registry.
+	 * Token service.
 	 *
-	 * @var ClientRepository
+	 * @var TokenServiceInterface
 	 */
-	private $clients;
+	private $tokens;
+
+	/**
+	 * OAuth connection persistence.
+	 *
+	 * @var ConnectionStoreInterface
+	 */
+	private $connections;
 
 	/**
 	 * Error from the last attempt, if it failed.
@@ -58,10 +64,12 @@ final class Bearer {
 	/**
 	 * Constructor.
 	 *
-	 * @param ClientRepository $clients Client registry.
+	 * @param TokenServiceInterface    $tokens      Token service.
+	 * @param ConnectionStoreInterface $connections Connection persistence.
 	 */
-	public function __construct( ClientRepository $clients ) {
-		$this->clients = $clients;
+	public function __construct( TokenServiceInterface $tokens, ConnectionStoreInterface $connections ) {
+		$this->tokens      = $tokens;
+		$this->connections = $connections;
 	}
 
 	/**
@@ -87,7 +95,7 @@ final class Bearer {
 			return $user_id;
 		}
 
-		$token = self::get_bearer_token();
+		$token = $this->get_bearer_token();
 		if ( null === $token || ! $this->is_api_request() ) {
 			return $user_id;
 		}
@@ -108,13 +116,10 @@ final class Bearer {
 			return $user_id;
 		}
 
-		[ $user, $item ] = $result;
+		$user = $result->get_user();
 
-		WP_Application_Passwords::record_application_password_usage( $user->ID, $item['uuid'] );
+		$this->tokens->record_usage( $result );
 		$this->authenticated = true;
-
-		/** This action is documented in wp-includes/user.php */
-		do_action( 'application_password_did_authenticate', $user, $item ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core hook, so Application Password integrations see OAuth logins too.
 
 		return $user->ID;
 	}
@@ -155,15 +160,15 @@ final class Bearer {
 	 * Stops OAuth-issued Application Passwords from working with Basic auth.
 	 *
 	 * @param WP_Error            $error Errors so far.
-	 * @param WP_User             $user  User being authenticated.
+	 * @param mixed               $user  User being authenticated.
 	 * @param array<string, mixed> $item  Application Password details.
 	 */
 	public function block_basic_auth( $error, $user, $item ): void {
-		if ( ! $error instanceof WP_Error || ! is_array( $item ) || empty( $item['app_id'] ) ) {
+		if ( ! $error instanceof WP_Error || ! $user instanceof WP_User || ! is_array( $item ) || empty( $item['app_id'] ) ) {
 			return;
 		}
 
-		if ( null === $this->clients->get( (string) $item['app_id'] ) ) {
+		if ( ! $this->connections->manages_credential( $user, $item ) ) {
 			return;
 		}
 
@@ -174,35 +179,10 @@ final class Bearer {
 	 * Validates a token.
 	 *
 	 * @param string $token Token.
-	 * @return array{0: WP_User, 1: array<string, mixed>}|WP_Error The user and Application Password, or an error.
+	 * @return AuthenticatedToken|WP_Error Validated token context, or an error.
 	 */
 	private function validate( string $token ) {
-		$invalid = new WP_Error(
-			'oauth_server_invalid_token',
-			__( 'The access token is invalid or has been revoked.', 'mcp-adapter' ),
-			array( 'status' => 401 )
-		);
-
-		$parts = AccessToken::decode( $token );
-		if ( null === $parts || ! Server::is_available() ) {
-			return $invalid;
-		}
-
-		$user = get_userdata( $parts['user_id'] );
-		if ( ! $user instanceof WP_User || ! wp_is_application_passwords_available_for_user( $user ) ) {
-			return $invalid;
-		}
-
-		$item = WP_Application_Passwords::get_user_application_password( $user->ID, $parts['uuid'] );
-		if ( ! is_array( $item ) || ! WP_Application_Passwords::check_password( $parts['password'], $item['password'] ) ) {
-			return $invalid;
-		}
-
-		if ( null === $this->clients->get( (string) $item['app_id'] ) ) {
-			return $invalid;
-		}
-
-		return array( $user, $item );
+		return $this->tokens->authenticate_access_token( $token );
 	}
 
 	/**
@@ -253,13 +233,13 @@ final class Bearer {
 	 *
 	 * Bearer tokens in other formats are left for other authentication handlers.
 	 */
-	public static function get_bearer_token(): ?string {
+	public function get_bearer_token(): ?string {
 		$header = self::get_authorization_header();
 		if ( null === $header || 1 !== preg_match( '/^Bearer\s+(\S+)\s*$/i', $header, $matches ) ) {
 			return null;
 		}
 
-		return AccessToken::has_prefix( $matches[1] ) ? $matches[1] : null;
+		return $this->tokens->supports( $matches[1] ) ? $matches[1] : null;
 	}
 
 	/**

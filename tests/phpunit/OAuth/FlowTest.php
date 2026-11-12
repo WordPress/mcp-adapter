@@ -11,9 +11,9 @@ namespace WP\OAuth\Tests;
 
 use WP\OAuth\Clients\Client;
 use WP\OAuth\Clients\ClientRepository;
-use WP\OAuth\Endpoints\Token;
 use WP\OAuth\Server;
-use WP\OAuth\Tokens\AccessToken;
+use WP\OAuth\Tokens\ApplicationPasswordConnectionStore;
+use WP\OAuth\Tokens\OpaqueTokenService;
 use WP_Application_Passwords;
 use WP_Post;
 use WP_REST_Request;
@@ -73,7 +73,9 @@ final class FlowTest extends WP_UnitTestCase {
 
 		$this->assertSame( 200, $response->get_status() );
 		$token = $response->get_data()['access_token'];
-		$this->assertStringStartsWith( AccessToken::PREFIX, $token );
+		$this->assertStringStartsWith( OpaqueTokenService::ACCESS_PREFIX, $token );
+		$this->assertStringStartsWith( OpaqueTokenService::REFRESH_PREFIX, $response->get_data()['refresh_token'] );
+		$this->assertSame( OpaqueTokenService::ACCESS_LIFETIME, $response->get_data()['expires_in'] );
 
 		$passwords = WP_Application_Passwords::get_user_application_passwords( $this->user->ID );
 		$this->assertCount( 1, $passwords );
@@ -117,16 +119,63 @@ final class FlowTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_oauth_passwords_are_refused_for_basic_auth(): void {
+	public function test_oauth_access_tokens_are_not_application_passwords(): void {
 		$token = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data()['access_token'];
-		$parts = AccessToken::decode( $token );
-		$this->assertNotNull( $parts );
 
 		add_filter( 'application_password_is_api_request', '__return_true' );
-		$result = wp_authenticate_application_password( null, $this->user->user_login, $parts['password'] );
+		$result = wp_authenticate_application_password( null, $this->user->user_login, $token );
 
 		$this->assertWPError( $result );
-		$this->assertContains( 'oauth_server_bearer_only', $result->get_error_codes() );
+		$this->assertContains( 'incorrect_password', $result->get_error_codes() );
+	}
+
+	public function test_only_hashes_of_opaque_tokens_are_stored(): void {
+		$tokens = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data();
+		$stored = wp_json_encode( get_user_meta( $this->user->ID ) );
+		$this->assertIsString( $stored );
+
+		$this->assertStringNotContainsString( $tokens['access_token'], $stored );
+		$this->assertStringNotContainsString( $tokens['refresh_token'], $stored );
+		$this->assertStringContainsString( hash( 'sha256', $tokens['access_token'] ), $stored );
+		$this->assertStringContainsString( hash( 'sha256', $tokens['refresh_token'] ), $stored );
+	}
+
+	public function test_refresh_rotates_both_tokens_and_keeps_the_connection(): void {
+		$issued  = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data();
+		$rotated = $this->refresh( $issued['refresh_token'] );
+
+		$this->assertSame( 200, $rotated->get_status() );
+		$this->assertNotSame( $issued['access_token'], $rotated->get_data()['access_token'] );
+		$this->assertNotSame( $issued['refresh_token'], $rotated->get_data()['refresh_token'] );
+		$this->assertSame( OpaqueTokenService::ACCESS_LIFETIME, $rotated->get_data()['expires_in'] );
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $rotated->get_data()['access_token'];
+		$this->assertSame( $this->user->ID, $this->server->bearer()->authenticate( false ) );
+	}
+
+	public function test_reusing_a_rotated_refresh_token_revokes_the_connection(): void {
+		$issued  = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data();
+		$rotated = $this->refresh( $issued['refresh_token'] );
+		$this->assertSame( 200, $rotated->get_status() );
+
+		$replay = $this->refresh( $issued['refresh_token'] );
+		$this->assertSame( 400, $replay->get_status() );
+		$this->assertSame( 'invalid_grant', $replay->get_data()['error'] );
+		$this->assertEmpty( WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $rotated->get_data()['access_token'];
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+	}
+
+	public function test_refresh_token_is_bound_to_its_client(): void {
+		$issued = $this->exchange( $this->issue_code(), self::VERIFIER )->get_data();
+		$other  = $this->server->clients()->create( 'Other Client', array( self::REDIRECT_URI ), false )[0];
+
+		$response = $this->refresh( $issued['refresh_token'], $other );
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( 'invalid_grant', $response->get_data()['error'] );
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
 	}
 
 	/**
@@ -301,11 +350,11 @@ final class FlowTest extends WP_UnitTestCase {
 	}
 
 	public function test_signing_in_again_beyond_the_limit_removes_the_oldest_connection(): void {
-		for ( $i = 0; $i <= Token::MAX_SESSIONS_PER_CLIENT; $i++ ) {
+		for ( $i = 0; $i <= ApplicationPasswordConnectionStore::MAX_CONNECTIONS_PER_CLIENT; $i++ ) {
 			$this->assertSame( 200, $this->exchange( $this->issue_code(), self::VERIFIER )->get_status() );
 		}
 
-		$this->assertCount( Token::MAX_SESSIONS_PER_CLIENT, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
+		$this->assertCount( ApplicationPasswordConnectionStore::MAX_CONNECTIONS_PER_CLIENT, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
 	}
 
 	private function issue_code( ?int $user_id = null, ?Client $client = null ): string {
@@ -332,6 +381,20 @@ final class FlowTest extends WP_UnitTestCase {
 				'client_secret' => (string) $secret,
 				'redirect_uri'  => self::REDIRECT_URI,
 				'code_verifier' => $verifier,
+			)
+		);
+
+		return rest_do_request( $request );
+	}
+
+	private function refresh( string $refresh_token, ?Client $client = null, ?string $secret = null ): WP_REST_Response {
+		$request = new WP_REST_Request( 'POST', '/oauth/v1/token' );
+		$request->set_body_params(
+			array(
+				'grant_type'    => 'refresh_token',
+				'refresh_token' => $refresh_token,
+				'client_id'     => ( $client ?? $this->client )->get_id(),
+				'client_secret' => (string) $secret,
 			)
 		);
 

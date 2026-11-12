@@ -10,9 +10,8 @@ declare( strict_types=1 );
 namespace WP\OAuth\Endpoints;
 
 use WP\OAuth\Clients\ClientRepository;
-use WP\OAuth\Server;
-use WP\OAuth\Tokens\AccessToken;
-use WP_Application_Passwords;
+use WP\OAuth\Tokens\AuthenticatedToken;
+use WP\OAuth\Tokens\Contracts\TokenServiceInterface;
 use WP_REST_Request;
 use WP_REST_Response;
 use stdClass;
@@ -38,12 +37,21 @@ final class Revoke {
 	private $clients;
 
 	/**
+	 * Token service.
+	 *
+	 * @var TokenServiceInterface
+	 */
+	private $tokens;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param ClientRepository $clients Client registry.
+	 * @param ClientRepository      $clients Client registry.
+	 * @param TokenServiceInterface $tokens  Token service.
 	 */
-	public function __construct( ClientRepository $clients ) {
+	public function __construct( ClientRepository $clients, TokenServiceInterface $tokens ) {
 		$this->clients = $clients;
+		$this->tokens  = $tokens;
 	}
 
 	/**
@@ -81,11 +89,11 @@ final class Revoke {
 
 		[ $client_id, $client_secret, $used_basic ] = Token::client_credentials( $request );
 
-		// Find the token's Application Password and the client it was issued to.
-		$parts        = Server::is_available() ? AccessToken::decode( $token ) : null;
-		$item         = null === $parts ? null : WP_Application_Passwords::get_user_application_password( $parts['user_id'], $parts['uuid'] );
-		$token_client = is_array( $item ) && WP_Application_Passwords::check_password( $parts['password'], $item['password'] )
-			? $this->clients->get( (string) $item['app_id'] )
+		// Resolve the token through the configured token service. Unknown and
+		// already-revoked tokens remain indistinguishable under RFC 7009.
+		$validated    = $this->tokens->resolve_for_revocation( $token );
+		$token_client = $validated instanceof AuthenticatedToken
+			? $this->clients->get( $validated->get_client_id() )
 			: null;
 
 		// The client asking is the one named, or else the one the token was issued
@@ -102,8 +110,8 @@ final class Revoke {
 
 		// Only revoke a token issued to the client asking. Unknown, invalid, and
 		// already-revoked tokens still get a 200 (RFC 7009 section 2.2).
-		if ( null !== $token_client && null !== $client && $token_client->get_id() === $client->get_id() ) {
-			WP_Application_Passwords::delete_application_password( $parts['user_id'], $parts['uuid'] );
+		if ( $validated instanceof AuthenticatedToken && null !== $token_client && null !== $client && $token_client->get_id() === $client->get_id() ) {
+			$this->tokens->revoke( $validated );
 		}
 
 		return new WP_REST_Response( new stdClass(), 200, array_filter( wp_get_nocache_headers() ) );

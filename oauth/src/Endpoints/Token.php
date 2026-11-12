@@ -13,10 +13,10 @@ use WP\OAuth\Authentication\Bearer;
 use WP\OAuth\Clients\Client;
 use WP\OAuth\Clients\ClientRepository;
 use WP\OAuth\Grants\AuthorizationCodes;
+use WP\OAuth\Grants\AuthorizedGrant;
 use WP\OAuth\Grants\Pkce;
 use WP\OAuth\Server;
-use WP\OAuth\Tokens\AccessToken;
-use WP_Application_Passwords;
+use WP\OAuth\Tokens\Contracts\TokenServiceInterface;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_User;
@@ -30,12 +30,6 @@ final class Token {
 
 	public const REST_NAMESPACE = 'oauth/v1';
 	public const REST_ROUTE     = '/token';
-
-	/**
-	 * Most connections one user can have to one client. Signing in again
-	 * beyond this removes the oldest, as in wp-media/mcp-oauth.
-	 */
-	public const MAX_SESSIONS_PER_CLIENT = 5;
 
 	/**
 	 * Client registry.
@@ -52,14 +46,23 @@ final class Token {
 	private $codes;
 
 	/**
+	 * Token service.
+	 *
+	 * @var TokenServiceInterface
+	 */
+	private $tokens;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param ClientRepository  $clients Client registry.
-	 * @param AuthorizationCodes $codes   Authorization code store.
+	 * @param ClientRepository      $clients Client registry.
+	 * @param AuthorizationCodes    $codes   Authorization code store.
+	 * @param TokenServiceInterface $tokens  Token service.
 	 */
-	public function __construct( ClientRepository $clients, AuthorizationCodes $codes ) {
+	public function __construct( ClientRepository $clients, AuthorizationCodes $codes, TokenServiceInterface $tokens ) {
 		$this->clients = $clients;
 		$this->codes   = $codes;
+		$this->tokens  = $tokens;
 	}
 
 	/**
@@ -106,8 +109,12 @@ final class Token {
 			return self::error( 'temporarily_unavailable', __( 'OAuth is not available on this site.', 'mcp-adapter' ), 503 );
 		}
 
-		if ( 'authorization_code' !== (string) $request->get_param( 'grant_type' ) ) {
-			return self::error( 'unsupported_grant_type', __( 'Only the authorization_code grant is supported.', 'mcp-adapter' ) );
+		$grant_type = (string) $request->get_param( 'grant_type' );
+		if ( 'refresh_token' === $grant_type ) {
+			return $this->handle_refresh( $request );
+		}
+		if ( 'authorization_code' !== $grant_type ) {
+			return self::error( 'unsupported_grant_type', __( 'Only the authorization_code and refresh_token grants are supported.', 'mcp-adapter' ) );
 		}
 
 		$code = (string) $request->get_param( 'code' );
@@ -154,29 +161,70 @@ final class Token {
 			return self::error( 'invalid_grant', __( 'The user can no longer authorize applications.', 'mcp-adapter' ) );
 		}
 
-		$this->prune_sessions( $user->ID, $client->get_id() );
-
-		$created = WP_Application_Passwords::create_new_application_password(
-			$user->ID,
-			array(
-				'name'   => $client->get_name(),
-				'app_id' => $client->get_id(),
+		$tokens = $this->tokens->issue(
+			new AuthorizedGrant(
+				$user,
+				$client->get_id(),
+				$client->get_name(),
+				(string) $grant['resource'],
+				array(
+					'client_id'     => $client->get_id(),
+					'client_name'   => $client->get_name(),
+					'redirect_uris' => $client->get_redirect_uris(),
+					'source'        => 'registered',
+				)
 			)
 		);
-		if ( is_wp_error( $created ) ) {
-			return self::error( 'server_error', $created->get_error_message(), 500 );
+		if ( is_wp_error( $tokens ) ) {
+			return self::error( 'server_error', $tokens->get_error_message(), 500 );
 		}
 
-		[ $password, $item ] = $created;
-
 		return new WP_REST_Response(
-			array(
-				'access_token' => AccessToken::encode( $user->ID, $item['uuid'], $password ),
-				'token_type'   => 'Bearer',
-			),
+			$tokens->to_response_data(),
 			200,
 			// Core's no-cache headers include Cache-Control: no-store (RFC 6749 section 5.1).
 			// Last-Modified is false there, meaning "remove", so it is filtered out.
+			array_filter( wp_get_nocache_headers() )
+		);
+	}
+
+	/**
+	 * Handles a refresh-token grant.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 */
+	private function handle_refresh( WP_REST_Request $request ): WP_REST_Response {
+		$refresh_token = (string) $request->get_param( 'refresh_token' );
+		if ( '' === $refresh_token ) {
+			return self::error( 'invalid_request', __( 'The refresh_token parameter is required.', 'mcp-adapter' ) );
+		}
+
+		[ $client_id, $client_secret, $used_basic ] = self::client_credentials( $request );
+		if ( '' === $client_id ) {
+			return self::error( 'invalid_request', __( 'The client_id parameter is required.', 'mcp-adapter' ) );
+		}
+
+		$client = $this->clients->get( $client_id );
+		if ( ! $client instanceof Client || ( $client->is_confidential() && ! $client->verify_secret( $client_secret ) ) ) {
+			$response = self::error( 'invalid_client', __( 'Client authentication failed.', 'mcp-adapter' ), 401 );
+			if ( $used_basic ) {
+				$response->header( 'WWW-Authenticate', 'Basic realm="oauth"' );
+			}
+
+			return $response;
+		}
+
+		$tokens = $this->tokens->refresh( $refresh_token, $client_id, (string) $request->get_param( 'resource' ) );
+		if ( is_wp_error( $tokens ) ) {
+			$data   = $tokens->get_error_data();
+			$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 400;
+			$code   = (string) $tokens->get_error_code();
+			return self::error( $code, $tokens->get_error_message(), $status );
+		}
+
+		return new WP_REST_Response(
+			$tokens->to_response_data(),
+			200,
 			array_filter( wp_get_nocache_headers() )
 		);
 	}
@@ -215,49 +263,6 @@ final class Token {
 			(string) $request->get_param( 'client_secret' ),
 			false,
 		);
-	}
-
-	/**
-	 * Removes the oldest connections between a user and a client so that one
-	 * more stays within the limit.
-	 *
-	 * Only Application Passwords issued to this client are touched; they are
-	 * matched by the app_id set when they were created.
-	 *
-	 * @param int    $user_id   User ID.
-	 * @param string $client_id Client ID.
-	 */
-	private function prune_sessions( int $user_id, string $client_id ): void {
-		/**
-		 * Filters how many connections one user can have to one client.
-		 *
-		 * @param int    $max       Maximum connections. Default 5.
-		 * @param string $client_id Client ID.
-		 */
-		$max = max( 1, (int) apply_filters( 'oauth_server_max_sessions_per_client', self::MAX_SESSIONS_PER_CLIENT, $client_id ) );
-
-		$sessions = array_values(
-			array_filter(
-				WP_Application_Passwords::get_user_application_passwords( $user_id ),
-				static function ( $item ) use ( $client_id ): bool {
-					return isset( $item['app_id'] ) && $item['app_id'] === $client_id;
-				}
-			)
-		);
-		if ( count( $sessions ) < $max ) {
-			return;
-		}
-
-		usort(
-			$sessions,
-			static function ( $a, $b ): int {
-				return (int) $a['created'] <=> (int) $b['created'];
-			}
-		);
-
-		foreach ( array_slice( $sessions, 0, count( $sessions ) - $max + 1 ) as $item ) {
-			WP_Application_Passwords::delete_application_password( $user_id, $item['uuid'] );
-		}
 	}
 
 	/**
