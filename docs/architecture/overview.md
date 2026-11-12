@@ -43,7 +43,7 @@ See [Default server](../guides/default-server.md) and [Creating abilities](../gu
 
 For HTTP, WordPress runs [HttpTransport::check_permission()](../../includes/Transport/HttpTransport.php) before invoking the request handler. A custom transport permission callback replaces the default capability check, which uses `current_user_can( 'read' )` unless filtered. This endpoint-level check is separate from the selected component's permission check.
 
-[HttpRequestHandler](../../includes/Transport/Infrastructure/HttpRequestHandler.php) handles HTTP methods, legacy sessions, and HTTP response status. [StdioServerBridge](../../includes/Cli/StdioServerBridge.php) reads newline-delimited JSON and writes responses to STDOUT, with diagnostics on STDERR. STDIO uses the WordPress user context selected through WP-CLI; it does not run the HTTP permission callback.
+[HttpRequestHandler](../../includes/Transport/Infrastructure/HttpRequestHandler.php) handles HTTP methods, legacy sessions, and HTTP response status. Before any of that, it rejects a present `Origin` header that does not match the WordPress installation with HTTP 403, through [HttpOriginValidator](../../includes/Transport/Infrastructure/HttpOriginValidator.php) and the `mcp_adapter_allowed_http_origins` filter. [StdioServerBridge](../../includes/Cli/StdioServerBridge.php) reads newline-delimited JSON and writes responses to STDOUT, with diagnostics on STDERR. STDIO uses the WordPress user context selected through WP-CLI; it does not run the HTTP permission callback.
 
 ### MCP validation and dispatch
 

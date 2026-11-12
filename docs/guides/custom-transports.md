@@ -18,7 +18,7 @@ interface McpRestTransportInterface extends McpTransportInterface {
 
 ## Custom REST transport
 
-Delegate MCP processing to `HttpRequestHandler`. It owns the exact 2025 session lifecycle, the sessionless 2026 lifecycle, revision selection, header validation, schema hydration, response encoding, and HTTP status.
+Delegate MCP processing to `HttpRequestHandler`. It owns Origin validation, the exact 2025 session lifecycle, the sessionless 2026 lifecycle, revision selection, header validation, schema hydration, response encoding, and HTTP status.
 
 ```php
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
@@ -79,6 +79,29 @@ add_action(
 	}
 );
 ```
+
+## Origin validation
+
+`HttpRequestHandler` validates the `Origin` header on every HTTP method and both protocol revisions before it touches sessions or the request body, as the Streamable HTTP transport requires to prevent DNS rebinding. A request without an `Origin` header, which is what command-line and server-side clients send, is not affected. A present `Origin` must match the origin of `home_url()` or `site_url()` by scheme, host, and port; the default ports 80 and 443 may be written or left out. Anything else, including the opaque `null` origin, receives HTTP 403 with a JSON-RPC permission error (`-32008`) and is not processed.
+
+Use the `mcp_adapter_allowed_http_origins` filter to allow a browser-based client served from another origin, such as a headless front end. It receives the default list and the `McpServer`, and must return an array of strings. Entries are compared by scheme, host, and port only, so a path is ignored. Any other return value rejects every request that carries an `Origin` header and logs a warning through the server's error handler.
+
+```php
+add_filter(
+	'mcp_adapter_allowed_http_origins',
+	static function ( array $origins, \WP\MCP\Core\McpServer $server ): array {
+		if ( 'mcp-adapter-default-server' === $server->get_server_id() ) {
+			$origins[] = 'https://app.example.com';
+		}
+
+		return $origins;
+	},
+	10,
+	2
+);
+```
+
+On multisite, each site accepts its own home and site origins; the origins of other sites in the network are not allowed by default.
 
 ## Non-HTTP transports
 
