@@ -14,11 +14,13 @@ This folder is self-contained: it has its own namespace (`WP\OAuth`), loader, an
 
 Protocol endpoints depend on `TokenServiceInterface`, which owns token issuance, authentication, refresh, and revocation. `OpaqueTokenService` is the current strategy. It depends in turn on `ConnectionStoreInterface`; `ApplicationPasswordConnectionStore` is the current persistence implementation. A JWT strategy can therefore replace the opaque token service without moving connection lifecycle or client approval into the token format.
 
-Clients are registered by an administrator under **Settings > OAuth Clients**. Each client is a private `oauth_server_client` post, as in WP-API/OAuth2: the client ID is the post slug, and the redirect URIs and secret hash are post meta.
+Clients can be registered by an administrator under **Settings > OAuth Clients**, or discovered from an HTTPS Client ID Metadata Document (CIMD) during authorization. First-time CIMD retrieval and site approval require `manage_options`. The verified document is held temporarily until the administrator explicitly allows it; the administrator then receives the separate, ordinary consent screen for access to their own account. Later users skip site approval but must still consent to their own connection. A site-approved document becomes a permanent, read-only private `oauth_server_client` record; token, refresh, revocation, and bearer authentication only use that local record and never fetch remote metadata.
+
+CIMD clients are public clients and must use authorization code with PKCE S256. Metadata URLs are DNS-pinned to public addresses, fetched without redirects or proxies, limited to 5 KiB, and cached for 5–60 minutes. Security-relevant document changes require renewed administrator approval; approval invalidates pending authorization codes and revokes existing connections. Publisher trust is deliberately separate from site approval: unverified clients get a warning on the consent screen, and sites can use filters to trust or block them. Because core's Application Password `app_id` is a UUID, URL client IDs use a stable derived UUID there; the exact URL remains in the connection metadata.
 
 ## Current scope
 
-This stage supports admin-registered clients, authorization code with required PKCE, short-lived access tokens, rotating refresh tokens, and revocation. Access tokens work on every REST route. Later stages add Client ID Metadata Documents, Dynamic Client Registration, and scopes.
+This stage supports admin-registered clients, CIMD clients, authorization code with required PKCE, short-lived access tokens, rotating refresh tokens, and revocation. When authorization includes a `resource`, the token request must repeat it and the resulting access and refresh tokens are restricted to that protected route. Omitting `resource` throughout the flow deliberately creates an unrestricted WordPress REST API token, which the consent screen identifies explicitly. Dynamic Client Registration and scopes remain outside the current scope.
 
 ## Hooks
 
@@ -27,6 +29,10 @@ This stage supports admin-registered clients, authorization code with required P
 | `oauth_server_enabled` | filter | Return false to turn the server off. |
 | `oauth_server_protected_resources` | filter | REST routes to protect, such as `/mcp/mcp-adapter-default-server`. |
 | `oauth_server_token_service` | filter | Replace the opaque token strategy with another `TokenServiceInterface` implementation. |
+| `oauth_server_cimd_enabled` | filter | Enable or disable CIMD support (default true). |
+| `oauth_server_cimd_admit_url` | filter | Admit or block a metadata URL before it is fetched. |
+| `oauth_server_cimd_client_trusted` | filter | Mark verified metadata as coming from a trusted publisher. |
+| `oauth_server_cimd_allow_untrusted_clients` | filter | Allow untrusted publishers with a consent warning (default true). |
 | `oauth_server_authorization_server_metadata` | filter | RFC 8414 metadata. |
 | `oauth_server_protected_resource_metadata` | filter | RFC 9728 metadata for a route. |
 | `oauth_server_www_authenticate_challenge` | filter | The challenge sent with 401 responses. |

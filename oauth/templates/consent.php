@@ -24,8 +24,9 @@ login_header(
 <style>
 	#oauth-server-consent .oauth-server-user { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
 	#oauth-server-consent .oauth-server-user img { border-radius: 50%; }
-	#oauth-server-consent p { margin-bottom: 12px; }
-	#oauth-server-consent .submit { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+	#login #oauth-server-consent p:not(.submit) { margin: 0 0 12px; }
+	#oauth-server-consent .oauth-server-warning { border-left: 4px solid #dba617; padding: 8px 12px; background: #fff8e5; }
+	#login #oauth-server-consent p.submit { display: flex; gap: 8px; justify-content: flex-end; margin: 20px 0 0; padding: 0; }
 </style>
 <form id="oauth-server-consent" method="post" action="<?php echo esc_url( $data['action_url'] ); ?>">
 	<h1 style="font-size:1.3em;margin-bottom:16px;">
@@ -51,18 +52,50 @@ login_header(
 		</span>
 	</div>
 
-	<p>
-		<?php
-		echo wp_kses(
-			sprintf(
-				/* translators: %s: application name. */
-				__( '<strong>%s</strong> wants to use this site as you. It will be able to do anything your account can do.', 'mcp-adapter' ),
-				esc_html( $oauth_server_app )
-			),
-			array( 'strong' => array() )
-		);
-		?>
-	</p>
+	<?php if ( '' !== $data['params']['resource'] ) : ?>
+		<p>
+			<?php
+			echo wp_kses(
+				sprintf(
+					/* translators: %s: application name. */
+					__( '<strong>%s</strong> wants to use this site as you.', 'mcp-adapter' ),
+					esc_html( $oauth_server_app )
+				),
+				array( 'strong' => array() )
+			);
+			?>
+		</p>
+		<p>
+			<?php
+			/* translators: %s: exact OAuth resource URL. */
+			echo esc_html( sprintf( __( 'Access will be limited to this resource: %s', 'mcp-adapter' ), $data['params']['resource'] ) );
+			?>
+		</p>
+	<?php else : ?>
+		<p>
+			<?php
+			echo wp_kses(
+				sprintf(
+					/* translators: %s: application name. */
+					__( '<strong>%s</strong> wants unrestricted REST API access. It will be able to do anything through the REST API that your account can do.', 'mcp-adapter' ),
+					esc_html( $oauth_server_app )
+				),
+				array( 'strong' => array() )
+			);
+			?>
+		</p>
+	<?php endif; ?>
+	<?php if ( $data['client']->is_cimd() ) : ?>
+		<p>
+			<?php
+			/* translators: %s: metadata publisher host. */
+			echo esc_html( sprintf( __( 'Application details were published by %s.', 'mcp-adapter' ), $data['client']->get_publisher_host() ) );
+			?>
+		</p>
+		<?php if ( ! $data['client']->is_trusted() ) : ?>
+			<p class="oauth-server-warning"><strong><?php esc_html_e( 'This publisher has not been verified by this site. Only approve if you started this connection and recognize the application.', 'mcp-adapter' ); ?></strong></p>
+		<?php endif; ?>
+	<?php endif; ?>
 	<?php if ( '' !== $data['redirect_host'] ) : ?>
 		<p>
 			<?php

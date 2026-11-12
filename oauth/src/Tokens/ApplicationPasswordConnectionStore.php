@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Tokens;
 
+use WP\OAuth\Clients\Client;
 use WP\OAuth\Grants\AuthorizedGrant;
 use WP\OAuth\Tokens\Contracts\ConnectionStoreInterface;
 use WP_Application_Passwords;
@@ -25,9 +26,81 @@ final class ApplicationPasswordConnectionStore implements ConnectionStoreInterfa
 
 	public const MAX_CONNECTIONS_PER_CLIENT = 5;
 	private const META_PREFIX               = 'oauth_server_connection_';
+	private const TYPE_COLUMN               = 'oauth_server_credential_type';
 
+	/**
+	 * Registers connection lifecycle and profile-screen hooks.
+	 */
 	public function register_hooks(): void {
 		add_action( 'wp_delete_application_password', array( $this, 'deleted_application_password' ), 10, 2 );
+		add_filter( 'manage_application-passwords-user_columns', array( $this, 'add_type_column' ) );
+		add_action( 'manage_application-passwords-user_custom_column', array( $this, 'render_type_column' ), 10, 2 );
+		add_action( 'manage_application-passwords-user_custom_column_js_template', array( $this, 'render_type_column_template' ) );
+	}
+
+	/**
+	 * Adds credential type and resource details to the Application Passwords list.
+	 *
+	 * @param array<string, string> $columns Existing list-table columns.
+	 * @return array<string, string> Columns with type and resource after the name.
+	 */
+	public function add_type_column( array $columns ): array {
+		$result = array();
+		foreach ( $columns as $key => $label ) {
+			$result[ $key ] = $label;
+			if ( 'name' !== $key ) {
+				continue;
+			}
+
+			$result[ self::TYPE_COLUMN ] = __( 'Type / Resource', 'mcp-adapter' );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Renders the credential type and resource for an existing row.
+	 *
+	 * @param string               $column_name Custom column name.
+	 * @param array<string, mixed> $item        Application Password record.
+	 */
+	public function render_type_column( string $column_name, array $item ): void {
+		if ( self::TYPE_COLUMN !== $column_name ) {
+			return;
+		}
+
+		global $user_id;
+		$uuid       = isset( $item['uuid'] ) ? (string) $item['uuid'] : '';
+		$connection = '' === $uuid ? null : $this->get( (int) $user_id, $uuid );
+		if ( null === $connection ) {
+			esc_html_e( 'Application Password', 'mcp-adapter' );
+			return;
+		}
+
+		echo '<strong>' . esc_html__( 'OAuth 2.0', 'mcp-adapter' ) . '</strong><br />';
+		$resource = $connection->get_resource();
+		if ( '' === $resource ) {
+			echo '<span class="description">' . esc_html__( 'All REST API resources', 'mcp-adapter' ) . '</span>';
+			return;
+		}
+
+		echo '<code style="overflow-wrap:anywhere;">' . esc_html( $resource ) . '</code>';
+	}
+
+	/**
+	 * Renders the credential type in core's new-password JavaScript row template.
+	 *
+	 * Rows created from that template are ordinary Application Passwords. OAuth
+	 * connections are created during token exchange and appear after a reload.
+	 *
+	 * @param string $column_name Custom column name.
+	 */
+	public function render_type_column_template( string $column_name ): void {
+		if ( self::TYPE_COLUMN !== $column_name ) {
+			return;
+		}
+
+		esc_html_e( 'Application Password', 'mcp-adapter' );
 	}
 
 	/** {@inheritDoc} */
@@ -40,7 +113,7 @@ final class ApplicationPasswordConnectionStore implements ConnectionStoreInterfa
 			$user->ID,
 			array(
 				'name'   => $grant->get_client_name(),
-				'app_id' => $client_id,
+				'app_id' => Client::application_password_id( $client_id ),
 			)
 		);
 		if ( is_wp_error( $created ) ) {
@@ -140,12 +213,13 @@ final class ApplicationPasswordConnectionStore implements ConnectionStoreInterfa
 	}
 
 	private function prune_connections( int $user_id, string $client_id ): void {
-		$max   = max( 1, (int) apply_filters( 'oauth_server_max_sessions_per_client', self::MAX_CONNECTIONS_PER_CLIENT, $client_id ) );
-		$items = array_values(
+		$max    = max( 1, (int) apply_filters( 'oauth_server_max_sessions_per_client', self::MAX_CONNECTIONS_PER_CLIENT, $client_id ) );
+		$app_id = Client::application_password_id( $client_id );
+		$items  = array_values(
 			array_filter(
 				WP_Application_Passwords::get_user_application_passwords( $user_id ),
-				static function ( $item ) use ( $client_id ): bool {
-					return isset( $item['app_id'] ) && $item['app_id'] === $client_id;
+				static function ( $item ) use ( $app_id ): bool {
+					return isset( $item['app_id'] ) && $item['app_id'] === $app_id;
 				}
 			)
 		);

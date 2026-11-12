@@ -24,6 +24,7 @@ defined( 'ABSPATH' ) || exit;
 final class ClientsPage {
 
 	private const SLUG          = 'oauth-server-clients';
+	private const ADD_SLUG      = 'oauth-server-add-client';
 	private const ADD_ACTION    = 'oauth_server_add_client';
 	private const UPDATE_ACTION = 'oauth_server_update_client';
 	private const SECRET_ACTION = 'oauth_server_reset_client_secret';
@@ -51,6 +52,7 @@ final class ClientsPage {
 	 */
 	public function register_hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_page' ) );
+		add_action( 'admin_head', array( $this, 'hide_add_page_from_menu' ) );
 		add_action( 'admin_post_' . self::ADD_ACTION, array( $this, 'handle_add' ) );
 		add_action( 'admin_post_' . self::UPDATE_ACTION, array( $this, 'handle_update' ) );
 		add_action( 'admin_post_' . self::SECRET_ACTION, array( $this, 'handle_secret' ) );
@@ -68,6 +70,22 @@ final class ClientsPage {
 			self::SLUG,
 			array( $this, 'render' )
 		);
+
+		add_submenu_page(
+			'options-general.php',
+			__( 'Add OAuth Client', 'mcp-adapter' ),
+			__( 'Add OAuth Client', 'mcp-adapter' ),
+			'manage_options',
+			self::ADD_SLUG,
+			array( $this, 'render_add' )
+		);
+	}
+
+	/**
+	 * Hides the add page after WordPress has resolved the current page title.
+	 */
+	public function hide_add_page_from_menu(): void {
+		remove_submenu_page( 'options-general.php', self::ADD_SLUG );
 	}
 
 	/**
@@ -84,7 +102,7 @@ final class ClientsPage {
 
 		$result = $this->clients->create( $name, $redirect_uris, ! empty( $_POST['confidential'] ) );
 		if ( is_wp_error( $result ) ) {
-			$this->finish( array( 'error' => $result->get_error_message() ) );
+			$this->finish_add( array( 'error' => $result->get_error_message() ) );
 		}
 
 		[ $client, $secret ] = $result;
@@ -105,7 +123,7 @@ final class ClientsPage {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
 		}
-		$client_id = isset( $_POST['client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Part of the nonce action, checked next.
+		$client_id = isset( $_POST['client_id'] ) && is_string( $_POST['client_id'] ) ? trim( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Exact client ID is part of the signed nonce.
 		check_admin_referer( self::UPDATE_ACTION . '_' . $client_id );
 
 		$name          = isset( $_POST['client_name'] ) ? sanitize_text_field( wp_unslash( $_POST['client_name'] ) ) : '';
@@ -126,7 +144,7 @@ final class ClientsPage {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
 		}
-		$client_id = isset( $_POST['client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Part of the nonce action, checked next.
+		$client_id = isset( $_POST['client_id'] ) && is_string( $_POST['client_id'] ) ? trim( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Exact client ID is part of the signed nonce.
 		check_admin_referer( self::SECRET_ACTION . '_' . $client_id );
 
 		$confidential = ! isset( $_POST['mode'] ) || 'remove' !== $_POST['mode'];
@@ -153,7 +171,7 @@ final class ClientsPage {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Sorry, you are not allowed to manage OAuth clients.', 'mcp-adapter' ), 403 );
 		}
-		$client_id = isset( $_POST['client_id'] ) ? sanitize_text_field( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Part of the nonce action, checked next.
+		$client_id = isset( $_POST['client_id'] ) && is_string( $_POST['client_id'] ) ? trim( wp_unslash( $_POST['client_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Exact client ID is part of the signed nonce.
 		check_admin_referer( self::DELETE_ACTION . '_' . $client_id );
 
 		$client = $this->clients->get( $client_id );
@@ -171,7 +189,7 @@ final class ClientsPage {
 	 * Renders the page.
 	 */
 	public function render(): void {
-		$client_id = isset( $_GET['client'] ) ? sanitize_text_field( wp_unslash( $_GET['client'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only selects which client to show.
+		$client_id = isset( $_GET['client'] ) && is_string( $_GET['client'] ) ? trim( wp_unslash( $_GET['client'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Exact client ID only selects a record and is escaped on output.
 		$client    = '' === $client_id ? null : $this->clients->get( $client_id );
 		$notice    = $this->take_notice();
 		?>
@@ -181,7 +199,9 @@ final class ClientsPage {
 				<a href="<?php echo esc_url( $this->page_url() ); ?>" class="page-title-action"><?php esc_html_e( 'All clients', 'mcp-adapter' ); ?></a>
 				<hr class="wp-header-end" />
 			<?php else : ?>
-				<h1><?php esc_html_e( 'OAuth Clients', 'mcp-adapter' ); ?></h1>
+				<h1 class="wp-heading-inline"><?php esc_html_e( 'OAuth Clients', 'mcp-adapter' ); ?></h1>
+				<a href="<?php echo esc_url( $this->add_url() ); ?>" class="page-title-action"><?php esc_html_e( 'Add client', 'mcp-adapter' ); ?></a>
+				<hr class="wp-header-end" />
 				<p><?php esc_html_e( 'Register applications that can ask users to connect to this site. Each connection appears in the user’s Application Passwords and can be revoked there.', 'mcp-adapter' ); ?></p>
 			<?php endif; ?>
 
@@ -206,7 +226,43 @@ final class ClientsPage {
 	}
 
 	/**
-	 * Renders the client list and the add form.
+	 * Renders the add client page.
+	 */
+	public function render_add(): void {
+		$notice = $this->take_notice();
+		?>
+		<div class="wrap">
+			<h1 class="wp-heading-inline"><?php esc_html_e( 'Add OAuth Client', 'mcp-adapter' ); ?></h1>
+			<a href="<?php echo esc_url( $this->page_url() ); ?>" class="page-title-action"><?php esc_html_e( 'All clients', 'mcp-adapter' ); ?></a>
+			<hr class="wp-header-end" />
+
+			<?php if ( ! Server::is_available() ) : ?>
+				<div class="notice notice-warning"><p><?php esc_html_e( 'Application Passwords are not available on this site, so OAuth sign-in is turned off. They need HTTPS, or a local environment type.', 'mcp-adapter' ); ?></p></div>
+			<?php endif; ?>
+
+			<?php $this->render_notice( $notice, null ); ?>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::ADD_ACTION ); ?>" />
+				<?php wp_nonce_field( self::ADD_ACTION ); ?>
+				<table class="form-table" role="presentation">
+					<?php $this->render_detail_fields( null ); ?>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Client secret', 'mcp-adapter' ); ?></th>
+						<td>
+							<label><input type="checkbox" name="confidential" value="1" /> <?php esc_html_e( 'Generate a client secret', 'mcp-adapter' ); ?></label>
+							<p class="description"><?php esc_html_e( 'Only for applications that run on a server and can keep a secret. Leave unchecked for desktop and browser apps.', 'mcp-adapter' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button( __( 'Add client', 'mcp-adapter' ) ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Renders the client list.
 	 */
 	private function render_list(): void {
 		$clients = $this->clients->all();
@@ -229,34 +285,17 @@ final class ClientsPage {
 						<td>
 							<strong><a class="row-title" href="<?php echo esc_url( $this->edit_url( $client ) ); ?>"><?php echo esc_html( $client->get_name() ); ?></a></strong>
 							<div class="row-actions visible">
-								<span class="edit"><a href="<?php echo esc_url( $this->edit_url( $client ) ); ?>"><?php esc_html_e( 'Edit', 'mcp-adapter' ); ?></a> | </span>
+								<span class="edit"><a href="<?php echo esc_url( $this->edit_url( $client ) ); ?>"><?php echo $client->is_cimd() ? esc_html__( 'View', 'mcp-adapter' ) : esc_html__( 'Edit', 'mcp-adapter' ); ?></a> | </span>
 								<span class="delete"><?php $this->render_delete_button( $client, true ); ?></span>
 							</div>
 						</td>
 						<td><code><?php echo esc_html( $client->get_id() ); ?></code></td>
 						<td><?php echo wp_kses( implode( '<br />', array_map( 'esc_html', $client->get_redirect_uris() ) ), array( 'br' => array() ) ); ?></td>
-						<td><?php echo $client->is_confidential() ? esc_html__( 'Confidential', 'mcp-adapter' ) : esc_html__( 'Public', 'mcp-adapter' ); ?></td>
+						<td><?php echo $client->is_cimd() ? esc_html__( 'Metadata document', 'mcp-adapter' ) : ( $client->is_confidential() ? esc_html__( 'Confidential', 'mcp-adapter' ) : esc_html__( 'Public', 'mcp-adapter' ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
 		</table>
-
-		<h2><?php esc_html_e( 'Add client', 'mcp-adapter' ); ?></h2>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" value="<?php echo esc_attr( self::ADD_ACTION ); ?>" />
-			<?php wp_nonce_field( self::ADD_ACTION ); ?>
-			<table class="form-table" role="presentation">
-				<?php $this->render_detail_fields( null ); ?>
-				<tr>
-					<th scope="row"><?php esc_html_e( 'Client secret', 'mcp-adapter' ); ?></th>
-					<td>
-						<label><input type="checkbox" name="confidential" value="1" /> <?php esc_html_e( 'Generate a client secret', 'mcp-adapter' ); ?></label>
-						<p class="description"><?php esc_html_e( 'Only for applications that run on a server and can keep a secret. Leave unchecked for desktop and browser apps.', 'mcp-adapter' ); ?></p>
-					</td>
-				</tr>
-			</table>
-			<?php submit_button( __( 'Add client', 'mcp-adapter' ) ); ?>
-		</form>
 
 		<h2><?php esc_html_e( 'Server details', 'mcp-adapter' ); ?></h2>
 		<p><?php esc_html_e( 'Applications normally discover these automatically.', 'mcp-adapter' ); ?></p>
@@ -275,6 +314,21 @@ final class ClientsPage {
 	 */
 	private function render_edit( Client $client ): void {
 		$post_url = admin_url( 'admin-post.php' );
+		if ( $client->is_cimd() ) {
+			?>
+			<p><?php esc_html_e( 'This is a permanent local record of a Client ID Metadata Document. Its fields are read-only and are refreshed from the publisher during authorization.', 'mcp-adapter' ); ?></p>
+			<table class="form-table" role="presentation">
+				<tr><th scope="row"><?php esc_html_e( 'Client ID', 'mcp-adapter' ); ?></th><td><code><?php echo esc_html( $client->get_id() ); ?></code></td></tr>
+				<tr><th scope="row"><?php esc_html_e( 'Name', 'mcp-adapter' ); ?></th><td><?php echo esc_html( $client->get_name() ); ?></td></tr>
+				<tr><th scope="row"><?php esc_html_e( 'Redirect URIs', 'mcp-adapter' ); ?></th><td><code><?php echo wp_kses( implode( '<br />', array_map( 'esc_html', $client->get_redirect_uris() ) ), array( 'br' => array() ) ); ?></code></td></tr>
+				<tr><th scope="row"><?php esc_html_e( 'Publisher trust', 'mcp-adapter' ); ?></th><td><?php echo $client->is_trusted() ? esc_html__( 'Trusted by site policy', 'mcp-adapter' ) : esc_html__( 'Not verified', 'mcp-adapter' ); ?></td></tr>
+			</table>
+			<h2><?php esc_html_e( 'Delete client', 'mcp-adapter' ); ?></h2>
+			<p><?php esc_html_e( 'Deleting this record revokes its connections. The record can be discovered again unless site policy blocks its URL.', 'mcp-adapter' ); ?></p>
+			<?php $this->render_delete_button( $client, false ); ?>
+			<?php
+			return;
+		}
 		?>
 		<form method="post" action="<?php echo esc_url( $post_url ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::UPDATE_ACTION ); ?>" />
@@ -430,6 +484,21 @@ final class ClientsPage {
 	}
 
 	/**
+	 * Stores a notice and redirects to the add client page. Always ends the request.
+	 *
+	 * @param array<string, string|null> $notice Notice data.
+	 * @return never
+	 */
+	private function finish_add( array $notice ): void {
+		if ( ! empty( $notice ) ) {
+			set_transient( self::NOTICE_PREFIX . get_current_user_id(), $notice, 5 * MINUTE_IN_SECONDS );
+		}
+
+		wp_safe_redirect( $this->add_url() );
+		exit;
+	}
+
+	/**
 	 * Reads and clears the current user's notice.
 	 *
 	 * @return array<string, string|null>
@@ -447,6 +516,13 @@ final class ClientsPage {
 	 */
 	private function page_url(): string {
 		return admin_url( 'options-general.php?page=' . self::SLUG );
+	}
+
+	/**
+	 * Gets the add client page URL.
+	 */
+	private function add_url(): string {
+		return admin_url( 'options-general.php?page=' . self::ADD_SLUG );
 	}
 
 	/**

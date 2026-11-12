@@ -40,6 +40,13 @@ final class AuthenticatedToken {
 	private $credential_id;
 
 	/**
+	 * Resource this token is restricted to, or an empty string when unrestricted.
+	 *
+	 * @var string
+	 */
+	private $resource;
+
+	/**
 	 * Backend-specific credential record.
 	 *
 	 * @var array<string, mixed>
@@ -52,12 +59,14 @@ final class AuthenticatedToken {
 	 * @param WP_User              $user          Authenticated user.
 	 * @param string               $client_id     Client identifier.
 	 * @param string               $credential_id Backend credential identifier.
+	 * @param string               $resource_indicator Resource indicator, or an empty string.
 	 * @param array<string, mixed> $credential    Backend credential record.
 	 */
-	public function __construct( WP_User $user, string $client_id, string $credential_id, array $credential = array() ) {
+	public function __construct( WP_User $user, string $client_id, string $credential_id, string $resource_indicator, array $credential = array() ) {
 		$this->user          = $user;
 		$this->client_id     = $client_id;
 		$this->credential_id = $credential_id;
+		$this->resource      = $resource_indicator;
 		$this->credential    = $credential;
 	}
 
@@ -80,6 +89,15 @@ final class AuthenticatedToken {
 	 */
 	public function get_credential_id(): string {
 		return $this->credential_id;
+	}
+
+	/**
+	 * Gets the resource this token is restricted to.
+	 *
+	 * @return string Resource indicator, or an empty string when unrestricted.
+	 */
+	public function get_resource(): string {
+		return $this->resource;
 	}
 
 	/**

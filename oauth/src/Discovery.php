@@ -129,6 +129,7 @@ final class Discovery {
 			'token_endpoint_auth_methods_supported'      => array( 'none', 'client_secret_post', 'client_secret_basic' ),
 			'revocation_endpoint_auth_methods_supported' => array( 'none', 'client_secret_post', 'client_secret_basic' ),
 			'authorization_response_iss_parameter_supported' => true,
+			'client_id_metadata_document_supported'      => true,
 		);
 
 		/**

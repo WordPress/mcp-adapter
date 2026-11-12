@@ -12,7 +12,10 @@ namespace WP\OAuth;
 use WP\OAuth\Admin\ClientsPage;
 use WP\OAuth\Admin\HealthCheck;
 use WP\OAuth\Authentication\Bearer;
+use WP\OAuth\Clients\Cimd\CimdFetcher;
+use WP\OAuth\Clients\Cimd\CimdResolver;
 use WP\OAuth\Clients\ClientRepository;
+use WP\OAuth\Clients\ClientResolver;
 use WP\OAuth\Endpoints\Authorize;
 use WP\OAuth\Endpoints\Revoke;
 use WP\OAuth\Endpoints\Token;
@@ -42,6 +45,9 @@ final class Server {
 	 * @var ClientRepository
 	 */
 	private $clients;
+
+	/** @var ClientResolver */
+	private $client_resolver;
 
 	/**
 	 * Protected resource registry.
@@ -150,11 +156,12 @@ final class Server {
 	 * Builds the components.
 	 */
 	private function __construct() {
-		$this->clients     = new ClientRepository();
-		$this->resources   = new ProtectedResources();
-		$this->codes       = new AuthorizationCodes();
-		$this->connections = new ApplicationPasswordConnectionStore();
-		$default_tokens    = new OpaqueTokenService( $this->connections );
+		$this->clients         = new ClientRepository();
+		$this->client_resolver = new ClientResolver( $this->clients, new CimdResolver( $this->clients, new CimdFetcher() ) );
+		$this->resources       = new ProtectedResources();
+		$this->codes           = new AuthorizationCodes();
+		$this->connections     = new ApplicationPasswordConnectionStore();
+		$default_tokens        = new OpaqueTokenService( $this->connections );
 
 		/**
 		 * Filters the OAuth token strategy.
@@ -167,7 +174,7 @@ final class Server {
 		 */
 		$tokens       = apply_filters( 'oauth_server_token_service', $default_tokens, $this->connections );
 		$this->tokens = $tokens instanceof TokenServiceInterface ? $tokens : $default_tokens;
-		$this->bearer = new Bearer( $this->tokens, $this->connections );
+		$this->bearer = new Bearer( $this->tokens, $this->connections, $this->resources );
 	}
 
 	/**
@@ -178,7 +185,7 @@ final class Server {
 		$this->connections->register_hooks();
 		( new Discovery( $this->resources ) )->register_hooks();
 		( new Challenge( $this->resources, $this->bearer ) )->register_hooks();
-		( new Authorize( $this->clients, $this->resources, $this->codes ) )->register_hooks();
+		( new Authorize( $this->client_resolver, $this->resources, $this->codes ) )->register_hooks();
 		( new Token( $this->clients, $this->codes, $this->tokens ) )->register_hooks();
 		( new Revoke( $this->clients, $this->tokens ) )->register_hooks();
 		( new ClientsPage( $this->clients ) )->register_hooks();

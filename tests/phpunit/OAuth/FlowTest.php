@@ -90,6 +90,41 @@ final class FlowTest extends WP_UnitTestCase {
 		$this->assertTrue( $this->server->bearer()->has_error() );
 	}
 
+	/** Tests that the profile list distinguishes OAuth connections. */
+	public function test_application_password_list_marks_oauth_connections(): void {
+		$resource = untrailingslashit( rest_url( 'mcp/mcp-adapter-default-server' ) );
+		$this->exchange( $this->issue_code( null, null, $resource ), self::VERIFIER, null, null, $resource );
+		$oauth_item = WP_Application_Passwords::get_user_application_passwords( $this->user->ID )[0];
+		$regular    = WP_Application_Passwords::create_new_application_password( $this->user->ID, array( 'name' => 'Regular credential' ) );
+		$this->assertIsArray( $regular );
+
+		$store   = new ApplicationPasswordConnectionStore();
+		$columns = $store->add_type_column(
+			array(
+				'name'    => 'Name',
+				'created' => 'Created',
+			)
+		);
+		$this->assertSame( array( 'name', 'oauth_server_credential_type', 'created' ), array_keys( $columns ) );
+
+		$previous_user_id    = $GLOBALS['user_id'] ?? null;
+		$GLOBALS['user_id'] = $this->user->ID; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The list table supplies this global.
+		try {
+			ob_start();
+			$store->render_type_column( 'oauth_server_credential_type', $oauth_item );
+			$oauth_column = ob_get_clean();
+			$this->assertIsString( $oauth_column );
+			$this->assertStringContainsString( 'OAuth 2.0', $oauth_column );
+			$this->assertStringContainsString( esc_html( $resource ), $oauth_column );
+
+			ob_start();
+			$store->render_type_column( 'oauth_server_credential_type', $regular[1] );
+			$this->assertSame( 'Application Password', ob_get_clean() );
+		} finally {
+			$GLOBALS['user_id'] = $previous_user_id; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores test state.
+		}
+	}
+
 	public function test_failed_pkce_check_burns_the_code(): void {
 		$code = $this->issue_code();
 
@@ -117,6 +152,51 @@ final class FlowTest extends WP_UnitTestCase {
 		} finally {
 			$this->server->clients()->register_post_type();
 		}
+	}
+
+	/** Tests that a bound token cannot authenticate a different REST resource. */
+	public function test_resource_bound_token_only_authenticates_on_that_resource(): void {
+		$resource = untrailingslashit( rest_url( 'mcp/mcp-adapter-default-server' ) );
+		$token    = $this->exchange( $this->issue_code( null, null, $resource ), self::VERIFIER, null, null, $resource )->get_data()['access_token'];
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$this->assertSame( $this->user->ID, $this->server->bearer()->authenticate( false ) );
+
+		$_SERVER['REQUEST_URI'] = '/wp-json/wp/v2/posts?rest_route=/mcp/mcp-adapter-default-server';
+		$_GET['rest_route']     = '/mcp/mcp-adapter-default-server';
+		$this->assertFalse( $this->server->bearer()->authenticate( false ) );
+		$this->assertSame( 'oauth_server_invalid_token', $this->server->bearer()->get_error()->get_error_code() );
+	}
+
+	/** Tests that the token request cannot remove an approved resource. */
+	public function test_resource_bound_code_requires_resource_at_token_endpoint(): void {
+		$resource = untrailingslashit( rest_url( 'mcp/mcp-adapter-default-server' ) );
+		$response = $this->exchange( $this->issue_code( null, null, $resource ) );
+
+		$this->assertSame( 400, $response->get_status() );
+		$this->assertSame( 'invalid_target', $response->get_data()['error'] );
+	}
+
+	/** Tests that refresh preserves the original resource restriction. */
+	public function test_resource_bound_refresh_requires_same_resource(): void {
+		$resource = untrailingslashit( rest_url( 'mcp/mcp-adapter-default-server' ) );
+		$issued   = $this->exchange( $this->issue_code( null, null, $resource ), self::VERIFIER, null, null, $resource )->get_data();
+
+		$missing = $this->refresh( $issued['refresh_token'] );
+		$this->assertSame( 400, $missing->get_status() );
+		$this->assertSame( 'invalid_target', $missing->get_data()['error'] );
+
+		$this->assertSame( 200, $this->refresh( $issued['refresh_token'], null, null, $resource )->get_status() );
+	}
+
+	/** Tests that deliberately unrestricted tokens still work across REST routes. */
+	public function test_unrestricted_token_authenticates_on_another_rest_route(): void {
+		$token = $this->exchange( $this->issue_code() )->get_data()['access_token'];
+
+		$_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ' . $token;
+		$_SERVER['REQUEST_URI']        = '/wp-json/wp/v2/posts';
+
+		$this->assertSame( $this->user->ID, $this->server->bearer()->authenticate( false ) );
 	}
 
 	public function test_oauth_access_tokens_are_not_application_passwords(): void {
@@ -357,7 +437,7 @@ final class FlowTest extends WP_UnitTestCase {
 		$this->assertCount( ApplicationPasswordConnectionStore::MAX_CONNECTIONS_PER_CLIENT, WP_Application_Passwords::get_user_application_passwords( $this->user->ID ) );
 	}
 
-	private function issue_code( ?int $user_id = null, ?Client $client = null ): string {
+	private function issue_code( ?int $user_id = null, ?Client $client = null, string $resource = '' ): string {
 		$challenge = rtrim( strtr( base64_encode( hash( 'sha256', self::VERIFIER, true ) ), '+/', '-_' ), '=' );
 
 		return $this->server->codes()->issue(
@@ -365,13 +445,13 @@ final class FlowTest extends WP_UnitTestCase {
 				'client_id'      => ( $client ?? $this->client )->get_id(),
 				'redirect_uri'   => self::REDIRECT_URI,
 				'code_challenge' => $challenge,
-				'resource'       => '',
+				'resource'       => $resource,
 				'user_id'        => $user_id ?? $this->user->ID,
 			)
 		);
 	}
 
-	private function exchange( string $code, string $verifier = self::VERIFIER, ?Client $client = null, ?string $secret = null ): WP_REST_Response {
+	private function exchange( string $code, string $verifier = self::VERIFIER, ?Client $client = null, ?string $secret = null, string $resource = '' ): WP_REST_Response {
 		$request = new WP_REST_Request( 'POST', '/oauth/v1/token' );
 		$request->set_body_params(
 			array(
@@ -381,13 +461,14 @@ final class FlowTest extends WP_UnitTestCase {
 				'client_secret' => (string) $secret,
 				'redirect_uri'  => self::REDIRECT_URI,
 				'code_verifier' => $verifier,
+				'resource'      => $resource,
 			)
 		);
 
 		return rest_do_request( $request );
 	}
 
-	private function refresh( string $refresh_token, ?Client $client = null, ?string $secret = null ): WP_REST_Response {
+	private function refresh( string $refresh_token, ?Client $client = null, ?string $secret = null, string $resource = '' ): WP_REST_Response {
 		$request = new WP_REST_Request( 'POST', '/oauth/v1/token' );
 		$request->set_body_params(
 			array(
@@ -395,6 +476,7 @@ final class FlowTest extends WP_UnitTestCase {
 				'refresh_token' => $refresh_token,
 				'client_id'     => ( $client ?? $this->client )->get_id(),
 				'client_secret' => (string) $secret,
+				'resource'      => $resource,
 			)
 		);
 

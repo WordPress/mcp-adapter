@@ -71,7 +71,11 @@ final class OpaqueTokenService implements TokenServiceInterface {
 		if ( empty( $data['refresh_hash'] ) || ! hash_equals( (string) $data['refresh_hash'], $hash ) || (int) ( $data['refresh_expires_at'] ?? 0 ) < time() ) {
 			return $this->invalid( 'invalid_grant', __( 'The refresh token is invalid or expired.', 'mcp-adapter' ) );
 		}
-		if ( '' !== $resource_indicator && '' !== $connection->get_resource() && untrailingslashit( $resource_indicator ) !== untrailingslashit( $connection->get_resource() ) ) {
+		$resource           = $connection->get_resource();
+		$resources_mismatch = '' === $resource || '' === $resource_indicator
+			? ! hash_equals( $resource, $resource_indicator )
+			: ! hash_equals( untrailingslashit( $resource ), untrailingslashit( $resource_indicator ) );
+		if ( $resources_mismatch ) {
 			return $this->invalid( 'invalid_target', __( 'The refresh token was not issued for this resource.', 'mcp-adapter' ) );
 		}
 
@@ -124,7 +128,7 @@ final class OpaqueTokenService implements TokenServiceInterface {
 			return $this->invalid_token();
 		}
 
-		return new AuthenticatedToken( $user, $connection->get_client_id(), $connection_id, $data );
+		return new AuthenticatedToken( $user, $connection->get_client_id(), $connection_id, $connection->get_resource(), $data );
 	}
 
 	/** {@inheritDoc} */
@@ -148,7 +152,7 @@ final class OpaqueTokenService implements TokenServiceInterface {
 			if ( is_string( $known_hash ) && hash_equals( $known_hash, $hash ) ) {
 				$user = get_userdata( $user_id );
 				return $user instanceof WP_User
-					? new AuthenticatedToken( $user, $connection->get_client_id(), $connection_id, $connection->get_data() )
+					? new AuthenticatedToken( $user, $connection->get_client_id(), $connection_id, $connection->get_resource(), $connection->get_data() )
 					: $this->invalid_token();
 			}
 		}

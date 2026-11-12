@@ -9,8 +9,9 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Endpoints;
 
+use WP\OAuth\Clients\Cimd\CimdApproval;
 use WP\OAuth\Clients\Client;
-use WP\OAuth\Clients\ClientRepository;
+use WP\OAuth\Clients\ClientResolver;
 use WP\OAuth\Grants\AuthorizationCodes;
 use WP\OAuth\Grants\Pkce;
 use WP\OAuth\ProtectedResources;
@@ -38,6 +39,7 @@ final class Authorize {
 
 	private const REQUEST_PREFIX   = 'oauth_server_request_';
 	private const REQUEST_LIFETIME = 10 * MINUTE_IN_SECONDS;
+	private const APPROVAL_PREFIX  = 'oauth_server_cimd_approval_';
 
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas.
 	private const PARAMS = array(
@@ -54,7 +56,7 @@ final class Authorize {
 	/**
 	 * Client registry.
 	 *
-	 * @var ClientRepository
+	 * @var ClientResolver
 	 */
 	private $clients;
 
@@ -75,11 +77,11 @@ final class Authorize {
 	/**
 	 * Constructor.
 	 *
-	 * @param ClientRepository  $clients   Client registry.
+	 * @param ClientResolver    $clients   Authorization-time client resolver.
 	 * @param ProtectedResources        $resources Protected resource registry.
 	 * @param AuthorizationCodes $codes     Authorization code store.
 	 */
-	public function __construct( ClientRepository $clients, ProtectedResources $resources, AuthorizationCodes $codes ) {
+	public function __construct( ClientResolver $clients, ProtectedResources $resources, AuthorizationCodes $codes ) {
 		$this->clients   = $clients;
 		$this->resources = $resources;
 		$this->codes     = $codes;
@@ -101,6 +103,9 @@ final class Authorize {
 		}
 
 		if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === $_SERVER['REQUEST_METHOD'] ) {
+			if ( isset( $_POST['cimd_approval_id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Selects the handler; that handler verifies its nonce.
+				$this->handle_cimd_approval();
+			}
 			$this->handle_decision();
 		}
 
@@ -109,8 +114,27 @@ final class Authorize {
 			$params[ $name ] = isset( $_GET[ $name ] ) && is_string( $_GET[ $name ] ) ? trim( wp_unslash( $_GET[ $name ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- An OAuth request from another site; values are validated below, and redirect URIs must match exactly.
 		}
 
-		// Check the client and redirect URI before redirecting anywhere (OAuth 2.1 section 7.5.2).
-		$client = $this->clients->get( $params['client_id'] );
+		// Never fetch an attacker-selected URL before a user has authenticated.
+		$client   = $this->clients->get( $params['client_id'] );
+		$approval = null;
+		if ( ! $client instanceof Client && $this->clients->is_cimd_candidate( $params['client_id'] ) && ! is_user_logged_in() ) {
+			wp_safe_redirect( wp_login_url( $this->request_url( $params ) ) );
+			exit;
+		}
+		if ( is_user_logged_in() && ( ! $client instanceof Client || $client->is_cimd() ) ) {
+			$resolved = $this->clients->resolve_for_authorization( $params['client_id'], get_current_user_id() );
+			if ( is_wp_error( $resolved ) ) {
+				$this->fail( $resolved->get_error_message() );
+			}
+			if ( $resolved instanceof CimdApproval ) {
+				$approval = $resolved;
+				$client   = $approval->to_client();
+			} else {
+				$client = $resolved;
+			}
+		}
+
+		// Check the client and redirect URI before redirecting to the client (OAuth 2.1 section 7.5.2).
 		if ( ! $client instanceof Client ) {
 			$this->fail( __( 'This application is not registered on this site.', 'mcp-adapter' ) );
 		}
@@ -142,11 +166,72 @@ final class Authorize {
 		if ( ! wp_is_application_passwords_available_for_user( $user ) ) {
 			$this->redirect_error( $params, 'access_denied', 'This user cannot authorize applications.' );
 		}
+		if ( $approval instanceof CimdApproval ) {
+			$approval_id = bin2hex( random_bytes( 16 ) );
+			set_transient(
+				self::APPROVAL_PREFIX . $approval_id,
+				array(
+					'params'   => $params,
+					'user_id'  => $user->ID,
+					'approval' => $approval->to_array(),
+				),
+				self::REQUEST_LIFETIME
+			);
+			$this->render_cimd_approval( $approval, $user, $params, $approval_id );
+			exit;
+		}
 
 		$request_id = bin2hex( random_bytes( 16 ) );
-		set_transient( self::REQUEST_PREFIX . $request_id, array_merge( $params, array( 'user_id' => $user->ID ) ), self::REQUEST_LIFETIME );
+		set_transient(
+			self::REQUEST_PREFIX . $request_id,
+			array_merge(
+				$params,
+				array(
+					'user_id'           => $user->ID,
+					'client_generation' => $client->get_generation(),
+				)
+			),
+			self::REQUEST_LIFETIME
+		);
 
 		$this->render_consent( $client, $user, $params, $request_id );
+		exit;
+	}
+
+	/**
+	 * Handles an administrator's site-level CIMD approval. Always ends the request.
+	 *
+	 * @return never
+	 */
+	private function handle_cimd_approval(): void {
+		$approval_id = isset( $_POST['cimd_approval_id'] ) ? sanitize_key( wp_unslash( $_POST['cimd_approval_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked below.
+		if ( 1 !== preg_match( '/^[a-f0-9]{32}$/', $approval_id ) || ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+			$this->fail( __( 'You are not allowed to approve this application for the site.', 'mcp-adapter' ) );
+		}
+
+		check_admin_referer( self::ACTION . '_cimd_' . $approval_id );
+
+		$key     = self::APPROVAL_PREFIX . $approval_id;
+		$pending = get_transient( $key );
+		if ( ! is_array( $pending ) || ! delete_transient( $key ) || get_current_user_id() !== (int) ( $pending['user_id'] ?? 0 ) || ! isset( $pending['params'], $pending['approval'] ) || ! is_array( $pending['params'] ) || ! is_array( $pending['approval'] ) ) {
+			$this->fail( __( 'This approval request has expired. Start again from the application.', 'mcp-adapter' ) );
+		}
+
+		$approval = CimdApproval::from_array( $pending['approval'] );
+		if ( ! $approval instanceof CimdApproval || $approval->get_client_id() !== (string) ( $pending['params']['client_id'] ?? '' ) ) {
+			$this->fail( __( 'This approval request is not valid. Start again from the application.', 'mcp-adapter' ) );
+		}
+
+		if ( ! isset( $_POST['approve_client'] ) ) {
+			$this->redirect_error( $pending['params'], 'access_denied', 'A site administrator denied this client registration.' );
+		}
+
+		$client = $this->clients->approve_cimd( $approval );
+		if ( is_wp_error( $client ) ) {
+			$this->fail( $client->get_error_message() );
+		}
+
+		wp_safe_redirect( $this->request_url( $pending['params'] ) );
 		exit;
 	}
 
@@ -171,7 +256,7 @@ final class Authorize {
 
 		// The client may have been edited or deleted while the user decided.
 		$client = $this->clients->get( (string) $pending['client_id'] );
-		if ( ! $client instanceof Client || ! $client->allows_redirect_uri( (string) $pending['redirect_uri'] ) ) {
+		if ( ! $client instanceof Client || ! $client->allows_redirect_uri( (string) $pending['redirect_uri'] ) || ! hash_equals( $client->get_generation(), (string) ( $pending['client_generation'] ?? '' ) ) ) {
 			$this->fail( __( 'This application is no longer registered on this site.', 'mcp-adapter' ) );
 		}
 
@@ -181,11 +266,12 @@ final class Authorize {
 
 		$code = $this->codes->issue(
 			array(
-				'client_id'      => $client->get_id(),
-				'redirect_uri'   => $pending['redirect_uri'],
-				'code_challenge' => $pending['code_challenge'],
-				'resource'       => $pending['resource'],
-				'user_id'        => get_current_user_id(),
+				'client_id'         => $client->get_id(),
+				'redirect_uri'      => $pending['redirect_uri'],
+				'code_challenge'    => $pending['code_challenge'],
+				'resource'          => $pending['resource'],
+				'user_id'           => get_current_user_id(),
+				'client_generation' => $client->get_generation(),
 			)
 		);
 
@@ -289,5 +375,30 @@ final class Authorize {
 		);
 
 		require dirname( __DIR__, 2 ) . '/templates/consent.php';
+	}
+
+	/**
+	 * Renders the site-level CIMD approval screen.
+	 *
+	 * @param CimdApproval          $approval    Verified registration awaiting approval.
+	 * @param WP_User               $user        Current administrator.
+	 * @param array<string, string> $params      Authorization request parameters.
+	 * @param string                $approval_id Stored approval ID.
+	 */
+	private function render_cimd_approval( CimdApproval $approval, WP_User $user, array $params, string $approval_id ): void {
+		nocache_headers();
+
+		$data = array( // phpcs:ignore SlevomatCodingStandard.Variables.UnusedVariable.UnusedVariable -- Used by the template.
+			'approval'        => $approval,
+			'client'          => $approval->to_client(),
+			'user'            => $user,
+			'params'          => $params,
+			'approval_id'     => $approval_id,
+			'action_url'      => Server::authorization_endpoint(),
+			'nonce_action'    => self::ACTION . '_cimd_' . $approval_id,
+			'switch_user_url' => wp_login_url( $this->request_url( $params ), true ),
+		);
+
+		require dirname( __DIR__, 2 ) . '/templates/client-approval.php';
 	}
 }

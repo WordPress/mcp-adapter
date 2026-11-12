@@ -35,6 +35,9 @@ final class ClientRepository {
 
 	private const REDIRECT_URIS_KEY = '_oauth_server_redirect_uris';
 	private const SECRET_HASH_KEY   = '_oauth_server_secret_hash';
+	private const SOURCE_KEY        = '_oauth_server_client_source';
+	private const CIMD_ID_KEY       = '_oauth_server_cimd_client_id';
+	private const CIMD_STATE_KEY    = '_oauth_server_cimd_state';
 
 	/**
 	 * Registers hooks.
@@ -184,6 +187,9 @@ final class ClientRepository {
 		if ( null === $post ) {
 			return new WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
 		}
+		if ( 'cimd' === get_post_meta( $post->ID, self::SOURCE_KEY, true ) ) {
+			return new WP_Error( 'oauth_server_client_read_only', __( 'Metadata document clients are updated from their publisher.', 'mcp-adapter' ) );
+		}
 
 		$details = self::validate_details( $name, $redirect_uris );
 		if ( is_wp_error( $details ) ) {
@@ -218,6 +224,9 @@ final class ClientRepository {
 		$post = self::find_post( $id );
 		if ( null === $post ) {
 			return new WP_Error( 'oauth_server_client_missing', __( 'That client no longer exists.', 'mcp-adapter' ) );
+		}
+		if ( 'cimd' === get_post_meta( $post->ID, self::SOURCE_KEY, true ) ) {
+			return new WP_Error( 'oauth_server_client_read_only', __( 'Metadata document clients are public and cannot have a secret.', 'mcp-adapter' ) );
 		}
 
 		$secret = $confidential ? wp_generate_password( 40, false ) : null;
@@ -261,29 +270,117 @@ final class ClientRepository {
 			return;
 		}
 
-		$client_id = $post->post_name;
+		$client_id = 'cimd' === get_post_meta( $post->ID, self::SOURCE_KEY, true )
+			? (string) get_post_meta( $post->ID, self::CIMD_ID_KEY, true )
+			: $post->post_name;
+		$this->revoke_connections_for_client( $client_id );
+	}
 
-		// Narrow to users whose stored passwords mention the client ID. Application
+	/**
+	 * Revokes every connection issued to a client ID.
+	 *
+	 * @param string $client_id Exact OAuth client identifier.
+	 */
+	public function revoke_connections_for_client( string $client_id ): void {
+		if ( '' === $client_id ) {
+			return;
+		}
+
+		$app_id = Client::application_password_id( $client_id );
+
+		// Narrow to users whose stored passwords mention the application ID. Application
 		// Passwords belong to the network-wide user, so search every site.
 		$user_ids = get_users(
 			array(
 				'blog_id'      => 0,
 				'fields'       => 'ID',
 				'meta_key'     => WP_Application_Passwords::USERMETA_KEY_APPLICATION_PASSWORDS, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Runs only when a client is deleted.
-				'meta_value'   => $client_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Runs only when a client is deleted.
+				'meta_value'   => $app_id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Runs only when a client is deleted.
 				'meta_compare' => 'LIKE',
 			)
 		);
 
 		foreach ( $user_ids as $user_id ) {
 			foreach ( WP_Application_Passwords::get_user_application_passwords( (int) $user_id ) as $item ) {
-				if ( ( $item['app_id'] ?? '' ) !== $client_id ) {
+				if ( ( $item['app_id'] ?? '' ) !== $app_id ) {
 					continue;
 				}
 
 				WP_Application_Passwords::delete_application_password( (int) $user_id, $item['uuid'] );
 			}
 		}
+	}
+
+	/**
+	 * Saves a verified metadata document as the permanent local client record.
+	 *
+	 * @param string               $id       Exact metadata document URL.
+	 * @param array<string, mixed> $metadata Validated metadata.
+	 * @param int                  $expires  Cache expiry timestamp.
+	 * @param bool                 $trusted  Whether policy trusts its publisher.
+	 * @return Client|WP_Error
+	 */
+	public function save_cimd( string $id, array $metadata, int $expires, bool $trusted ) {
+		$post          = self::find_post( $id );
+		$security_hash = self::cimd_security_hash( $metadata );
+		$old_state     = $post ? get_post_meta( $post->ID, self::CIMD_STATE_KEY, true ) : array();
+		$old_hash      = is_array( $old_state ) ? (string) ( $old_state['security_hash'] ?? '' ) : '';
+		$generation    = is_array( $old_state ) ? (string) ( $old_state['generation'] ?? '' ) : '';
+		if ( '' === $generation || ! hash_equals( $old_hash, $security_hash ) ) {
+			$generation = bin2hex( random_bytes( 16 ) );
+			if ( $post ) {
+				$this->revoke_connections_for_client( $id );
+			}
+		}
+
+		$state     = array(
+			'metadata'      => $metadata,
+			'expires'       => $expires,
+			'generation'    => $generation,
+			'security_hash' => $security_hash,
+			'trusted'       => $trusted,
+			'updated'       => time(),
+		);
+		$post_data = array(
+			'post_type'   => self::POST_TYPE,
+			'post_status' => 'publish',
+			'post_title'  => (string) $metadata['client_name'],
+			'post_name'   => self::cimd_slug( $id ),
+			'meta_input'  => array(
+				self::SOURCE_KEY     => 'cimd',
+				self::CIMD_ID_KEY    => $id,
+				self::CIMD_STATE_KEY => $state,
+			),
+		);
+		if ( $post ) {
+			$post_data['ID'] = $post->ID;
+		}
+		$result = $post ? wp_update_post( $post_data, true ) : wp_insert_post( $post_data, true );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return $this->get( $id ) ?? new WP_Error( 'oauth_server_client_save', __( 'The client could not be saved.', 'mcp-adapter' ) );
+	}
+
+	/**
+	 * Whether verified metadata needs administrator approval before it is saved.
+	 *
+	 * New registrations and changes to security-relevant fields require approval.
+	 * Display-name and cache-only changes do not.
+	 *
+	 * @param string               $id       Exact metadata document URL.
+	 * @param array<string, mixed> $metadata Verified metadata document.
+	 * @return bool Whether administrator approval is required.
+	 */
+	public function cimd_requires_approval( string $id, array $metadata ): bool {
+		$post = self::find_post( $id );
+		if ( null === $post ) {
+			return true;
+		}
+
+		$state = get_post_meta( $post->ID, self::CIMD_STATE_KEY, true );
+		return ! is_array( $state ) || ! isset( $state['security_hash'] ) || ! hash_equals( (string) $state['security_hash'], self::cimd_security_hash( $metadata ) );
 	}
 
 	/**
@@ -296,11 +393,11 @@ final class ClientRepository {
 	 * @param string $id Client ID.
 	 */
 	private static function find_post( string $id ): ?WP_Post {
-		if ( ! wp_is_uuid( $id, 4 ) ) {
+		$slug = wp_is_uuid( $id, 4 ) ? $id : self::cimd_slug( $id );
+		$post = get_page_by_path( $slug, OBJECT, self::POST_TYPE );
+		if ( $post instanceof WP_Post && ! wp_is_uuid( $id, 4 ) && get_post_meta( $post->ID, self::CIMD_ID_KEY, true ) !== $id ) {
 			return null;
 		}
-
-		$post = get_page_by_path( $id, OBJECT, self::POST_TYPE );
 
 		return $post instanceof WP_Post && 'publish' === $post->post_status ? $post : null;
 	}
@@ -312,6 +409,15 @@ final class ClientRepository {
 	 * @return Client|null The client, or null if the post is malformed.
 	 */
 	private static function to_client( WP_Post $post ): ?Client {
+		if ( 'cimd' === get_post_meta( $post->ID, self::SOURCE_KEY, true ) ) {
+			$id    = (string) get_post_meta( $post->ID, self::CIMD_ID_KEY, true );
+			$state = get_post_meta( $post->ID, self::CIMD_STATE_KEY, true );
+			$data  = is_array( $state ) && isset( $state['metadata'] ) && is_array( $state['metadata'] ) ? $state['metadata'] : array();
+			if ( '' === $id || empty( $data['redirect_uris'] ) || ! is_array( $data['redirect_uris'] ) ) {
+				return null;
+			}
+			return new Client( $id, (string) ( $data['client_name'] ?? $post->post_title ), array_map( 'strval', $data['redirect_uris'] ), null, (int) get_post_time( 'U', true, $post ), $data, (string) ( $state['generation'] ?? '' ), (int) ( $state['expires'] ?? 0 ), (bool) ( $state['trusted'] ?? false ) );
+		}
 		$redirect_uris = get_post_meta( $post->ID, self::REDIRECT_URIS_KEY, true );
 		if ( '' === $post->post_name || ! is_array( $redirect_uris ) || empty( $redirect_uris ) ) {
 			return null;
@@ -326,6 +432,28 @@ final class ClientRepository {
 			'' === $secret_hash ? null : $secret_hash,
 			(int) get_post_time( 'U', true, $post )
 		);
+	}
+
+	/**
+	 * Gets the collision-resistant post slug for a metadata URL.
+	 *
+	 * @param string $id Exact client ID metadata document URL.
+	 * @return string Private client post slug.
+	 */
+	private static function cimd_slug( string $id ): string {
+		return 'cimd-' . hash( 'sha256', $id );
+	}
+
+	/**
+	 * Fingerprints the metadata fields that affect OAuth security.
+	 *
+	 * @param array<string, mixed> $metadata Verified metadata document.
+	 * @return string SHA-256 metadata fingerprint.
+	 */
+	private static function cimd_security_hash( array $metadata ): string {
+		$security_data = array_intersect_key( $metadata, array_flip( array( 'client_id', 'redirect_uris', 'grant_types', 'response_types', 'token_endpoint_auth_method', 'token_endpoint_auth_methods' ) ) );
+
+		return hash( 'sha256', wp_json_encode( $security_data ) ?: '' );
 	}
 
 	/**

@@ -142,6 +142,9 @@ final class Token {
 
 			return $response;
 		}
+		if ( ! hash_equals( $client->get_generation(), (string) ( $grant['client_generation'] ?? '' ) ) ) {
+			return self::error( 'invalid_grant', __( 'The client registration changed after this code was issued.', 'mcp-adapter' ) );
+		}
 
 		if ( (string) $request->get_param( 'redirect_uri' ) !== (string) $grant['redirect_uri'] ) {
 			return self::error( 'invalid_grant', __( 'The redirect_uri does not match the authorization request.', 'mcp-adapter' ) );
@@ -151,8 +154,12 @@ final class Token {
 			return self::error( 'invalid_grant', __( 'The code_verifier does not match the code challenge.', 'mcp-adapter' ) );
 		}
 
-		$resource = (string) $request->get_param( 'resource' );
-		if ( '' !== $resource && '' !== (string) $grant['resource'] && untrailingslashit( $resource ) !== untrailingslashit( (string) $grant['resource'] ) ) {
+		$resource           = (string) $request->get_param( 'resource' );
+		$granted_resource   = (string) $grant['resource'];
+		$resources_mismatch = '' === $resource || '' === $granted_resource
+			? ! hash_equals( $granted_resource, $resource )
+			: ! hash_equals( untrailingslashit( $granted_resource ), untrailingslashit( $resource ) );
+		if ( $resources_mismatch ) {
 			return self::error( 'invalid_target', __( 'The resource does not match the authorization request.', 'mcp-adapter' ) );
 		}
 
@@ -167,7 +174,7 @@ final class Token {
 				$client->get_id(),
 				$client->get_name(),
 				(string) $grant['resource'],
-				array(
+				$client->is_cimd() ? $client->get_metadata() : array(
 					'client_id'     => $client->get_id(),
 					'client_name'   => $client->get_name(),
 					'redirect_uris' => $client->get_redirect_uris(),

@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\OAuth\Authentication;
 
+use WP\OAuth\ProtectedResources;
 use WP\OAuth\Tokens\AuthenticatedToken;
 use WP\OAuth\Tokens\Contracts\ConnectionStoreInterface;
 use WP\OAuth\Tokens\Contracts\TokenServiceInterface;
@@ -35,6 +36,13 @@ final class Bearer {
 	 * @var ConnectionStoreInterface
 	 */
 	private $connections;
+
+	/**
+	 * Protected resource registry.
+	 *
+	 * @var ProtectedResources
+	 */
+	private $resources;
 
 	/**
 	 * Error from the last attempt, if it failed.
@@ -66,10 +74,12 @@ final class Bearer {
 	 *
 	 * @param TokenServiceInterface    $tokens      Token service.
 	 * @param ConnectionStoreInterface $connections Connection persistence.
+	 * @param ProtectedResources       $resources   Protected resource registry.
 	 */
-	public function __construct( TokenServiceInterface $tokens, ConnectionStoreInterface $connections ) {
+	public function __construct( TokenServiceInterface $tokens, ConnectionStoreInterface $connections, ProtectedResources $resources ) {
 		$this->tokens      = $tokens;
 		$this->connections = $connections;
+		$this->resources   = $resources;
 	}
 
 	/**
@@ -112,6 +122,15 @@ final class Bearer {
 
 		if ( is_wp_error( $result ) ) {
 			$this->error = $result;
+
+			return $user_id;
+		}
+		if ( ! $this->token_allows_request( $result ) ) {
+			$this->error = new WP_Error(
+				'oauth_server_invalid_token',
+				__( 'The access token is not valid for this resource.', 'mcp-adapter' ),
+				array( 'status' => 401 )
+			);
 
 			return $user_id;
 		}
@@ -183,6 +202,48 @@ final class Bearer {
 	 */
 	private function validate( string $token ) {
 		return $this->tokens->authenticate_access_token( $token );
+	}
+
+	/**
+	 * Whether a token is unrestricted or is being used on its exact resource.
+	 *
+	 * @param AuthenticatedToken $token Validated token context.
+	 */
+	private function token_allows_request( AuthenticatedToken $token ): bool {
+		$resource = $token->get_resource();
+		if ( '' === $resource ) {
+			return true;
+		}
+
+		$route = self::current_rest_route();
+		if ( null === $route ) {
+			return false;
+		}
+
+		$registered = $this->resources->find_by_route( $route );
+		return null !== $registered && hash_equals( untrailingslashit( $resource ), $this->resources->url_for( $registered ) );
+	}
+
+	/**
+	 * Gets the REST route targeted by the current request.
+	 *
+	 * Supports pretty, index.php, and plain permalink styles before the REST
+	 * server has populated the request object.
+	 */
+	private static function current_rest_route(): ?string {
+		$path = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared with registered routes.
+		$mark = '/' . rest_get_url_prefix() . '/';
+		$at   = strrpos( $path . '/', $mark );
+		if ( false !== $at ) {
+			return '/' . trim( rawurldecode( substr( $path, $at + strlen( $mark ) ) ), '/' );
+		}
+
+		if ( isset( $_GET['rest_route'] ) && is_string( $_GET['rest_route'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only identifies the request route.
+			$route = wp_unslash( $_GET['rest_route'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Only compared with registered routes.
+			return '/' . trim( $route, '/' );
+		}
+
+		return null;
 	}
 
 	/**
