@@ -452,7 +452,7 @@ final class McpWireOrchestrator {
 	 */
 	private function context_2025_11_25( array $generic, string $transport, array $metadata, ?array $client_params_2025_11_25 ): McpRequestContext {
 		$params       = 'initialize' === $generic['method'] ? ( $generic['params'] ?? array() ) : ( $client_params_2025_11_25 ?? array() );
-		$capabilities = $this->to_object( $params['capabilities'] ?? array() );
+		$capabilities = $this->capabilities_object( $params['capabilities'] ?? array() );
 		$client_info  = isset( $params['clientInfo'] ) ? $this->to_object( $params['clientInfo'] ) : null;
 		$negotiated   = self::negotiated_protocol_version( $params );
 
@@ -1007,6 +1007,36 @@ final class McpWireOrchestrator {
 		}
 
 		return $object;
+	}
+
+	/**
+	 * Copy 2025 client capabilities, whose associative decoding turns `{}` into an empty list.
+	 *
+	 * The schema makes every capability, and every entry of `experimental` and
+	 * `extensions`, an object, so an empty list in those positions was `{}`.
+	 *
+	 * @param mixed $value Capabilities object or associative array.
+	 */
+	private function capabilities_object( $value ): \stdClass {
+		$capabilities = $this->to_object( $value );
+		foreach ( get_object_vars( $capabilities ) as $name => $capability ) {
+			if ( array() === $capability ) {
+				$capabilities->{$name} = new \stdClass();
+				continue;
+			}
+			if ( ! $capability instanceof \stdClass || ! in_array( $name, array( 'experimental', 'extensions' ), true ) ) {
+				continue;
+			}
+			foreach ( get_object_vars( $capability ) as $key => $settings ) {
+				if ( array() !== $settings ) {
+					continue;
+				}
+
+				$capability->{$key} = new \stdClass();
+			}
+		}
+
+		return $capabilities;
 	}
 
 	/**
