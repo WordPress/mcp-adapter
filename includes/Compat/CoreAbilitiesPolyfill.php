@@ -21,8 +21,6 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Compat;
 
-use WP_Ability;
-
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit;
 
@@ -70,8 +68,8 @@ final class CoreAbilitiesPolyfill {
 	 * The ability categories the polyfilled abilities are registered under, in core's order.
 	 *
 	 * Each is registered only when missing: WordPress 6.9–7.1 provides `site` and `user`
-	 * itself and 7.2 adds `content` and `uncategorized`, but none of them can be assumed —
-	 * the WordPress test framework, for one, unhooks core's category registration entirely.
+	 * itself and 7.2 adds `content`, but none of them can be assumed — the WordPress test
+	 * framework, for one, unhooks core's category registration entirely.
 	 *
 	 * Labels and descriptions match core's English strings. They are intentionally not
 	 * translated: the originals use core's text domain, so no plugin translations exist.
@@ -80,28 +78,26 @@ final class CoreAbilitiesPolyfill {
 	 */
 	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
 	private const CATEGORIES = array(
-		'site'          => array(
+		'site'    => array(
 			'label'       => 'Site',
 			'description' => 'Abilities that retrieve or modify site information and settings.',
 		),
-		'user'          => array(
+		'user'    => array(
 			'label'       => 'User',
 			'description' => 'Abilities that retrieve or modify user information and settings.',
 		),
-		'content'       => array(
+		'content' => array(
 			'label'       => 'Content',
 			'description' => 'Abilities that retrieve or manage posts and other content.',
-		),
-		'uncategorized' => array(
-			'label'       => 'Uncategorized',
-			'description' => 'Abilities that have not been assigned to a specific category.',
 		),
 	);
 
 	/**
 	 * The initial settings WordPress 7.2 flags with `show_in_abilities`, keyed by group.
 	 *
-	 * Mirrors the flags core adds in `register_initial_settings()` since 7.2.
+	 * Mirrors the flags core adds in `register_initial_settings()` since 7.2, except for
+	 * `wp_page_for_privacy_policy`: WordPress 7.2 first registers that setting, together
+	 * with REST API restrictions older versions lack, so the polyfill leaves it out.
 	 *
 	 * @var array<string, list<string>>
 	 */
@@ -109,7 +105,7 @@ final class CoreAbilitiesPolyfill {
 	private const SETTINGS_FLAG_MAP = array(
 		'general'    => array( 'blogname', 'blogdescription', 'siteurl', 'admin_email', 'timezone_string', 'date_format', 'time_format', 'start_of_week', 'WPLANG' ),
 		'writing'    => array( 'use_smilies', 'default_category', 'default_post_format' ),
-		'reading'    => array( 'posts_per_page', 'show_on_front', 'page_on_front', 'page_for_posts', 'wp_page_for_privacy_policy' ),
+		'reading'    => array( 'posts_per_page', 'show_on_front', 'page_on_front', 'page_for_posts' ),
 		'discussion' => array( 'default_ping_status', 'default_comment_status' ),
 	);
 
@@ -145,7 +141,6 @@ final class CoreAbilitiesPolyfill {
 
 		add_filter( 'register_post_type_args', array( self::class, 'add_post_type_arg' ), 10, 2 );
 		add_filter( 'register_setting_args', array( self::class, 'add_setting_arg' ), 10, 4 );
-		add_filter( 'wp_register_ability_args', array( self::class, 'map_required_capabilities' ), 10, 2 );
 		add_action( 'wp_abilities_api_categories_init', array( self::class, 'register_categories' ), 20 );
 		// Priority 1 mirrors core's own hook for `_wp_register_initial_settings_for_abilities()`,
 		// so the flagged settings exist before the settings ability class snapshots them.
@@ -196,8 +191,11 @@ final class CoreAbilitiesPolyfill {
 		 * Filters whether the plugin registers the core abilities missing from this WordPress version.
 		 *
 		 * Return false to prevent the plugin from registering any `core/*` ability and from
-		 * applying the registration shims (the `show_in_abilities` flags on post types and
-		 * settings, and the `required_capabilities` mapping) that support them.
+		 * applying the registration shims that support them: the ability categories, the
+		 * `show_in_abilities` flags on post types and settings, and the settings registration.
+		 *
+		 * Add the filter in a plugin's main file or a theme's functions.php: some shims run
+		 * during `init`, before the abilities initialize.
 		 *
 		 * @since 0.8.0
 		 *
@@ -252,60 +250,6 @@ final class CoreAbilitiesPolyfill {
 	}
 
 	/**
-	 * Converts the WordPress 7.2 `required_capabilities` ability argument for older versions.
-	 *
-	 * Before 7.2, `WP_Ability` rejects unknown arguments with a `_doing_it_wrong` notice and
-	 * requires a `permission_callback`. This maps the capability list to an equivalent
-	 * callback with 7.2 semantics — each capability checked with `current_user_can()`,
-	 * failing fast, and any explicit `permission_callback` running only after all
-	 * capabilities pass — and removes the unknown argument.
-	 *
-	 * Only abilities in the `core/` namespace are mapped, so the registration behavior of
-	 * third-party abilities is never changed.
-	 *
-	 * @param array<string, mixed> $args The ability registration arguments.
-	 * @param string               $name The ability name.
-	 * @return array<string, mixed> The filtered arguments.
-	 */
-	public static function map_required_capabilities( array $args, string $name ): array {
-		if ( ! self::is_enabled() || ! isset( $args['required_capabilities'] ) || ! str_starts_with( $name, 'core/' ) ) {
-			return $args;
-		}
-
-		// This WordPress (or a feature plugin's WP_Ability) supports the argument natively.
-		// Reachable only on 7.2+, which the CI matrix tests without coverage collection.
-		if ( property_exists( WP_Ability::class, 'required_capabilities' ) ) {
-			return $args; // @codeCoverageIgnore
-		}
-
-		$capabilities = $args['required_capabilities'];
-		unset( $args['required_capabilities'] );
-
-		if ( ! is_array( $capabilities ) || array() === $capabilities ) {
-			return $args;
-		}
-
-		$permission_callback = $args['permission_callback'] ?? null;
-
-		$args['permission_callback'] = static function ( $input = null ) use ( $capabilities, $permission_callback ) {
-			foreach ( $capabilities as $capability ) {
-				// phpcs:ignore WordPress.WP.Capabilities.Undetermined -- Capabilities come from the ability's own registration arguments.
-				if ( ! is_string( $capability ) || ! current_user_can( $capability ) ) {
-					return false;
-				}
-			}
-
-			if ( null !== $permission_callback && is_callable( $permission_callback ) ) {
-				return $permission_callback( $input );
-			}
-
-			return true;
-		};
-
-		return $args;
-	}
-
-	/**
 	 * Registers the ability categories the polyfilled abilities need that nothing else provides.
 	 *
 	 * Runs on `wp_abilities_api_categories_init` after core and other plugins (priority
@@ -329,21 +273,20 @@ final class CoreAbilitiesPolyfill {
 	 * Makes sure the settings the core abilities read are registered in time.
 	 *
 	 * Mirrors core's private `_wp_register_initial_settings_for_abilities()` (WordPress
-	 * 7.2): the initial settings normally register on `rest_api_init`, which fires lazily
+	 * 7.2), and does nothing where core provides that function, so the settings register
+	 * once: the initial settings normally register on `rest_api_init`, which fires lazily
 	 * and independently of `wp_abilities_api_init`, so they may not exist yet when the
-	 * settings ability class's register() snapshots the exposed settings. Re-registering
-	 * them later on `rest_api_init` is harmless.
-	 *
-	 * Additionally registers the `wp_page_for_privacy_policy` setting, which WordPress
-	 * before 7.2 never registers — not even on `rest_api_init` — exposed to abilities
-	 * under the same `page_for_privacy_policy` name as in 7.2. It is deliberately not
-	 * given `show_in_rest`, so the REST API settings endpoint behaves exactly as the
-	 * running WordPress version shipped it.
+	 * settings ability class's register() snapshots the exposed settings.
 	 *
 	 * @global array<int|string, mixed> $new_allowed_options
 	 */
 	public static function register_initial_settings_for_abilities(): void {
-		if ( ! self::is_enabled() ) {
+		if ( ! self::is_enabled() || function_exists( '_wp_register_initial_settings_for_abilities' ) ) {
+			return;
+		}
+
+		// The settings are already registered once `rest_api_init` has run.
+		if ( did_action( 'rest_api_init' ) && ! doing_action( 'rest_api_init' ) ) {
 			return;
 		}
 
@@ -351,23 +294,7 @@ final class CoreAbilitiesPolyfill {
 
 		$allowed_options = $new_allowed_options;
 
-		if ( ! did_action( 'rest_api_init' ) || doing_action( 'rest_api_init' ) ) {
-			register_initial_settings();
-		}
-
-		$registered_settings = get_registered_settings();
-		if ( ! isset( $registered_settings['wp_page_for_privacy_policy'] ) ) {
-			register_setting(
-				'reading',
-				'wp_page_for_privacy_policy',
-				array(
-					'show_in_abilities' => array( 'name' => 'page_for_privacy_policy' ),
-					'type'              => 'integer',
-					// Core's string, untranslated here: the original uses core's text domain.
-					'description'       => 'The ID of the page that should be displayed as the privacy policy page',
-				)
-			);
-		}
+		register_initial_settings();
 
 		/*
 		 * Registering a setting also allows it on the options screen of its group. Restore

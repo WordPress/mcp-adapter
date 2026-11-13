@@ -57,7 +57,7 @@ final class CoreAbilitiesPolyfillBootstrapTest extends TestCase {
 		foreach ( self::CORE_ABILITIES as $name ) {
 			$this->assertContains( $name, $result['abilities'] );
 		}
-		foreach ( array( 'site', 'user', 'content', 'uncategorized' ) as $category ) {
+		foreach ( array( 'site', 'user', 'content' ) as $category ) {
 			$this->assertContains( $category, $result['categories'] );
 		}
 
@@ -89,7 +89,6 @@ final class CoreAbilitiesPolyfillBootstrapTest extends TestCase {
 		}
 
 		$this->assertNotContains( 'content', $result['categories'] );
-		$this->assertNotContains( 'uncategorized', $result['categories'] );
 		$this->assertSame( array(), $result['abilities_post_types'] );
 	}
 

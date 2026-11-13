@@ -15,7 +15,6 @@ namespace WP\MCP\Tests\Unit\Compat;
 
 use WP\MCP\Compat\CoreAbilitiesPolyfill;
 use WP\MCP\Tests\TestCase;
-use WP_Ability;
 
 /**
  * Test CoreAbilitiesPolyfill functionality.
@@ -81,10 +80,10 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 	}
 
 	/**
-	 * Whether the running WordPress supports `required_capabilities` natively (7.2+).
+	 * Whether the running WordPress registers the settings for abilities itself (7.2+).
 	 */
-	private static function wordpress_supports_required_capabilities(): bool {
-		return property_exists( WP_Ability::class, 'required_capabilities' );
+	private static function core_registers_settings_for_abilities(): bool {
+		return function_exists( '_wp_register_initial_settings_for_abilities' );
 	}
 
 	/**
@@ -101,7 +100,7 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 	}
 
 	public function test_core_ability_categories_are_available(): void {
-		foreach ( array( 'site', 'user', 'content', 'uncategorized' ) as $category ) {
+		foreach ( array( 'site', 'user', 'content' ) as $category ) {
 			$this->assertTrue( wp_has_ability_category( $category ), "Category {$category} is not registered." );
 		}
 	}
@@ -152,7 +151,7 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 		$this->assertIsArray( $schema );
 		$exposed_names = $schema['properties']['fields']['items']['enum'];
 
-		foreach ( array( 'title', 'description', 'posts_per_page', 'page_for_privacy_policy', 'default_comment_status' ) as $name ) {
+		foreach ( array( 'title', 'description', 'posts_per_page', 'default_comment_status' ) as $name ) {
 			$this->assertContains( $name, $exposed_names );
 		}
 	}
@@ -208,88 +207,6 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 		$this->assertNotEmpty( $result['items'] );
 	}
 
-	public function test_mapper_is_a_noop_when_wordpress_supports_required_capabilities(): void {
-		if ( ! self::wordpress_supports_required_capabilities() ) {
-			$this->markTestSkipped( 'This WordPress does not support required_capabilities.' );
-		}
-
-		$args = array(
-			'label'                 => 'Test',
-			'required_capabilities' => array( 'manage_options' ),
-		);
-
-		$this->assertSame( $args, CoreAbilitiesPolyfill::map_required_capabilities( $args, 'core/test' ) );
-	}
-
-	public function test_mapper_converts_required_capabilities_to_a_permission_callback(): void {
-		if ( self::wordpress_supports_required_capabilities() ) {
-			$this->markTestSkipped( 'This WordPress supports required_capabilities natively.' );
-		}
-
-		$args = CoreAbilitiesPolyfill::map_required_capabilities(
-			array( 'required_capabilities' => array( 'manage_options' ) ),
-			'core/test'
-		);
-
-		$this->assertArrayNotHasKey( 'required_capabilities', $args );
-		$this->assertIsCallable( $args['permission_callback'] );
-
-		wp_set_current_user( $this->subscriber_id );
-		$this->assertFalse( $args['permission_callback']() );
-
-		wp_set_current_user( $this->admin_id );
-		$this->assertTrue( $args['permission_callback']() );
-	}
-
-	public function test_mapper_composes_with_an_existing_permission_callback(): void {
-		if ( self::wordpress_supports_required_capabilities() ) {
-			$this->markTestSkipped( 'This WordPress supports required_capabilities natively.' );
-		}
-
-		$args = CoreAbilitiesPolyfill::map_required_capabilities(
-			array(
-				'required_capabilities' => array( 'read' ),
-				'permission_callback'   => static function ( $input = null ): bool {
-					return 'yes' === $input;
-				},
-			),
-			'core/test'
-		);
-
-		// The callback runs only after every capability passes.
-		wp_set_current_user( 0 );
-		$this->assertFalse( $args['permission_callback']( 'yes' ) );
-
-		wp_set_current_user( $this->subscriber_id );
-		$this->assertTrue( $args['permission_callback']( 'yes' ) );
-		$this->assertFalse( $args['permission_callback']( 'no' ) );
-	}
-
-	public function test_mapper_drops_a_malformed_capabilities_argument(): void {
-		if ( self::wordpress_supports_required_capabilities() ) {
-			$this->markTestSkipped( 'This WordPress supports required_capabilities natively.' );
-		}
-
-		foreach ( array( 'manage_options', array() ) as $invalid ) {
-			$args = CoreAbilitiesPolyfill::map_required_capabilities(
-				array( 'required_capabilities' => $invalid ),
-				'core/test'
-			);
-
-			// The unknown argument is removed, and no permission callback is synthesized from it.
-			$this->assertSame( array(), $args );
-		}
-	}
-
-	public function test_mapper_ignores_abilities_outside_the_core_namespace(): void {
-		$args = array(
-			'label'                 => 'Test',
-			'required_capabilities' => array( 'manage_options' ),
-		);
-
-		$this->assertSame( $args, CoreAbilitiesPolyfill::map_required_capabilities( $args, 'my-plugin/test' ) );
-	}
-
 	public function test_post_type_flag_is_added_for_core_types_only(): void {
 		$this->assertTrue( CoreAbilitiesPolyfill::add_post_type_arg( array(), 'post' )['show_in_abilities'] );
 		$this->assertTrue( CoreAbilitiesPolyfill::add_post_type_arg( array(), 'page' )['show_in_abilities'] );
@@ -304,11 +221,14 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 
 	public function test_setting_flag_is_added_for_mapped_settings_only(): void {
 		$this->assertTrue( CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'general', 'blogname' )['show_in_abilities'] );
-		$this->assertTrue( CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'reading', 'wp_page_for_privacy_policy' )['show_in_abilities'] );
+		$this->assertTrue( CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'reading', 'posts_per_page' )['show_in_abilities'] );
 
 		// The same option in another group is not a core initial setting.
 		$this->assertArrayNotHasKey( 'show_in_abilities', CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'writing', 'blogname' ) );
 		$this->assertArrayNotHasKey( 'show_in_abilities', CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'general', 'unmapped_option' ) );
+
+		// WordPress 7.2 first registers this setting, with REST API restrictions older versions lack.
+		$this->assertArrayNotHasKey( 'show_in_abilities', CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'reading', 'wp_page_for_privacy_policy' ) );
 	}
 
 	public function test_setting_flag_respects_an_explicit_value(): void {
@@ -323,20 +243,18 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 		$this->assertSame( array(), CoreAbilitiesPolyfill::add_post_type_arg( array(), 'post' ) );
 		$this->assertSame( array(), CoreAbilitiesPolyfill::add_setting_arg( array(), array(), 'general', 'blogname' ) );
 
-		$args = array( 'required_capabilities' => array( 'manage_options' ) );
-		$this->assertSame( $args, CoreAbilitiesPolyfill::map_required_capabilities( $args, 'core/test' ) );
-
 		remove_filter( 'mcp_adapter_register_core_abilities', '__return_false' );
 	}
 
 	public function test_kill_switch_disables_every_registrar(): void {
-		global $wp_current_filter, $wp_registered_settings;
+		global $wp_actions, $wp_current_filter, $wp_registered_settings;
 
 		$saved_settings = $wp_registered_settings;
-		unset( $wp_registered_settings['wp_page_for_privacy_policy'] );
+		$saved_actions  = $wp_actions;
+		unset( $wp_registered_settings['blogname'], $wp_actions['rest_api_init'] );
 
 		wp_unregister_ability( 'core/users-query' );
-		wp_unregister_ability_category( 'uncategorized' );
+		wp_unregister_ability_category( 'content' );
 
 		add_filter( 'mcp_adapter_register_core_abilities', '__return_false' );
 
@@ -349,33 +267,82 @@ final class CoreAbilitiesPolyfillTest extends TestCase {
 		CoreAbilitiesPolyfill::register_core_abilities();
 		array_pop( $wp_current_filter );
 
-		$this->assertFalse( wp_has_ability_category( 'uncategorized' ) );
+		$this->assertFalse( wp_has_ability_category( 'content' ) );
 		$this->assertFalse( wp_has_ability( 'core/users-query' ) );
-		$this->assertArrayNotHasKey( 'wp_page_for_privacy_policy', get_registered_settings() );
+		$this->assertArrayNotHasKey( 'blogname', get_registered_settings() );
 
 		remove_filter( 'mcp_adapter_register_core_abilities', '__return_false' );
 
 		// With the switch back on, the guarded registrars restore what they manage.
 		self::ensure_core_abilities_registered();
-		$this->assertTrue( wp_has_ability_category( 'uncategorized' ) );
+		$this->assertTrue( wp_has_ability_category( 'content' ) );
 		$this->assertTrue( wp_has_ability( 'core/users-query' ) );
 
 		$wp_registered_settings = $saved_settings;
+		$wp_actions             = $saved_actions;
 	}
 
-	public function test_privacy_policy_setting_is_registered_for_abilities(): void {
-		global $new_allowed_options, $wp_registered_settings;
+	public function test_initial_settings_are_registered_for_abilities(): void {
+		if ( self::core_registers_settings_for_abilities() ) {
+			$this->markTestSkipped( 'This WordPress registers the settings for abilities itself.' );
+		}
+
+		global $new_allowed_options, $wp_actions, $wp_registered_settings;
 
 		$saved_registered = $wp_registered_settings;
 		$saved_allowed    = $new_allowed_options;
+		$saved_actions    = $wp_actions;
+		unset( $wp_registered_settings['blogname'], $wp_actions['rest_api_init'] );
 
 		CoreAbilitiesPolyfill::register_initial_settings_for_abilities();
 
 		$registered = get_registered_settings();
-		$this->assertArrayHasKey( 'wp_page_for_privacy_policy', $registered );
-		$this->assertNotEmpty( $registered['wp_page_for_privacy_policy']['show_in_abilities'] );
+		$this->assertArrayHasKey( 'blogname', $registered );
+		$this->assertTrue( $registered['blogname']['show_in_abilities'] );
+		$this->assertArrayNotHasKey( 'wp_page_for_privacy_policy', $registered, 'Only WordPress 7.2 registers this setting.' );
 		$this->assertSame( $saved_allowed, $new_allowed_options, 'The allowed options list must be restored.' );
 
 		$wp_registered_settings = $saved_registered;
+		$wp_actions             = $saved_actions;
+	}
+
+	public function test_initial_settings_are_left_alone_once_rest_api_init_ran(): void {
+		if ( self::core_registers_settings_for_abilities() ) {
+			$this->markTestSkipped( 'This WordPress registers the settings for abilities itself.' );
+		}
+
+		global $wp_actions, $wp_registered_settings;
+
+		$saved_registered = $wp_registered_settings;
+		$saved_actions    = $wp_actions;
+		unset( $wp_registered_settings['blogname'] );
+		$wp_actions['rest_api_init'] = 1;
+
+		CoreAbilitiesPolyfill::register_initial_settings_for_abilities();
+
+		$this->assertArrayNotHasKey( 'blogname', get_registered_settings() );
+
+		$wp_registered_settings = $saved_registered;
+		$wp_actions             = $saved_actions;
+	}
+
+	public function test_initial_settings_are_left_to_core_where_core_registers_them(): void {
+		if ( ! self::core_registers_settings_for_abilities() ) {
+			$this->markTestSkipped( 'This WordPress does not register the settings for abilities itself.' );
+		}
+
+		global $wp_actions, $wp_registered_settings;
+
+		$saved_registered = $wp_registered_settings;
+		$saved_actions    = $wp_actions;
+		unset( $wp_registered_settings['blogname'], $wp_actions['rest_api_init'] );
+
+		CoreAbilitiesPolyfill::register_initial_settings_for_abilities();
+
+		// Core's own `_wp_register_initial_settings_for_abilities()` registers them, once.
+		$this->assertArrayNotHasKey( 'blogname', get_registered_settings() );
+
+		$wp_registered_settings = $saved_registered;
+		$wp_actions             = $saved_actions;
 	}
 }

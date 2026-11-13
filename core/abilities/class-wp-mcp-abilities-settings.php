@@ -83,16 +83,18 @@ final class WP_MCP_Abilities_Settings {
 		wp_register_ability(
 			'core/settings-get',
 			array(
-				'label'                 => __( 'Get Settings' ),
-				'description'           => __( 'Returns WordPress settings as a flat map of setting name to value. By default returns all settings exposed to abilities, or optionally a subset filtered by settings group, by setting name, or both. A setting whose value does not match its schema is left out. Requires an authenticated user who can manage options.' ),
-				'category'              => self::CATEGORY,
-				'input_schema'          => $this->get_settings_get_input_schema( $groups, array_map( 'strval', array_keys( $this->exposed_settings ) ) ),
-				'output_schema'         => $this->get_settings_get_output_schema(),
-				'execute_callback'      => function ( $input = array() ): array {
+				'label'               => __( 'Get Settings' ),
+				'description'         => __( 'Returns WordPress settings as a flat map of setting name to value. By default returns all settings exposed to abilities, or optionally a subset filtered by settings group, by setting name, or both. A setting whose value does not match its schema is left out. Requires an authenticated user who can manage options.' ),
+				'category'            => self::CATEGORY,
+				'input_schema'        => $this->get_settings_get_input_schema( $groups, array_map( 'strval', array_keys( $this->exposed_settings ) ) ),
+				'output_schema'       => $this->get_settings_get_output_schema(),
+				'execute_callback'    => function ( $input = array() ): array {
 					return $this->execute_settings_get( $input );
 				},
-				'required_capabilities' => array( 'manage_options' ),
-				'meta'                  => array(
+				'permission_callback' => function (): bool {
+					return current_user_can( 'manage_options' );
+				},
+				'meta'                => array(
 					'annotations' => array(
 						'readonly'    => true,
 						'destructive' => false,
