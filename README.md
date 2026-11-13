@@ -44,6 +44,10 @@ Connect via WP-CLI over STDIO, or point an HTTP client at `/wp-json/mcp/mcp-adap
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, coding standards, and the contribution workflow, and the [Testing Guide](docs/guides/testing.md) for running the test suite.
 
+### Maintainers
+
+Maintainers for this repo are [Dovid Levine (@justlevine)](https://github.com/justlevine), [Jeffrey Paul (@jeffpaul)](https://github.com/jeffpaul), [Jonathan Bossenger (@jonathanbossenger)](https://github.com/jonathanbossenger), and [Ovidiu Galatan (@galatanovidiu)](https://github.com/galatanovidiu); all can be reached using the [@WordPress/mcp-adapter-maintainers](https://github.com/orgs/WordPress/teams/mcp-adapter-maintainers) team.
+
 ## Attribution
 
 Model Context Protocol, MCP, and the [MCP logo](https://commons.wikimedia.org/wiki/File:Model_Context_Protocol_logo.svg) are [trademarks of LF Projects, LLC](https://lfprojects.org/policies/trademark-policy/), and are used here solely for informational purposes. 
