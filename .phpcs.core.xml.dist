@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<ruleset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="MCP Adapter core copies" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/PHPCSStandards/PHP_CodeSniffer/master/phpcs.xsd">
+	<description>WordPress core coding standards for the files staged in core/ for a future WordPress release. Files that already exist in core are validated upstream; this ruleset keeps plugin-first files core-ready. No plugin prefix or text domain rules apply here on purpose: the files are written exactly as they will land in core (see core/README.md).</description>
+
+	<file>./core/</file>
+
+	<!-- Show sniff codes and progress, and use colors. -->
+	<arg value="ps"/>
+	<arg name="colors"/>
+	<arg name="basepath" value="./"/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="20"/>
+
+	<!-- PHP compatibility: the plugin's floor, which staged files must also honor. -->
+	<config name="testVersion" value="7.4-"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- WordPress core's own ruleset applies WordPress-Core only (not WordPress-Docs). -->
+	<rule ref="WordPress-Core"/>
+</ruleset>

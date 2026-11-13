@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- The WordPress 7.2 core abilities — `core/content-query`, `core/users-query`, and `core/settings-get` — are now available on WordPress 6.9–7.1. The plugin registers them from copies of the core classes (identical apart from a plugin class prefix, per-ability registration guards, and a `permission_callback` in place of the 7.2-only `required_capabilities` argument), along with any missing ability categories and the `show_in_abilities` flags the abilities read; on WordPress versions that ship them, the plugin detects core's registration and does nothing. The new `mcp_adapter_register_core_abilities` filter disables this. See `docs/guides/core-abilities.md` for the differences from WordPress 7.2. The `core/` directory also serves as the staging ground where future core abilities are developed before landing in WordPress — see `core/README.md`.
+
 ## [0.7.1] - 2026-10-15
 
 ### Added
