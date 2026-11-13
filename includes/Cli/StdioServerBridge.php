@@ -11,6 +11,7 @@ namespace WP\MCP\Cli;
 
 use WP\MCP\Core\McpServer;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+use WP\MCP\Transport\Infrastructure\JsonRpcRequestDecoder;
 use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
 use WP\McpSchema\Record;
 
@@ -43,6 +44,13 @@ final class StdioServerBridge {
 	 * @var bool
 	 */
 	private bool $is_running = false;
+
+	/**
+	 * Whether this bridge has reported an unsupported runtime cache backend.
+	 *
+	 * @var bool
+	 */
+	private bool $has_warned_unsupported_cache = false;
 
 	/**
 	 * Parameters retained from successful legacy initialization, or null before initialization.
@@ -147,6 +155,18 @@ final class StdioServerBridge {
 			return $this->encode_response( McpErrorFactory::parse_error( null, $throwable->getMessage() ) );
 		}
 
+		$envelope = JsonRpcRequestDecoder::inspect_envelope( $message );
+		if ( 'invalid' === $envelope['kind'] ) {
+			return $this->encode_response( $envelope['error'] );
+		}
+
+		try {
+			$this->flush_runtime_cache();
+		} catch ( \Throwable $throwable ) {
+			$this->log_to_stderr( 'Error resetting runtime object cache: ' . $throwable->getMessage() );
+			return 'notification' === $envelope['kind'] ? '' : $this->encode_response( McpErrorFactory::internal_error( $envelope['id'] ) );
+		}
+
 		$processed = $this->orchestrator->process( $message, 'STDIO', array(), $this->client_params_2025_11_25 );
 		if ( $processed['notification'] ) {
 			return '';
@@ -157,6 +177,41 @@ final class StdioServerBridge {
 		}
 
 		return null === $processed['response'] ? '' : $this->encode_response( $processed['response'] );
+	}
+
+	/**
+	 * Reset process-local cache entries without flushing shared persistent data.
+	 *
+	 * @throws \RuntimeException If the cache explicitly reports a flush failure.
+	 */
+	private function flush_runtime_cache(): void {
+		/**
+		 * Filters whether STDIO resets the runtime object cache before each message.
+		 *
+		 * Disabling this requires an integration to manage cache freshness itself.
+		 *
+		 * @param bool $enabled Whether to reset the runtime cache. Default true.
+		 */
+		if ( ! apply_filters( 'mcp_adapter_stdio_flush_runtime_cache', true ) ) {
+			return;
+		}
+
+		$is_external_cache = (bool) wp_using_ext_object_cache();
+		if ( ! $is_external_cache ) {
+			$result = wp_cache_flush();
+		} elseif ( wp_cache_supports( 'flush_runtime' ) ) {
+			$result = wp_cache_flush_runtime();
+		} else {
+			if ( ! $this->has_warned_unsupported_cache ) {
+				$this->log_to_stderr( 'Warning: the external object cache does not support runtime flushing. STDIO requests may read stale data. Use a cache backend supporting flush_runtime or provide request-boundary invalidation; the shared cache will not be flushed.' );
+				$this->has_warned_unsupported_cache = true;
+			}
+			return;
+		}
+
+		if ( false === $result ) {
+			throw new \RuntimeException( 'The object cache reported a runtime flush failure.' );
+		}
 	}
 
 	/**

@@ -9,6 +9,8 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport\Infrastructure;
 
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
+
 /**
  * Decodes raw JSON once and protects PHP's native integer boundary.
  *
@@ -49,6 +51,48 @@ final class JsonRpcRequestDecoder {
 		$this->normalize_integral_id( $value );
 
 		return $value;
+	}
+
+	/**
+	 * Inspect the basic envelope before transport work or protocol dispatch.
+	 *
+	 * @param \stdClass $message Decoded message with normalized integral IDs.
+	 * @return array{kind: 'request', id: int|string, method: string}|array{kind: 'notification', id: null, method: string}|array{kind: 'invalid', id: int|string|null, method: string|null, error: array<string, mixed>}
+	 */
+	public static function inspect_envelope( \stdClass $message ): array {
+		$id           = $message->id ?? null;
+		$safe_id      = is_string( $id ) || is_int( $id ) ? $id : null;
+		$method       = isset( $message->method ) && is_string( $message->method ) ? $message->method : null;
+		$notification = '2.0' === ( $message->jsonrpc ?? null ) && null !== $method && ! property_exists( $message, 'id' );
+		if ( '2.0' !== ( $message->jsonrpc ?? null ) || null === $method ) {
+			return array(
+				'kind'   => 'invalid',
+				'id'     => $safe_id,
+				'method' => $method,
+				'error'  => McpErrorFactory::invalid_request( $safe_id, 'Invalid JSON-RPC request envelope' ),
+			);
+		}
+		if ( $notification ) {
+			return array(
+				'kind'   => 'notification',
+				'id'     => null,
+				'method' => $method,
+			);
+		}
+		if ( ! is_string( $id ) && ! is_int( $id ) ) {
+			return array(
+				'kind'   => 'invalid',
+				'id'     => null,
+				'method' => $method,
+				'error'  => McpErrorFactory::invalid_request( null, 'Request id must be a string or integer' ),
+			);
+		}
+
+		return array(
+			'kind'   => 'request',
+			'id'     => $id,
+			'method' => $method,
+		);
 	}
 
 	/**
