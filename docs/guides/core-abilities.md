@@ -10,6 +10,24 @@ WordPress 7.2 ships three core abilities built on the Abilities API:
 
 The MCP Adapter makes these abilities available on **every supported WordPress version** (6.9+), and its `core/` directory doubles as the staging ground where future core abilities are developed before landing in WordPress itself. Each plugin copy is core's file with the class renamed to the `WP_MCP_` prefix and a `wp_has_ability()` guard around each registration — the two mechanical transforms `core/README.md` defines — so the copy can load and register per-ability on any WordPress version, alongside core's own class.
 
+## Consuming the core abilities
+
+The core abilities in this plugin are meant to be consumed by MCP clients and other agents, like the WordPress AI Client. Consumers don't rely on the specific schema of each ability: they retrieve the schema of an ability and pass inputs that match it, instead of hardcoding property names, enum values, or required properties.
+
+This matters for two reasons:
+
+- **Schemas can change.** Abilities ship in the MCP Adapter before they ship in WordPress core. Keeping consumers independent of the schema allows us to change a schema if feedback in that direction is provided.
+- **Schemas depend on the site.** Some schemas are built from the site when the ability is registered: the post type enum of `core/content-query` lists the post types flagged with `show_in_abilities`, the `roles` enum of `core/users-query` lists the site's roles, and the `group` and `fields` enums of `core/settings-get` list the settings exposed to abilities. The same ability can have a different schema on another site, or on the same site after a plugin is activated.
+
+### Retrieving the schema
+
+- **MCP, default server:** call `mcp-adapter-get-ability-info` with the `ability_name`. The response has the ability's `input_schema`, and its `output_schema` when it declares one. Then call `mcp-adapter-execute-ability` with `parameters` that match `input_schema`.
+- **MCP, custom server:** each ability exposed as a tool has its `inputSchema`, and its `outputSchema` when it declares one, in the `tools/list` response. Build the arguments from that response, not from a schema stored in the client.
+- **PHP, e.g. the AI Client:** `wp_get_ability( 'core/content-query' )->get_input_schema()` returns the input schema, and `get_output_schema()` the output schema. The AI Client already works this way: `using_abilities()` builds the function declaration it sends to the model from the ability's input schema on the site it runs on.
+- **REST API:** `GET /wp-json/wp-abilities/v1/abilities/<name>` returns `input_schema` and `output_schema` for abilities exposed in the REST API.
+
+An ability validates its input against its input schema before it runs, so an input that doesn't match is rejected with an `ability_invalid_input` error. When that happens, retrieve the schema again before retrying.
+
 ## How the polyfill behaves per WordPress version
 
 **On WordPress 7.2 and newer** the plugin does nothing, as long as no staged ability goes beyond what core ships (true today). At load time `WP\MCP\Compat\CoreAbilitiesPolyfill` sees that every mirrored core class exists and nothing is staged, and never hooks the polyfill. The abilities you see come from core, byte for byte. Once an ability is staged beyond a shipped class, the polyfill hooks everywhere, loads the plugin copies whose abilities are not all registered, and the guards inside `register()` fill in only what is missing — core's registrations always stay untouched.
