@@ -220,7 +220,8 @@ final class McpSessionManagerTest extends TestCase {
 			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'fresh-client' ), new DummyErrorHandler() );
 			$this->assertIsString( $session_id );
 			$this->assertSame( array( $session_id ), array_keys( SessionManager::get_all_user_sessions( $this->test_user_id ) ) );
-			$this->assertSame( array( 'DELETE', 'INSERT' ), $queries );
+			// The first map is an empty insert-if-absent followed by a compare-and-swap.
+			$this->assertSame( array( 'DELETE', 'INSERT', 'UPDATE' ), $queries );
 		} finally {
 			remove_filter( 'query', $observe );
 			DummyErrorHandler::reset();
@@ -344,6 +345,190 @@ final class McpSessionManagerTest extends TestCase {
 		$after_write = wp_cache_get_last_changed( 'users' );
 		$this->assertCount( 1, SessionManager::get_all_user_sessions( $this->test_user_id, new DummyErrorHandler() ) );
 		$this->assertSame( $after_write, wp_cache_get_last_changed( 'users' ) );
+	}
+
+	/**
+	 * Stored session rows a user's first session is written over.
+	 *
+	 * @return array<string, array{0: bool}>
+	 */
+	public static function first_session_map_provider(): array {
+		return array(
+			'absent row' => array( false ),
+			'empty map'  => array( true ),
+		);
+	}
+
+	/**
+	 * A first session that loses the write to a concurrent first session retries and keeps both.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @dataProvider first_session_map_provider
+	 *
+	 * @param bool $empty_row Whether an empty map is stored instead of no row.
+	 */
+	public function test_create_session_first_map_keeps_a_concurrent_first_session( bool $empty_row ): void {
+		$meta_key = self::session_meta_key();
+		if ( $empty_row ) {
+			$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, array() ) );
+		}
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		// Between this request's read and its first write, another request stores its first session.
+		$user_id       = $this->test_user_id;
+		$raced         = false;
+		$raced_session = false;
+		$race          = static function ( string $query ) use ( $user_id, $meta_key, &$raced, &$raced_session ): string {
+			if ( ! $raced && preg_match( '/^\s*(?:INSERT|UPDATE)\b/i', $query ) && false !== strpos( $query, "'" . $meta_key . "'" ) ) {
+				$raced         = true;
+				$raced_session = SessionManager::create_session( $user_id, array( 'name' => 'raced-client' ), new DummyErrorHandler() );
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $race );
+		try {
+			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'first-client' ), new DummyErrorHandler() );
+		} finally {
+			remove_filter( 'query', $race );
+		}
+
+		$this->assertTrue( $raced );
+		$this->assertIsString( $raced_session );
+		$this->assertIsString( $session_id );
+		$this->assertNotSame( $raced_session, $session_id );
+
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$this->assertCount( 2, $sessions );
+		$this->assertArrayHasKey( $raced_session, $sessions );
+		$this->assertArrayHasKey( $session_id, $sessions );
+		$this->assertCount( 1, get_user_meta( $this->test_user_id, $meta_key, false ) );
+		$this->assertSame( array(), DummyErrorHandler::$logs );
+		DummyErrorHandler::reset();
+	}
+
+	/**
+	 * Named lock results that do not grant the lock.
+	 *
+	 * @return array<string, array{0: string}>
+	 */
+	public static function unacquired_lock_provider(): array {
+		return array(
+			'lock error'   => array( 'SELECT NULL' ),
+			'lock timeout' => array( 'SELECT 0' ),
+		);
+	}
+
+	/**
+	 * A first session is never inserted without the named lock; creation fails explicitly instead.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @dataProvider unacquired_lock_provider
+	 *
+	 * @param string $lock_result Query that replaces GET_LOCK() and yields its failed result.
+	 */
+	public function test_create_session_first_map_requires_the_named_lock( string $lock_result ): void {
+		$meta_key = self::session_meta_key();
+		$writes   = 0;
+		$deny     = static function ( string $query ) use ( $lock_result, $meta_key, &$writes ): string {
+			if ( preg_match( '/^\s*SELECT GET_LOCK\(/i', $query ) ) {
+				return $lock_result;
+			}
+			if ( preg_match( '/^\s*(?:INSERT|UPDATE)\b/i', $query ) && false !== strpos( $query, "'" . $meta_key . "'" ) ) {
+				++$writes;
+			}
+
+			return $query;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'query', $deny );
+		try {
+			$this->assertFalse( SessionManager::create_session( $this->test_user_id, array( 'name' => 'first-client' ), new DummyErrorHandler() ) );
+		} finally {
+			remove_filter( 'query', $deny );
+		}
+
+		$this->assertSame( 0, $writes );
+		$this->assertFalse( metadata_exists( 'user', $this->test_user_id, $meta_key ) );
+		$this->assertCount( 1, DummyErrorHandler::$logs );
+		$this->assertSame( 'Failed to persist MCP sessions after exhausting update retries.', DummyErrorHandler::$logs[0]['message'] );
+		DummyErrorHandler::reset();
+	}
+
+	/**
+	 * A first session replaces a stored value that holds no session map.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_create_session_replaces_an_unreadable_session_map(): void {
+		$meta_key = self::session_meta_key();
+		$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, 'not-a-session-map' ) );
+
+		$before     = wp_cache_get_last_changed( 'users' );
+		$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'first-client' ), new DummyErrorHandler() );
+
+		$this->assertIsString( $session_id );
+		$this->assertNotSame( $before, wp_cache_get_last_changed( 'users' ) );
+		$this->assertSame( array( $session_id ), array_keys( SessionManager::get_all_user_sessions( $this->test_user_id ) ) );
+		$this->assertCount( 1, get_user_meta( $this->test_user_id, $meta_key, false ) );
+	}
+
+	/**
+	 * A first session is stored as update_user_meta() stores every later write, unslashed.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_create_session_first_map_matches_update_user_meta_storage(): void {
+		$params     = array( 'name' => 'C:\\client\\"quoted"' );
+		$session_id = SessionManager::create_session( $this->test_user_id, $params, new DummyErrorHandler() );
+		$this->assertIsString( $session_id );
+
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$this->assertSame( wp_unslash( $params ), $sessions[ $session_id ]['client_params'] );
+	}
+
+	/**
+	 * A first session passes through a registered meta sanitizer before the update_user_metadata filter, as update_user_meta() does.
+	 *
+	 * @since n.e.x.t
+	 */
+	public function test_create_session_first_map_applies_meta_sanitization(): void {
+		$meta_key = self::session_meta_key();
+		$sanitize = static function ( $sessions ) {
+			foreach ( $sessions as $session_id => $session ) {
+				$sessions[ $session_id ]['client_params'] = array( 'name' => 'sanitized' );
+			}
+
+			return $sessions;
+		};
+		$filtered = null;
+		$observe  = static function ( $check, $object_id, $key, $value ) use ( $meta_key, &$filtered ) {
+			if ( $meta_key === $key ) {
+				$filtered = $value;
+			}
+
+			return $check;
+		};
+
+		add_filter( "sanitize_user_meta_{$meta_key}", $sanitize );
+		add_filter( 'update_user_metadata', $observe, 10, 4 );
+		try {
+			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'raw-client' ), new DummyErrorHandler() );
+		} finally {
+			remove_filter( "sanitize_user_meta_{$meta_key}", $sanitize );
+			remove_filter( 'update_user_metadata', $observe, 10 );
+		}
+
+		$this->assertIsString( $session_id );
+		$this->assertSame( array( 'name' => 'sanitized' ), $filtered[ $session_id ]['client_params'] );
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$this->assertSame( array( 'name' => 'sanitized' ), $sessions[ $session_id ]['client_params'] );
 	}
 
 	/**
