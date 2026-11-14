@@ -21,8 +21,9 @@ use WP_Error;
  * Sessions are tied to authenticated users to prevent anonymous session flooding.
  * MCP protocol revisions that do not negotiate session IDs should bypass this
  * compatibility storage entirely.
- * Established session maps use compare-and-swap semantics. An older
- * unconditional writer can still overwrite a concurrent newer writer.
+ * Session maps, including a user's first map, use compare-and-swap
+ * semantics. An older unconditional writer can still overwrite a concurrent
+ * newer writer.
  */
 final class SessionManager {
 
@@ -240,13 +241,15 @@ final class SessionManager {
 	}
 
 	/**
-	 * Apply a session mutation without overwriting an established session map.
+	 * Apply a session mutation without overwriting a concurrent writer.
 	 *
-	 * WordPress ignores an empty $prev_value. Concurrent first connections may
-	 * therefore still overwrite each other, but subsequent writes retry when the
-	 * previously read non-empty map has changed.
+	 * Every write is a compare-and-swap against the map the mutation read, and
+	 * a conflicting write is retried against the latest map. WordPress ignores
+	 * an empty $prev_value, so writes over an empty map go through
+	 * {@see replace_empty_session_map()} instead of update_user_meta().
 	 *
 	 * @since 0.6.0
+	 * @since n.e.x.t Writes over an absent or empty map are compare-and-swap too.
 	 *
 	 * @param int                                                   $user_id       The user ID.
 	 * @param callable                                              $mutation      Receives the latest sessions and returns the updated sessions.
@@ -261,6 +264,14 @@ final class SessionManager {
 
 			if ( $updated_sessions === $previous_sessions ) {
 				return true;
+			}
+
+			if ( array() === $previous_sessions ) {
+				if ( self::replace_empty_session_map( $user_id, $updated_sessions ) ) {
+					return true;
+				}
+
+				continue;
 			}
 
 			$updated = update_user_meta( $user_id, self::session_meta_key(), $updated_sessions, $previous_sessions );
@@ -281,6 +292,116 @@ final class SessionManager {
 		);
 
 		return false;
+	}
+
+	/**
+	 * Store a session map only while the stored map is still absent or empty.
+	 *
+	 * update_user_meta() cannot express this: it skips the comparison for an
+	 * empty previous value and inserts unconditionally when no row exists, so
+	 * two first connections would each report success while one session is
+	 * lost. An absent row is first replaced by an empty map with an
+	 * insert-if-absent statement, then the stored value is swapped only while
+	 * it is still the one read here. Any value that does not hold sessions
+	 * (an empty or unreadable map) can be replaced; a map with sessions means
+	 * a concurrent writer won and the caller retries against it.
+	 *
+	 * On MySQL and MariaDB the insert runs only under a named lock. Without
+	 * it, READ COMMITTED takes no gap lock for the NOT EXISTS check, so
+	 * overlapping inserts would both add a row and only the first would be
+	 * read. A lock that is not acquired, whether it timed out or failed, ends
+	 * the attempt and the caller retries. The SQLite drop-in has no named
+	 * locks and serializes writes, so its single statement runs unlocked.
+	 *
+	 * As in update_user_meta(), the value is unslashed and passed through
+	 * sanitize_meta() and the update_user_metadata short-circuit filter. Like
+	 * {@see delete_oversized_session_map()}, the direct queries clear the
+	 * user's meta cache and the users last_changed salt, and the user meta
+	 * actions do not fire.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param int   $user_id  The user ID.
+	 * @param array $sessions Sessions to store.
+	 *
+	 * @return bool True when the map was stored, false when a concurrent writer changed it first.
+	 */
+	private static function replace_empty_session_map( int $user_id, array $sessions ): bool {
+		global $wpdb;
+
+		$meta_key   = self::session_meta_key();
+		$meta_value = sanitize_meta( $meta_key, wp_unslash( $sessions ), 'user', get_object_subtype( 'user', $user_id ) );
+
+		// Honor the short-circuit update_user_meta() offers, for storage that replaces user meta.
+		/** This filter is documented in wp-includes/meta.php */
+		$check = apply_filters( 'update_user_metadata', null, $user_id, $meta_key, $meta_value, array() ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core's filter, applied as update_user_meta() would.
+		if ( null !== $check ) {
+			return (bool) $check;
+		}
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users -- The meta API has no conditional insert or empty-value comparison; the cache is cleared below. The users table only confirms the user exists.
+		// Match get_user_meta( ..., true ), which returns the lowest umeta_id.
+		$stored = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT meta_value FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s ORDER BY umeta_id ASC LIMIT 1",
+				$user_id,
+				$meta_key
+			)
+		);
+
+		if ( null === $stored ) {
+			$stored = maybe_serialize( array() );
+
+			$needs_lock = ! is_a( $wpdb, 'WP_SQLite_DB' );
+			$lock_name  = 'mcp_sessions_' . md5( $wpdb->usermeta . '|' . $user_id . '|' . $meta_key );
+			if ( $needs_lock && '1' !== $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK( %s, 5 )', $lock_name ) ) ) {
+				return false;
+			}
+
+			try {
+				$wpdb->query(
+					$wpdb->prepare(
+						"INSERT INTO {$wpdb->usermeta} ( user_id, meta_key, meta_value ) SELECT ID, %s, %s FROM {$wpdb->users} WHERE ID = %d AND NOT EXISTS ( SELECT 1 FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s )",
+						$meta_key,
+						$stored,
+						$user_id,
+						$user_id,
+						$meta_key
+					)
+				);
+			} finally {
+				if ( $needs_lock ) {
+					$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK( %s )', $lock_name ) );
+				}
+			}
+		} else {
+			$stored_sessions = maybe_unserialize( $stored );
+			if ( is_array( $stored_sessions ) && array() !== $stored_sessions ) {
+				wp_cache_delete( $user_id, 'user_meta' );
+
+				return false;
+			}
+		}
+
+		$updated = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE {$wpdb->usermeta} SET meta_value = %s WHERE user_id = %d AND meta_key = %s AND meta_value = %s",
+				maybe_serialize( $meta_value ),
+				$user_id,
+				$meta_key,
+				$stored
+			)
+		);
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPressVIPMinimum.Variables.RestrictedVariables.user_meta__wpdb__users
+		wp_cache_delete( $user_id, 'user_meta' );
+
+		if ( ! is_int( $updated ) || $updated < 1 ) {
+			return false;
+		}
+
+		wp_cache_set_users_last_changed();
+
+		return true;
 	}
 
 	/**
