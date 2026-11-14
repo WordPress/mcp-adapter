@@ -412,6 +412,58 @@ final class McpSessionManagerTest extends TestCase {
 	}
 
 	/**
+	 * A first session that finds a concurrent session map on its database reread backs off and keeps both.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @dataProvider first_session_map_provider
+	 *
+	 * @param bool $empty_row Whether an empty map is stored instead of no row.
+	 */
+	public function test_create_session_first_map_backs_off_when_the_reread_finds_sessions( bool $empty_row ): void {
+		$meta_key = self::session_meta_key();
+		if ( $empty_row ) {
+			$this->assertNotFalse( update_user_meta( $this->test_user_id, $meta_key, array() ) );
+		}
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+
+		// After this request read no sessions, and before its raw reread, another request stores its first session.
+		$user_id       = $this->test_user_id;
+		$raced         = false;
+		$raced_session = false;
+		$race          = static function ( $check, $object_id, $key ) use ( $user_id, $meta_key, &$raced, &$raced_session ) {
+			if ( ! $raced && $user_id === $object_id && $meta_key === $key ) {
+				$raced         = true;
+				$raced_session = SessionManager::create_session( $user_id, array( 'name' => 'raced-client' ), new DummyErrorHandler() );
+			}
+
+			return $check;
+		};
+
+		DummyErrorHandler::reset();
+		add_filter( 'update_user_metadata', $race, 10, 3 );
+		try {
+			$session_id = SessionManager::create_session( $this->test_user_id, array( 'name' => 'first-client' ), new DummyErrorHandler() );
+		} finally {
+			remove_filter( 'update_user_metadata', $race, 10 );
+		}
+
+		$this->assertTrue( $raced );
+		$this->assertIsString( $raced_session );
+		$this->assertIsString( $session_id );
+		$this->assertNotSame( $raced_session, $session_id );
+
+		wp_cache_delete( $this->test_user_id, 'user_meta' );
+		$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
+		$this->assertCount( 2, $sessions );
+		$this->assertArrayHasKey( $raced_session, $sessions );
+		$this->assertArrayHasKey( $session_id, $sessions );
+		$this->assertCount( 1, get_user_meta( $this->test_user_id, $meta_key, false ) );
+		$this->assertSame( array(), DummyErrorHandler::$logs );
+		DummyErrorHandler::reset();
+	}
+
+	/**
 	 * Named lock results that do not grant the lock.
 	 *
 	 * @return array<string, array{0: string}>
