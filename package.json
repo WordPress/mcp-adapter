@@ -11,6 +11,7 @@
 		"npm": ">=10.9.4"
 	},
 	"files": [
+		"core",
 		"includes",
 		"vendor",
 		"composer.json",

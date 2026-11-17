@@ -78,12 +78,14 @@
 	"scripts": {
 		"format": "phpcbf",
 		"lint": "phpcs",
+		"lint:core": "phpcs --standard=.phpcs.core.xml.dist",
 		"phpstan": "phpstan analyse --memory-limit=1G",
 		"test": "phpunit --strict-coverage"
 	},
 	"scripts-descriptions": {
 		"format": "Automatically fix coding standards issues",
 		"lint": "Check coding standards compliance",
+		"lint:core": "Check the core/ staged files against WordPress core coding standards",
 		"phpstan": "Run static analysis with PHPStan",
 		"test": "Run PHPUnit tests"
 	}

@@ -37,6 +37,10 @@ parameters:
 		- vendor/phpstan/php-8-stubs/stubs/ext/standard/str_contains.php
 		- vendor/phpstan/php-8-stubs/stubs/ext/standard/str_starts_with.php
 		- vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+	scanDirectories:
+		# Verbatim copies of core files (see core/README.md): scanned so their symbols are
+		# known, not analyzed — they are validated upstream in wordpress-develop.
+		- core/
 
 	ignoreErrors:
 		- # TODO: These are too noisy, we'll restore them in the future.

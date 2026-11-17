@@ -63,9 +63,12 @@ jobs:
             file_type
           ignore-codes: |
             plugin_header_unsupported_plugin_name
+          # Exclude core because it holds copies of WordPress core files, validated
+          # upstream with core's own tooling (see core/README.md).
           exclude-directories: |
             .github
             .wordpress-org
             bin
+            core
             docs
             tests

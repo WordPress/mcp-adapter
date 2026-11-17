@@ -24,6 +24,7 @@ The MCP Adapter bridges WordPress's Abilities API with the [Model Context Protoc
 * **Flexible Error Handling** - Default WordPress-compatible error logging with support for custom, server-specific handlers.
 * **Observability** - Zero-overhead metrics tracking with configurable handlers.
 * **Permission Control** - Granular, configurable permission checking for all exposed functionality.
+* **Core Abilities Included** - The newest WordPress core abilities (content, users, and settings queries) work on every supported WordPress version; the plugin registers them only where core does not ship them yet.
 
 == Installation ==
 
