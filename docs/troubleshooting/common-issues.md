@@ -208,6 +208,10 @@ add_action( 'wp_loaded', function() {
 });
 ```
 
+### 403 with "Invalid Origin header"
+
+The request carried an `Origin` header that does not match the site, so the MCP endpoint refused it before reading the body. Browsers add this header automatically; command-line tools and most desktop clients do not, which is why the same request can work from `curl` and fail from a web page. Compare the origin the browser sends, visible in the Network tab of the developer tools, with `wp option get home` and `wp option get siteurl`: scheme, host, and port must all match, so `http` versus `https`, `www` versus no `www`, or a dev server on another port is enough to fail. If the client legitimately runs on another origin, such as a headless front end or a local dev server, add that exact origin with the `mcp_adapter_allowed_http_origins` filter (see [Custom transports](../guides/custom-transports.md#origin-validation)).
+
 ### Test Permission Callback
 ```php
 // Temporarily allow all users for testing

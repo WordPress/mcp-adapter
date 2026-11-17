@@ -14,7 +14,9 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Transport;
 
+use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Transport\Contracts\McpRestTransportInterface;
+use WP\MCP\Transport\Infrastructure\HttpOriginValidator;
 use WP\MCP\Transport\Infrastructure\HttpRequestContext;
 use WP\MCP\Transport\Infrastructure\HttpRequestHandler;
 use WP\MCP\Transport\Infrastructure\McpTransportContext;
@@ -48,6 +50,51 @@ class HttpTransport implements McpRestTransportInterface {
 	public function __construct( McpTransportContext $transport_context ) {
 		$this->request_handler = new HttpRequestHandler( $transport_context );
 		add_action( 'rest_api_init', array( $this, 'register_routes' ), 16 );
+
+		// Last on rest_pre_dispatch: runs before the route's permission callback,
+		// so an invalid Origin is answered with 403 rather than 401, and after
+		// every other pre-dispatch filter, so an earlier result cannot mask it.
+		add_filter( 'rest_pre_dispatch', array( $this, 'reject_invalid_origin' ), PHP_INT_MAX, 3 );
+	}
+
+	/**
+	 * Answer a request to this server's route that carries an invalid Origin with HTTP 403.
+	 *
+	 * The Streamable HTTP transport requires a present, invalid Origin to be
+	 * rejected with 403. Checking here, before dispatch, keeps that answer
+	 * ahead of WordPress permission handling for anonymous requests and ahead
+	 * of any response another pre-dispatch filter prepared for the route.
+	 * OPTIONS requests and every other route are left as they are. Requests
+	 * WordPress rejects during global authentication (for example a wrong
+	 * Application Password) never reach dispatch and keep their 401.
+	 *
+	 * @since n.e.x.t
+	 *
+	 * @param mixed            $result  Response prepared by an earlier filter, or null.
+	 * @param \WP_REST_Server  $server  REST server instance.
+	 * @param \WP_REST_Request $request Request being dispatched.
+	 *
+	 * @return mixed The 403 response for an invalid Origin on this route, otherwise $result unchanged.
+	 */
+	public function reject_invalid_origin( $result, $server, $request ) {
+		if ( ! $request instanceof \WP_REST_Request || 'OPTIONS' === $request->get_method() ) {
+			return $result;
+		}
+
+		$transport_context = $this->request_handler->get_transport_context();
+		$mcp_server        = $transport_context->mcp_server;
+		$route             = '/' . trim( $mcp_server->get_server_route_namespace(), '/' ) . '/' . trim( $mcp_server->get_server_route(), '/' );
+
+		// WordPress matches REST routes case-insensitively.
+		if ( 0 !== strcasecmp( untrailingslashit( $request->get_route() ), $route ) ) {
+			return $result;
+		}
+
+		if ( HttpOriginValidator::is_allowed( $request->get_header( 'origin' ), $mcp_server, $transport_context->error_handler ) ) {
+			return $result;
+		}
+
+		return new \WP_REST_Response( McpErrorFactory::permission_denied( null, 'Invalid Origin header' ), 403 );
 	}
 
 	/**
