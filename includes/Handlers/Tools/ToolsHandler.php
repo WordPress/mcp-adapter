@@ -75,13 +75,15 @@ class ToolsHandler {
 		 * or reorder the tools list.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t Added the `$request_context` parameter.
 		 *
-		 * @param array<\WP\McpSchema\Record\Tool> $tools  Array of Tool records.
-		 * @param \WP\MCP\Core\McpServer                     $server The MCP server instance.
-		 * @param \WP\McpSchema\Schema                        $schema Selected schema.
+		 * @param array<\WP\McpSchema\Record\Tool> $tools           Array of Tool records.
+		 * @param \WP\MCP\Core\McpServer           $server          The MCP server instance.
+		 * @param \WP\McpSchema\Schema             $schema          Selected schema.
+		 * @param \WP\MCP\Core\McpRequestContext   $request_context Request context, with the client's capabilities.
 		 */
 		$tools = $this->validate_filtered_list(
-			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp, $schema ),
+			apply_filters( 'mcp_adapter_tools_list', $tools, $this->mcp, $schema, $request_context ),
 			$tools,
 			'mcp_adapter_tools_list',
 			$this->mcp->get_error_handler()
@@ -173,13 +175,15 @@ class ToolsHandler {
 			 * or return a WP_Error to block execution and return an error to the client.
 			 *
 			 * @since 0.5.0
+			 * @since n.e.x.t Added the `$request_context` parameter.
 			 *
-			 * @param array                        $args      The tool arguments.
-			 * @param string                       $tool_name The tool name being called.
-			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
-			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 * @param array                          $args            The tool arguments.
+			 * @param string                         $tool_name       The tool name being called.
+			 * @param \WP\MCP\Domain\Tools\McpTool   $mcp_tool        The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer         $server          The MCP server instance.
+			 * @param \WP\MCP\Core\McpRequestContext $request_context Request context, with the client's capabilities.
 			 */
-			$args = apply_filters( 'mcp_adapter_pre_tool_call', $args, $tool_name, $mcp_tool, $this->mcp );
+			$args = apply_filters( 'mcp_adapter_pre_tool_call', $args, $tool_name, $mcp_tool, $this->mcp, $request_context );
 
 			// Allow pre-filter to short-circuit execution by returning WP_Error.
 			if ( is_wp_error( $args ) ) {
@@ -196,14 +200,16 @@ class ToolsHandler {
 			 *
 			 * @since 0.5.0
 			 * @since 0.7.0 `$result` may be a `McpInputRequired` when a direct tool requests more client input.
+			 * @since n.e.x.t Added the `$request_context` parameter.
 			 *
 			 * @param mixed|\WP_Error|\WP\MCP\Domain\Tools\McpInputRequired $result The raw execution result (may be WP_Error or McpInputRequired).
-			 * @param array                        $args      The tool arguments used.
-			 * @param string                       $tool_name The tool name that was called.
-			 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
-			 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+			 * @param array                          $args            The tool arguments used.
+			 * @param string                         $tool_name       The tool name that was called.
+			 * @param \WP\MCP\Domain\Tools\McpTool   $mcp_tool        The MCP tool instance.
+			 * @param \WP\MCP\Core\McpServer         $server          The MCP server instance.
+			 * @param \WP\MCP\Core\McpRequestContext $request_context Request context, with the client's capabilities.
 			 */
-			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp );
+			$result = apply_filters( 'mcp_adapter_tool_call_result', $result, $args, $tool_name, $mcp_tool, $this->mcp, $request_context );
 
 			if ( $result instanceof McpInputRequired ) {
 				if ( null === $call_context || Schemas::V2026_07_28 !== $request_context->revision() ) {

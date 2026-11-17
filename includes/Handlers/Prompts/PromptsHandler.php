@@ -61,13 +61,15 @@ class PromptsHandler {
 		 * Filters the list of prompts before returning to the client.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t Added the `$request_context` parameter.
 		 *
-		 * @param array<\WP\McpSchema\Record\Prompt> $prompts Prompt records.
-		 * @param \WP\MCP\Core\McpServer             $server  MCP server.
-		 * @param \WP\McpSchema\Schema                $schema  Selected schema.
+		 * @param array<\WP\McpSchema\Record\Prompt> $prompts         Prompt records.
+		 * @param \WP\MCP\Core\McpServer             $server          MCP server.
+		 * @param \WP\McpSchema\Schema                $schema          Selected schema.
+		 * @param \WP\MCP\Core\McpRequestContext     $request_context Request context, with the client's capabilities.
 		 */
 		$prompts = $this->validate_filtered_list(
-			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp, $schema ),
+			apply_filters( 'mcp_adapter_prompts_list', $prompts, $this->mcp, $schema, $request_context ),
 			$prompts,
 			'mcp_adapter_prompts_list',
 			$this->mcp->get_error_handler()
@@ -108,13 +110,15 @@ class PromptsHandler {
 			 * Filters prompt arguments before execution.
 			 *
 			 * @since 0.5.0
+			 * @since n.e.x.t Added the `$request_context` parameter.
 			 *
 			 * @param array $arguments Prompt arguments; return WP_Error to stop execution.
 			 * @param string $prompt_name Requested prompt name.
 			 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt Prompt execution component.
 			 * @param \WP\MCP\Core\McpServer $server Server owning the prompt.
+			 * @param \WP\MCP\Core\McpRequestContext $request_context Request context, with the client's capabilities.
 			 */
-			$arguments = apply_filters( 'mcp_adapter_pre_prompt_get', $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+			$arguments = apply_filters( 'mcp_adapter_pre_prompt_get', $arguments, $prompt_name, $mcp_prompt, $this->mcp, $request_context );
 			if ( is_wp_error( $arguments ) ) {
 				return McpErrorFactory::internal_error( $request_id, $arguments->get_error_message() );
 			}
@@ -125,14 +129,16 @@ class PromptsHandler {
 			 * Filters the prompt execution result before normalization.
 			 *
 			 * @since 0.5.0
+			 * @since n.e.x.t Added the `$request_context` parameter.
 			 *
 			 * @param mixed|\WP_Error $result Raw execution result or error.
 			 * @param array $arguments Arguments used for execution.
 			 * @param string $prompt_name Requested prompt name.
 			 * @param \WP\MCP\Domain\Prompts\McpPrompt $mcp_prompt Prompt execution component.
 			 * @param \WP\MCP\Core\McpServer $server Server owning the prompt.
+			 * @param \WP\MCP\Core\McpRequestContext $request_context Request context, with the client's capabilities.
 			 */
-			$result = apply_filters( 'mcp_adapter_prompt_get_result', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp );
+			$result = apply_filters( 'mcp_adapter_prompt_get_result', $result, $arguments, $prompt_name, $mcp_prompt, $this->mcp, $request_context );
 			if ( is_wp_error( $result ) ) {
 				$this->mcp->get_error_handler()->log(
 					'Prompt execution returned WP_Error',

@@ -77,11 +77,13 @@ class InitializeHandler {
 		 * the selected schema.
 		 *
 		 * @since 0.5.0
+		 * @since n.e.x.t Added the `$request_context` parameter.
 		 *
-		 * @param \WP\McpSchema\Record\InitializeResult $result The initialize result record.
-		 * @param \WP\MCP\Core\McpServer                             $server The MCP server instance.
-		 * @param \WP\McpSchema\Schema                                $schema Selected schema.
+		 * @param \WP\McpSchema\Record\InitializeResult $result          The initialize result record.
+		 * @param \WP\MCP\Core\McpServer                $server          The MCP server instance.
+		 * @param \WP\McpSchema\Schema                  $schema          Selected schema.
+		 * @param \WP\MCP\Core\McpRequestContext        $request_context Request context, with the client's capabilities.
 		 */
-		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp, $schema );
+		return apply_filters( 'mcp_adapter_initialize_response', $result, $this->mcp, $schema, $request_context );
 	}
 }

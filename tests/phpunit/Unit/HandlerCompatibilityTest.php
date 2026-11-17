@@ -13,6 +13,7 @@ use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Prompts\McpPrompt;
 use WP\MCP\Domain\Resources\McpResource;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
@@ -24,6 +25,7 @@ use WP\McpSchema\Record;
 use WP\McpSchema\Schemas;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Record\GetPromptRequest;
+use WP\McpSchema\Record\InitializeRequest;
 use WP\McpSchema\Record\ListPromptsRequest;
 use WP\McpSchema\Record\ListResourcesRequest;
 use WP\McpSchema\Record\ListToolsRequest;
@@ -231,6 +233,216 @@ final class HandlerCompatibilityTest extends TestCase {
 			array( 'mcp_adapter_tools_list', 'mcp_adapter_resources_list', 'mcp_adapter_prompts_list' ),
 			array_column( array_column( DummyErrorHandler::$logs, 'context' ), 'filter' )
 		);
+	}
+
+	/** Request filters receive the request context, so callbacks can read the client's capabilities. */
+	public function test_request_filters_receive_request_context(): void {
+		$tool     = McpTool::fromArray(
+			array(
+				'name'        => 'context-tool',
+				'inputSchema' => array( 'type' => 'object' ),
+				'handler'     => static fn(): array => array( 'ok' => true ),
+				'permission'  => '__return_true',
+			)
+		);
+		$resource = McpResource::fromArray(
+			array(
+				'uri'        => 'fixture://context-resource',
+				'handler'    => static fn(): string => 'contents',
+				'permission' => '__return_true',
+			)
+		);
+		$prompt   = McpPrompt::fromArray(
+			array(
+				'name'       => 'context-prompt',
+				'handler'    => static fn(): array => array( 'text' => 'prompt' ),
+				'permission' => '__return_true',
+			)
+		);
+		$this->assertInstanceOf( McpTool::class, $tool );
+		$this->assertInstanceOf( McpResource::class, $resource );
+		$this->assertInstanceOf( McpPrompt::class, $prompt );
+		$server    = $this->makeServer( array( $tool ), array( $resource ), array( $prompt ) );
+		$schema    = $this->schema();
+		$context   = $this->request_context( $server );
+		$received  = array();
+		$hooks     = array(
+			'mcp_adapter_initialize_response'  => 4,
+			'mcp_adapter_tools_list'           => 4,
+			'mcp_adapter_resources_list'       => 4,
+			'mcp_adapter_prompts_list'         => 4,
+			'mcp_adapter_pre_tool_call'        => 5,
+			'mcp_adapter_tool_call_result'     => 6,
+			'mcp_adapter_pre_resource_read'    => 5,
+			'mcp_adapter_resource_read_result' => 6,
+			'mcp_adapter_pre_prompt_get'       => 5,
+			'mcp_adapter_prompt_get_result'    => 6,
+		);
+		$callbacks = array();
+		foreach ( $hooks as $hook => $accepted_args ) {
+			$callbacks[ $hook ] = static function ( $value, ...$args ) use ( $hook, &$received ) {
+				$received[ $hook ] = end( $args );
+
+				return $value;
+			};
+			add_filter( $hook, $callbacks[ $hook ], 10, $accepted_args );
+		}
+
+		try {
+			( new InitializeHandler( $server ) )->handle(
+				$schema->fromArray(
+					InitializeRequest::class,
+					$this->request_array(
+						1,
+						'initialize',
+						array(
+							'protocolVersion' => Schemas::V2025_11_25,
+							'capabilities'    => array(),
+							'clientInfo'      => array(
+								'name'    => 'test',
+								'version' => '1',
+							),
+						)
+					)
+				),
+				$context
+			);
+			( new ToolsHandler( $server ) )->list_tools( $schema->fromArray( ListToolsRequest::class, $this->request_array( 2, 'tools/list' ) ), $context );
+			( new ResourcesHandler( $server ) )->list_resources( $schema->fromArray( ListResourcesRequest::class, $this->request_array( 3, 'resources/list' ) ), $context );
+			( new PromptsHandler( $server ) )->list_prompts( $schema->fromArray( ListPromptsRequest::class, $this->request_array( 4, 'prompts/list' ) ), $context );
+			( new ToolsHandler( $server ) )->call_tool(
+				$schema->fromArray( CallToolRequest::class, $this->request_array( 5, 'tools/call', array( 'name' => 'context-tool' ) ) ),
+				$context
+			);
+			( new ResourcesHandler( $server ) )->read_resource(
+				$schema->fromArray( ReadResourceRequest::class, $this->request_array( 6, 'resources/read', array( 'uri' => 'fixture://context-resource' ) ) ),
+				$context
+			);
+			( new PromptsHandler( $server ) )->get_prompt(
+				$schema->fromArray( GetPromptRequest::class, $this->request_array( 7, 'prompts/get', array( 'name' => 'context-prompt' ) ) ),
+				$context
+			);
+		} finally {
+			foreach ( $callbacks as $hook => $callback ) {
+				remove_filter( $hook, $callback, 10 );
+			}
+		}
+
+		foreach ( array_keys( $hooks ) as $hook ) {
+			$this->assertArrayHasKey( $hook, $received, $hook . ' did not run.' );
+			$this->assertSame( $context, $received[ $hook ], $hook . ' did not receive the request context.' );
+		}
+	}
+
+	/**
+	 * An extension the client declares is visible to filters on later requests, on both revisions.
+	 *
+	 * @dataProvider declared_extension_settings_provider
+	 * @param array<string, mixed>|\stdClass $settings Settings the client declares for the UI extension.
+	 */
+	public function test_declared_extension_reaches_later_request_filters( $settings ): void {
+		$server       = $this->makeServer( array( 'test/always-allowed' ) );
+		$orchestrator = new McpWireOrchestrator( $server->create_transport_context() );
+		$extensions   = array( 'io.modelcontextprotocol/ui' => $settings );
+		$seen         = array();
+		$filter       = static function ( array $tools, $server, $schema, $request_context ) use ( &$seen ): array {
+			unset( $server, $schema );
+			$seen[] = $request_context->client_extension( 'io.modelcontextprotocol/ui' );
+
+			return $tools;
+		};
+		add_filter( 'mcp_adapter_tools_list', $filter, 10, 4 );
+
+		try {
+			$initialize = $orchestrator->process(
+				$this->wire_message(
+					$this->request_array(
+						1,
+						'initialize',
+						array(
+							'protocolVersion' => Schemas::V2025_11_25,
+							'capabilities'    => array( 'extensions' => $extensions ),
+							'clientInfo'      => array(
+								'name'    => 'apps-host',
+								'version' => '1.0.0',
+							),
+						)
+					)
+				),
+				'test'
+			);
+			$this->assertIsArray( $initialize['initializeParams'] );
+
+			$orchestrator->process( $this->wire_message( $this->request_array( 2, 'tools/list' ) ), 'test', array(), $initialize['initializeParams'] );
+			$orchestrator->process(
+				$this->wire_message(
+					$this->request_array(
+						3,
+						'tools/list',
+						array(
+							'_meta' => array(
+								'io.modelcontextprotocol/protocolVersion' => Schemas::V2026_07_28,
+								'io.modelcontextprotocol/clientCapabilities' => array( 'extensions' => $extensions ),
+							),
+						)
+					)
+				),
+				'test'
+			);
+		} finally {
+			remove_filter( 'mcp_adapter_tools_list', $filter, 10 );
+		}
+
+		$this->assertCount( 2, $seen );
+		foreach ( $seen as $index => $received ) {
+			$this->assertInstanceOf( \stdClass::class, $received, 'Request ' . $index . ' lost the declared extension.' );
+			$this->assertSame( wp_json_encode( $settings ), wp_json_encode( $received ) );
+		}
+	}
+
+	/**
+	 * Settings a client may declare for an extension.
+	 *
+	 * @return array<string, array{0: array<string, mixed>|\stdClass}>
+	 */
+	public function declared_extension_settings_provider(): array {
+		return array(
+			'with settings'  => array( array( 'mimeTypes' => array( 'text/html;profile=mcp-app' ) ) ),
+			'empty settings' => array( new \stdClass() ),
+		);
+	}
+
+	/**
+	 * Build a JSON-RPC request array.
+	 *
+	 * @param int                  $id     Request ID.
+	 * @param string               $method Method name.
+	 * @param array<string, mixed> $params Request params, omitted when empty.
+	 * @return array<string, mixed>
+	 */
+	private function request_array( int $id, string $method, array $params = array() ): array {
+		$request = array(
+			'jsonrpc' => '2.0',
+			'id'      => $id,
+			'method'  => $method,
+		);
+		if ( array() !== $params ) {
+			$request['params'] = $params;
+		}
+
+		return $request;
+	}
+
+	/**
+	 * Decode a request the way transports hand it to the orchestrator.
+	 *
+	 * @param array<string, mixed> $message JSON-RPC message.
+	 */
+	private function wire_message( array $message ): \stdClass {
+		$decoded = json_decode( (string) wp_json_encode( $message ) );
+		$this->assertInstanceOf( \stdClass::class, $decoded );
+
+		return $decoded;
 	}
 
 	/** Tool pre/result hooks can modify values and WP_Error short-circuits execution. */

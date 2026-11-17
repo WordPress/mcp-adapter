@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `McpRequestContext::client_extension()` returns the settings a client declared for a protocol extension, such as `io.modelcontextprotocol/ui` for MCP Apps, or `null` when the client did not declare it. `McpRequestContext::client_supports_extension()` answers whether it was declared at all.
+- Request filters receive the request context as a new last argument, so callbacks can adapt what they return to the client's capabilities: the fourth for `mcp_adapter_initialize_response`, `mcp_adapter_tools_list`, `mcp_adapter_resources_list`, and `mcp_adapter_prompts_list`; the fifth for `mcp_adapter_pre_tool_call`, `mcp_adapter_pre_resource_read`, and `mcp_adapter_pre_prompt_get`; the sixth for `mcp_adapter_tool_call_result`, `mcp_adapter_resource_read_result`, and `mcp_adapter_prompt_get_result`. Existing callbacks are unaffected.
+
+### Fixed
+- On the 2025 protocol revisions, a capability or extension the client declares as an empty object, such as `"io.modelcontextprotocol/ui": {}`, reaches the request context as an object instead of an empty list.
+
 ## [0.7.1] - 2026-10-15
 
 ### Added

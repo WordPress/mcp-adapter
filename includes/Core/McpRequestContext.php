@@ -128,6 +128,38 @@ final class McpRequestContext {
 	}
 
 	/**
+	 * Get the settings a client declared for a protocol extension, such as
+	 * `io.modelcontextprotocol/ui` for MCP Apps.
+	 *
+	 * An extension only applies once the client declares it under
+	 * `capabilities.extensions`, so servers check this before listing what needs it.
+	 *
+	 * @param string $identifier Extension identifier.
+	 * @return \stdClass|null A copy of the declared settings, or null when the client did not declare the extension.
+	 * @since n.e.x.t
+	 */
+	public function client_extension( string $identifier ): ?\stdClass {
+		$extensions = $this->client_capabilities->extensions ?? null;
+		if ( ! $extensions instanceof \stdClass ) {
+			return null;
+		}
+
+		$settings = $extensions->{$identifier} ?? null;
+
+		return $settings instanceof \stdClass ? self::copy_object( $settings ) : null;
+	}
+
+	/**
+	 * Whether the client declared a protocol extension, with or without settings.
+	 *
+	 * @param string $identifier Extension identifier.
+	 * @since n.e.x.t
+	 */
+	public function client_supports_extension( string $identifier ): bool {
+		return null !== $this->client_extension( $identifier );
+	}
+
+	/**
 	 * Get a defensive copy of client identity.
 	 *
 	 * @since 0.7.0
