@@ -20,10 +20,14 @@
 		<testsuite name="integration">
 			<directory suffix="Test.php">./tests/phpunit/Integration/</directory>
 		</testsuite>
+		<testsuite name="oauth">
+			<directory suffix="Test.php">./tests/phpunit/OAuth/</directory>
+		</testsuite>
 	</testsuites>
 	<coverage processUncoveredFiles="false">
 		<include>
 			<directory suffix=".php">includes</directory>
+			<directory suffix=".php">oauth</directory>
 		</include>
 		<report>
 			<clover outputFile="tests/_output/php-coverage.xml" />
