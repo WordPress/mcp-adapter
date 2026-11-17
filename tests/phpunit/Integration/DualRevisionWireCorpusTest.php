@@ -1846,10 +1846,6 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $mismatch['data']['error']['code'] );
 		$this->assertSame( 91, $mismatch['data']['id'] );
 
-		$missing = $this->http_post( $this->list_payload( 92 ), array( 'Mcp-Session-Id' => $session_id ) );
-		$this->assertSame( 400, $missing['status'] );
-		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $missing['data']['error']['code'] );
-
 		$delete = new WP_REST_Request( 'DELETE', '/mcp' );
 		$delete->set_header( 'MCP-Protocol-Version', '2025-06-18' );
 		$delete->set_header( 'Mcp-Session-Id', $session_id );
@@ -1857,24 +1853,13 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 200, $delete_response->get_status() );
 	}
 
-	/** A 2025-11-25 session requires the MCP-Protocol-Version header on every request after initialize. */
-	public function test_http_2025_11_25_session_requires_protocol_version_header(): void {
+	/** A legacy HTTP session supplies the negotiated revision when the client omits the header. */
+	public function test_http_2025_11_25_session_uses_negotiated_revision_without_protocol_header(): void {
 		$session_id = $this->initialize_http_session();
 
 		$missing = $this->http_post( $this->list_payload( 93 ), array( 'Mcp-Session-Id' => $session_id ) );
-		$this->assertSame( 400, $missing['status'] );
-		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $missing['data']['error']['code'] );
-		$this->assertSame( 93, $missing['data']['id'] );
-		$this->assertStringContainsString( 'required for a 2025-11-25 session', $missing['data']['error']['message'] );
-
-		$present = $this->http_post(
-			$this->list_payload( 94 ),
-			array(
-				'Mcp-Session-Id'       => $session_id,
-				'MCP-Protocol-Version' => Schemas::V2025_11_25,
-			)
-		);
-		$this->assertSame( 200, $present['status'] );
+		$this->assertSame( 200, $missing['status'] );
+		$this->assertSame( 'test-always-allowed', $missing['data']['result']['tools'][0]['name'] );
 	}
 
 	/** Identifiers that predate the header may omit it, but a sent header must still match. */

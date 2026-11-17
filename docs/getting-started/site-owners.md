@@ -80,7 +80,7 @@ If the site runs on your own computer and you have WP-CLI, the client can start 
 
 ### Web apps (claude.ai, ChatGPT)
 
-The web versions of Claude and ChatGPT add connectors through an OAuth sign-in, and they have no field for an Application Password. WordPress does not include an OAuth server and MCP Adapter does not add one, so these apps cannot connect to MCP Adapter on their own today. Use a desktop client, or a plugin that adds an OAuth sign-in to your site.
+The web versions of Claude and ChatGPT add connectors through an OAuth sign-in, and they have no field for an Application Password. The MCP Adapter plugin includes that sign-in. Add `https://example.com/wp-json/mcp/mcp-adapter-default-server` as a connector with no credentials, log in to WordPress when the browser opens, and approve the app. The site must use HTTPS, permalinks must not be Plain, and the site must be at the root of its domain. See [OAuth Sign-in](../guides/oauth.md).
 
 ## Step 3: Test the connection
 

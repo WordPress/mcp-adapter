@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- The standalone plugin runs an OAuth authorization server, so MCP clients such as Claude, ChatGPT, Cursor and VS Code connect with only the endpoint URL: the person logs in to WordPress and approves the app. A token acts as the approving user on the site's whole REST API, and that user's capabilities decide what it can do; the one advertised scope, `general`, is never enforced. Access tokens last one hour, refresh tokens rotate on every use, and a reused refresh token revokes the connection. Users revoke connections from their profile. Public clients only, with PKCE S256, identified by a Client ID Metadata Document or by stateless dynamic registration. OAuth turns on when the site uses HTTPS (local environments are exempt), has pretty permalinks and sits at the root of its domain; `mcp_adapter_oauth_enabled` turns it off. A plugin that bundles MCP Adapter as a library does not start it. See the [OAuth guide](docs/guides/oauth.md).
+- OAuth return addresses may use an app's own scheme, such as `cursor://`, as well as HTTPS and HTTP on a loopback host. The MCP authorization specification allows only HTTPS and localhost; app schemes are accepted so Cursor can connect, and PKCE keeps an intercepted code useless. Schemes the browser handles itself, such as `javascript:` and `data:`, are refused.
+
 ## [0.7.1] - 2026-10-15
 
 ### Added
