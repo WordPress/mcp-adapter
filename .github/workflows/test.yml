@@ -171,6 +171,9 @@ jobs:
           - php: '8.5'
             wp: latest
             coverage: true
+          - php: '8.5'
+            wp: trunk
+            coverage: true
     env:
       WP_ENV_PHP_VERSION: ${{ matrix.php }}
       WP_ENV_CORE: ${{ matrix.wp == 'trunk' && 'WordPress/WordPress' || format( 'https://wordpress.org/wordpress-{0}.zip', matrix.wp ) }}

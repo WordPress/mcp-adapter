@@ -13,6 +13,7 @@ namespace WP\MCP\Domain\Prompts;
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Prompts\Contracts\McpPromptBuilderInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\AbilityPermissionChecker;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -329,9 +330,8 @@ final class McpPrompt implements McpComponentInterface {
 
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
-			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
 
-			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
+			return self::guard( 'mcp_permission_check_failed', static fn() => AbilityPermissionChecker::check( $ability, $args ) );
 		}
 
 		if ( null !== $this->builder ) {

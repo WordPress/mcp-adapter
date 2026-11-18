@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace WP\MCP\Abilities;
 
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\AbilityPermissionChecker;
 use WP_Error;
 
 /**
@@ -188,8 +189,7 @@ final class ExecuteAbilityAbility {
 		// Normalize parameters for ability's schema requirements
 		// Empty {} from MCP is treated as null for abilities without input schema
 		$parameters        = $input['parameters'] ?? null;
-		$parameters        = AbilityArgumentNormalizer::normalize( $ability, $parameters );
-		$permission_result = $ability->check_permissions( $parameters );
+		$permission_result = AbilityPermissionChecker::check( $ability, $parameters );
 
 		// Return WP_Error as-is, or convert other values to boolean
 		if ( is_wp_error( $permission_result ) ) {

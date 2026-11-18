@@ -12,6 +12,7 @@ namespace WP\MCP\Domain\Tools;
 
 use WP\MCP\Domain\Contracts\McpComponentInterface;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
+use WP\MCP\Domain\Utils\AbilityPermissionChecker;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
@@ -374,9 +375,8 @@ final class McpTool implements McpComponentInterface {
 		// Ability-backed tools delegate to the ability's permission system.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
-			$args    = AbilityArgumentNormalizer::normalize( $ability, $args );
 
-			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
+			return self::guard( 'mcp_permission_check_failed', static fn() => AbilityPermissionChecker::check( $ability, $args ) );
 		}
 
 		// Callable-backed tools use their required permission callback.

@@ -840,6 +840,8 @@ wp_register_ability('my-plugin/analysis-prompt', [
 
 > **💡 Two-Layer Security**: Abilities have their own permissions (fine-grained), but [transport permissions](transport-permissions.md) act as a gatekeeper for the entire server. If transport blocks a user, they can't access ANY abilities regardless of individual ability permissions.
 
+Ability-backed tools and prompts prepare and validate input before their permission checks. The adapter pre-execution filters run afterward, so they cannot supply missing required input for the initial check. See [input preparation and pre-execution filters](../migration/ability-input-preparation.md) for the execution order and migration guidance.
+
 ### Permission Callback Examples
 
 ```php
