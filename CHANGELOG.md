@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Ability-backed permission checks now prepare and validate input before the adapter pre-execution filters run. Integrations that supply required input or repair invalid input only in `mcp_adapter_pre_tool_call` or `mcp_adapter_pre_prompt_get` must migrate that preparation earlier. See the [compatibility and migration notes](docs/migration/ability-input-preparation.md), including the WordPress 7.1+ normalization-hook example.
+
 ## [0.7.1] - 2026-10-15
 
 ### Added
