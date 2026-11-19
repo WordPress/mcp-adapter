@@ -1847,8 +1847,9 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 91, $mismatch['data']['id'] );
 
 		$missing = $this->http_post( $this->list_payload( 92 ), array( 'Mcp-Session-Id' => $session_id ) );
-		$this->assertSame( 400, $missing['status'] );
-		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $missing['data']['error']['code'] );
+		$this->assertSame( 200, $missing['status'] );
+		$this->assertSame( 'test-always-allowed', $missing['data']['result']['tools'][0]['name'] );
+		$this->assertArrayNotHasKey( 'resultType', $missing['data']['result'] );
 
 		$delete = new WP_REST_Request( 'DELETE', '/mcp' );
 		$delete->set_header( 'MCP-Protocol-Version', '2025-06-18' );
@@ -1857,15 +1858,37 @@ final class DualRevisionWireCorpusTest extends TestCase {
 		$this->assertSame( 200, $delete_response->get_status() );
 	}
 
-	/** A 2025-11-25 session requires the MCP-Protocol-Version header on every request after initialize. */
-	public function test_http_2025_11_25_session_requires_protocol_version_header(): void {
+	/**
+	 * Without the MCP-Protocol-Version header, a 2025-11-25 session uses its negotiated version.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/411
+	 */
+	public function test_http_2025_11_25_session_uses_negotiated_version_without_header(): void {
 		$session_id = $this->initialize_http_session();
 
+		$initialized = $this->http_post(
+			array(
+				'jsonrpc' => '2.0',
+				'method'  => 'notifications/initialized',
+			),
+			array( 'Mcp-Session-Id' => $session_id )
+		);
+		$this->assertSame( 202, $initialized['status'] );
+
 		$missing = $this->http_post( $this->list_payload( 93 ), array( 'Mcp-Session-Id' => $session_id ) );
-		$this->assertSame( 400, $missing['status'] );
-		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $missing['data']['error']['code'] );
+		$this->assertSame( 200, $missing['status'] );
 		$this->assertSame( 93, $missing['data']['id'] );
-		$this->assertStringContainsString( 'required for a 2025-11-25 session', $missing['data']['error']['message'] );
+		$this->assertSame( 'test-always-allowed', $missing['data']['result']['tools'][0]['name'] );
+
+		$mismatch = $this->http_post(
+			$this->list_payload( 95 ),
+			array(
+				'Mcp-Session-Id'       => $session_id,
+				'MCP-Protocol-Version' => '2025-06-18',
+			)
+		);
+		$this->assertSame( 400, $mismatch['status'] );
+		$this->assertSame( McpErrorFactory::INVALID_REQUEST, $mismatch['data']['error']['code'] );
 
 		$present = $this->http_post(
 			$this->list_payload( 94 ),
