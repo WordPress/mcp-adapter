@@ -4,7 +4,7 @@ Tags:              mcp, ai, abilities-api, model-context-protocol
 Requires at least: 6.9
 Tested up to:      7.1
 Requires PHP:      7.4
-Stable tag:        0.7.1
+Stable tag:        0.7.2
 License:           GPL-2.0-or-later
 License URI:       https://spdx.org/licenses/GPL-2.0-or-later.html
 
@@ -64,6 +64,22 @@ On the [GitHub repository](https://github.com/WordPress/mcp-adapter/issues). Sec
 Plugin developers should depend on MCP Adapter by adding `Requires Plugins: mcp-adapter` to their plugin header. See the [README](https://github.com/WordPress/mcp-adapter#installation) for WP-CLI and wp-env options.
 
 == Changelog ==
+
+= 0.7.2 - 2026-11-19 =
+
+**Fixed**
+
+- Permission callbacks of abilities receive the same prepared input that WordPress gives them when it runs the ability directly.
+- Clients that do not send the `MCP-Protocol-Version` header after `initialize` can connect again. Since 0.7.0 their requests received HTTP 400, except in `2024-11-05` sessions.
+- The examples in `wp help mcp-adapter serve` use the registered command name.
+
+**Changed**
+
+- Tools and prompts backed by abilities prepare and validate their input before the permission check. A call with missing or invalid input is rejected before the `mcp_adapter_pre_tool_call` and `mcp_adapter_pre_prompt_get` filters run. Integrations that supply or repair required input only in those filters must do it earlier. See the [compatibility notes](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/ability-input-preparation.md).
+- The site-owner guide separates the two causes of a 404 on the connection address and gives the checks for each.
+- The bundled Jetpack Autoloader is updated to 6.0.3.
+
+See [CHANGELOG.md](https://github.com/WordPress/mcp-adapter/blob/trunk/CHANGELOG.md) for the full list of changes.
 
 = 0.7.1 - 2026-10-15 =
 
@@ -152,6 +168,9 @@ No API, hook, or protocol behavior changed. Upgrading from 0.6.0 requires no mig
 For older releases, see [CHANGELOG.md](https://github.com/WordPress/mcp-adapter/blob/trunk/CHANGELOG.md).
 
 == Upgrade Notice ==
+
+= 0.7.2 =
+Fixes HTTP 400 errors for clients that omit the MCP-Protocol-Version header. Ability input is now validated before permission checks; see the [compatibility notes](https://github.com/WordPress/mcp-adapter/blob/trunk/docs/migration/ability-input-preparation.md).
 
 = 0.7.1 =
 Fixes a session storage security issue, improves plugin loading alongside bundled copies, and adds clearer ability errors and a site-owner guide. Clients whose oversized session data is cleared need to reconnect once.

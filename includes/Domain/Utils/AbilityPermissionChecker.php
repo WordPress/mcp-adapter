@@ -11,11 +11,15 @@ namespace WP\MCP\Domain\Utils;
 
 /**
  * Keep direct permission checks consistent with WP_Ability::execute().
+ *
+ * @since 0.7.2
  */
 final class AbilityPermissionChecker {
 
 	/**
 	 * Apply input preparation before invoking the ability's permission callback.
+	 *
+	 * @since 0.7.2
 	 *
 	 * @param \WP_Ability $ability   Ability to check.
 	 * @param mixed       $arguments MCP arguments.

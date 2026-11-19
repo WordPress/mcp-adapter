@@ -36,6 +36,7 @@ Connect via WP-CLI over STDIO, or point an HTTP client at `/wp-json/mcp/mcp-adap
 
 ## Migration
 
+- [Compatibility notes: ability input preparation (v0.7.2)](docs/migration/ability-input-preparation.md)
 - [Migration Guide: v0.7.0](docs/migration/v0.7.0.md)
 - [Migration Guide: v0.5.0](docs/migration/v0.5.0.md)
 - [Migration Guide: v0.3.0](docs/migration/v0.3.0.md)

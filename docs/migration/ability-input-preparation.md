@@ -1,6 +1,6 @@
 # Ability input preparation and pre-execution filters
 
-Ability-backed tools and prompts now prepare and validate input before calling the ability's permission callback. The adapter uses `WP_Ability::prepare_input()` when available; on older Core versions it calls `normalize_input()` and `validate_input()` before `check_permissions()`.
+Since version 0.7.2, ability-backed tools and prompts prepare and validate input before calling the ability's permission callback. The adapter uses `WP_Ability::prepare_input()` when available; on older Core versions it calls `normalize_input()` and `validate_input()` before `check_permissions()`.
 
 The existing adapter filter order is unchanged:
 

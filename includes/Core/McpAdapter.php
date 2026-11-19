@@ -28,7 +28,7 @@ defined( 'ABSPATH' ) || exit;
  */
 final class McpAdapter {
 
-	public const VERSION = '0.7.1';
+	public const VERSION = '0.7.2';
 
 	/**
 	 * Directory of this copy of the class.
