@@ -2,10 +2,20 @@
 
 All notable changes to this project will be documented in this file, per [the Keep a Changelog standard](http://keepachangelog.com/), and will adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.7.2] - 2026-11-19
 
 ### Changed
-- Ability-backed permission checks now prepare and validate input before the adapter pre-execution filters run. Integrations that supply required input or repair invalid input only in `mcp_adapter_pre_tool_call` or `mcp_adapter_pre_prompt_get` must migrate that preparation earlier. See the [compatibility and migration notes](docs/migration/ability-input-preparation.md), including the WordPress 7.1+ normalization-hook example.
+- Ability-backed permission checks now prepare and validate input before the adapter pre-execution filters run. Integrations that supply required input or repair invalid input only in `mcp_adapter_pre_tool_call` or `mcp_adapter_pre_prompt_get` must migrate that preparation earlier. See the [compatibility and migration notes](docs/migration/ability-input-preparation.md), including the WordPress 7.1+ normalization-hook example ([#438](https://github.com/WordPress/mcp-adapter/issues/438), [#444](https://github.com/WordPress/mcp-adapter/pull/444)).
+- Jetpack Autoloader, which ships in the plugin ZIP, is updated from 6.0.1 to 6.0.3 ([#422](https://github.com/WordPress/mcp-adapter/pull/422), [#450](https://github.com/WordPress/mcp-adapter/pull/450)).
+- The site-owner guide separates a 404 that returns a web page from a `rest_no_route` JSON error and gives the checks for each case. The WordPress.org FAQ on connecting a client links to the guide ([#379](https://github.com/WordPress/mcp-adapter/pull/379), [#415](https://github.com/WordPress/mcp-adapter/pull/415)).
+
+### Fixed
+- After `initialize`, an HTTP request without the `MCP-Protocol-Version` header is accepted for every session and served with the negotiated version. Since 0.7.0 such a request received HTTP 400 unless the session was negotiated under `2024-11-05`, so clients that do not send the header could not get past `notifications/initialized`. A header that is sent must still match the negotiated version, and `2026-07-28` requests still require the header ([#411](https://github.com/WordPress/mcp-adapter/issues/411), [#416](https://github.com/WordPress/mcp-adapter/pull/416)).
+- The examples in `wp help mcp-adapter serve` use the registered command name, `wp mcp-adapter serve`, instead of `wp mcp serve` ([#423](https://github.com/WordPress/mcp-adapter/pull/423)).
+
+### Developer
+- A `CODEOWNERS` file makes the maintainers team the default owner of every file ([#407](https://github.com/WordPress/mcp-adapter/pull/407)).
+- Updated development dependencies: PHPStan to 2.3.5 with its PHP stubs, `wp-phpunit` to 7.1.3, `@wordpress/env` to 12.1.0, `@wordpress/scripts` to 36.1.0, other npm lockfile packages, and the GitHub Actions used by the workflows.
 
 ## [0.7.1] - 2026-10-15
 

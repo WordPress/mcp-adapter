@@ -26,6 +26,7 @@ Documentation for the WordPress MCP Adapter - transform WordPress abilities into
 
 ## Migration guides
 
+- **[Ability input preparation (v0.7.2)](migration/ability-input-preparation.md)**
 - **[Migrating to v0.7.0](migration/v0.7.0.md)**
 - **[Migrating to v0.5.0](migration/v0.5.0.md)**
 - **[Migrating to v0.3.0](migration/v0.3.0.md)**
