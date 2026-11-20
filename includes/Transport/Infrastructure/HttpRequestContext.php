@@ -14,6 +14,12 @@ namespace WP\MCP\Transport\Infrastructure;
  */
 class HttpRequestContext {
 
+	/** HTTP POST method used to process MCP requests. */
+	public const METHOD_POST = 'POST';
+
+	/** HTTP DELETE method used to terminate legacy MCP sessions. */
+	public const METHOD_DELETE = 'DELETE';
+
 	/**
 	 * The original WordPress REST request object.
 	 *
@@ -77,7 +83,7 @@ class HttpRequestContext {
 		$this->session_id       = $request->get_header( 'Mcp-Session-Id' );
 		$this->protocol_version = $request->get_header( 'Mcp-Protocol-Version' );
 		$this->accept_header    = $request->get_header( 'accept' );
-		$this->raw_body         = 'POST' === $this->method ? ( $request->get_body() ?? '' ) : '';
+		$this->raw_body         = self::METHOD_POST === $this->method ? ( $request->get_body() ?? '' ) : '';
 		$this->headers          = $this->prepare_headers( $request->get_headers() );
 	}
 

@@ -112,12 +112,12 @@ final class McpWireOrchestrator {
 	 * @return string One of process, terminate-session, or reject.
 	 */
 	public function http_method_action( string $method, ?string $header_revision ): string {
-		if ( 'POST' === $method ) {
+		if ( HttpRequestContext::METHOD_POST === $method ) {
 			return 'process';
 		}
 
 		$is_2025 = null === $header_revision || McpVersionNegotiator::is_negotiable( $header_revision );
-		return $is_2025 && 'DELETE' === $method ? 'terminate-session' : 'reject';
+		return $is_2025 && HttpRequestContext::METHOD_DELETE === $method ? 'terminate-session' : 'reject';
 	}
 
 	/**
