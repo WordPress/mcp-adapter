@@ -261,6 +261,7 @@ final class DualRevisionProjectionTest extends TestCase {
 		$this->assertSame( Schemas::V2025_11_25, McpVersionNegotiator::schema_version_for( Schemas::V2025_11_25 ) );
 		$this->assertSame( Schemas::V2026_07_28, McpVersionNegotiator::schema_version_for( Schemas::V2026_07_28 ) );
 
+		$this->setExpectedDeprecated( McpVersionNegotiator::class . '::requires_protocol_version_header' );
 		$this->assertTrue( McpVersionNegotiator::requires_protocol_version_header( Schemas::V2025_11_25 ) );
 		$this->assertTrue( McpVersionNegotiator::requires_protocol_version_header( '2025-06-18' ) );
 		$this->assertFalse( McpVersionNegotiator::requires_protocol_version_header( '2024-11-05' ) );
