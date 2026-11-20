@@ -97,6 +97,24 @@ The STDIO transport uses JSON-RPC 2.0 protocol for communication:
 }
 ```
 
+### Cache freshness between messages
+
+The STDIO server keeps WordPress running for the entire connection. Before dispatching each valid JSON-RPC message, the bridge clears the process-local object cache so tool, resource, and prompt reads can observe changes made by other WordPress requests. This also happens before dispatch-time permission checks.
+
+With the default WordPress object cache, the bridge uses `wp_cache_flush()`. With an external object cache, it checks `wp_cache_supports( 'flush_runtime' )` and uses `wp_cache_flush_runtime()`. It never falls back to flushing shared persistent storage.
+
+If an external cache does not support runtime flushing, the bridge writes a warning to STDERR once per connection and continues serving. **Freshness is not guaranteed on that backend.** Use a backend supporting runtime flushing or provide equivalent request-boundary invalidation. If a supported cache operation explicitly fails or throws, the message is not dispatched: requests receive an internal error with their original ID, and notifications receive no response.
+
+Integrations managing their own cache freshness can disable the adapter's reset:
+
+```php
+add_filter( 'mcp_adapter_stdio_flush_runtime_cache', '__return_false' );
+```
+
+The filter defaults to `true` and should return a Boolean. Disabling it can reintroduce stale reads unless the integration provides its own invalidation. This behavior applies only to STDIO, not HTTP.
+
+Runtime invalidation does not reset arbitrary plugin static caches, rebuild existing WordPress objects, or make concurrent read-modify-write operations atomic.
+
 ## Integration Examples
 
 ### Using with MCP Clients
