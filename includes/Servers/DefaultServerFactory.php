@@ -73,11 +73,11 @@ class DefaultServerFactory {
 		 *     Default server configuration.
 		 *
 		 *     @type string   $server_id              Server identifier. Default 'mcp-adapter-default-server'.
-		 *     @type string   $server_route_namespace REST API namespace. Default 'mcp-adapter/v1'.
-		 *     @type string   $server_route           REST API route. Default 'mcp'.
-		 *     @type string   $server_name            Human-readable name. Default 'WordPress MCP Server'.
+		 *     @type string   $server_route_namespace REST API namespace. Default 'mcp'.
+		 *     @type string   $server_route           REST API route. Default 'mcp-adapter-default-server'.
+		 *     @type string   $server_name            Human-readable name. Default 'MCP Adapter Default Server'.
 		 *     @type string   $server_description     Server description.
-		 *     @type string   $server_version         Server version. Default WORDPRESS_MCP_ADAPTER_VERSION.
+		 *     @type string   $server_version         Server version. Default 'v1.0.0'.
 		 *     @type string[] $mcp_transports         Transport class names. Default [HttpTransport::class].
 		 *     @type string   $error_handler          Error handler class. Default ErrorLogMcpErrorHandler::class.
 		 *     @type string   $observability_handler  Observability handler class. Default NullMcpObservabilityHandler::class.
