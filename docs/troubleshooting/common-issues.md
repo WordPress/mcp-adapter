@@ -154,7 +154,7 @@ add_action( 'mcp_adapter_init', function ( $adapter ) {
 }, 20 );
 ```
 
-`get_servers()` returns `McpServer` objects keyed by server ID. The JSON from `json_encode()`, or from a REST response built with `rest_ensure_response()`, has no server ID, name, or version. Build a plain array from the getters instead, for example `get_server_id()`, `get_server_name()`, and `get_server_version()`.
+`get_servers()` returns `McpServer` objects keyed by server ID. The JSON from `json_encode()`, or from a REST response built with `rest_ensure_response()`, keeps the server IDs as keys but has no server name or version. Build a plain array from the getters instead, for example `get_server_id()`, `get_server_name()`, and `get_server_version()`.
 
 ### REST API Not Working
 ```bash
