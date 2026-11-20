@@ -57,6 +57,50 @@ final class ThrowingCompatibilityPromptBuilder extends McpPromptBuilder {
 /** Protects component behavior that remains independent of schema representation. */
 final class ComponentCompatibilityTest extends TestCase {
 
+	public function test_ability_backed_resource_with_object_input_schema_executes(): void {
+		$this->register_ability_in_hook(
+			'test/resource-object-schema',
+			array(
+				'label'               => 'Resource Object Schema',
+				'description'         => 'Ability-backed resource with an object input schema',
+				'category'            => 'test',
+				'input_schema'        => array( 'type' => 'object' ),
+				'execute_callback'    => static function ( $input ) {
+					return array() === $input ? 'object schema content' : 'unexpected input';
+				},
+				'permission_callback' => static function ( $input ) {
+					return array() === $input;
+				},
+				'meta'                => array(
+					'mcp' => array(
+						'public' => true,
+						'type'   => 'resource',
+						'uri'    => 'WordPress://local/resource-object-schema',
+					),
+				),
+			)
+		);
+
+		try {
+			$ability = wp_get_ability( 'test/resource-object-schema' );
+			$this->assertNotNull( $ability );
+
+			$mcp_resource = McpResource::fromAbility( $ability );
+			$this->assertNotWPError( $mcp_resource );
+
+			// The uri is protocol-level, so the ability must receive [], not null.
+			$permission = $mcp_resource->check_permission( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
+			$this->assertTrue( $permission );
+
+			$result = $mcp_resource->execute( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
+			$this->assertNotWPError( $result );
+			$this->assertSame( 'object schema content', $result );
+		} finally {
+			wp_unregister_ability( 'test/resource-object-schema' );
+		}
+	}
+
+
 	/** All converters reject malformed adapter metadata before indexing it. */
 	public function test_ability_mcp_meta_must_be_an_array(): void {
 		foreach ( array( new \stdClass(), 'bad', 42 ) as $meta ) {
