@@ -4,6 +4,17 @@ Common issues and quick solutions for the MCP Adapter.
 
 ## Quick Fixes
 
+### Check Site Health first
+
+Go to **Tools > Site Health > Info** and open the **MCP Adapter** section. It is read-only and shows:
+
+- the adapter version and whether the default server is enabled
+- each registered MCP server with its ID, full endpoint URL, transports, and number of tools, resources and prompts
+- the abilities the default server exposes, and how many registered abilities it does not expose and why (not marked public, `mcp.public` set to `false`, or invalid `mcp` metadata)
+- whether Application Passwords are available, and if not, whether the site lacks HTTPS or a filter turned them off
+
+Use the endpoint URL shown there when you configure a client. It already accounts for subdirectory installs and plain permalinks. **Copy site info to clipboard** includes this section, so you can paste it into a support request or a GitHub issue.
+
 ### REST API 404 Errors
 ```bash
 # Check WordPress REST API works
