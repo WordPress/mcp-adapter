@@ -15,6 +15,7 @@ use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
+use WP\MCP\Handlers\Tools\ToolCallConfirmation;
 use WP_Error;
 
 /**
@@ -102,7 +103,7 @@ class RegisterAbilityAsMcpTool {
 			'name'        => $tool_name,
 			'description' => $this->ability->get_description(),
 			// Retain the empty properties object historically supplied by the schema DTO.
-			'inputSchema' => $input_transform['schema'] + array( 'properties' => new \stdClass() ),
+			'inputSchema' => $this->with_confirmation_token( $input_transform['schema'] ) + array( 'properties' => new \stdClass() ),
 			'title'       => $label,
 		);
 
@@ -165,6 +166,38 @@ class RegisterAbilityAsMcpTool {
 			'tool_data'    => $tool_data,
 			'adapter_meta' => $adapter_meta,
 		);
+	}
+
+	/**
+	 * Publish the confirmation token argument on a closed schema of a destructive Ability.
+	 *
+	 * ToolCallConfirmation asks for it at the top level of the arguments and removes it
+	 * before the Ability runs. A schema with `additionalProperties: false` would make that
+	 * argument invalid for clients that check arguments against the published schema, so
+	 * the tool's schema names it as optional. The Ability's own schema is unchanged.
+	 *
+	 * @param array<string, mixed> $schema Transformed input schema.
+	 *
+	 * @return array<string, mixed>
+	 * @since n.e.x.t
+	 */
+	private function with_confirmation_token( array $schema ): array {
+		$annotations = $this->ability->get_meta()['annotations'] ?? null;
+		$destructive = is_array( $annotations ) && true === ( $annotations['destructive'] ?? null ) && true !== ( $annotations['readonly'] ?? null );
+		if ( ! $destructive || false !== ( $schema['additionalProperties'] ?? null ) ) {
+			return $schema;
+		}
+
+		$properties = is_array( $schema['properties'] ?? null ) ? $schema['properties'] : array();
+
+		$properties[ ToolCallConfirmation::TOKEN_ARGUMENT ] = array(
+			'type'        => 'string',
+			'description' => 'Only after this tool asked for a confirmation: the token it gave, sent back once the person said yes. The Ability never receives it.',
+		);
+
+		$schema['properties'] = $properties;
+
+		return $schema;
 	}
 
 	/**

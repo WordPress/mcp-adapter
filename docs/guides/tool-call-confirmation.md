@@ -40,6 +40,8 @@ The Adapter picks the strongest channel the client supports:
 | MCP `2026-07-28` with form elicitation | The call returns `input_required` with one form question (`mcp_adapter_confirmation`, a required boolean `confirm`). The client asks the person and retries with the answer. The model never sees the confirmation. |
 | Every other client | The call returns a tool execution error that says what would change and gives a token. The agent asks in the conversation and, after a yes, sends the same call again with `"_mcp_confirmation_token": "<token>"` at the top level of the arguments. The Adapter removes that argument before the Ability sees it. |
 
+When a destructive Ability's input schema sets `additionalProperties: false`, its tool's published schema lists `_mcp_confirmation_token` as an optional string, so clients that check arguments against the schema can send it back. The Ability's own schema does not change. Other schemas already accept it, including `mcp-adapter-execute-ability`'s.
+
 A conversation token shows that the agent was told to ask, not that a person answered. A site that needs more can turn the conversation channel off. Clients without elicitation then get a plain refusal; clients with form or URL elicitation are still asked:
 
 ```php

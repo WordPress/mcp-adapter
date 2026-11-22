@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Integration;
 
+use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Handlers\Tools\ToolCallConfirmation;
 use WP\McpSchema\Schemas;
 
@@ -421,6 +422,23 @@ final class ToolCallConfirmationTest extends ToolCallConfirmationTestCase {
 		// Without either, the call runs as today.
 		$this->assertFalse( $this->call_ability( 'test/confirm-delete', array( 'id' => 7 ) )['isError'] );
 		$this->assertSame( 1, self::runs() );
+	}
+
+	/** Tools that may ask publish the token argument, so clients that validate arguments can send it. */
+	public function test_published_schema_accepts_the_token(): void {
+		$published = static function ( string $ability ): array {
+			$tool = McpTool::fromAbility( wp_get_ability( $ability ) );
+			return json_decode( (string) wp_json_encode( $tool->get_protocol_record( Schemas::create()->forVersion( Schemas::V2025_11_25 ) ) ), true )['inputSchema'];
+		};
+
+		$schema = $published( 'test/confirm-delete' );
+		$this->assertFalse( $schema['additionalProperties'] );
+		$this->assertSame( 'string', $schema['properties'][ ToolCallConfirmation::TOKEN_ARGUMENT ]['type'] );
+		$this->assertSame( array( 'id' ), $schema['required'] );
+
+		// The Ability's own schema never sees it, and tools that cannot ask stay as they were.
+		$this->assertArrayNotHasKey( ToolCallConfirmation::TOKEN_ARGUMENT, wp_get_ability( 'test/confirm-delete' )->get_input_schema()['properties'] );
+		$this->assertArrayNotHasKey( ToolCallConfirmation::TOKEN_ARGUMENT, $published( 'test/confirm-read' )['properties'] );
 	}
 
 	/** Other continuations on Ability-backed tools are still rejected. */
