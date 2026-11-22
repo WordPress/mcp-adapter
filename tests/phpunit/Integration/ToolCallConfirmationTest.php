@@ -468,6 +468,63 @@ final class ToolCallConfirmationTest extends ToolCallConfirmationTestCase {
 		$this->assertSame( $direct, $this->call( $server, $this->tool( 'test/confirm-activate' )->get_name(), array( 'plugin' => 'hello' ) )['result'] );
 	}
 
+	/** A request that lost the race sees the winner's result even after its first poll missed it. */
+	public function test_losing_request_sees_a_result_stored_after_its_first_poll(): void {
+		global $wpdb;
+		if ( wp_using_ext_object_cache() ) {
+			$this->markTestSkipped( 'Polls read a shared object cache.' );
+		}
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		add_filter(
+			'mcp_adapter_tool_call_confirmation_replay_wait',
+			static function (): int {
+				return 2;
+			}
+		);
+		$token   = $this->token_from( $this->call_ability( 'test/confirm-delete', array( 'id' => 7 ) ) );
+		$binding = get_transient( 'mcp_adapter_confirm_' . $token )['binding'];
+		$stored  = array(
+			'content'           => array(
+				array(
+					'type' => 'text',
+					'text' => 'done elsewhere',
+				),
+			),
+			'structuredContent' => array( 'deleted' => 7 ),
+			'isError'           => false,
+		);
+
+		// Another request uses the confirmation first: this one cannot delete it.
+		add_action(
+			'delete_transient_mcp_adapter_confirm_' . $token,
+			static function () use ( $wpdb, $token ): void {
+				$wpdb->delete( $wpdb->options, array( 'option_name' => '_transient_mcp_adapter_confirm_' . $token ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			}
+		);
+		// The winner stores its result in its own process after this request's first poll.
+		$polls = 0;
+		add_filter(
+			'pre_transient_mcp_adapter_confirm_used_' . $token,
+			static function ( $pre ) use ( &$polls, $wpdb, $token, $binding, $stored ) {
+				if ( 2 === ++$polls ) {
+					$used = array(
+						'binding' => $binding,
+						'status'  => 'done',
+						'result'  => $stored,
+						'expires' => time() + 60,
+					);
+					$wpdb->insert( $wpdb->options, array( 'option_name' => '_transient_timeout_mcp_adapter_confirm_used_' . $token, 'option_value' => (string) ( time() + 60 ), 'autoload' => 'off' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+					$wpdb->insert( $wpdb->options, array( 'option_name' => '_transient_mcp_adapter_confirm_used_' . $token, 'option_value' => maybe_serialize( $used ), 'autoload' => 'off' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+				}
+				return $pre;
+			}
+		);
+
+		$result = $this->call_ability( 'test/confirm-delete', array( 'id' => 7, ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+		$this->assertSame( $stored, $result );
+		$this->assertSame( 0, self::runs() );
+	}
+
 	/** Other continuations on Ability-backed tools are still rejected. */
 	public function test_foreign_continuation_is_still_rejected(): void {
 		$response = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), array( 'requestState' => 'someone-else' ) );

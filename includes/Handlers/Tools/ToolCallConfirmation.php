@@ -765,10 +765,7 @@ final class ToolCallConfirmation {
 
 		while ( true ) {
 			$key = self::USED_PREFIX . $used_id;
-			if ( ! wp_using_ext_object_cache() ) {
-				// Read the row again instead of this request's cached copy.
-				wp_cache_delete( '_transient_' . $key, 'options' );
-			}
+			self::forget_cached_transient( $key );
 			$used = get_transient( $key );
 
 			if ( is_array( $used ) ) {
@@ -800,6 +797,33 @@ final class ToolCallConfirmation {
 			}
 			usleep( 250000 );
 		}
+	}
+
+	/**
+	 * Make the next get_transient() read the database row, not this request's cache.
+	 *
+	 * Without a persistent object cache, another request's write never reaches this
+	 * request's cache, and a read that missed is remembered in `notoptions`. Both the
+	 * cached value and that miss are dropped, for the value and its timeout. A persistent
+	 * object cache is shared, so it already holds the other request's write.
+	 *
+	 * @param string $key Transient key.
+	 */
+	private static function forget_cached_transient( string $key ): void {
+		if ( wp_using_ext_object_cache() ) {
+			return;
+		}
+
+		$options = array( '_transient_' . $key, '_transient_timeout_' . $key );
+		foreach ( $options as $option ) {
+			wp_cache_delete( $option, 'options' );
+		}
+
+		$notoptions = wp_cache_get( 'notoptions', 'options' );
+		if ( ! is_array( $notoptions ) || array() === array_intersect_key( $notoptions, array_flip( $options ) ) ) {
+			return;
+		}
+		wp_cache_set( 'notoptions', array_diff_key( $notoptions, array_flip( $options ) ), 'options' );
 	}
 
 	/**
