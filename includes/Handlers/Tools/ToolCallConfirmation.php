@@ -85,9 +85,11 @@ final class ToolCallConfirmation {
 	private const STATE_PREFIX = 'mcp-adapter-confirmation.';
 
 	/**
-	 * Transient key prefixes: pending confirmations, used ones with their result, follow-up grants.
+	 * Transient key prefixes: pending confirmations, answers from the approval page, used
+	 * confirmations with their result, follow-up grants.
 	 */
 	private const PENDING_PREFIX = 'mcp_adapter_confirm_';
+	private const ANSWER_PREFIX  = 'mcp_adapter_confirm_answer_';
 	private const USED_PREFIX    = 'mcp_adapter_confirm_used_';
 	private const FOLLOW_PREFIX  = 'mcp_adapter_confirm_follow_';
 
@@ -245,12 +247,16 @@ final class ToolCallConfirmation {
 			'summary'      => (string) $record['summary'],
 			'expires'      => (int) $record['expires'],
 			'requested_by' => (int) $record['binding']['user'],
-			'answered'     => ! empty( $record['approved_by'] ) || ! empty( $record['declined'] ),
+			'answered'     => null !== self::load_answer( $id ),
 		);
 	}
 
 	/**
 	 * Record the approver's answer from the approval page.
+	 *
+	 * The answer is kept in a record of its own and the pending confirmation is never
+	 * written again, so an answer that read the request before a continuation used it
+	 * cannot bring the used confirmation back.
 	 *
 	 * @param string $id      Confirmation identifier from the approval link.
 	 * @param int    $user_id The user answering.
@@ -267,22 +273,35 @@ final class ToolCallConfirmation {
 			return new WP_Error( 'mcp_adapter_confirmation_answered', __( 'This request was already answered.', 'mcp-adapter' ), array( 'status' => 409 ) );
 		}
 
-		$record = self::load( self::PENDING_PREFIX . $id );
-		if ( null === $record ) {
-			return self::link_expired();
-		}
-		if ( $approve ) {
-			$record['approved_by'] = $user_id;
-		} else {
-			$record['declined'] = true;
-		}
-		$record['answered_at'] = time();
-
-		if ( ! self::store_until( self::PENDING_PREFIX . $id, $record, (int) $record['expires'] ) ) {
+		$answer = array(
+			'approved_by' => $approve ? $user_id : 0,
+			'declined'    => ! $approve,
+			'answered_at' => time(),
+		);
+		if ( ! self::store_until( self::ANSWER_PREFIX . $id, $answer, $request['expires'] ) ) {
 			return self::link_expired();
 		}
 
 		return true;
+	}
+
+	/**
+	 * The approval page's answer to a pending confirmation, or null when there is none yet.
+	 *
+	 * @param string $id Confirmation identifier.
+	 *
+	 * @return array{approved_by: int, declined: bool}|null
+	 */
+	private static function load_answer( string $id ): ?array {
+		$answer = get_transient( self::ANSWER_PREFIX . $id );
+		if ( ! is_array( $answer ) ) {
+			return null;
+		}
+
+		return array(
+			'approved_by' => (int) ( $answer['approved_by'] ?? 0 ),
+			'declined'    => true === ( $answer['declined'] ?? false ),
+		);
 	}
 
 	/**
@@ -557,10 +576,12 @@ final class ToolCallConfirmation {
 		if ( self::CHANNEL_URL === $record['channel'] ) {
 			// In URL mode "accept" only means the person agreed to open the page.
 			// The page records the real answer.
-			if ( ! empty( $record['declined'] ) || in_array( $action, array( 'decline', 'cancel' ), true ) ) {
+			$page_answer = self::load_answer( $id );
+			if ( ( null !== $page_answer && $page_answer['declined'] ) || in_array( $action, array( 'decline', 'cancel' ), true ) ) {
 				return self::declined( $id );
 			}
-			if ( (int) $record['approved_by'] > 0 ) {
+			if ( null !== $page_answer && $page_answer['approved_by'] > 0 ) {
+				$record['approved_by'] = $page_answer['approved_by'];
 				return self::consume( self::PENDING_PREFIX . $id, $id, $record, $tool_name, $server );
 			}
 
@@ -627,6 +648,7 @@ final class ToolCallConfirmation {
 			// Another request used it first: wait for its result.
 			return self::replay( $used_id, $record['binding'], true );
 		}
+		delete_transient( self::ANSWER_PREFIX . $used_id );
 
 		self::store_until(
 			self::USED_PREFIX . $used_id,
@@ -883,6 +905,7 @@ final class ToolCallConfirmation {
 	 */
 	private static function declined( string $id ): WP_Error {
 		delete_transient( self::PENDING_PREFIX . $id );
+		delete_transient( self::ANSWER_PREFIX . $id );
 
 		return new WP_Error( 'mcp_adapter_confirmation_declined', __( 'The person did not confirm this change, so nothing ran. Do not try it again unless they ask.', 'mcp-adapter' ) );
 	}

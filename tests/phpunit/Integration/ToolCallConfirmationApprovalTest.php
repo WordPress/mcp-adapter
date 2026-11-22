@@ -77,6 +77,42 @@ final class ToolCallConfirmationApprovalTest extends ToolCallConfirmationTestCas
 		$this->assertSame( 0, self::stored_rows_containing( 'quokka' ) );
 	}
 
+	/** An answer that read the request before it was used cannot bring it back, so the call runs once. */
+	public function test_stale_answer_cannot_restore_a_used_request(): void {
+		$parent = $this->make_agent_with_parent();
+		$asked  = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), array(), array( 'url' ) )['result'];
+		$id     = self::id_from_state( $asked['requestState'] );
+		$retry  = array(
+			'requestState'   => $asked['requestState'],
+			'inputResponses' => array( ToolCallConfirmation::INPUT_KEY => array( 'action' => 'accept' ) ),
+		);
+
+		// A second approval POST has read the unanswered request. Just before it saves its
+		// answer, the first approval is saved and the client's continuation uses it.
+		$overlapped = false;
+		$overlap    = function ( $value ) use ( &$overlapped, $id, $parent, $retry ) {
+			if ( ! $overlapped ) {
+				$overlapped = true;
+				$this->assertTrue( ToolCallConfirmation::answer( $id, $parent, true ) );
+				$this->assertSame( 'complete', $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), $retry, array( 'url' ) )['result']['resultType'] );
+				$this->assertSame( 1, self::runs() );
+			}
+			return $value;
+		};
+		// Wherever the answer is saved: the request itself, or a record of its own.
+		add_filter( 'pre_set_transient_mcp_adapter_confirm_' . $id, $overlap );
+		add_filter( 'pre_set_transient_mcp_adapter_confirm_answer_' . $id, $overlap );
+
+		ToolCallConfirmation::answer( $id, $parent, true );
+		$this->assertTrue( $overlapped );
+		$this->assertSame( 1, self::runs() );
+		$this->assertFalse( get_transient( 'mcp_adapter_confirm_' . $id ), 'The used request must stay gone.' );
+
+		$again = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), $retry, array( 'url' ) )['result'];
+		$this->assertSame( 1, self::runs() );
+		$this->assertFalse( $again['isError'] ?? false, (string) wp_json_encode( $again ) );
+	}
+
 	/** Nobody but the approver can see or answer the request: not another user, not the agent. */
 	public function test_only_the_approver_can_answer(): void {
 		$parent = $this->make_agent_with_parent();

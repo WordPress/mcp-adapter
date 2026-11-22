@@ -78,6 +78,7 @@ The person has to see what will change, so the default question shows the Abilit
 | Record | Holds | Until |
 | --- | --- | --- |
 | Pending confirmation | The binding (input as a SHA-256 hash), the question text, the approver | Used, declined or expired, then deleted |
+| Approval page answer | Who approved or declined, and when | Used, declined or the confirmation's expiry |
 | Stored result | The binding and the call's response | The confirmation's expiry |
 | Follow-up grant | The binding and the follow-up's declared sentence | Used or the confirmation's expiry |
 
