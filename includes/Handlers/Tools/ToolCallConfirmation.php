@@ -166,14 +166,17 @@ final class ToolCallConfirmation {
 		}
 		[ $ability, $input ] = $target;
 
-		if ( ! self::is_required( $ability, $input, $tool_name, $server ) ) {
+		// A token or request state is checked whatever the policy says now, so a retry of a
+		// call that already ran is replayed, and one this server never issued is refused.
+		$state      = $context->request_state();
+		$continuing = self::is_confirmation_state( $state );
+		if ( ! $continuing && null === $token && ! self::is_required( $ability, $input, $tool_name, $server ) ) {
 			return null;
 		}
 
 		$binding = self::binding( $server->get_server_id(), $tool_name, $ability->get_name(), $input );
 
-		$state = $context->request_state();
-		if ( self::is_confirmation_state( $state ) ) {
+		if ( $continuing ) {
 			return self::continue_question( substr( (string) $state, strlen( self::STATE_PREFIX ) ), $binding, $context, $tool_name, $server );
 		}
 

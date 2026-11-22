@@ -394,6 +394,35 @@ final class ToolCallConfirmationTest extends ToolCallConfirmationTestCase {
 		$this->assertSame( array( 'Activate the plugin world', 'ability', $token ), array( $events[3]['summary'], $events[3]['summary_source'], $events[3]['follow_up_of'] ) );
 	}
 
+	/** A retry is answered from the stored result even when the policy no longer asks. */
+	public function test_retry_replays_after_the_policy_changes(): void {
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$token     = $this->token_from( $this->call_ability( 'test/confirm-delete', array( 'id' => 7 ) ) );
+		$arguments = array( 'id' => 7, ToolCallConfirmation::TOKEN_ARGUMENT => $token );
+		$first     = $this->call_ability( 'test/confirm-delete', $arguments );
+		$this->assertFalse( $first['isError'] );
+
+		remove_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$this->assertSame( $first, $this->call_ability( 'test/confirm-delete', $arguments ) );
+		$this->assertSame( 1, self::runs() );
+	}
+
+	/** A token or request state this server never issued is refused, even for a call that needs no confirmation. */
+	public function test_unissued_confirmation_is_refused_when_none_is_needed(): void {
+		$state = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), array( 'requestState' => 'mcp-adapter-confirmation.' . str_repeat( 'a', 32 ) ) )['result'];
+		$this->assertTrue( $state['isError'], (string) wp_json_encode( $state ) );
+		$this->assertStringContainsString( 'unknown or expired', $state['content'][0]['text'] );
+
+		$token = $this->call_ability( 'test/confirm-delete', array( 'id' => 7, ToolCallConfirmation::TOKEN_ARGUMENT => str_repeat( 'b', 32 ) ) );
+		$this->assertTrue( $token['isError'], (string) wp_json_encode( $token ) );
+		$this->assertStringContainsString( 'unknown or expired', $token['content'][0]['text'] );
+		$this->assertSame( 0, self::runs() );
+
+		// Without either, the call runs as today.
+		$this->assertFalse( $this->call_ability( 'test/confirm-delete', array( 'id' => 7 ) )['isError'] );
+		$this->assertSame( 1, self::runs() );
+	}
+
 	/** Other continuations on Ability-backed tools are still rejected. */
 	public function test_foreign_continuation_is_still_rejected(): void {
 		$response = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), array( 'requestState' => 'someone-else' ) );
