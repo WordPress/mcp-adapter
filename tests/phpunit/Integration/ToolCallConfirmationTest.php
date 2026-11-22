@@ -441,6 +441,33 @@ final class ToolCallConfirmationTest extends ToolCallConfirmationTestCase {
 		$this->assertArrayNotHasKey( ToolCallConfirmation::TOKEN_ARGUMENT, $published( 'test/confirm-read' )['properties'] );
 	}
 
+	/** A follow-up that ran through one tool is never replayed in another tool's response shape, or run again. */
+	public function test_follow_up_retry_through_another_tool_does_not_replay_the_wrong_shape(): void {
+		add_filter( 'mcp_adapter_tool_call_requires_confirmation', '__return_true' );
+		$token = $this->token_from( $this->call_ability( 'test/confirm-install', array( 'plugin' => 'hello' ) ) );
+		$this->call_ability( 'test/confirm-install', array( 'plugin' => 'hello', ToolCallConfirmation::TOKEN_ARGUMENT => $token ) );
+
+		$direct = $this->call_ability( 'test/confirm-activate', array( 'plugin' => 'hello' ) );
+		$this->assertFalse( $direct['isError'], (string) wp_json_encode( $direct ) );
+		$this->assertSame( 1, self::runs( 'test/confirm-activate' ) );
+
+		$server  = $this->makeServer( array( $this->tool( 'test/confirm-activate' ), 'mcp-adapter/execute-ability' ) );
+		$wrapped = $this->call(
+			$server,
+			'mcp-adapter-execute-ability',
+			array(
+				'ability_name' => 'test/confirm-activate',
+				'parameters'   => array( 'plugin' => 'hello' ),
+			)
+		)['result'];
+		$this->assertTrue( $wrapped['isError'], (string) wp_json_encode( $wrapped ) );
+		$this->assertStringContainsString( 'another tool', $wrapped['content'][0]['text'] );
+		$this->assertSame( 1, self::runs( 'test/confirm-activate' ) );
+
+		// The tool it ran through still gets its own result back.
+		$this->assertSame( $direct, $this->call( $server, $this->tool( 'test/confirm-activate' )->get_name(), array( 'plugin' => 'hello' ) )['result'] );
+	}
+
 	/** Other continuations on Ability-backed tools are still rejected. */
 	public function test_foreign_continuation_is_still_rejected(): void {
 		$response = $this->call_modern( 'test/confirm-delete', array( 'id' => 7 ), array( 'requestState' => 'someone-else' ) );

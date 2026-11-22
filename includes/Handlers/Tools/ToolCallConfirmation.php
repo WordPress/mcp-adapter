@@ -534,7 +534,7 @@ final class ToolCallConfirmation {
 
 		$record = self::load( self::PENDING_PREFIX . $token );
 		if ( null === $record ) {
-			return self::replay( $token, $binding, false );
+			return self::replay( $token, $binding, $tool_name, false );
 		}
 		if ( self::CHANNEL_CHAT !== $record['channel'] ) {
 			return self::unknown();
@@ -560,7 +560,7 @@ final class ToolCallConfirmation {
 	private static function continue_question( string $id, array $binding, McpToolCallContext $context, string $tool_name, McpServer $server ) {
 		$record = self::load( self::PENDING_PREFIX . $id );
 		if ( null === $record ) {
-			return self::replay( $id, $binding, false );
+			return self::replay( $id, $binding, $tool_name, false );
 		}
 		if ( ! in_array( $record['channel'], array( self::CHANNEL_FORM, self::CHANNEL_URL ), true ) ) {
 			return self::unknown();
@@ -626,7 +626,7 @@ final class ToolCallConfirmation {
 		// A retry of a follow-up that already ran gets its result back.
 		$used = get_transient( self::USED_PREFIX . 'f' . $key );
 		if ( is_array( $used ) && ( $used['binding'] ?? null ) === $target ) {
-			return self::replay( 'f' . $key, $target, false );
+			return self::replay( 'f' . $key, $target, $tool_name, false );
 		}
 
 		return null;
@@ -646,7 +646,7 @@ final class ToolCallConfirmation {
 	private static function consume( string $pending_key, string $used_id, array $record, string $tool_name, McpServer $server ) {
 		if ( ! delete_transient( $pending_key ) ) {
 			// Another request used it first: wait for its result.
-			return self::replay( $used_id, $record['binding'], true );
+			return self::replay( $used_id, $record['binding'], $tool_name, true );
 		}
 		delete_transient( self::ANSWER_PREFIX . $used_id );
 
@@ -654,6 +654,8 @@ final class ToolCallConfirmation {
 			self::USED_PREFIX . $used_id,
 			array(
 				'binding' => $record['binding'],
+				// A follow-up's binding leaves the tool out; its stored response is in this tool's shape.
+				'tool'    => $tool_name,
 				'status'  => 'running',
 				'expires' => (int) $record['expires'],
 			),
@@ -744,11 +746,12 @@ final class ToolCallConfirmation {
 	 *
 	 * @param string               $used_id          Key of the used-confirmation record.
 	 * @param array<string, mixed> $binding          What this call is.
+	 * @param string               $tool_name        MCP tool name receiving the retry.
 	 * @param bool                 $wait_for_missing Whether a missing record may still appear (lost a race).
 	 *
 	 * @return \WP_Error|array<string, mixed>
 	 */
-	private static function replay( string $used_id, array $binding, bool $wait_for_missing ) {
+	private static function replay( string $used_id, array $binding, string $tool_name, bool $wait_for_missing ) {
 		/**
 		 * Filters how long a retry waits for a confirmed call that is still running, in seconds.
 		 *
@@ -771,6 +774,10 @@ final class ToolCallConfirmation {
 			if ( is_array( $used ) ) {
 				if ( ( $used['binding'] ?? null ) !== $binding ) {
 					return self::mismatch();
+				}
+				if ( isset( $used['tool'] ) && $used['tool'] !== $tool_name ) {
+					// Each tool shapes its response; never hand one tool's response to another.
+					return new WP_Error( 'mcp_adapter_confirmation_ran_elsewhere', __( 'This confirmed call already ran once through another tool. Nothing ran a second time. Check the site for the outcome.', 'mcp-adapter' ) );
 				}
 				$status = $used['status'] ?? '';
 				if ( 'done' === $status && is_array( $used['result'] ?? null ) ) {

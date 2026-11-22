@@ -88,7 +88,7 @@ Nothing that outlives the confirmation or is passed to a hook carries the input 
 
 ## One yes for the obvious next step
 
-A confirmation can cover a short list of follow-up calls, for example installing a plugin covering activating that same plugin. Each follow-up names one Ability, its exact input and the sentence the person sees. The question always lists them under "The same yes also covers:", and a covered call runs once, for the same user and site, without a second question. Any other Ability, or the same Ability with a different input, is asked as usual. At most three follow-ups are kept, and they expire with the confirmation.
+A confirmation can cover a short list of follow-up calls, for example installing a plugin covering activating that same plugin. Each follow-up names one Ability, its exact input and the sentence the person sees. The question always lists them under "The same yes also covers:", and a covered call runs once, for the same user and site, without a second question. Any other Ability, or the same Ability with a different input, is asked as usual. At most three follow-ups are kept, and they expire with the confirmation. A follow-up is covered whichever tool on the server reaches it, but it still runs once: a retry through the tool it ran through gets the stored response, and a retry through another tool is told that it already ran.
 
 An Ability can declare them with a callback in its MCP metadata:
 
