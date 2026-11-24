@@ -33,7 +33,7 @@
 	"devDependencies": {
 		"@wordpress/env": "^12.1.0",
 		"@wordpress/scripts": "^36.1.0",
-		"@wordpress/prettier-config": "^4.55.0"
+		"@wordpress/prettier-config": "^5.0.0"
 	},
 	"overrides": {
 		"@babel/runtime@<=7.26.10": ">=7.26.10",
