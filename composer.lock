@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a15fa0ca38316ba26bc369d68408cc04",
+    "content-hash": "608de992e760797f91d6ab2b8d4352b2",
     "packages": [
         {
             "name": "automattic/jetpack-autoloader",
@@ -761,16 +761,16 @@
         },
         {
             "name": "phpcompatibility/phpcompatibility-paragonie",
-            "version": "2.0.0-alpha2",
+            "version": "2.0.0-alpha3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCompatibility/PHPCompatibilityParagonie.git",
-                "reference": "7a979711c87d8202b52f56c56bd719d09d8ed7f5"
+                "reference": "aa2baa7027d2491732420d0cffc12a749e89e97c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCompatibility/PHPCompatibilityParagonie/zipball/7a979711c87d8202b52f56c56bd719d09d8ed7f5",
-                "reference": "7a979711c87d8202b52f56c56bd719d09d8ed7f5",
+                "url": "https://api.github.com/repos/PHPCompatibility/PHPCompatibilityParagonie/zipball/aa2baa7027d2491732420d0cffc12a749e89e97c",
+                "reference": "aa2baa7027d2491732420d0cffc12a749e89e97c",
                 "shasum": ""
             },
             "require": {
@@ -828,20 +828,20 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2025-11-29T13:09:49+00:00"
+            "time": "2026-11-17T20:00:34+00:00"
         },
         {
             "name": "phpcompatibility/phpcompatibility-wp",
-            "version": "3.0.0-alpha2",
+            "version": "3.0.0-alpha3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPCompatibility/PHPCompatibilityWP.git",
-                "reference": "bd53f24e7528422ac51d64dc8d53e8d4c4a877b3"
+                "reference": "b475f1d61eb600b72e93f640d1265639c8fc3610"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPCompatibility/PHPCompatibilityWP/zipball/bd53f24e7528422ac51d64dc8d53e8d4c4a877b3",
-                "reference": "bd53f24e7528422ac51d64dc8d53e8d4c4a877b3",
+                "url": "https://api.github.com/repos/PHPCompatibility/PHPCompatibilityWP/zipball/b475f1d61eb600b72e93f640d1265639c8fc3610",
+                "reference": "b475f1d61eb600b72e93f640d1265639c8fc3610",
                 "shasum": ""
             },
             "require": {
@@ -895,7 +895,7 @@
                     "type": "thanks_dev"
                 }
             ],
-            "time": "2025-12-16T13:35:20+00:00"
+            "time": "2026-11-17T21:25:26+00:00"
         },
         {
             "name": "phpcsstandards/phpcsextra",
