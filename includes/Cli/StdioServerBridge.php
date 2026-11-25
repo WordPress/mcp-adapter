@@ -147,6 +147,10 @@ final class StdioServerBridge {
 			return $this->encode_response( McpErrorFactory::parse_error( null, $throwable->getMessage() ) );
 		}
 
+		// Clear the process-local runtime object cache so long-lived STDIO sessions
+		// read fresh database state updated by other processes (HTTP, cron, WP-CLI).
+		wp_cache_flush_runtime();
+
 		$processed = $this->orchestrator->process( $message, 'STDIO', array(), $this->client_params_2025_11_25 );
 		if ( $processed['notification'] ) {
 			return '';
