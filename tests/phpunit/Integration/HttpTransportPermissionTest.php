@@ -74,9 +74,47 @@ final class HttpTransportPermissionTest extends TestCase {
 		$this->assertTrue( $transport->check_permission( $request ) );
 
 		wp_set_current_user( 0 );
-		$this->assertFalse( $transport->check_permission( $request ) );
+		$result = $transport->check_permission( $request );
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'authentication_required', $result->get_error_code() );
+		$this->assertSame( array( 'status' => 401 ), $result->get_error_data() );
+		$this->assertStringContainsString( 'not signed in as a WordPress user', $result->get_error_message() );
 		$this->assertCount( 1, DummyErrorHandler::$logs );
 		$this->assertStringContainsString( 'does not have capability "read"', DummyErrorHandler::$logs[0]['message'] );
+	}
+
+	/**
+	 * A signed-in user without the capability gets a 403 that names it.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/398
+	 */
+	public function test_default_permission_names_missing_capability(): void {
+		$transport = $this->make_transport();
+		add_filter( 'mcp_adapter_default_transport_permission_user_capability', static fn(): string => 'manage_options' );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+
+		$result = $transport->check_permission( new WP_REST_Request( 'POST', '/mcp' ) );
+
+		$this->assertInstanceOf( WP_Error::class, $result );
+		$this->assertSame( 'insufficient_capability', $result->get_error_code() );
+		$this->assertSame( array( 'status' => 403 ), $result->get_error_data() );
+		$this->assertStringContainsString( '"manage_options"', $result->get_error_message() );
+	}
+
+	/**
+	 * The REST server returns the specific message instead of rest_forbidden.
+	 *
+	 * @see https://github.com/WordPress/mcp-adapter/issues/398
+	 */
+	public function test_refused_rest_request_explains_the_refusal(): void {
+		$this->make_transport();
+		do_action( 'rest_api_init' );
+		wp_set_current_user( 0 );
+
+		$response = rest_get_server()->dispatch( new WP_REST_Request( 'POST', '/mcp/v1/mcp' ) );
+
+		$this->assertSame( 401, $response->get_status() );
+		$this->assertSame( 'authentication_required', $response->get_data()['code'] );
 	}
 
 	/** The capability filter is honored and invalid values fall back to read. */
