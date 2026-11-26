@@ -28,6 +28,19 @@ namespace WP\MCP;
 // Exit if accessed directly.
 defined( 'ABSPATH' ) || exit();
 
+// Another copy's entry point may already have declared the loader, when a plugin that loads first
+// includes its bundled copy's mcp-adapter.php. Requiring ours would then be a fatal "Cannot declare
+// class" on every request, so stand down and report which copy is running.
+if ( class_exists( Autoloader::class, false ) ) {
+	$wp_mcp_running_loader = ( new \ReflectionClass( Autoloader::class ) )->getFileName();
+	if ( realpath( (string) $wp_mcp_running_loader ) !== realpath( __DIR__ . '/includes/Autoloader.php' ) ) {
+		( require __DIR__ . '/includes/loaded-elsewhere-notice.php' )( (string) $wp_mcp_running_loader );
+		unset( $wp_mcp_running_loader );
+		return;
+	}
+	unset( $wp_mcp_running_loader );
+}
+
 require_once __DIR__ . '/includes/Autoloader.php';
 
 // If autoloader failed, we cannot proceed.

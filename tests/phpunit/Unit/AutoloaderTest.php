@@ -69,9 +69,30 @@ final class AutoloaderTest extends TestCase {
 		$this->assertNotFalse( has_action( 'admin_notices' ) );
 		$this->assertNotFalse( has_action( 'network_admin_notices' ) );
 
-		$this->expectOutputRegex( '/Another version of MCP Adapter is already loaded/' );
+		// Shown to someone who can manage plugins, on the Plugins screen, and dismissible.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		set_current_screen( 'plugins' );
+		$this->assertMatchesRegularExpression( '/Another version of MCP Adapter is already loaded/', self::render_admin_notices() );
+		$this->assertStringContainsString( 'is-dismissible', self::render_admin_notices() );
+
+		// Not on other screens, where nobody can act on it.
+		set_current_screen( 'dashboard' );
+		$this->assertSame( '', trim( self::render_admin_notices() ) );
+
+		// Not for users who cannot manage plugins.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+		set_current_screen( 'plugins' );
+		$this->assertSame( '', trim( self::render_admin_notices() ) );
+	}
+
+	/**
+	 * Captures what the admin_notices hook prints.
+	 */
+	private static function render_admin_notices(): string {
+		ob_start();
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Rendering the notice registered on the core hook.
 		do_action( 'admin_notices' );
+		return (string) ob_get_clean();
 	}
 
 	/**
