@@ -149,6 +149,7 @@ class ToolsHandler {
 			if ( true !== $permission ) {
 				$error_message = __( 'Permission denied', 'mcp-adapter' );
 				if ( is_wp_error( $permission ) ) {
+					$error         = $permission;
 					$error_message = $permission->get_error_message();
 
 					$this->mcp->get_error_handler()->log(
@@ -161,7 +162,27 @@ class ToolsHandler {
 							'failure_reason' => FailureReason::PERMISSION_CHECK_FAILED,
 						)
 					);
+				} else {
+					$error = new \WP_Error( 'mcp_adapter_permission_denied', $error_message );
 				}
+
+				/**
+				 * Fires when a tool call is refused by its permission check.
+				 *
+				 * This is an observation point for audit logging and metrics. Callbacks
+				 * cannot change the refusal or the error result sent to the client. As with
+				 * the other tool call hooks, an exception thrown by a callback ends the
+				 * request with an internal error.
+				 *
+				 * @since n.e.x.t
+				 *
+				 * @param \WP_Error                    $error     The refusal. Uses `mcp_adapter_permission_denied` when the check returned a non-WP_Error value.
+				 * @param array                        $args      The tool arguments.
+				 * @param string                       $tool_name The tool name that was called.
+				 * @param \WP\MCP\Domain\Tools\McpTool $mcp_tool  The MCP tool instance.
+				 * @param \WP\MCP\Core\McpServer       $server    The MCP server instance.
+				 */
+				do_action( 'mcp_adapter_tool_call_refused', $error, $args, $tool_name, $mcp_tool, $this->mcp );
 
 				return $this->create_error_result( $error_message );
 			}
