@@ -53,10 +53,10 @@ final class McpVersionNegotiator {
 	 * proposes it receives 2025-11-25 as the counter-proposal, as on every release
 	 * before this list existed.
 	 *
-	 * 2024-11-05 predates the `MCP-Protocol-Version` header, so sessions
-	 * negotiated under it may omit it. Real 2024-11-05 clients use the HTTP+SSE
-	 * transport, which this Adapter does not implement; that identifier is only
-	 * reachable over STDIO or from newer clients that still send it.
+	 * 2024-11-05 predates the `MCP-Protocol-Version` header. Real 2024-11-05
+	 * clients use the HTTP+SSE transport, which this Adapter does not implement;
+	 * that identifier is only reachable over STDIO or from newer clients that
+	 * still send it.
 	 *
 	 * @since 0.7.0
 	 *
@@ -72,6 +72,7 @@ final class McpVersionNegotiator {
 	 * First revision that requires the `MCP-Protocol-Version` header on HTTP requests after initialization.
 	 *
 	 * @since 0.7.0
+	 * @deprecated n.e.x.t No longer used. After initialization, requests without the header use the negotiated version.
 	 *
 	 * @var string
 	 */
@@ -140,12 +141,15 @@ final class McpVersionNegotiator {
 	 * Whether a negotiated version requires the `MCP-Protocol-Version` header after initialization.
 	 *
 	 * @since 0.7.0
+	 * @deprecated n.e.x.t No longer used. After initialization, requests without the header use the negotiated version.
 	 *
 	 * @param string $negotiated_version A negotiated protocol version.
 	 *
 	 * @return bool True from 2025-06-18 on, false for older identifiers.
 	 */
 	public static function requires_protocol_version_header( string $negotiated_version ): bool {
+		_deprecated_function( __METHOD__, 'n.e.x.t' );
+
 		return strcmp( $negotiated_version, self::PROTOCOL_VERSION_HEADER_SINCE ) >= 0;
 	}
 }
