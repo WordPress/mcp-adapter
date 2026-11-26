@@ -26,6 +26,27 @@ use WP\MCP\Transport\HttpTransport;
 class DefaultServerFactory {
 
 	/**
+	 * ID of the default server created in this request, or null when it was not created.
+	 *
+	 * The ID can be changed through the mcp_adapter_default_server_config filter,
+	 * and creation can fail, so callers that need the real server read this.
+	 *
+	 * @var string|null
+	 */
+	private static ?string $created_server_id = null;
+
+	/**
+	 * ID of the default server created in this request.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @return string|null Server ID, or null when the default server was not created.
+	 */
+	public static function get_created_server_id(): ?string {
+		return self::$created_server_id;
+	}
+
+	/**
 	 * Create default server for WordPress MCP Adapter with WordPress filters support.
 	 *
 	 * This method creates a server using WordPress-specific defaults and applies
@@ -114,6 +135,7 @@ class DefaultServerFactory {
 		// Log error if server creation failed, but don't halt execution.
 		// This allows other servers to be registered even if default server fails.
 		if ( ! is_wp_error( $result ) ) {
+			self::$created_server_id = (string) $config['server_id'];
 			return;
 		}
 
