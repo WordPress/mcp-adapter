@@ -212,7 +212,8 @@ final class HttpSessionStorageLimitTest extends TestCase {
 			$response = rest_do_request( $request );
 			$this->assertSame( 200, $response->get_status() );
 			$this->assertArrayHasKey( 'Mcp-Session-Id', $response->get_headers() );
-			$this->assertSame( array( 'DELETE', 'INSERT' ), $queries );
+			// The first map is an empty insert-if-absent followed by a compare-and-swap.
+			$this->assertSame( array( 'DELETE', 'INSERT', 'UPDATE' ), $queries );
 			$this->assertLessThan( 1024, strlen( (string) maybe_serialize( get_user_meta( $user_id, $meta_key, true ) ) ) );
 			$this->assertSame( $failed_queries_before, count( $GLOBALS['EZSQL_ERROR'] ?? array() ), 'Recovery must not produce a failed query, which WordPress would log in full.' );
 		} finally {

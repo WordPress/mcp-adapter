@@ -44,16 +44,53 @@ final class McpSessionManagerConcurrencyTest extends TestCase {
 	}
 
 	/**
-	 * Test concurrent creation preserves every session in an established map.
+	 * Stored session maps the concurrent creations start from.
+	 *
+	 * @return array<string, array{0: string, 1: bool}>
 	 */
-	public function test_concurrent_session_creation_preserves_every_session(): void {
+	public static function initial_session_map_provider(): array {
+		return array(
+			'established map'            => array( 'established', false ),
+			'absent row'                 => array( 'absent', false ),
+			'empty map'                  => array( 'empty', false ),
+			'absent row, read committed' => array( 'absent', true ),
+		);
+	}
+
+	/**
+	 * Test concurrent creation preserves every session, including a user's first sessions.
+	 *
+	 * @dataProvider initial_session_map_provider
+	 *
+	 * @param string $initial_map    Stored map before the workers start: established, absent or empty.
+	 * @param bool   $read_committed Whether workers use READ COMMITTED with staggered session row inserts.
+	 */
+	public function test_concurrent_session_creation_preserves_every_session( string $initial_map, bool $read_committed ): void {
+		global $wpdb;
+
 		if ( ! function_exists( 'proc_open' ) ) {
 			$this->markTestSkipped( 'proc_open() is required for the concurrency integration test.' );
 		}
 
-		$existing_session_id = SessionManager::create_session( $this->test_user_id, array( 'worker' => 'existing' ) );
-		$this->assertIsString( $existing_session_id );
+		$existing_session_ids = array();
+		if ( 'established' === $initial_map ) {
+			$existing_session_ids[] = SessionManager::create_session( $this->test_user_id, array( 'worker' => 'existing' ) );
+			$this->assertIsString( $existing_session_ids[0] );
+		} elseif ( 'empty' === $initial_map ) {
+			$this->assertNotFalse( update_user_meta( $this->test_user_id, self::session_meta_key(), array() ) );
+		}
 		self::commit_transaction();
+
+		// Delays each worker's insert by its own @mcp_test_insert_delay, after its NOT EXISTS check has run.
+		$trigger = $wpdb->prefix . 'mcp_test_session_insert_delay';
+		if ( $read_committed ) {
+			$wpdb->query( "DROP TRIGGER IF EXISTS {$trigger}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Test-owned trigger name built from the table prefix.
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Test-owned trigger; the meta key is prepared.
+			$created = $wpdb->query( $wpdb->prepare( "CREATE TRIGGER {$trigger} BEFORE INSERT ON {$wpdb->usermeta} FOR EACH ROW SET @mcp_test_slept = IF( NEW.meta_key = %s, SLEEP( COALESCE( @mcp_test_insert_delay, 0 ) ), 0 )", self::session_meta_key() ) );
+			if ( false === $created ) {
+				$this->markTestSkipped( 'Creating a trigger is required to force overlapping inserts: ' . $wpdb->last_error );
+			}
+		}
 
 		$worker_count = 4;
 		$barrier_dir  = sys_get_temp_dir() . '/mcp-session-concurrency-' . wp_generate_uuid4();
@@ -70,12 +107,13 @@ final class McpSessionManagerConcurrencyTest extends TestCase {
 		try {
 			for ( $worker_id = 0; $worker_id < $worker_count; ++$worker_id ) {
 				$command = sprintf(
-					'%s %s %d %s %d',
+					'%s %s %d %s %d %s',
 					escapeshellarg( PHP_BINARY ),
 					escapeshellarg( $worker_script ),
 					$this->test_user_id,
 					escapeshellarg( $barrier_dir ),
-					$worker_id
+					$worker_id,
+					$read_committed ? 'read-committed' : 'default'
 				);
 
 				$pipes = array();
@@ -142,13 +180,16 @@ final class McpSessionManagerConcurrencyTest extends TestCase {
 			wp_cache_delete( $this->test_user_id, 'user_meta' );
 			$sessions = SessionManager::get_all_user_sessions( $this->test_user_id );
 
-			$this->assertCount( $worker_count + 1, $sessions );
-			$this->assertArrayHasKey( $existing_session_id, $sessions );
-			foreach ( $session_ids as $session_id ) {
+			$this->assertCount( $worker_count + count( $existing_session_ids ), $sessions );
+			foreach ( array_merge( $existing_session_ids, $session_ids ) as $session_id ) {
 				$this->assertArrayHasKey( $session_id, $sessions );
 			}
 			$this->assertCount( 1, get_user_meta( $this->test_user_id, self::session_meta_key(), false ) );
 		} finally {
+			if ( $read_committed ) {
+				$wpdb->query( "DROP TRIGGER IF EXISTS {$trigger}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Test-owned trigger name built from the table prefix.
+			}
+
 			if ( ! file_exists( $barrier_dir . '/go' ) ) {
 				// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Releases test-owned worker processes during cleanup.
 				file_put_contents( $barrier_dir . '/go', '' );

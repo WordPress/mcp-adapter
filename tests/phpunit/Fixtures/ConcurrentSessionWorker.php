@@ -14,6 +14,7 @@ require dirname( __DIR__ ) . '/bootstrap.php';
 $wp_mcp_test_user_id     = isset( $argv[1] ) ? (int) $argv[1] : 0;
 $wp_mcp_test_barrier_dir = isset( $argv[2] ) ? $argv[2] : '';
 $wp_mcp_test_worker_id   = isset( $argv[3] ) ? $argv[3] : '';
+$wp_mcp_test_isolation   = isset( $argv[4] ) ? $argv[4] : '';
 $wp_mcp_test_result_file = $wp_mcp_test_barrier_dir . '/result-' . $wp_mcp_test_worker_id . '.json';
 
 try {
@@ -25,11 +26,27 @@ try {
 		}
 	}
 
+	if ( 'read-committed' === $wp_mcp_test_isolation ) {
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Session settings of this test worker's own connection.
+		$wpdb->query( 'SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED' );
+		// Read by the test's delay trigger: staggers each worker's session row insert.
+		$wpdb->query( $wpdb->prepare( 'SET @mcp_test_insert_delay = %f', 0.3 * (int) $wp_mcp_test_worker_id ) );
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	}
+
+	// Hold every worker before its first session write or write lock, after each has read the map.
 	add_filter(
-		'update_user_metadata',
-		static function ( $check, $object_id, $meta_key ) use ( $wp_mcp_test_barrier_dir, $wp_mcp_test_user_id, $wp_mcp_test_worker_id, $wp_mcp_session_meta_key ) {
-			if ( $wp_mcp_test_user_id !== $object_id || $wp_mcp_session_meta_key !== $meta_key ) {
-				return $check;
+		'query',
+		static function ( $query ) use ( $wp_mcp_test_barrier_dir, $wp_mcp_test_worker_id, $wp_mcp_session_meta_key ) {
+			global $wpdb;
+
+			$is_session_write = preg_match( '/^\s*(?:INSERT|UPDATE)\b/i', $query )
+				&& false !== strpos( $query, $wpdb->usermeta )
+				&& false !== strpos( $query, "'" . $wp_mcp_session_meta_key . "'" );
+			if ( ! $is_session_write && ! preg_match( '/^\s*SELECT GET_LOCK\(/i', $query ) ) {
+				return $query;
 			}
 
 			// phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_file_put_contents -- Test-owned synchronization file under the system temporary directory.
@@ -44,10 +61,8 @@ try {
 				usleep( 1000 );
 			}
 
-			return $check;
-		},
-		10,
-		3
+			return $query;
+		}
 	);
 
 	$wp_mcp_test_session_id = SessionManager::create_session( $wp_mcp_test_user_id, array( 'worker' => $wp_mcp_test_worker_id ) );
