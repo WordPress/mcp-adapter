@@ -355,7 +355,7 @@ final class SessionManager {
 			return $sessions;
 		}
 
-		if ( ! self::delete_oversized_session_map( $user_id, $budget ) ) {
+		if ( ! self::delete_oversized_session_map( $user_id ) ) {
 			// A concurrent request already replaced the row; serve the current map.
 			$current = get_user_meta( $user_id, self::session_meta_key(), true );
 
@@ -392,33 +392,60 @@ final class SessionManager {
 	}
 
 	/**
-	 * Delete the user's session row only while it still exceeds the budget.
+	 * Delete the user's session row only while it is still the oversized row.
 	 *
 	 * The meta API offers no conditional delete that avoids sending the
-	 * oversized value back in the predicate, so this is one small direct query.
-	 * The length predicate makes the delete atomic: a concurrent request that
-	 * already replaced the row with a small map leaves nothing to delete. The
-	 * caches delete_metadata() maintains are cleared here the same way: the
-	 * user's meta cache, and the users last_changed salt once a row is gone.
-	 * The delete_user_meta and deleted_user_meta actions do not fire.
+	 * oversized value back in the predicate, so this is one direct read and one
+	 * small direct delete. The stored value is read raw and judged by its own
+	 * session count, and the delete matches only that exact value (its length
+	 * and MD5). A length-only predicate was not enough: a map written
+	 * concurrently can hold more sessions, be valid for its own count, and
+	 * still be longer than the budget of the row read earlier (#395). Any
+	 * replacement now leaves nothing to delete. The caches delete_metadata()
+	 * maintains are cleared here the same way: the user's meta cache, and the
+	 * users last_changed salt once a row is gone. The delete_user_meta and
+	 * deleted_user_meta actions do not fire.
 	 *
 	 * @since 0.7.1
+	 * @since 0.7.2 Binds the delete to the value read, not to a length budget.
 	 *
 	 * @param int $user_id The user ID.
-	 * @param int $budget  Serialized byte budget the stored row must exceed.
 	 *
 	 * @return bool True when a row was deleted.
 	 */
-	private static function delete_oversized_session_map( int $user_id, int $budget ): bool {
+	private static function delete_oversized_session_map( int $user_id ): bool {
 		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The raw stored bytes are needed to bind the delete below; the cache is cleared after it.
+		$stored = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT meta_value FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s ORDER BY umeta_id ASC LIMIT 1",
+				$user_id,
+				self::session_meta_key()
+			)
+		);
+		if ( ! is_string( $stored ) ) {
+			wp_cache_delete( $user_id, 'user_meta' );
+
+			return false;
+		}
+
+		$sessions = maybe_unserialize( $stored );
+		if ( ! is_array( $sessions ) || strlen( $stored ) <= self::session_map_budget_bytes( count( $sessions ) ) ) {
+			// Already replaced by a map that is valid for its own session count.
+			wp_cache_delete( $user_id, 'user_meta' );
+
+			return false;
+		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- The meta API cannot delete conditionally without repeating the oversized value; the cache is cleared below.
 		$deleted = $wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s AND LENGTH( meta_value ) > %d",
+				"DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s AND LENGTH( meta_value ) = %d AND MD5( meta_value ) = %s",
 				$user_id,
 				self::session_meta_key(),
-				$budget
+				strlen( $stored ),
+				md5( $stored )
 			)
 		);
 		wp_cache_delete( $user_id, 'user_meta' );
