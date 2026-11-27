@@ -15,6 +15,7 @@ use WP\MCP\Domain\Utils\McpAnnotationMapper;
 use WP\MCP\Domain\Utils\McpNameSanitizer;
 use WP\MCP\Domain\Utils\McpValidator;
 use WP\MCP\Domain\Utils\SchemaTransformer;
+use WP\MCP\Tasks\McpTaskManager;
 use WP_Error;
 
 /**
@@ -148,6 +149,22 @@ class RegisterAbilityAsMcpTool {
 		if ( null !== $output_transform && ! empty( $output_transform['was_transformed'] ) ) {
 			$adapter_meta['output_schema_transformed'] = true;
 			$adapter_meta['output_schema_wrapper']     = $output_transform['wrapper_property'];
+		}
+
+		// `meta.mcp.task` lets calls run as background tasks. An unknown value is
+		// rejected, since guessing could run a long call inline or refuse a short one.
+		if ( isset( $mcp_meta['task'] ) ) {
+			if ( ! in_array( $mcp_meta['task'], array( McpTaskManager::SUPPORT_OPTIONAL, McpTaskManager::SUPPORT_REQUIRED ), true ) ) {
+				return new WP_Error(
+					'mcp_ability_invalid_task_support',
+					sprintf(
+					/* translators: %s: ability name */
+						__( 'Ability meta "mcp.task" must be "optional" or "required" for ability "%s".', 'mcp-adapter' ),
+						$this->ability->get_name()
+					)
+				);
+			}
+			$adapter_meta['task'] = $mcp_meta['task'];
 		}
 
 		// Icons and `_meta` come from ability.meta.mcp and are carried as given; the

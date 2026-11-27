@@ -18,6 +18,7 @@ use WP\MCP\Infrastructure\ErrorHandling\NullMcpErrorHandler;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
 use WP\MCP\Infrastructure\Observability\NullMcpObservabilityHandler;
 use WP\MCP\Servers\DefaultServerFactory;
+use WP\MCP\Tasks\McpTaskRunner;
 use WP_Error;
 
 // Exit if accessed directly.
@@ -72,6 +73,10 @@ final class McpAdapter {
 			// Subscribe before `init`, the earliest point the Abilities API registries can initialize.
 			add_action( 'wp_abilities_api_categories_init', array( self::$instance, 'register_default_category' ) );
 			add_action( 'wp_abilities_api_init', array( self::$instance, 'register_default_abilities' ) );
+
+			// Tasks run from WP-Cron, where neither hook below fires.
+			McpTaskRunner::register();
+			add_filter( 'mcp_adapter_tool_task_support', array( ExecuteAbilityAbility::class, 'task_support' ), 10, 3 );
 
 			// In WP-CLI context, initialize immediately so commands have access to servers
 			if ( defined( 'WP_CLI' ) && constant( 'WP_CLI' ) ) {

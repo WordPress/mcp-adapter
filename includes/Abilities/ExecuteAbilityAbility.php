@@ -9,8 +9,10 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Abilities;
 
+use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Utils\AbilityArgumentNormalizer;
 use WP\MCP\Domain\Utils\AbilityPermissionChecker;
+use WP\MCP\Domain\Utils\McpAbilityMeta;
 use WP_Error;
 
 /**
@@ -88,6 +90,33 @@ final class ExecuteAbilityAbility {
 				),
 			)
 		);
+	}
+
+	/**
+	 * Let a call through this tool run as a task when the target ability asks for it.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @param mixed                        $support   Task support of the tool being called.
+	 * @param mixed                        $arguments Tool arguments.
+	 * @param \WP\MCP\Domain\Tools\McpTool $tool      Tool being called.
+	 *
+	 * @return mixed The target ability's `meta.mcp.task`, or the unchanged value for another tool.
+	 */
+	public static function task_support( $support, $arguments, McpTool $tool ) {
+		if ( 'mcp-adapter/execute-ability' !== ( $tool->get_adapter_meta()['ability'] ?? null ) ) {
+			return $support;
+		}
+
+		$ability_name = is_array( $arguments ) ? ( $arguments['ability_name'] ?? null ) : null;
+		$ability      = is_string( $ability_name ) && wp_has_ability( $ability_name ) ? wp_get_ability( $ability_name ) : null;
+		if ( null === $ability ) {
+			return $support;
+		}
+
+		$mcp_meta = McpAbilityMeta::mcp( $ability );
+
+		return is_array( $mcp_meta ) ? ( $mcp_meta['task'] ?? null ) : null;
 	}
 
 	/**

@@ -14,6 +14,7 @@ use WP\MCP\Core\McpVersionNegotiator;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\ErrorLogMcpObservabilityHandler;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\MCP\Tasks\McpTaskManager;
 use WP\McpSchema\Record;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Record\DiscoverRequest;
@@ -308,6 +309,12 @@ class RequestRouter {
 				return $request instanceof GetPromptRequest
 					? $this->context->prompts_handler->get_prompt( $request, $context )
 					: McpErrorFactory::invalid_request( $request_id, 'Invalid prompts/get request record.' );
+			case 'tasks/get':
+				return $this->context->tasks_handler->get_task( $request, $context );
+			case 'tasks/update':
+				return $this->context->tasks_handler->update_task( $request, $context );
+			case 'tasks/cancel':
+				return $this->context->tasks_handler->cancel_task( $request, $context );
 			default:
 				return $this->create_method_not_found_error( $method, $request_id );
 		}
@@ -322,9 +329,10 @@ class RequestRouter {
 		return array(
 			'supportedVersions' => McpVersionNegotiator::SUPPORTED_PROTOCOL_VERSIONS,
 			'capabilities'      => array(
-				'prompts'   => array( 'listChanged' => false ),
-				'resources' => array( 'listChanged' => false ),
-				'tools'     => array( 'listChanged' => false ),
+				'prompts'    => array( 'listChanged' => false ),
+				'resources'  => array( 'listChanged' => false ),
+				'tools'      => array( 'listChanged' => false ),
+				'extensions' => array( McpTaskManager::EXTENSION => new \stdClass() ),
 			),
 			'instructions'      => $this->context->mcp_server->get_server_description(),
 		);
