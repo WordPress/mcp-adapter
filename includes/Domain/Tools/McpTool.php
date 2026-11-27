@@ -16,6 +16,7 @@ use WP\MCP\Domain\Utils\AbilityPermissionChecker;
 use WP\MCP\Domain\Utils\RevisionProjectionTrait;
 use WP\MCP\Domain\Utils\ThrowableGuardTrait;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\MCP\Tasks\McpTaskManager;
 use WP\McpSchema\Record\Tool;
 use WP\McpSchema\Schema;
 use WP_Error;
@@ -320,6 +321,36 @@ final class McpTool implements McpComponentInterface {
 	 */
 	public function is_ability_backed(): bool {
 		return null !== $this->ability;
+	}
+
+	/**
+	 * Get how a call to this tool may run as a background task.
+	 *
+	 * Set through `meta.mcp.task` on the ability behind the tool.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @param array<string, mixed> $arguments Arguments of the call.
+	 *
+	 * @return string|null 'optional', 'required', or null when the call runs inline.
+	 */
+	public function get_task_support( array $arguments = array() ): ?string {
+		/**
+		 * Filters how a tool call may run as a background task.
+		 *
+		 * A tool that executes other abilities can use this to follow the
+		 * ability a call targets. The call runs again from stored arguments in
+		 * a later request, so the tool must be registered on every request.
+		 *
+		 * @since 0.8.0
+		 *
+		 * @param string|null                  $support   'optional', 'required', or null to run inline.
+		 * @param array<string, mixed>         $arguments Arguments of the call.
+		 * @param \WP\MCP\Domain\Tools\McpTool $tool      The tool being called.
+		 */
+		$support = apply_filters( 'mcp_adapter_tool_task_support', $this->adapter_meta['task'] ?? null, $arguments, $this );
+
+		return in_array( $support, array( McpTaskManager::SUPPORT_OPTIONAL, McpTaskManager::SUPPORT_REQUIRED ), true ) ? $support : null;
 	}
 
 	/**

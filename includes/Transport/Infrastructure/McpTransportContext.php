@@ -14,6 +14,7 @@ use WP\MCP\Handlers\Initialize\InitializeHandler;
 use WP\MCP\Handlers\Prompts\PromptsHandler;
 use WP\MCP\Handlers\Resources\ResourcesHandler;
 use WP\MCP\Handlers\System\SystemHandler;
+use WP\MCP\Handlers\Tasks\TasksHandler;
 use WP\MCP\Handlers\Tools\ToolsHandler;
 use WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface;
 use WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface;
@@ -56,6 +57,7 @@ class McpTransportContext {
 		'request_router',
 		'transport_permission_callback',
 		'error_handler',
+		'tasks_handler',
 	);
 
 	/**
@@ -101,6 +103,15 @@ class McpTransportContext {
 	public SystemHandler $system_handler;
 
 	/**
+	 * The tasks handler.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @var \WP\MCP\Handlers\Tasks\TasksHandler
+	 */
+	public TasksHandler $tasks_handler;
+
+	/**
 	 * The observability handler instance.
 	 *
 	 * @var \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface
@@ -139,13 +150,15 @@ class McpTransportContext {
 	 *   observability_handler: \WP\MCP\Infrastructure\Observability\Contracts\McpObservabilityHandlerInterface,
 	 *   request_router?: \WP\MCP\Transport\Infrastructure\RequestRouter,
 	 *   transport_permission_callback?: callable|null,
-	 *   error_handler?: \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface
+	 *   error_handler?: \WP\MCP\Infrastructure\ErrorHandling\Contracts\McpErrorHandlerInterface,
+	 *   tasks_handler?: \WP\MCP\Handlers\Tasks\TasksHandler
 	 * } $properties Properties to set on the context.
 	 * Note: request_router is optional and will be auto-created if not provided.
 	 *
 	 * @throws \InvalidArgumentException If required keys are missing or unknown keys are present.
 	 *
 	 * @since 0.5.0
+	 * @since 0.8.0 Added the optional `tasks_handler` property.
 	 */
 	public function __construct( array $properties ) {
 		$this->validate_properties( $properties );
@@ -163,6 +176,9 @@ class McpTransportContext {
 		$this->error_handler = $properties['error_handler'] ?? $properties['mcp_server']->get_error_handler();
 
 		$this->transport_permission_callback = $properties['transport_permission_callback'] ?? null;
+
+		// Optional so transports that build their own context keep working.
+		$this->tasks_handler = $properties['tasks_handler'] ?? new TasksHandler( $properties['mcp_server'] );
 
 		// Create request_router if not provided.
 		$this->request_router = $properties['request_router'] ?? new RequestRouter( $this );

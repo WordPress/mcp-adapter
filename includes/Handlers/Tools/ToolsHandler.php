@@ -12,11 +12,13 @@ namespace WP\MCP\Handlers\Tools;
 use WP\MCP\Core\McpRequestContext;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Tools\McpInputRequired;
+use WP\MCP\Domain\Tools\McpTool;
 use WP\MCP\Domain\Tools\McpToolCallContext;
 use WP\MCP\Domain\Utils\ContentBlockHelper;
 use WP\MCP\Handlers\HandlerHelperTrait;
 use WP\MCP\Infrastructure\ErrorHandling\McpErrorFactory;
 use WP\MCP\Infrastructure\Observability\FailureReason;
+use WP\MCP\Tasks\McpTaskManager;
 use WP\McpSchema\Record\CallToolRequest;
 use WP\McpSchema\Record\InputRequests;
 use WP\McpSchema\Record\ListToolsRequest;
@@ -109,6 +111,36 @@ class ToolsHandler {
 	 * @since 0.7.0
 	 */
 	public function call_tool( CallToolRequest $request, McpRequestContext $request_context ): array {
+		return $this->handle_call( $request, $request_context, true );
+	}
+
+	/**
+	 * Runs a tool call that a task already stands for.
+	 *
+	 * Identical to call_tool(), except that it never creates another task.
+	 *
+	 * @internal
+	 *
+	 * @param \WP\McpSchema\Record\CallToolRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 *
+	 * @return array<string, mixed>
+	 * @since 0.8.0
+	 */
+	public function call_tool_for_task( CallToolRequest $request, McpRequestContext $request_context ): array {
+		return $this->handle_call( $request, $request_context, false );
+	}
+
+	/**
+	 * Resolve, authorize and execute one tool call.
+	 *
+	 * @param \WP\McpSchema\Record\CallToolRequest $request Validated request.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @param bool $may_create_task Whether the call may be handed to a background task.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function handle_call( CallToolRequest $request, McpRequestContext $request_context, bool $may_create_task ): array {
 		$request_params = $request->getParams();
 		$request_id     = $request->getId();
 
@@ -145,7 +177,14 @@ class ToolsHandler {
 				);
 			}
 
-			$permission = $mcp_tool->check_permission( $args );
+			$permission   = $mcp_tool->check_permission( $args );
+			$task_support = true === $permission && $may_create_task ? $mcp_tool->get_task_support( $args ) : null;
+			if ( null !== $task_support ) {
+				$task_result = $this->maybe_create_task( $mcp_tool, $task_support, $request_params->getArguments() ?? new \stdClass(), $request_context, $request_id );
+				if ( null !== $task_result ) {
+					return $task_result;
+				}
+			}
 			if ( true !== $permission ) {
 				$error_message = __( 'Permission denied', 'mcp-adapter' );
 				if ( is_wp_error( $permission ) ) {
@@ -390,6 +429,43 @@ class ToolsHandler {
 
 			return McpErrorFactory::internal_error( $request_id, 'Failed to execute tool' );
 		}
+	}
+
+	/**
+	 * Hand a tool call to a background task when the tool and client allow it.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @param \WP\MCP\Domain\Tools\McpTool   $mcp_tool        Tool that opted in to tasks.
+	 * @param string                        $task_support    'optional' or 'required'.
+	 * @param \stdClass                      $arguments       Validated arguments as the client sent them.
+	 * @param \WP\MCP\Core\McpRequestContext $request_context Exact request context.
+	 * @param string|int|float              $request_id      Request ID.
+	 *
+	 * @return array<string, mixed>|null A task result or protocol error, or null to run the call inline.
+	 */
+	private function maybe_create_task( McpTool $mcp_tool, string $task_support, \stdClass $arguments, McpRequestContext $request_context, $request_id ): ?array {
+		if ( ! McpTaskManager::client_supports_tasks( $request_context ) ) {
+			return McpTaskManager::SUPPORT_REQUIRED === $task_support
+				? McpTaskManager::missing_capability_error( $request_id )
+				: null;
+		}
+
+		$task = McpTaskManager::create( $this->mcp, $mcp_tool, $arguments );
+		if ( is_wp_error( $task ) ) {
+			$this->mcp->get_error_handler()->log(
+				'Task creation failed',
+				array(
+					'tool_name'     => $mcp_tool->get_name(),
+					'error_code'    => $task->get_error_code(),
+					'error_message' => $task->get_error_message(),
+				)
+			);
+
+			return McpErrorFactory::internal_error( $request_id, 'Failed to create task' );
+		}
+
+		return array_merge( array( 'resultType' => 'task' ), McpTaskManager::to_wire( $task ) );
 	}
 
 	/**

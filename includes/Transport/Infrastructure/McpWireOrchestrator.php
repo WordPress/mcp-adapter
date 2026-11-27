@@ -29,6 +29,7 @@ use WP\McpSchema\Record\InitializeResult;
 use WP\McpSchema\Record\InitializedNotification;
 use WP\McpSchema\Record\InputRequiredResult;
 use WP\McpSchema\Record\JSONRPCErrorResponse;
+use WP\McpSchema\Record\JSONRPCRequest;
 use WP\McpSchema\Record\JSONRPCResultResponse;
 use WP\McpSchema\Record\ListPromptsRequest;
 use WP\McpSchema\Record\ListPromptsResult;
@@ -46,6 +47,7 @@ use WP\McpSchema\Record\PingRequest;
 use WP\McpSchema\Record\ReadResourceRequest;
 use WP\McpSchema\Record\ReadResourceResult;
 use WP\McpSchema\Record\ReadResourceResultResponse;
+use WP\McpSchema\Record\Result;
 use WP\McpSchema\Record\ResultMetaObject;
 use WP\McpSchema\Record\UnsupportedProtocolVersionError;
 use WP\McpSchema\Schema;
@@ -57,6 +59,16 @@ use WP\McpSchema\Schemas;
  * @since 0.7.0
  */
 final class McpWireOrchestrator {
+
+	/**
+	 * Methods of the Tasks extension, served under 2026-07-28 only.
+	 *
+	 * @since 0.8.0
+	 *
+	 * @var list<string>
+	 */
+	// phpcs:ignore SlevomatCodingStandard.Classes.DisallowMultiConstantDefinition -- False positive: sniff mistakes array() commas for multi-const commas (only handles short syntax).
+	private const TASK_METHODS = array( 'tasks/get', 'tasks/update', 'tasks/cancel' );
 
 	/**
 	 * Server and handler dependencies used to dispatch validated requests.
@@ -309,7 +321,8 @@ final class McpWireOrchestrator {
 
 		$params = $generic['params'] ?? array();
 		if ( is_array( $params ) && ( array_key_exists( 'requestState', $params ) || array_key_exists( 'inputResponses', $params ) )
-			&& ( Schemas::V2026_07_28 !== $selection || 'tools/call' !== $method ) ) {
+			&& ( Schemas::V2026_07_28 !== $selection || 'tools/call' !== $method )
+			&& ! ( 'tasks/update' === $method && ! array_key_exists( 'requestState', $params ) ) ) {
 			$error = McpErrorFactory::invalid_params( $id, 'Continuation parameters are supported only for direct MCP 2026-07-28 tool calls.' );
 			return $this->failure( $this->hydrate_error( $error, $schema ), $method, $id, false, $request_context );
 		}
@@ -319,7 +332,9 @@ final class McpWireOrchestrator {
 			$request_context,
 			$transport,
 			function ( $result ) use ( $method, $id, $schema, $selection ): Record {
-				if ( is_array( $result ) && isset( $result['error'] ) ) {
+				// A failed task carries its own `error` field inside a successful result.
+				$is_task = 'tasks/get' === $method && is_array( $result ) && isset( $result['taskId'] );
+				if ( is_array( $result ) && isset( $result['error'] ) && ! $is_task ) {
 					return $this->hydrate_error( $result, $schema );
 				}
 
@@ -371,6 +386,11 @@ final class McpWireOrchestrator {
 		);
 		if ( in_array( $method, $shared, true ) ) {
 			return $schema->allowsClientRequest( $method );
+		}
+
+		// The Tasks extension is defined outside the core schema, so its catalog cannot list these.
+		if ( in_array( $method, self::TASK_METHODS, true ) ) {
+			return Schemas::V2026_07_28 === $revision;
 		}
 
 		$implemented = Schemas::V2026_07_28 === $revision
@@ -543,7 +563,9 @@ final class McpWireOrchestrator {
 		if ( $input_required && 'tools/call' !== $method ) {
 			throw new \UnexpectedValueException( 'MRTR is implemented for direct tools/call handlers only.' );
 		}
-		$result['resultType'] = $input_required ? 'input_required' : 'complete';
+		// A tool call handed to a background task answers with the task instead of a tool result.
+		$is_task              = 'tools/call' === $method && 'task' === ( $result['resultType'] ?? null );
+		$result['resultType'] = $input_required ? 'input_required' : ( $is_task ? 'task' : 'complete' );
 		if (
 			in_array(
 				$method,
@@ -600,7 +622,14 @@ final class McpWireOrchestrator {
 				return $schema->fromArray( DiscoverResult::class, $data );
 			case 'tools/list':
 				return $schema->fromArray( ListToolsResult::class, $data );
+			case 'tasks/get':
+			case 'tasks/update':
+			case 'tasks/cancel':
+				return $schema->fromArray( Result::class, $data );
 			case 'tools/call':
+				if ( Schemas::V2026_07_28 === $schema->version() && 'task' === ( $data['resultType'] ?? null ) ) {
+					return $schema->fromArray( Result::class, $data );
+				}
 				if ( Schemas::V2026_07_28 === $schema->version() && 'input_required' === ( $data['resultType'] ?? null ) ) {
 					if ( ! array_key_exists( 'inputRequests', $data ) && ! array_key_exists( 'requestState', $data ) ) {
 						throw new \UnexpectedValueException( 'Input-required results need inputRequests or requestState.' );
@@ -701,8 +730,13 @@ final class McpWireOrchestrator {
 				return $schema->fromArray( DiscoverResultResponse::class, $data );
 			case 'tools/list':
 				return $schema->fromArray( ListToolsResultResponse::class, $data );
+			case 'tasks/get':
+			case 'tasks/update':
+			case 'tasks/cancel':
+				return $schema->fromArray( JSONRPCResultResponse::class, $data );
 			case 'tools/call':
-				return $schema->fromArray( CallToolResultResponse::class, $data );
+				// A task result is not a tool result, so it needs the generic envelope.
+				return $schema->fromArray( $result instanceof Result ? JSONRPCResultResponse::class : CallToolResultResponse::class, $data );
 			case 'resources/list':
 				return $schema->fromArray( ListResourcesResultResponse::class, $data );
 			case 'resources/templates/list':
@@ -753,6 +787,10 @@ final class McpWireOrchestrator {
 				return $schema->fromValue( PingRequest::class, $message );
 			case 'server/discover':
 				return $schema->fromValue( DiscoverRequest::class, $message );
+			case 'tasks/get':
+			case 'tasks/update':
+			case 'tasks/cancel':
+				return $schema->fromValue( JSONRPCRequest::class, $message );
 			case 'tools/list':
 				return $schema->fromValue( ListToolsRequest::class, $message );
 			case 'tools/call':
@@ -834,8 +872,8 @@ final class McpWireOrchestrator {
 			return McpErrorFactory::header_mismatch( $id, 'Mcp-Method is missing or does not match the request body' );
 		}
 
-		$name_field = 'resources/read' === $method ? 'uri' : 'name';
-		if ( in_array( $method, array( 'tools/call', 'resources/read', 'prompts/get' ), true ) ) {
+		$name_field = 'resources/read' === $method ? 'uri' : ( in_array( $method, self::TASK_METHODS, true ) ? 'taskId' : 'name' );
+		if ( in_array( $method, array_merge( array( 'tools/call', 'resources/read', 'prompts/get' ), self::TASK_METHODS ), true ) ) {
 			$header_name = $this->decode_header_value( $headers['mcp-name'] ?? null );
 			if ( null === $header_name || ( $params[ $name_field ] ?? null ) !== $header_name ) {
 				return McpErrorFactory::header_mismatch( $id, 'Mcp-Name is missing or does not match the request body' );

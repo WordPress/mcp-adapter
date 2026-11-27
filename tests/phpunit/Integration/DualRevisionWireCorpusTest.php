@@ -1178,7 +1178,7 @@ final class DualRevisionWireCorpusTest extends TestCase {
 
 	/** Modern requests reject removed and noncanonical methods before dispatch. */
 	public function test_http_2026_rejects_ping_and_tools_list_all(): void {
-		foreach ( array( 'initialize', 'notifications/initialized', 'ping', 'tools/list/all', 'logging/setLevel', 'roots/list', 'tasks/get', 'elicitation/create' ) as $method ) {
+		foreach ( array( 'initialize', 'notifications/initialized', 'ping', 'tools/list/all', 'logging/setLevel', 'roots/list', 'tasks/list', 'tasks/result', 'elicitation/create' ) as $method ) {
 			$response = $this->http_request_2026_07_28( $method, 20, array() );
 			$this->assertSame( 404, $response['status'] );
 			$this->assertSame( McpErrorFactory::METHOD_NOT_FOUND, $response['data']['error']['code'] );
