@@ -9,10 +9,14 @@ declare( strict_types=1 );
 
 namespace WP\MCP\Tests\Integration;
 
+use WP\MCP\Abilities\ExecuteAbilityAbility;
 use WP\MCP\Core\McpAdapter;
 use WP\MCP\Core\McpServer;
 use WP\MCP\Domain\Tools\McpTool;
+use WP\MCP\Tasks\Contracts\McpTaskStoreInterface;
 use WP\MCP\Tasks\McpTaskManager;
+use WP\MCP\Tasks\OptionsTaskStore;
+use WP\MCP\Tests\Fixtures\DummyErrorHandler;
 use WP\MCP\Tests\TestCase;
 use WP\MCP\Transport\Infrastructure\McpWireOrchestrator;
 use WP\McpSchema\Schemas;
@@ -375,6 +379,148 @@ final class TasksExtensionTest extends TestCase {
 
 		$headers['mcp-name'] = str_repeat( 'b', 40 );
 		$this->assertSame( -32020, $this->task_request( 'tasks/get', $task_id, array(), null, null, $headers )['error']['code'] );
+	}
+
+	/** A task whose server is gone fails instead of staying in progress. */
+	public function test_task_fails_when_its_server_is_gone(): void {
+		$task_id  = $this->call_tool( 'optional', array( 'value' => 1 ) )['result']['taskId'];
+		$property = new \ReflectionProperty( McpAdapter::class, 'servers' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$property->setAccessible( true );
+		}
+		$property->setValue( McpAdapter::instance(), array() );
+
+		do_action( McpTaskManager::RUN_HOOK, $task_id );
+		do_action( McpTaskManager::RUN_HOOK, array( 'not-a-task-id' ) );
+
+		$task = $this->task_request( 'tasks/get', $task_id )['result'];
+		$this->assertSame( 'failed', $task['status'] );
+		$this->assertSame( 'The MCP server for this task is no longer registered.', $task['statusMessage'] );
+		$this->assertSame( 0, self::$executions );
+	}
+
+	/** A stored call that can no longer be replayed fails with a generic message and is logged. */
+	public function test_unreadable_stored_call_fails_the_task(): void {
+		$task_id = $this->call_tool( 'optional', array( 'value' => 1 ) )['result']['taskId'];
+		McpTaskManager::store()->transition( $task_id, array( 'queued' ), array( 'arguments' => '{broken' ) );
+
+		do_action( McpTaskManager::RUN_HOOK, $task_id );
+
+		$task = $this->task_request( 'tasks/get', $task_id )['result'];
+		$this->assertSame( 'failed', $task['status'] );
+		$this->assertSame( 'The task could not be completed.', $task['statusMessage'] );
+		$this->assertSame( -32603, $task['error']['code'] );
+		$this->assertContains( 'Error running task', array_column( DummyErrorHandler::$logs, 'message' ) );
+	}
+
+	/** A result the store rejects fails the task instead of leaving it in progress. */
+	public function test_result_that_cannot_be_stored_fails_the_task(): void {
+		$store  = new class() implements McpTaskStoreInterface {
+			/** @var \WP\MCP\Tasks\OptionsTaskStore */
+			private $inner;
+
+			public function __construct() {
+				$this->inner = new OptionsTaskStore();
+			}
+
+			public function create( array $task ): bool {
+				return $this->inner->create( $task );
+			}
+
+			public function get( string $task_id ): ?array {
+				return $this->inner->get( $task_id );
+			}
+
+			public function transition( string $task_id, array $expected, array $changes ): ?array {
+				return 'completed' === ( $changes['status'] ?? null ) ? null : $this->inner->transition( $task_id, $expected, $changes );
+			}
+
+			public function delete( string $task_id ): void {
+				$this->inner->delete( $task_id );
+			}
+		};
+		$filter = static function () use ( $store ) {
+			return $store;
+		};
+		add_filter( 'mcp_adapter_task_store', $filter );
+
+		$task_id = $this->call_tool( 'optional', array( 'value' => 1 ) )['result']['taskId'];
+		do_action( McpTaskManager::RUN_HOOK, $task_id );
+		$task = $this->task_request( 'tasks/get', $task_id )['result'];
+		remove_filter( 'mcp_adapter_task_store', $filter );
+
+		$this->assertSame( 'failed', $task['status'] );
+		$this->assertSame( 'The task result could not be stored.', $task['statusMessage'] );
+	}
+
+	/** A task that cannot be stored or scheduled is a protocol error, and nothing is left behind. */
+	public function test_task_creation_failures(): void {
+		$store  = new class() implements McpTaskStoreInterface {
+			public function create( array $task ): bool {
+				return false;
+			}
+
+			public function get( string $task_id ): ?array {
+				return null;
+			}
+
+			public function transition( string $task_id, array $expected, array $changes ): ?array {
+				return null;
+			}
+
+			public function delete( string $task_id ): void {}
+		};
+		$filter = static function () use ( $store ) {
+			return $store;
+		};
+		add_filter( 'mcp_adapter_task_store', $filter );
+		$error = $this->call_tool( 'optional', array( 'value' => 1 ) )['error'];
+		remove_filter( 'mcp_adapter_task_store', $filter );
+		$this->assertSame( -32603, $error['code'] );
+		$this->assertContains( 'Task creation failed', array_column( DummyErrorHandler::$logs, 'message' ) );
+
+		$block = static function () {
+			return new \WP_Error( 'blocked', 'Scheduling is blocked.' );
+		};
+		add_filter( 'pre_schedule_event', $block );
+		$error = $this->call_tool( 'optional', array( 'value' => 1 ) )['error'];
+		remove_filter( 'pre_schedule_event', $block );
+		$this->assertSame( -32603, $error['code'] );
+		$this->assertSame( 0, self::$executions );
+
+		// A filter that returns something else leaves the default store in place.
+		add_filter( 'mcp_adapter_task_store', '__return_false' );
+		$this->assertInstanceOf( OptionsTaskStore::class, McpTaskManager::store() );
+		remove_filter( 'mcp_adapter_task_store', '__return_false' );
+	}
+
+	/** The options store refuses malformed input and missing tasks. */
+	public function test_options_store_edges(): void {
+		$store = new OptionsTaskStore();
+
+		$this->assertFalse( $store->create( array( 'status' => 'queued' ) ) );
+		$this->assertNull( $store->transition( str_repeat( 'c', 40 ), array( 'queued' ), array( 'status' => 'running' ) ) );
+
+		// A stored value without the fields a task needs is treated as missing.
+		$task_id = str_repeat( 'd', 40 );
+		$this->assertTrue( $store->create( array( 'id' => $task_id ) ) );
+		$this->assertSame( -32602, $this->task_request( 'tasks/get', $task_id )['error']['code'] );
+		do_action( McpTaskManager::RUN_HOOK, $task_id );
+		$this->assertSame( array( 'id' => $task_id ), $store->get( $task_id ) );
+	}
+
+	/** The gateway filter leaves other tools and unknown abilities alone. */
+	public function test_execute_ability_task_support_filter_edges(): void {
+		$gateway = $this->server->get_mcp_tool( 'mcp-adapter-execute-ability' );
+		$other   = $this->server->get_mcp_tool( 'test-task-optional' );
+		$this->assertInstanceOf( McpTool::class, $gateway );
+		$this->assertInstanceOf( McpTool::class, $other );
+
+		$this->assertSame( 'required', ExecuteAbilityAbility::task_support( 'required', array( 'ability_name' => 'test/task-optional' ), $other ) );
+		$this->assertNull( ExecuteAbilityAbility::task_support( null, array( 'ability_name' => 'test/does-not-exist' ), $gateway ) );
+		$this->assertNull( ExecuteAbilityAbility::task_support( null, 'not-an-array', $gateway ) );
+		$this->assertSame( 'required', ExecuteAbilityAbility::task_support( null, array( 'ability_name' => 'test/task-required' ), $gateway ) );
+		$this->assertNull( $gateway->get_task_support( array( 'ability_name' => 'mcp-adapter/discover-abilities' ) ) );
 	}
 
 	/** An unknown `meta.mcp.task` value keeps the ability from becoming a tool. */
