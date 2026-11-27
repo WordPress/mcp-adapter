@@ -57,6 +57,10 @@ The `type` parameter specifies how the ability should be exposed in the MCP serv
 
 If not specified, abilities default to `type: 'tool'`.
 
+### Background tasks
+
+Set `meta.mcp.task` to `optional` or `required` to let calls to a long-running ability run in the background. See [Background tasks](tasks.md).
+
 ## Ability categories (required)
 
 Every ability **must** declare a `category`, and that category must already be registered when `wp_register_ability()` runs. If you omit `category` or use one that isn't registered, `wp_register_ability()` returns `null` and the ability never appears. There is no `WP_Error`; core calls `_doing_it_wrong()`, which only surfaces a PHP notice when `WP_DEBUG` is on. With `WP_DEBUG` off (typical on production) the failure looks completely silent.
