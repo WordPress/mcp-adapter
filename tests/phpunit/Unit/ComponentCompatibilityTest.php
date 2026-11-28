@@ -57,19 +57,36 @@ final class ThrowingCompatibilityPromptBuilder extends McpPromptBuilder {
 /** Protects component behavior that remains independent of schema representation. */
 final class ComponentCompatibilityTest extends TestCase {
 
-	public function test_ability_backed_resource_with_object_input_schema_executes(): void {
+	public function resource_input_schemas(): array {
+		return array(
+			'object'    => array( array( 'type' => 'object' ), array() ),
+			'nullable'  => array( array( 'type' => array( 'object', 'null' ) ), null ),
+			'no schema' => array( array(), null ),
+			'default'   => array(
+				array(
+					'type'    => 'object',
+					'default' => array(),
+				),
+				array(),
+			),
+		);
+	}
+
+	/** @dataProvider resource_input_schemas */
+	public function test_ability_backed_resource_with_object_input_schema_executes( array $input_schema, $expected_input ): void {
 		$this->register_ability_in_hook(
 			'test/resource-object-schema',
 			array(
 				'label'               => 'Resource Object Schema',
 				'description'         => 'Ability-backed resource with an object input schema',
 				'category'            => 'test',
-				'input_schema'        => array( 'type' => 'object' ),
-				'execute_callback'    => static function ( $input ) {
-					return array() === $input ? 'object schema content' : 'unexpected input';
+				'input_schema'        => $input_schema,
+				'execute_callback'    => static function ( $input = null ) use ( $expected_input ) {
+					return $expected_input === $input ? 'object schema content' : 'unexpected input';
 				},
-				'permission_callback' => static function ( $input ) {
-					return array() === $input;
+				'permission_callback' => static function ( $input = null ) use ( $expected_input, $input_schema ) {
+					// Core applies defaults on execution, after the direct permission check.
+					return $expected_input === $input || ( array_key_exists( 'default', $input_schema ) && null === $input );
 				},
 				'meta'                => array(
 					'mcp' => array(
@@ -88,7 +105,7 @@ final class ComponentCompatibilityTest extends TestCase {
 			$mcp_resource = McpResource::fromAbility( $ability );
 			$this->assertNotWPError( $mcp_resource );
 
-			// The uri is protocol-level, so the ability must receive [], not null.
+			// The uri is protocol-level; only the schema determines ability input.
 			$permission = $mcp_resource->check_permission( array( 'uri' => 'WordPress://local/resource-object-schema' ) );
 			$this->assertTrue( $permission );
 

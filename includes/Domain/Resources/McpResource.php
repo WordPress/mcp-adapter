@@ -255,7 +255,7 @@ final class McpResource implements McpComponentInterface {
 		// resources/read params are protocol-level, so the ability gets no input.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
-			$args    = AbilityArgumentNormalizer::normalize( $ability, array() );
+			$args    = AbilityArgumentNormalizer::normalize( $ability, null );
 
 			return self::guard( 'mcp_execution_failed', static fn() => $ability->execute( $args ) );
 		}
@@ -280,7 +280,7 @@ final class McpResource implements McpComponentInterface {
 		// resources/read params are protocol-level, so the ability gets no input.
 		if ( null !== $this->ability ) {
 			$ability = $this->ability;
-			$args    = AbilityArgumentNormalizer::normalize( $ability, array() );
+			$args    = AbilityArgumentNormalizer::normalize( $ability, null );
 
 			return self::guard( 'mcp_permission_check_failed', static fn() => $ability->check_permissions( $args ) );
 		}
